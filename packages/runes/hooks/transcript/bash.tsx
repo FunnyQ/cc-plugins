@@ -2,33 +2,13 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
-import { bubble, foldRows, isLight, paint, runLine } from "./bubble";
+import { bubble, foldRows, isLight, memo, paint, PALETTES, runLine } from "./bubble";
 import { glow } from "./glow";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
 import { innerWidth, wrapRuns } from "./text";
 
 type Style = { color?: string; bold?: boolean; italic?: boolean };
-
-// text stands in for the terminal's foreground, which has no hex to mute
-// dim replaces dimColor, which lit every card's dim text at once under any pointer, live
-// move these into config.yaml if anyone wants to retheme
-const PALETTES = {
-  dark: {
-    text: "#d4d4d4",
-    dim: "#8a8a8a",
-    str: "#b5bd68",
-    var: "#b294bb",
-    op: "#de935f",
-  },
-  light: {
-    text: "#4d4d4c",
-    dim: "#8e908c",
-    str: "#718c00",
-    var: "#8959a8",
-    op: "#f5871f",
-  },
-};
 
 const shell = (p: (typeof PALETTES)["dark"]): Partial<Record<Kind, Style>> => ({
   prompt: { color: p.dim },
@@ -41,15 +21,7 @@ const shell = (p: (typeof PALETTES)["dark"]): Partial<Record<Kind, Style>> => ({
 const SHELL = { dark: shell(PALETTES.dark), light: shell(PALETTES.light) };
 
 // a finished card's command and output never change, yet every redraw re-tokenized, re-parsed and re-wrapped them
-const MEMO_SIZE = 200;
-const memo = new Map<string, unknown>();
-const remember = <V,>(key: string, make: () => V): V => {
-  if (memo.has(key)) return memo.get(key) as V;
-  const value = make();
-  memo.set(key, value);
-  if (memo.size > MEMO_SIZE) memo.delete(memo.keys().next().value!);
-  return value;
-};
+const remember = memo();
 
 // a progress bar redraws its line with \r, so only the text after the last one is what the terminal showed
 const toRuns = (text: unknown, color?: string): Run[][] =>
@@ -102,6 +74,8 @@ export const bash = (on: On) => {
       };
       const id = e.requestId;
       const inner = innerWidth(e.viewport?.columns);
+      // the call keeps two columns free on its right, so the output card under it reaches past its edge
+      const callInner = inner - 2;
       const isBad = isErrored || isInterrupted;
       const tint = isBad ? error_color : color;
 
@@ -138,15 +112,15 @@ export const bash = (on: On) => {
         return s.color ? { ...s, ...paint(s.color, callScope) } : s;
       };
       // the link runs through the middle column of the call card, and the output card meets it there
-      const linkAt = Math.floor((inner + 4) / 2);
+      const linkAt = Math.floor((callInner + 4) / 2);
 
       const state = isInterrupted
         ? " · interrupted"
         : isRunning
           ? " · running"
           : "";
-      const lines = remember(`cmd\0${id}\0${inner}\0${command.length}`, () =>
-        layout(command, inner),
+      const lines = remember(`cmd\0${id}\0${callInner}\0${command.length}`, () =>
+        layout(command, callInner),
       );
       const call = bubble(
         { Box, Text },
@@ -156,13 +130,13 @@ export const bash = (on: On) => {
           icon,
           title: `${description ?? "Bash"}${state}`,
           side,
-          inner,
+          inner: callInner,
           rows: [
             ...visible("cmd", lines).map((line, i): [string, unknown] => [
               `cmd:${i}`,
               runLine(Text, line, tokenStyle, { hover: { scope: callScope } }),
             ]),
-            ...fold("cmd", lines.length, callScope, inner),
+            ...fold("cmd", lines.length, callScope, callInner),
           ],
           link: isRunning ? undefined : { to: "down", at: linkAt },
           bar: false,
@@ -243,7 +217,7 @@ export const bash = (on: On) => {
               icon: outputIcon,
               title: isBad ? "error" : "output",
               side,
-              // two columns in, and two narrower, so its right edge stays under the call's
+              // two columns in, and two narrower, so its right edge stays with the other bubbles
               inner: inner - 2,
               indent: 2,
               rows: outRows,

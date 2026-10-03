@@ -28,6 +28,9 @@ const BY_EXT: Record<string, string> = {
   md: "markdown",
 };
 
+export const languageOf = (path: string): string | undefined =>
+  BY_EXT[path.split(".").pop()!.toLowerCase()];
+
 const READERS = new Set(["cat", "head", "tail", "bat", "sed"]);
 
 // glow only helps output whose language is known: raw text through it turns `#` lines into headings and `-` lines into bullets
@@ -53,5 +56,5 @@ export const language = (
   // a count like `head -n 5` is a bare word too, so a file is a word with an extension
   const files = rest.filter((t) => t.kind === "text" && /\.\w+$/.test(t.text));
   if (files.length !== 1) return undefined;
-  return BY_EXT[files[0]!.text.split(".").pop()!.toLowerCase()];
+  return languageOf(files[0]!.text);
 };

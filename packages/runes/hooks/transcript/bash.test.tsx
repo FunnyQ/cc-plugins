@@ -2,7 +2,7 @@ import { expect, test, type Engine } from "claude-code/testing";
 
 import { mute } from "./bubble";
 import { xterm256 } from "./ansi";
-import { CONFIG, eventually, startSession } from "./test-session";
+import { CONFIG, eventually, startSession, find, within, ran } from "./test-session";
 
 const CALL = (
   input: Record<string, unknown>,
@@ -43,35 +43,7 @@ const OUT = (stdout: string, stderr = "") => ({
   interrupted: false,
 });
 
-const find = async (
-  $: Engine,
-  event: never,
-  query: Parameters<Awaited<ReturnType<Engine["ui"]["mount"]>>["find"]>[0],
-) => {
-  const row = await $.ui.mount(event);
-  const found = await row.find(query);
-  await row.unmount();
-  return found;
-};
 
-type Node = { children?: unknown[] };
-// find() drops an element's own hover, which sits beside its props; its children keep theirs
-const within = async ($: Engine, event: never, key: string, text: RegExp) => {
-  const walk = (n: Node): Node | undefined => {
-    for (const c of n.children ?? []) {
-      if (typeof c !== "object" || c === null) continue;
-      const own = ((c as Node).children ?? []).filter(
-        (x) => typeof x === "string",
-      );
-      if (own.length && text.test(own.join(""))) return c as Node;
-      const hit = walk(c as Node);
-      if (hit) return hit;
-    }
-    return undefined;
-  };
-  const card = await find($, event, { key });
-  return card ? walk(card) : undefined;
-};
 
 test("a Bash call draws its description in the header and the command after a $", async ($, on) => {
   await startSession($, on);
@@ -143,22 +115,22 @@ test("Bash cards draw no bar, and the link runs down the middle column", async (
   const result = RESULT({ stdout: "ok", stderr: "" });
   const card = await find($, result, { key: "bash:output" });
   expect(card?.children?.[0]?.props?.backgroundColor).toBeUndefined();
-  // 60 columns leave a 53-cell inner, so the 57-cell frame's middle is column 28
+  // 60 columns leave a 53-cell inner; the call keeps 2 columns free on its right, so its 55-cell frame's middle is column 27
   const tee = await find($, result, { type: "Text", text: /┬/ });
   const stem = await find($, result, { type: "Text", text: /^\s{2,}│$/ });
-  expect(String(tee?.text).indexOf("┬")).toBe(28);
+  expect(String(tee?.text).indexOf("┬")).toBe(27);
   // the ┬ meets the ┴ directly, so the link takes no row of its own
   expect(stem).toBeUndefined();
   expect(
     await find($, result, { type: "Text", text: "\u{EF11}  output " }),
   ).toBeDefined();
-  // the output card sits two columns in, so its frame's column 26 is the call's 28;
+  // the output card sits two columns in, so its frame's column 25 is the call's 27;
   // its ┴ sits in the rule after "╭─ <icon>  output ", which starts at column 13
   expect(await find($, result, { key: "bash:output" })).toMatchObject({
     props: { marginLeft: 2 },
   });
   const elbow = await find($, result, { type: "Text", text: /┴/ });
-  expect(String(elbow?.text).indexOf("┴")).toBe(26 - 13);
+  expect(String(elbow?.text).indexOf("┴")).toBe(25 - 13);
 });
 
 test("an empty Bash result says so", async ($, on) => {
@@ -190,10 +162,10 @@ test("enabled.bash: false hands both rows to the engine", async ($, on) => {
 test("another tool's row is left to the engine", async ($, on) => {
   engine(on);
   await startSession($, on);
-  const call = CALL({ file_path: "/a" }) as unknown as { props: object };
-  const read = { ...call, props: { ...call.props, tool: "Read" } } as never;
-  expect(await find($, read, { key: "bash" })).toBeUndefined();
-  expect(await find($, read, { type: "Text", text: "engine" })).toBeDefined();
+  const call = CALL({ pattern: "x" }) as unknown as { props: object };
+  const grep = { ...call, props: { ...call.props, tool: "Grep" } } as never;
+  expect(await find($, grep, { key: "bash" })).toBeUndefined();
+  expect(await find($, grep, { type: "Text", text: "engine" })).toBeDefined();
 });
 
 test("a Bash call highlights the command name and its flags", async ($, on) => {
@@ -237,17 +209,19 @@ test("a foldable card folds and unfolds from a full-width row under a divider", 
   expect(await row.find({ key: "cmd:2" })).toBeUndefined();
   expect(await row.find({ key: "cmd:toggle" })).toBeUndefined();
   expect(await row.find({ type: "Text", text: /^├─+┤$/ })).toBeDefined();
-  // the label pads to the 53-cell inner width, so the whole row takes the press
+  // the label pads to the call's 51-cell inner width, so the whole row takes the press
   const more = await row.find({ key: "cmd:more" });
   expect(more?.text.trim()).toBe("▸ 2 more lines");
-  expect(more?.text.length).toBe(53);
+  expect(more?.text.length).toBe(51);
   await row.press({ key: "cmd:more" });
   expect(await row.find({ key: "cmd:2" })).toBeDefined();
   expect((await row.find({ key: "cmd:more" }))?.text.trim()).toBe("▾ fold");
   await row.press({ key: "cmd:more" });
   expect(await row.find({ key: "cmd:2" })).toBeUndefined();
   await row.unmount();
-  expect(await find($, CALL({ command: "ls" }), { key: "cmd:more" })).toBeUndefined();
+  expect(
+    await find($, CALL({ command: "ls" }), { key: "cmd:more" }),
+  ).toBeUndefined();
 });
 
 test("plain text rests a muted grey and lights to a light grey under its own card's pointer", async ($, on) => {
@@ -269,13 +243,14 @@ test("plain text rests a muted grey and lights to a light grey under its own car
 test("a card is only as wide as its frame, so the pointer beside it does not light it", async ($, on) => {
   await startSession($, on);
   const result = RESULT(OUT("ok"));
-  expect(await find($, result, { key: "bash" })).toMatchObject({ props: { alignSelf: "flex-start" } });
-  expect(await find($, result, { key: "bash:output" })).toMatchObject({ props: { alignSelf: "flex-start" } });
+  expect(await find($, result, { key: "bash" })).toMatchObject({
+    props: { alignSelf: "flex-start" },
+  });
+  expect(await find($, result, { key: "bash:output" })).toMatchObject({
+    props: { alignSelf: "flex-start" },
+  });
 });
 
-const ran = (stdout: string) => ({
-  value: { exitCode: 0, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
-});
 
 test("a JSON result goes through glow as a json fence and draws its colours, muted", async ($, on) => {
   const stdins: string[] = [];
@@ -283,12 +258,17 @@ test("a JSON result goes through glow as a json fence and draws its colours, mut
     run: (e) => {
       stdins.push(e.init?.stdin ?? "");
       // glow's margin plus the code block's own indent, then chroma's colours
-      return ran('\n    \x1b[38;5;187m{\x1b[0m\x1b[38;5;140m"a"\x1b[0m\x1b[38;5;187m}\x1b[0m\n\n');
+      return ran(
+        '\n    \x1b[38;5;187m{\x1b[0m\x1b[38;5;140m"a"\x1b[0m\x1b[38;5;187m}\x1b[0m\n\n',
+      );
     },
   });
   const result = RESULT(OUT('{"a":1}\n'));
   expect(
-    await eventually(async () => (await within($, result, "bash:output", /^"a"$/)) !== undefined),
+    await eventually(
+      async () =>
+        (await within($, result, "bash:output", /^"a"$/)) !== undefined,
+    ),
   ).toBe(true);
   expect(stdins).toContain('```json\n{"a":1}\n```');
   expect(await within($, result, "bash:output", /^"a"$/)).toMatchObject({
@@ -301,8 +281,17 @@ test("a JSON result goes through glow as a json fence and draws its colours, mut
 
 test("output of no known language never reaches glow", async ($, on) => {
   const stdins: string[] = [];
-  await startSession($, on, { run: (e) => (stdins.push(e.init?.stdin ?? ""), ran("")) });
-  expect(await within($, RESULT(OUT("# total 3\n- 42 pass")), "bash:output", /^# total 3$/)).toBeDefined();
+  await startSession($, on, {
+    run: (e) => (stdins.push(e.init?.stdin ?? ""), ran("")),
+  });
+  expect(
+    await within(
+      $,
+      RESULT(OUT("# total 3\n- 42 pass")),
+      "bash:output",
+      /^# total 3$/,
+    ),
+  ).toBeDefined();
   await new Promise((r) => setTimeout(r, 20));
   expect(stdins.some((s) => s.includes("total 3"))).toBe(false);
 });
@@ -312,7 +301,9 @@ test("on a light terminal mute lifts a colour toward white instead of dimming it
 });
 
 test("glow's light style switches the cards to the light palette", async ($, on) => {
-  await startSession($, on, { files: new Map([[CONFIG, "glow:\n  style: light\n"]]) });
+  await startSession($, on, {
+    files: new Map([[CONFIG, "glow:\n  style: light\n"]]),
+  });
   expect(
     await within($, CALL({ command: "bun test --parallel" }), "bash", /^test$/),
   ).toMatchObject({
@@ -320,7 +311,12 @@ test("glow's light style switches the cards to the light palette", async ($, on)
     hover: { color: "#4d4d4c", scope: "t1:call" },
   });
   expect(
-    await within($, CALL({ command: "bun test --parallel" }), "bash", /^--parallel$/),
+    await within(
+      $,
+      CALL({ command: "bun test --parallel" }),
+      "bash",
+      /^--parallel$/,
+    ),
   ).toMatchObject({
     props: { color: mute("#8e908c", true) },
     hover: { color: "#8e908c", scope: "t1:call" },

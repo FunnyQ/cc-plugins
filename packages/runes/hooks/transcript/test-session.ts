@@ -101,3 +101,39 @@ export const eventually = async (check: () => Promise<boolean>) => {
   }
   return false;
 };
+
+type Mounted = Awaited<ReturnType<Engine["ui"]["mount"]>>;
+
+// mounts one row, runs one query and unmounts it again
+export const find = async (
+  $: Engine,
+  event: never,
+  query: Parameters<Mounted["find"]>[0],
+) => {
+  const row = await $.ui.mount(event);
+  const found = await row.find(query);
+  await row.unmount();
+  return found;
+};
+
+type Node = { children?: unknown[] };
+// find() drops an element's own hover, which sits beside its props; its children keep theirs
+export const within = async ($: Engine, event: never, key: string, text: RegExp) => {
+  const walk = (n: Node): Node | undefined => {
+    for (const c of n.children ?? []) {
+      if (typeof c !== "object" || c === null) continue;
+      const own = ((c as Node).children ?? []).filter((x) => typeof x === "string");
+      if (own.length && text.test(own.join(""))) return c as Node;
+      const hit = walk(c as Node);
+      if (hit) return hit;
+    }
+    return undefined;
+  };
+  const card = await find($, event, { key });
+  return card ? walk(card) : undefined;
+};
+
+// what a process.run hook answers for a command that printed `stdout`
+export const ran = (stdout: string) => ({
+  value: { exitCode: 0, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
+});

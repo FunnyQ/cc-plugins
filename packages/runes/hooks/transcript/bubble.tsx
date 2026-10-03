@@ -1,6 +1,6 @@
-import type { Elements } from "claude-code";
+import type { Elements, On } from "claude-code";
 
-import { config, type Side } from "../config";
+import { config, type Rune, type Side } from "../config";
 import { hex } from "./ansi";
 import { cells, wrap } from "./text";
 
@@ -33,6 +33,68 @@ const muted = new Map<string, string>();
 // glow's light style is the one sign of a light terminal the config carries
 export const isLight = () => config.glow.style === "light";
 
+// text stands in for the terminal's foreground, which has no hex to mute
+// dim replaces dimColor, which lit every card's dim text at once under any pointer, live
+// move these into config.yaml if anyone wants to retheme
+export const PALETTES = {
+  dark: {
+    text: "#d4d4d4",
+    dim: "#8a8a8a",
+    str: "#b5bd68",
+    var: "#b294bb",
+    op: "#de935f",
+  },
+  light: {
+    text: "#4d4d4c",
+    dim: "#8e908c",
+    str: "#718c00",
+    var: "#8959a8",
+    op: "#f5871f",
+  },
+};
+
+export const palette = () => PALETTES[isLight() ? "light" : "dark"];
+
+// a finished card's content never changes, yet every redraw re-derived it; each card keeps its own, so one kind never evicts another's
+export const memo = (size = 200) => {
+  const cache = new Map<string, unknown>();
+  return <V,>(key: string, make: () => V): V => {
+    if (cache.has(key)) return cache.get(key) as V;
+    const value = make();
+    cache.set(key, value);
+    if (cache.size > size) cache.delete(cache.keys().next().value!);
+    return value;
+  };
+};
+
+// the title's tail for a call still running or cut short
+export const stateOf = (p: { isRunning: boolean; isInterrupted: boolean }) =>
+  p.isInterrupted ? " · interrupted" : p.isRunning ? " · running" : "";
+
+// the text the model read for a call that errored, wrapped to the card
+export const errorRows = (
+  Text: Elements["terminal"]["Text"],
+  text: string,
+  width: number,
+  color: string,
+): [string, unknown][] =>
+  wrap(text.replace(/\n+$/, ""), width).map((line, i) => [
+    `err:${i}`,
+    <Text color={color}>{line}</Text>,
+  ]);
+
+// a card that draws its call's result makes the engine's own block under it a repeat, so that block draws empty
+export const hideResult = (on: On, tool: string, rune: Rune) =>
+  on(
+    "ui.render",
+    { component: "ToolResult", props: { tool } },
+    ($, e, next) => {
+      if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
+      const { Box } = $.ui.resolve(e);
+      return <Box key={`${rune}:result`} />;
+    },
+  );
+
 // pulls each channel halfway to the colour's grey, then moves it a quarter toward the background,
 // so the hue stays at lower saturation and contrast
 export const mute = (color: string, light = isLight()) => {
@@ -59,8 +121,35 @@ export const DIVIDER = Symbol("divider");
 export const paint = (color: string, scope?: string) =>
   scope ? { color: mute(color), hover: { color, scope } } : { color };
 
-// a divider, then the fold label centred on a Button padded to the row: Box takes no onPress,
-// so the padding is what makes the whole row the press target
+// a Button padded to the row: Box takes no onPress, so the padding is what makes the whole row the press target
+export const pressRow = (
+  Button: Elements["terminal"]["Button"],
+  {
+    key,
+    text,
+    width,
+    onPress,
+    hover,
+    align = "left",
+  }: {
+    key: string;
+    text: string;
+    width: number;
+    onPress: () => void;
+    hover?: { color: string; scope: string };
+    align?: "left" | "center";
+  },
+) => {
+  const room = Math.max(0, width - cells(text));
+  const left = align === "center" ? Math.floor(room / 2) : 0;
+  return (
+    <Button key={key} plain {...(hover ? { hover } : {})} onPress={onPress}>
+      {`${" ".repeat(left)}${text}${" ".repeat(room - left)}`}
+    </Button>
+  );
+};
+
+// a divider, then the fold label centred on a full-row Button
 export const foldRows = (
   Button: Elements["terminal"]["Button"],
   {
@@ -80,16 +169,49 @@ export const foldRows = (
   },
 ): [string, unknown][] => {
   const text = isOpen ? "▾ fold" : `▸ ${hidden} more lines`;
-  const left = Math.max(0, Math.floor((width - cells(text)) / 2));
-  const right = Math.max(0, width - cells(text) - left);
   return [
     [`${key}:divider`, DIVIDER],
     [
       `${key}:more:row`,
-      <Button key={`${key}:more`} plain {...(hover ? { hover } : {})} onPress={onPress}>
-        {`${" ".repeat(left)}${text}${" ".repeat(right)}`}
-      </Button>,
+      pressRow(Button, { key: `${key}:more`, text, width, onPress, hover, align: "center" }),
     ],
+  ];
+};
+
+// a toggle row that folds a whole section away; open, the body follows and a fold row closes it from its end.
+// body is a function, so a folded section derives nothing
+export const foldSection = (
+  Button: Elements["terminal"]["Button"],
+  {
+    key,
+    label,
+    isOpen,
+    width,
+    onPress,
+    body,
+  }: {
+    key: string;
+    label: string;
+    isOpen: boolean;
+    width: number;
+    onPress: () => void;
+    body: () => [string, unknown][];
+  },
+): [string, unknown][] => {
+  const toggle: [string, unknown] = [
+    `${key}:toggle:row`,
+    pressRow(Button, {
+      key: `${key}:toggle`,
+      text: `${isOpen ? "▾" : "▸"} ${label}`,
+      width,
+      onPress,
+    }),
+  ];
+  if (!isOpen) return [toggle];
+  return [
+    toggle,
+    ...body(),
+    ...foldRows(Button, { key: `${key}:end`, isOpen: true, hidden: 0, width, onPress }),
   ];
 };
 
