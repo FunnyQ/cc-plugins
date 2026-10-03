@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { CONFIG, startSession, find } from "./test-session";
+import { CONFIG, HOME, eventually, startSession, find } from "./test-session";
 
 const CALL = (
   more: Record<string, unknown> = {},
@@ -42,7 +42,7 @@ const FORKED = {
   result: "Committed 2 changes.\nAll clean.",
 };
 
-test("an inline skill draws its name, model, args and tool count", async ($, on) => {
+test("an inline skill draws its name, model, args and success", async ($, on) => {
   await startSession($, on);
   const card = CALL({ output: INLINE });
   expect(await find($, card, { key: "skill" })).toBeDefined();
@@ -51,25 +51,18 @@ test("an inline skill draws its name, model, args and tool count", async ($, on)
   ).toBeDefined();
   expect(await find($, card, { type: "Text", text: "simple" })).toBeDefined();
   expect(
-    await find($, card, { type: "Text", text: "inline · 2 tools" }),
+    await find($, card, {
+      type: "Text",
+      text: "success",
+    }),
   ).toBeDefined();
   expect(await find($, card, { key: "result:toggle" })).toBeUndefined();
-});
-
-test("a read-only load says so", async ($, on) => {
-  await startSession($, on);
-  const card = CALL({
-    output: { ...INLINE, allowedTools: undefined, readOnly: true },
-  });
-  expect(
-    await find($, card, { type: "Text", text: "inline · read-only" }),
-  ).toBeDefined();
 });
 
 test("a forked skill folds its result, unfolding with a fold row at its end", async ($, on) => {
   await startSession($, on);
   const row = await $.ui.mount(CALL({ output: FORKED }));
-  expect(await row.find({ type: "Text", text: "forked · ag9" })).toBeDefined();
+  expect(await row.find({ type: "Text", text: "success" })).toBeDefined();
   expect((await row.find({ key: "result:toggle" }))?.text.trim()).toBe(
     "▸ result · 2 lines",
   );
@@ -142,4 +135,86 @@ test("enabled.skill: false hands the row to the engine", async ($, on) => {
       text: "engine",
     }),
   ).toBeDefined();
+});
+
+test("a skill that failed says so", async ($, on) => {
+  await startSession($, on);
+  const card = CALL({ output: { ...INLINE, success: false, allowedTools: [] } });
+  expect(
+    await find($, card, { type: "Text", text: "failed" }),
+  ).toBeDefined();
+});
+
+// records every path read, so a test can tell a SKILL.md stays unread until its fold opens
+class Reads extends Map<string, string> {
+  read: string[] = [];
+  override get(key: string) {
+    this.read.push(key);
+    return super.get(key);
+  }
+}
+
+const PLUGINS = `${HOME}/.claude/plugins/installed_plugins.json`;
+const ROOT = "/cache/chronicle/0.22.2";
+
+test("SKILL.md is read only once its fold is pressed, from the installed plugin's path", async ($, on) => {
+  const files = new Reads([
+    [
+      PLUGINS,
+      JSON.stringify({
+        version: 2,
+        plugins: { "chronicle@q-lab": [{ scope: "user", installPath: ROOT }] },
+      }),
+    ],
+    [`${ROOT}/skills/commit/SKILL.md`, "# Chronicle Commit\nOne agent."],
+  ]);
+  await startSession($, on, { files });
+  const row = await $.ui.mount(CALL({ output: INLINE }));
+  expect((await row.find({ key: "skill.md:toggle" }))?.text.trim()).toBe(
+    "▸ SKILL.md",
+  );
+  expect(files.read.filter((p) => p !== CONFIG)).toEqual([]);
+  await row.press({ key: "skill.md:toggle" });
+  expect(
+    await eventually(async () =>
+      Boolean(await row.find({ type: "Text", text: /One agent\./ })),
+    ),
+  ).toBe(true);
+  expect((await row.find({ key: "skill.md:toggle" }))?.text.trim()).toBe(
+    "▾ fold",
+  );
+  await row.press({ key: "skill.md:toggle" });
+  expect(await row.find({ type: "Text", text: /One agent\./ })).toBeUndefined();
+  expect((await row.find({ key: "skill.md:toggle" }))?.text.trim()).toBe(
+    "▸ SKILL.md · 2 lines",
+  );
+  await row.unmount();
+});
+
+test("a personal skill's SKILL.md is read from ~/.claude/skills", async ($, on) => {
+  await startSession($, on, {
+    files: new Map([
+      [`${HOME}/.claude/skills/tidy/SKILL.md`, "Tidy the tree."],
+    ]),
+  });
+  const row = await $.ui.mount(CALL({ output: INLINE }, { skill: "tidy" }));
+  await row.press({ key: "skill.md:toggle" });
+  expect(
+    await eventually(async () =>
+      Boolean(await row.find({ type: "Text", text: /Tidy the tree\./ })),
+    ),
+  ).toBe(true);
+  await row.unmount();
+});
+
+test("a skill with no SKILL.md on disk says so once opened", async ($, on) => {
+  await startSession($, on);
+  const row = await $.ui.mount(CALL({ output: INLINE }, { skill: "simplify" }));
+  await row.press({ key: "skill.md:toggle" });
+  expect(
+    await eventually(async () =>
+      Boolean(await row.find({ type: "Text", text: "(no SKILL.md found)" })),
+    ),
+  ).toBe(true);
+  await row.unmount();
 });
