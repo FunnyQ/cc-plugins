@@ -15,10 +15,12 @@ export const planLine = (plan: string) => `flightdeck plan: ${plan}`;
 
 export function parseArgs(
   argv: string[],
+  env: Record<string, string | undefined> = process.env,
 ): { ok: true; args: Args } | { ok: false; message: string } {
   let plan: string | undefined;
   let port = DEFAULT_PORT;
-  let open = true;
+  // under Claude Code the dispatch mod opens its pane instead, and the pane's button passes --open
+  let open = env.CLAUDECODE !== "1";
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -31,6 +33,8 @@ export function parseArgs(
       index += 1;
     } else if (argument === "--no-open") {
       open = false;
+    } else if (argument === "--open") {
+      open = true;
     }
   }
 

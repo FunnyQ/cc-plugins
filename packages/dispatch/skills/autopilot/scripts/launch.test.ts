@@ -7,7 +7,7 @@ import { parseArgs, planLine, validatePlanDir } from "./launch";
 
 describe("parseArgs", () => {
   test("parses valid arguments", () => {
-    expect(parseArgs(["--plan", "/plan", "--port", "6000"])).toEqual({
+    expect(parseArgs(["--plan", "/plan", "--port", "6000"], {})).toEqual({
       ok: true,
       args: { plan: "/plan", port: 6000, open: true },
     });
@@ -32,17 +32,24 @@ describe("parseArgs", () => {
   });
 
   test("suppresses opening the browser", () => {
-    expect(parseArgs(["--plan", "/plan", "--no-open"])).toEqual({
+    expect(parseArgs(["--plan", "/plan", "--no-open"], {})).toEqual({
       ok: true,
       args: { plan: "/plan", port: 5757, open: false },
     });
   });
 
   test("uses the default port", () => {
-    expect(parseArgs(["--plan", "/plan"])).toEqual({
+    expect(parseArgs(["--plan", "/plan"], {})).toEqual({
       ok: true,
       args: { plan: "/plan", port: 5757, open: true },
     });
+  });
+
+  test("under Claude Code the pane stands in, so the browser stays shut unless --open asks", () => {
+    const claude = { CLAUDECODE: "1" };
+    expect(parseArgs(["--plan", "/plan"], claude)).toMatchObject({ args: { open: false } });
+    expect(parseArgs(["--plan", "/plan", "--open"], claude)).toMatchObject({ args: { open: true } });
+    expect(parseArgs(["--plan", "/plan", "--no-open"], {})).toMatchObject({ args: { open: false } });
   });
 });
 
