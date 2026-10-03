@@ -3,6 +3,7 @@ import type { On } from 'claude-code'
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
+import { enabled } from '../switch'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
@@ -10,9 +11,6 @@ const DONE_MS = 5_000
 // 20x16 grid at 2 CSS px per pixel
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
-
-// the engine lists $.state refs per file, so each file spells this one out
-const RUNES_ON = { plugin: 'runes', key: 'enabled' } as const
 
 export const mascot = (on: On) => {
   const director = new Director()
@@ -40,16 +38,13 @@ export const mascot = (on: On) => {
     idleFor: isWorking ? 0 : (now - lastActiveAt) / 1000,
   })
 
-  // mirrors the switch for the tick; ui.render refreshes it, and a switch write redraws ui.render
-  let isOn = true
-
   // register.tsx holds the unmatched session.start; a mascot only matters where someone watches
   on('session.start', { isInteractive: true }, async ($, e, next) => {
     clip = director.next(inputs())
     $.clock.every(TICK_MS, () => {
       now += TICK_MS
       elapsed += TICK_MS
-      if (!isOn || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
+      if (enabled.clawd === false || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
       elapsed = 0
       index += 1
       if (index === CLIPS[clip]!.length) {
@@ -114,14 +109,12 @@ export const mascot = (on: On) => {
     return next(e)
   })
 
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    const { value: runes } = await $.state.get(RUNES_ON)
-    isOn = runes?.clawd !== false
-    if (!isOn || e.props.hasSurvey) return next(e)
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+    if (enabled.clawd === false || e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
-    const { Box } = $.ui.resolve(e)
+    const { Box, Image, Svg, Text } = $.ui.resolve(e)
     // bodyColumns, not the viewport: a docked pane narrows the band
     const right = (sprite: ReturnType<typeof h>) => (
       <Box key="clawd-row" flexDirection="row" justifyContent="flex-end" width={e.props.bodyColumns}>{sprite}</Box>
@@ -129,11 +122,8 @@ export const mascot = (on: On) => {
 
     if (e.surface === 'desktop') {
       isDesktop = true
-      const { Svg } = $.ui.resolve(e)
       return right(<Svg key="clawd" source={svg(clip, index)} alt={`Clawd ${clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
     }
-    const { Image, Text } = $.ui.resolve(e)
-
     // Raster refuses non-BMP characters, so octants go out as plain coloured Text
     if (useText) {
       return right(

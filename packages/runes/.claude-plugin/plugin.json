@@ -13,6 +13,5 @@
     "mod",
     "function-hooks",
     "animation"
-  ],
-  "types": "./types/index.d.ts"
+  ]
 }

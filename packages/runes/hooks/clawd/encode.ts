@@ -2,7 +2,6 @@ import { CLIPS, PALETTE } from './frames'
 
 // the hooks runtime has Uint8Array#toBase64; this tsconfig's lib predates it
 const toBase64 = (bytes: Uint8Array) => (bytes as Uint8Array & { toBase64(): string }).toBase64()
-const rgbaCache = new Map<string, string>()
 
 // Octant glyphs (Unicode 16) for a 2x4 bitmask, bit = row * 2 + column. U+1CD00 holds the
 // 230 patterns no older block character already drew, in ascending mask order.
@@ -14,18 +13,24 @@ const OLDER_BLOCKS: Record<number, number> = {
 let nextOctant = 0x1cd00
 export const OCTANT = Array.from({ length: 256 }, (_, mask) => OLDER_BLOCKS[mask] ?? nextOctant++)
 
+// every frame is drawn once per clip and index, then served from the cache
+const memo = <T>(draw: (clip: string, index: number) => T) => {
+  const cache = new Map<string, T>()
+  return (clip: string, index: number): T => {
+    const id = `${clip}/${index}`
+    if (!cache.has(id)) cache.set(id, draw(clip, index))
+    return cache.get(id)!
+  }
+}
+
 const hex = (rgb: number) => `#${rgb.toString(16).padStart(6, '0')}`
 const distance = (a: number, b: number) =>
   ((a >> 16) - (b >> 16)) ** 2 + (((a >> 8) & 255) - ((b >> 8) & 255)) ** 2 + ((a & 255) - (b & 255)) ** 2
 
 export type Run = { text: string; color?: string; backgroundColor?: string }
-const octantCache = new Map<string, Run[][]>()
 
 // a cell holds two colours; a third goes to the commonest so the silhouette survives (1.3% of pixels lost)
-export const octants = (clip: string, index: number): Run[][] => {
-  const id = `${clip}/${index}`
-  const hit = octantCache.get(id)
-  if (hit) return hit
+export const octants = memo((clip, index): Run[][] => {
   const grid = CLIPS[clip]![index]!.grid
   const rows = Array.from({ length: 4 }, (_, r) => {
     const runs: Run[] = []
@@ -49,9 +54,8 @@ export const octants = (clip: string, index: number): Run[][] => {
     }
     return runs
   })
-  octantCache.set(id, rows)
   return rows
-}
+})
 
 // The terminal stretches a picture to its box with linear filtering, so the blocks are
 // scaled here, nearest-neighbour, to about the box's own pixel size and stay sharp.
@@ -65,32 +69,21 @@ const CANVAS_WIDTH = IMAGE_COLUMNS * CELL_WIDTH
 const CANVAS_HEIGHT = IMAGE_ROWS * CELL_HEIGHT
 const TOP = CANVAS_HEIGHT - 16 * BLOCK
 
-export const pixels = (clip: string, index: number) => {
-  const id = `${clip}/${index}`
-  let rgba = rgbaCache.get(id)
-  if (!rgba) {
-    const grid = CLIPS[clip]![index]!.grid
-    const bytes = new Uint8Array(CANVAS_WIDTH * CANVAS_HEIGHT * 4)
-    for (let p = 0; p < 320; p++) {
-      if (grid[p] === '.') continue
-      const rgb = PALETTE[grid[p]!]!
-      const pixel = [rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255]
-      const x = (p % 20) * BLOCK, y = TOP + Math.floor(p / 20) * BLOCK
-      for (let dy = 0; dy < BLOCK; dy++) for (let dx = 0; dx < BLOCK; dx++) bytes.set(pixel, ((y + dy) * CANVAS_WIDTH + x + dx) * 4)
-    }
-    rgba = toBase64(bytes)
-    rgbaCache.set(id, rgba)
+export const pixels = memo((clip, index) => {
+  const grid = CLIPS[clip]![index]!.grid
+  const bytes = new Uint8Array(CANVAS_WIDTH * CANVAS_HEIGHT * 4)
+  for (let p = 0; p < 320; p++) {
+    if (grid[p] === '.') continue
+    const rgb = PALETTE[grid[p]!]!
+    const pixel = [rgb >> 16, (rgb >> 8) & 255, rgb & 255, 255]
+    const x = (p % 20) * BLOCK, y = TOP + Math.floor(p / 20) * BLOCK
+    for (let dy = 0; dy < BLOCK; dy++) for (let dx = 0; dx < BLOCK; dx++) bytes.set(pixel, ((y + dy) * CANVAS_WIDTH + x + dx) * 4)
   }
-  return { rgba, width: CANVAS_WIDTH, height: CANVAS_HEIGHT }
-}
-
-const svgCache = new Map<string, string>()
+  return { rgba: toBase64(bytes), width: CANVAS_WIDTH, height: CANVAS_HEIGHT }
+})
 
 // One <rect> per horizontal run of a colour; crispEdges keeps the pixels square when scaled.
-export const svg = (clip: string, index: number): string => {
-  const id = `${clip}/${index}`
-  const hit = svgCache.get(id)
-  if (hit) return hit
+export const svg = memo((clip, index): string => {
   const grid = CLIPS[clip]![index]!.grid
   const rects: string[] = []
   for (let y = 0; y < 16; y++) {
@@ -98,11 +91,9 @@ export const svg = (clip: string, index: number): string => {
       const c = grid[y * 20 + x]!
       let end = x + 1
       while (end < 20 && grid[y * 20 + end] === c) end++
-      if (c !== '.') rects.push(`<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="#${PALETTE[c]!.toString(16).padStart(6, '0')}"/>`)
+      if (c !== '.') rects.push(`<rect x="${x}" y="${y}" width="${end - x}" height="1" fill="${hex(PALETTE[c]!)}"/>`)
       x = end
     }
   }
-  const markup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 16" shape-rendering="crispEdges">${rects.join('')}</svg>`
-  svgCache.set(id, markup)
-  return markup
-}
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 16" shape-rendering="crispEdges">${rects.join('')}</svg>`
+})

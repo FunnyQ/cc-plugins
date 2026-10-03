@@ -1,41 +1,38 @@
 import type { Register } from 'claude-code'
 
 import { mascot } from './clawd/mascot'
-import { RUNES, type Rune } from './switch'
+import { enabled, RUNES } from './switch'
 
-// the engine lists $.state refs per file, so each file spells this one out
-const RUNES_ON = { plugin: 'runes', key: 'enabled' } as const
+const status = () => RUNES.map(r => `${r}: ${enabled[r] === false ? 'off' : 'on'}`).join(', ')
 
-// the switches live in $.state for the session, mirrored to $.store so they outlast it
+// each switch persists across sessions in $.store as `rune:<name>`; a rune never switched off is on
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    const enabled: Record<string, boolean> = {}
-    for (const r of RUNES) enabled[r] = (await $.store.get(`rune:${r}`)) !== false
-    await $.state.set(RUNES_ON, enabled)
-    await $.command.register({
-      name: 'runes',
-      description: 'Turn runes (UI mods) on or off',
-      argumentHint: `on|off|status, or <${RUNES.join('|')}> on|off`,
-    })
+    const [stored] = await Promise.all([
+      Promise.all(RUNES.map(r => $.store.get(`rune:${r}`))),
+      $.command.register({
+        name: 'runes',
+        description: 'Turn runes (UI mods) on or off',
+        argumentHint: `on|off|status, or <${RUNES.join('|')}> on|off`,
+      }),
+    ])
+    RUNES.forEach((r, i) => { enabled[r] = stored[i] !== false })
     return next(e)
   })
 
   on('command.run', { command: 'runes' }, async ($, e) => {
     const [first = 'status', second] = e.args.trim().split(/\s+/).filter(Boolean)
-    const { value: enabled = {} } = await $.state.get(RUNES_ON)
-    const status = (now: Record<string, boolean>) => RUNES.map(r => `${r}: ${now[r] === false ? 'off' : 'on'}`).join(', ')
-    const [targets, state] = (RUNES as readonly string[]).includes(first)
-      ? [[first as Rune], second]
-      : [[...RUNES], first]
-    if (state === 'status' || state === undefined) return { text: `Runes — ${status(enabled)}` }
+    const isRune = (RUNES as readonly string[]).includes(first)
+    const targets = isRune ? [first] : RUNES
+    const state = isRune ? second : first
+    if (state === 'status' || state === undefined) return { text: `Runes — ${status()}` }
     if (state !== 'on' && state !== 'off') return { text: `Usage: /runes on|off|status, or /runes <${RUNES.join('|')}> on|off` }
-    const next = { ...enabled }
-    for (const r of targets) {
-      next[r] = state === 'on'
-      await $.store.set(`rune:${r}`, next[r])
-    }
-    await $.state.set(RUNES_ON, next)
-    return { text: `Runes — ${status(next)}` }
+    await Promise.all(targets.map(r => {
+      enabled[r] = state === 'on'
+      return $.store.set(`rune:${r}`, enabled[r])
+    }))
+    $.ui.invalidate('ui.render')
+    return { text: `Runes — ${status()}` }
   })
 
   mascot(on)

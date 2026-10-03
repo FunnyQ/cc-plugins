@@ -1,3 +1,5 @@
-// every rune; a new rune adds its name here and its module to hooks.json
+// every rune; a new rune adds its name here and gates its hooks on `enabled[name]`
 export const RUNES = ['clawd'] as const
-export type Rune = (typeof RUNES)[number]
+
+// register.tsx loads this from $.store at session.start and redraws on every change; a missing rune is on
+export const enabled: Record<string, boolean> = {}
