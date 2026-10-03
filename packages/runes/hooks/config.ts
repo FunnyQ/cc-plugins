@@ -5,6 +5,10 @@ export const RUNES = [
   "prompt",
   "reply",
   "bash",
+  "read",
+  "edit",
+  "write",
+  "agent",
   "peer",
 ] as const;
 export type Rune = (typeof RUNES)[number];
@@ -22,6 +26,23 @@ type Config = {
     side: Side;
     fold_lines: number;
   };
+  read: { color: string; error_color: string; icon: string; side: Side };
+  edit: {
+    color: string;
+    error_color: string;
+    icon: string;
+    side: Side;
+    fold_lines: number;
+  };
+  write: {
+    color: string;
+    error_color: string;
+    icon: string;
+    replace_icon: string;
+    side: Side;
+    fold_lines: number;
+  };
+  agent: { color: string; error_color: string; icon: string; side: Side };
   peer: { color: string; icon: string; side: Side; fold_lines: number };
   glow: { style: string };
 };
@@ -45,6 +66,28 @@ export const DEFAULTS: Config = {
     side: "left",
     fold_lines: 8,
   },
+  // nf-md-file_document U+F0219, needs a Nerd Font
+  read: { color: "#6b8fb3", error_color: "#c94f4f", icon: "\u{F0219}", side: "left" },
+  // nf-md-pencil U+F03EB, needs a Nerd Font
+  edit: {
+    color: "#b8954a",
+    error_color: "#c94f4f",
+    icon: "\u{F03EB}",
+    side: "left",
+    fold_lines: 12,
+  },
+  // nf-md-file_plus U+F0752, needs a Nerd Font
+  write: {
+    color: "#4f9a94",
+    error_color: "#c94f4f",
+    icon: "\u{F0752}",
+    // nf-md-file_edit U+F11E7, for a Write over an existing file
+    replace_icon: "\u{F11E7}",
+    side: "left",
+    fold_lines: 12,
+  },
+  // nf-md-robot_outline U+F167A, needs a Nerd Font; peer's filled robot draws the hand-back
+  agent: { color: "#7f8fd1", error_color: "#c94f4f", icon: "\u{F167A}", side: "left" },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   glow: { style: "dark" },
@@ -84,6 +127,33 @@ transcript:
     # output_icon: "\\uEF11"   # Nerd Font glyph
     # side: ${DEFAULTS.bash.side}
     # fold_lines: ${DEFAULTS.bash.fold_lines}
+  read:
+    enabled: ${enabled.read}    # Read calls
+    # color: "${DEFAULTS.read.color}"
+    # error_color: "${DEFAULTS.read.error_color}"
+    # icon: "\\U000F0219"   # Nerd Font glyph
+    # side: ${DEFAULTS.read.side}
+  edit:
+    enabled: ${enabled.edit}    # Edit and Write calls, as a diff
+    # color: "${DEFAULTS.edit.color}"
+    # error_color: "${DEFAULTS.edit.error_color}"
+    # icon: "\\U000F03EB"   # Nerd Font glyph
+    # side: ${DEFAULTS.edit.side}
+    # fold_lines: ${DEFAULTS.edit.fold_lines}
+  write:
+    enabled: ${enabled.write}    # Write calls: a new file folded, a replaced one as a diff
+    # color: "${DEFAULTS.write.color}"
+    # error_color: "${DEFAULTS.write.error_color}"
+    # icon: "\\U000F0752"   # Nerd Font glyph, a new file
+    # replace_icon: "\\U000F11E7"   # Nerd Font glyph, a replaced file
+    # side: ${DEFAULTS.write.side}
+    # fold_lines: ${DEFAULTS.write.fold_lines}
+  agent:
+    enabled: ${enabled.agent}    # Agent calls: the task, its totals, and its prompt and report folded
+    # color: "${DEFAULTS.agent.color}"
+    # error_color: "${DEFAULTS.agent.error_color}"
+    # icon: "\\U000F167A"   # Nerd Font glyph
+    # side: ${DEFAULTS.agent.side}
   peer:
     enabled: ${enabled.peer}    # subagents' and other sessions' messages
     # color: "${DEFAULTS.peer.color}"
@@ -96,7 +166,17 @@ transcript:
 
 // the keys at each level in the order the template writes them; the bubbles and glow live under transcript
 const TOP = ["clawd", "transcript"] as const;
-const UNDER = ["prompt", "reply", "bash", "peer", "glow"] as const;
+const UNDER = [
+  "prompt",
+  "reply",
+  "bash",
+  "read",
+  "edit",
+  "write",
+  "agent",
+  "peer",
+  "glow",
+] as const;
 type Section = Rune | "glow";
 const pathOf = (s: Section): string[] =>
   (UNDER as readonly string[]).includes(s) ? ["transcript", s] : [s];
@@ -142,6 +222,33 @@ const RULES: {
     output_icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
     fold_lines: [isCount, "a whole number above 0"],
+  },
+  read: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+  },
+  edit: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+    fold_lines: [isCount, "a whole number above 0"],
+  },
+  write: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    replace_icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
+    fold_lines: [isCount, "a whole number above 0"],
+  },
+  agent: {
+    color: [isColor, "#rrggbb"],
+    error_color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
+    side: [isSide, "left | right"],
   },
   peer: {
     color: [isColor, "#rrggbb"],

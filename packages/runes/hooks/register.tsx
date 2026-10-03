@@ -14,11 +14,15 @@ import {
   upgrade,
   isComplete,
 } from "./config";
+import { agent } from "./transcript/agent";
 import { bash } from "./transcript/bash";
+import { edit } from "./transcript/edit";
 import { glow } from "./transcript/glow";
 import { prompt } from "./transcript/prompt";
 import { peer } from "./transcript/peer";
+import { read } from "./transcript/read";
 import { reply } from "./transcript/reply";
+import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
 
@@ -38,6 +42,7 @@ type Loaded = {
 // read on session.start and on every /runes, never while drawing
 const load = async ($: $): Promise<Loaded> => {
   const home = (await $.env.get("HOME")) ?? "";
+  where.home = home;
   const path = configPath(home);
   const parse = async (text: string) => {
     // a mod's child gets no HOME
@@ -100,6 +105,7 @@ const notice = (l: Loaded) =>
 
 export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
+    where.cwd = e.cwd;
     const [loaded] = await Promise.all([
       load($),
       $.command.register({
@@ -167,5 +173,8 @@ export const register: Register = (on) => {
   prompt(on);
   reply(on);
   bash(on);
+  read(on);
+  edit(on);
+  agent(on);
   peer(on);
 };

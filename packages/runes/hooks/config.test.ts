@@ -18,6 +18,10 @@ const CURRENT = () => ({
     prompt: { enabled: true },
     reply: { enabled: true },
     bash: { enabled: true },
+    read: { enabled: true },
+    edit: { enabled: true },
+    write: { enabled: true },
+    agent: { enabled: true },
     peer: { enabled: true },
     glow: null,
   },
@@ -182,7 +186,9 @@ test("upgrade moves the oldest top-level enabled block into the nested sections"
   expect(out).toContain("  bash:\n    enabled: false    # Bash calls");
   expect(out).toContain("transcript:\n  enabled: true");
   // the commented defaults come with each block the template supplies
-  expect(out).toContain('  bash:\n    enabled: false    # Bash calls and their output\n    # color: "#5f8f6a"\n');
+  expect(out).toContain(
+    '  bash:\n    enabled: false    # Bash calls and their output\n    # color: "#5f8f6a"\n',
+  );
   expect(out).toContain("  glow:\n    # style: dark");
 });
 
