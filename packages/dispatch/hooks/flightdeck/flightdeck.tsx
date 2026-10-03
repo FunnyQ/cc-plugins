@@ -55,6 +55,8 @@ const toastText = (t: DeckTask) => {
 
 // a done task's tokens never change, so each is read once and kept; null marks a read that found none
 const tokens = new Map<string, number | null>();
+// the run total from the last --usage read, carried onto every later snapshot
+let runTokens: number | null = null;
 const unread = (s: DeckSnapshot | null) =>
   Object.values(s?.tasks ?? {}).some((t) => t.state === "done" && !tokens.has(t.ref));
 
@@ -73,6 +75,8 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
         if (withUsage && !tokens.has(t.ref)) tokens.set(t.ref, t.tokens);
         t.tokens = tokens.get(t.ref) ?? null;
       }
+      if (withUsage) runTokens = snapshot.tokens;
+      snapshot.tokens = runTokens;
       view = {
         snapshot,
         stale: false,
@@ -98,6 +102,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
   const gen = ++generation;
   current = plan;
   tokens.clear();
+  runTokens = null;
   view = EMPTY;
   lastOut = "";
   void publish($);
@@ -254,7 +259,7 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
-    const { top, cards, crew } = docked(s, width, Date.now(), stale);
+    const { head, bars, states, cards, crew } = docked(s, width, Date.now(), stale);
     // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
     const cardBox = (c: CardModel) => (
       <Box
@@ -291,11 +296,8 @@ export const flightdeck = (on: On) => {
     return (
       // the top row clears the pane's close mark, which sits over the body's first line
       <Box flexDirection="column" paddingTop={1}>
-        {top.slice(0, 2).map(row)}
-        <Box flexDirection="row" justifyContent="center">
-          {row(top[2]!)}
-        </Box>
-        {top.slice(3).map(row)}
+        {head.map(row)}
+        {bars.map(row)}
         {crew.length > 0 && (
           <Box
             key="loose-agents"
@@ -308,6 +310,9 @@ export const flightdeck = (on: On) => {
           </Box>
         )}
         {row([])}
+        <Box flexDirection="row" justifyContent="center">
+          {row(states)}
+        </Box>
         {cards.groups.map((g) => (
           <Box flexDirection="row">
             <Text>{g.label}</Text>

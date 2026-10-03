@@ -2,7 +2,7 @@ import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./t
 
 // Width is text.length: every glyph used here (✓ ● ○ · ✗ █ ░ … —) is one BMP code unit drawn one column wide.
 
-// `ref` is set only on card segments; the mod makes those pressable.
+// `ref` is set only on card segments; the mod makes those pressable
 // `fill` marks the one segment the mod lets the layout stretch or truncate, so a line drawn wider than computed never wraps.
 export type Seg = { text: string; color?: string; dim?: boolean; ref?: string; fill?: boolean };
 export type Line = Seg[];
@@ -81,17 +81,22 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number)
       : state === "done"
         ? { text: "all done" }
         : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid };
-  const wall = s.time
-    ? ` · ${formatElapsed((s.time.endedAt === null ? now : Date.parse(s.time.endedAt)) - Date.parse(s.time.startedAt))}`
-    : "";
-  const fill = Math.max(1, w - s.slug.length - right.text.length - wall.length - 2);
+  const fill = Math.max(1, w - s.slug.length - right.text.length - 2);
   const title: Line = [
     { text: `${s.slug} ` },
     { text: RULE.repeat(fill), dim: true, fill: true },
     { text: " " },
     right,
-    ...(wall ? [{ text: wall }] : []),
   ];
+
+  // right-aligned under the count, the way the web header pairs wall time with the token rollup
+  const wall = s.time
+    ? formatElapsed((s.time.endedAt === null ? now : Date.parse(s.time.endedAt)) - Date.parse(s.time.startedAt))
+    : null;
+  const total = [wall, s.tokens === null ? null : `${formatTokens(s.tokens)} tok`].filter(Boolean).join(" · ");
+  const totals: Line = total
+    ? [{ text: " ".repeat(Math.max(0, w - total.length)), fill: true }, { text: total, dim: true }]
+    : [];
 
   const count = `${s.counts.done}/${s.counts.total}`;
   const progress: Line = [
@@ -114,7 +119,7 @@ export function summary(s: DeckSnapshot, stale: boolean, w: number, now: number)
     { text: "  " },
     pair("invalid", c.invalid, ""),
   ];
-  return [title, progress, states];
+  return [title, progress, totals, states];
 }
 
 export function compactSummary(s: DeckSnapshot, stale: boolean): Line {
@@ -275,9 +280,12 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
-): { top: Line[]; cards: WaveCards; crew: Line[] } {
+): { head: Line[]; bars: Line[]; states: Line; cards: WaveCards; crew: Line[] } {
+  const [title, progress, totals, states] = summary(s, stale, w, now);
   return {
-    top: [...summary(s, stale, w, now), ...bucketBars(s, w)].map((l) => clip(l, w)),
+    head: [title, progress, ...(totals.length > 0 ? [totals] : [])].map((l) => clip(l, w)),
+    bars: bucketBars(s, w).map((l) => clip(l, w)),
+    states: clip(states, w),
     cards: waveCards(s, w, now),
     // the crew box spends two columns on its border
     crew: crewLines(s, now).map((l) => clip(l, w - 2)),

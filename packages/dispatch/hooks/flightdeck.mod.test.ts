@@ -439,7 +439,8 @@ test("agents with no task sit in a bordered box above the waves; none means no b
   const texts = (await ui.findAll({ type: "Text" })).map((el) => el.text);
   const at = (needle: string) => texts.findIndex((t) => t.includes(needle));
   expect(at("scout scout-wave-2")).toBeGreaterThan(-1);
-  expect(at("scout scout-wave-2")).toBeLessThan(at("W1"));
+  expect(at("scout scout-wave-2")).toBeLessThan(at("running"));
+  expect(at("running")).toBeLessThan(at("W1"));
   expect(at("dev #2")).toBeGreaterThan(at("W1"));
   await ui.unmount();
 });
@@ -455,7 +456,10 @@ test("a pane with no taskless agents draws no agent box", async ($, on) => {
 test("a done task's tokens are read once, with --usage, and kept on later ticks", async ($, on) => {
   const w = world(on, (argv) => {
     const s = snap(argv[2]!);
-    if (argv.includes("--usage")) s.tasks["api/01"]!.tokens = 1_234_567;
+    if (argv.includes("--usage")) {
+      s.tasks["api/01"]!.tokens = 1_234_567;
+      s.tokens = 2_000_000;
+    }
     return { exitCode: 0, stdout: JSON.stringify(s) };
   });
   await run($, "/abs/docs/x");
@@ -465,6 +469,7 @@ test("a done task's tokens are read once, with --usage, and kept on later ticks"
   const texts = await drawnText($);
   expect(texts).toContain("3m12s");
   expect(texts).toContain("1.2M tok");
+  expect(texts).toContain("2.0M tok");
 });
 
 test("the inline seat draws two lines: the summary and the current wave's cards", async ($, on) => {
