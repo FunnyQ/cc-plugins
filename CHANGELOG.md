@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.7.2] - 2026-10-03
+
+_tracks tag `runes-v0.7.2`_
+
+### Fixed
+- Other plugins that render user and assistant messages now keep working alongside runes, because the prompt and reply bubbles no longer cut off the render chain.
+
 ## [runes 0.7.1] - 2026-10-03
 
 _tracks tag `runes-v0.7.1`_
