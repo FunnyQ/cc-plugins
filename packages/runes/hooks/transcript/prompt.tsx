@@ -2,7 +2,7 @@ import type { On } from "claude-code";
 
 import { enabled } from "../switch";
 import type { Run } from "./ansi";
-import { glow, glowArgv, toLines } from "./glow";
+import { GLOW_INIT, glow, glowArgv, toLines } from "./glow";
 
 // a prompt body taller than this folds to its head
 const FOLD_LINES = 6;
@@ -13,7 +13,8 @@ const ICON = "\u{F064C}";
 const CHROME = 7;
 
 // East Asian wide ranges and emoji take two cells
-const WIDE = /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6\u{1F300}-\u{1FAFF}]/u;
+const WIDE =
+  /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6\u{1F300}-\u{1FAFF}]/u;
 
 export const cells = (text: string): number =>
   [...text].reduce((n, ch) => n + (WIDE.test(ch) ? 2 : 1), 0);
@@ -77,23 +78,15 @@ export const prompt = (on: On) => {
       // each row is one terminal line, so the side borders are one glyph tall
       const row = (key: string, child: unknown) => (
         <Box key={key} flexDirection="row">
-          <Text color={ACCENT}>
-            {"│ "}
-          </Text>
-          <Box width={inner}>
-            {child as never}
-          </Box>
-          <Text color={ACCENT}>
-            {" │"}
-          </Text>
+          <Text color={ACCENT}>{"│ "}</Text>
+          <Box width={inner}>{child as never}</Box>
+          <Text color={ACCENT}>{" │"}</Text>
         </Box>
       );
       // a flex-filled rule wrapped to blank rows even clipped to height 1, so every edge is counted
       const label = `${ICON} `;
       const line = (n: number) => (
-        <Text color={ACCENT}>
-          {"─".repeat(Math.max(0, n))}
-        </Text>
+        <Text color={ACCENT}>{"─".repeat(Math.max(0, n))}</Text>
       );
       const parts = segments(e.props.text);
       // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
@@ -110,7 +103,10 @@ export const prompt = (on: On) => {
         if (!glow.rendered.has(key)) {
           let lines: Run[][] | null = null;
           try {
-            const { exitCode, stdout } = await $.process.run(glowArgv(inner), { stdin: shownOf(s, i) });
+            const { exitCode, stdout } = await $.process.run(glowArgv(inner), {
+              ...GLOW_INIT,
+              stdin: shownOf(s, i),
+            });
             if (exitCode === 0) lines = toLines(stdout);
           } catch {
             glow.missing = true;
@@ -165,7 +161,9 @@ export const prompt = (on: On) => {
                 </Text>,
               ),
             )
-          : wrap(shownOf(s, i), inner).map((line, j) => row(`body:${i}:${j}`, <Text>{line}</Text>));
+          : wrap(shownOf(s, i), inner).map((line, j) =>
+              row(`body:${i}:${j}`, <Text>{line}</Text>),
+            );
         if (!isLong) return body;
         return [
           ...body,
@@ -180,33 +178,31 @@ export const prompt = (on: On) => {
 
       return (
         <Box key="prompt" flexDirection="row" marginTop={1}>
-          {/* an empty Box stretches to its row's height, so the bar follows the bubble */}
-          <Box width={1} flexShrink={0} backgroundColor={ACCENT} />
-          <Box flexDirection="column" flexGrow={1} marginLeft={1}>
+          <Box flexDirection="column" flexGrow={1}>
             {/* every edge is drawn by hand: Box borders refuse single sides and hid an absolute label */}
             <Box flexDirection="row">
-              <Text color={ACCENT}>
-                {"╭─ "}
-              </Text>
+              <Text color={ACCENT}>{"╭"}</Text>
+              {line(inner + 4 - 1 - cells(` ${label}`) - 2)}
+              {/* the person's bubble keeps its icon and bar on the right, Claude's on the left */}
               <Text bold color={ACCENT}>
-                {label}
+                {` ${label}`}
               </Text>
-              {line(inner + 4 - 3 - cells(label) - 1)}
-              <Text color={ACCENT}>
-                {"╮"}
-              </Text>
+              <Text color={ACCENT}>{"─╮"}</Text>
             </Box>
             {rows}
             <Box flexDirection="row">
-              <Text color={ACCENT}>
-                {"╰"}
-              </Text>
+              <Text color={ACCENT}>{"╰"}</Text>
               {line(inner + 2)}
-              <Text color={ACCENT}>
-                {"╯"}
-              </Text>
+              <Text color={ACCENT}>{"╯"}</Text>
             </Box>
           </Box>
+          {/* an empty Box stretches to its row's height, so the bar follows the bubble */}
+          <Box
+            width={1}
+            flexShrink={0}
+            marginLeft={1}
+            backgroundColor={ACCENT}
+          />
         </Box>
       );
     },

@@ -25,8 +25,10 @@ const ran = (exitCode: number, stdout: string) => ({
 
 test("a reply draws glow's lines inside the orange bubble", async ($, on) => {
   const calls: (readonly string[])[] = [];
+  let home: string | undefined;
   on("process.run", (_$, e) => {
     calls.push(e.argv);
+    home = e.init?.env?.HOME;
     return ran(0, GLOW);
   });
   const row = await $.ui.mount(REPLY("**hi** there\n\nsecond"));
@@ -37,6 +39,8 @@ test("a reply draws glow's lines inside the orange bubble", async ($, on) => {
   expect(await row.find({ key: "line:2" })).toBeUndefined();
   expect(await row.find({ type: "Text", text: "hi" })).toBeDefined();
   expect(calls[0][0]).toBe("glow");
+  // a mod's child gets no HOME, and glow then writes its config under a literal ~ in the cwd
+  expect(home).toBe("/tmp/q-lab/runes/glow");
   await row.unmount();
 });
 

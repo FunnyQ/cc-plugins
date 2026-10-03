@@ -2,7 +2,7 @@ import type { On } from "claude-code";
 
 import { enabled } from "../switch";
 import type { Run } from "./ansi";
-import { glow, glowArgv, toLines } from "./glow";
+import { GLOW_INIT, glow, glowArgv, toLines } from "./glow";
 import { cells } from "./prompt";
 
 const CLAUDE = "#d97757";
@@ -20,6 +20,7 @@ export const reply = (on: On) => {
       let lines: Run[][] | null = null;
       try {
         const { exitCode, stdout } = await $.process.run(glowArgv(inner), {
+          ...GLOW_INIT,
           stdin: e.props.text,
         });
         if (exitCode === 0) lines = toLines(stdout);
@@ -40,7 +41,9 @@ export const reply = (on: On) => {
 
     return (
       <Box key="reply" flexDirection="row" marginTop={1}>
-        <Box flexDirection="column" flexGrow={1}>
+        {/* an empty Box stretches to its row's height, so the bar follows the bubble */}
+        <Box width={1} flexShrink={0} backgroundColor={CLAUDE} />
+        <Box flexDirection="column" flexGrow={1} marginLeft={1}>
           <Box flexDirection="row">
             <Text color={CLAUDE}>{"╭─ "}</Text>
             <Text bold color={CLAUDE}>
@@ -72,8 +75,6 @@ export const reply = (on: On) => {
             <Text color={CLAUDE}>{"╯"}</Text>
           </Box>
         </Box>
-        {/* an empty Box stretches to its row's height, so the bar follows the bubble */}
-        <Box width={1} flexShrink={0} marginLeft={1} backgroundColor={CLAUDE} />
       </Box>
     );
   });

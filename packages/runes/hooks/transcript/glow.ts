@@ -15,6 +15,9 @@ export const glowArgv = (width: number) => [
   "-",
 ];
 
+// a mod's child gets no HOME, so glow wrote its config and log under a literal ~ in the session's cwd
+export const GLOW_INIT = { env: { HOME: "/tmp/q-lab/runes/glow" } };
+
 // module state shared by both bubbles, so a hot reload renders everything again
 export const glow = {
   // glow could not start, so stop paying a spawn per render
