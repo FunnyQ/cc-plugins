@@ -1,6 +1,7 @@
 import type { On } from "claude-code";
 
 import { enabled } from "../switch";
+import { bubble } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { cells, innerWidth, wrap } from "./text";
 
@@ -45,19 +46,7 @@ export const prompt = (on: On) => {
       };
 
       const inner = innerWidth(e.viewport?.columns);
-      // each row is one terminal line, so the side borders are one glyph tall
-      const row = (key: string, child: unknown) => (
-        <Box key={key} flexDirection="row">
-          <Text color={ACCENT}>{"│ "}</Text>
-          <Box width={inner}>{child as never}</Box>
-          <Text color={ACCENT}>{" │"}</Text>
-        </Box>
-      );
-      // a flex-filled rule wrapped to blank rows even clipped to height 1, so every edge is counted
-      const label = `${ICON} `;
-      const line = (n: number) => (
-        <Text color={ACCENT}>{"─".repeat(Math.max(0, n))}</Text>
-      );
+      const row = (key: string, child: unknown): [string, unknown] => [key, child];
       const parts = segments(e.props.text);
       // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
       const shown = parts.map((s, i) => {
@@ -132,34 +121,10 @@ export const prompt = (on: On) => {
         ];
       });
 
-      return (
-        <Box key="prompt" flexDirection="row" marginTop={1}>
-          <Box flexDirection="column" flexGrow={1}>
-            {/* every edge is drawn by hand: Box borders refuse single sides and hid an absolute label */}
-            <Box flexDirection="row">
-              <Text color={ACCENT}>{"╭"}</Text>
-              {line(inner + 4 - 1 - cells(` ${label}`) - 2)}
-              {/* the person's bubble keeps its icon and bar on the right, Claude's on the left */}
-              <Text bold color={ACCENT}>
-                {` ${label}`}
-              </Text>
-              <Text color={ACCENT}>{"─╮"}</Text>
-            </Box>
-            {rows}
-            <Box flexDirection="row">
-              <Text color={ACCENT}>{"╰"}</Text>
-              {line(inner + 2)}
-              <Text color={ACCENT}>{"╯"}</Text>
-            </Box>
-          </Box>
-          {/* an empty Box stretches to its row's height, so the bar follows the bubble */}
-          <Box
-            width={1}
-            flexShrink={0}
-            marginLeft={1}
-            backgroundColor={ACCENT}
-          />
-        </Box>
+      // the person's bubble keeps its icon and bar on the right, Claude's on the left
+      return bubble(
+        { Box, Text },
+        { key: "prompt", color: ACCENT, label: `${ICON} `, side: "right", inner, rows },
       );
     },
   );
