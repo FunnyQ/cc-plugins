@@ -2,11 +2,15 @@ import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type {
   DeckAgent,
+  DeckCrew,
   DeckSnapshot,
   DeckTask,
 } from "../../../hooks/flightdeck/types.ts";
 import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
+import { readRunId } from "./events-api";
 import { aggregateFleet, type FleetRow } from "./fleet";
+import { attributeUsage } from "./usage-attribute";
+import { createTranscriptSource, repoRootOf } from "./usage-source";
 import { detectSource, loadGraphPlan } from "./graph-source";
 import { buildTreePayload, loadPlan, type TreePayload } from "./tree-api";
 
@@ -41,12 +45,31 @@ export function layerByDepth(tasks: { ref: string; dependsOn: string[] }[]): {
 }
 
 /** Pure: shapes the payload and fleet into the pane's contract. */
+// the web fleet's runElapsed: one clock per task, so concurrent lenses count once
+function timeOf(rows: FleetRow[]): DeckTask["time"] {
+  const started = rows.filter((row) => row.startedAt);
+  if (started.length === 0) return null;
+  const startMs = Math.min(...started.map((row) => Date.parse(row.startedAt!)));
+  const endMs = started.some((row) => row.status === "in-flight")
+    ? null
+    : Math.max(...started.map((row) => Date.parse(row.startedAt!) + (row.elapsedMs ?? 0)));
+  return {
+    startedAt: new Date(startMs).toISOString(),
+    endedAt: endMs === null ? null : new Date(endMs).toISOString(),
+  };
+}
+
 export function buildDeckSnapshot(input: {
   plan: string;
   payload: TreePayload;
   fleet: FleetRow[];
+  usage?: Map<string, number>; // billed tokens per ref, read only on a --usage run
 }): DeckSnapshot {
   const { payload } = input;
+  const rowsByRef = Map.groupBy(
+    input.fleet.filter((row) => row.ref),
+    (row) => row.ref!,
+  );
 
   const tasks: Record<string, DeckTask> = {};
   for (const view of payload.tasks) {
@@ -61,6 +84,8 @@ export function buildDeckSnapshot(input: {
         threshold: score.threshold,
         passed: score.passed,
       },
+      time: timeOf(rowsByRef.get(view.ref) ?? []),
+      tokens: view.state === "done" ? (input.usage?.get(view.ref) ?? null) : null,
     };
   }
 
@@ -91,6 +116,18 @@ export function buildDeckSnapshot(input: {
       label: row.label,
       startedAt: row.startedAt ?? null,
     }));
+  // three rows show the scout or commit just finished beside the one running, without growing the box every wave
+  const crew: DeckCrew[] = input.fleet
+    .filter((row) => !row.ref || !tasks[row.ref])
+    .sort((a, b) => (Date.parse(b.startedAt ?? "") || 0) - (Date.parse(a.startedAt ?? "") || 0))
+    .slice(0, 3)
+    .map((row) => ({
+      role: row.role,
+      label: row.label,
+      status: row.status,
+      startedAt: row.startedAt ?? null,
+      elapsedMs: row.elapsedMs ?? null,
+    }));
 
   return {
     deckSource: payload.deckSource,
@@ -104,6 +141,7 @@ export function buildDeckSnapshot(input: {
     currentWave: open === -1 ? null : open + 1,
     tasks,
     agents,
+    crew,
     errors: payload.errors.length,
   };
 }
@@ -133,6 +171,23 @@ export async function latestPlan(root: string): Promise<string | null> {
   return best?.dir ?? null;
 }
 
+// Claude tokens only: the codex side of a dev or review row is left to the web fleet
+function usageByRef(
+  plan: string,
+  deckSource: "tasks" | "graph",
+  fleet: FleetRow[],
+): Map<string, number> {
+  const runId = deckSource === "graph" ? readRunId(plan) : undefined;
+  const agents = createTranscriptSource(plan, undefined, repoRootOf(plan) ?? undefined).read(runId);
+  const byRef = new Map<string, number>();
+  for (const row of attributeUsage(fleet, agents).rows) {
+    if (!row.ref || !row.usage) continue;
+    const u = row.usage;
+    byRef.set(row.ref, (byRef.get(row.ref) ?? 0) + u.input + u.output + u.cacheRead + u.cacheWrite);
+  }
+  return byRef;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -148,11 +203,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args[0] === undefined) {
-    console.error("usage: deck-snapshot.ts <planDir> | --latest <dir>");
+  const withUsage = args.includes("--usage");
+  const planArg = args.find((arg) => arg !== "--usage");
+  if (planArg === undefined) {
+    console.error("usage: deck-snapshot.ts <planDir> [--usage] | --latest <dir>");
     process.exit(1);
   }
-  const plan = resolve(args[0]);
+  const plan = resolve(planArg);
   const deckSource = detectSource(plan);
   if (deckSource === "none") {
     console.error(`no tasks/ or graph.json in ${plan}`);
@@ -162,9 +219,10 @@ async function main(): Promise<void> {
   const loaded =
     deckSource === "tasks" ? await loadPlan(plan) : await loadGraphPlan(plan);
   const payload = buildTreePayload({ ...loaded, deckSource });
-  // No token attribution: it reads transcripts, too costly for the pane's 2 s poll.
   const fleet = aggregateFleet(loaded.entries);
-  console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet })));
+  // a cold transcript read costs ~500 ms, so the pane asks for it only when a task newly lands
+  const usage = withUsage ? usageByRef(plan, deckSource, fleet) : undefined;
+  console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, usage })));
 }
 
 if (import.meta.main) {

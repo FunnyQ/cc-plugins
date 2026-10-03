@@ -11,6 +11,8 @@ export type DeckTask = {
   state: DeckState;
   attempts: number;
   score: { weighted: number; threshold: number; passed: boolean } | null;
+  time: { startedAt: string; endedAt: string | null } | null; // first agent start to last finish; endedAt null while one runs
+  tokens: number | null; // billed total, done tasks only, and only from a --usage run
 };
 
 export type DeckAgent = {
@@ -19,6 +21,15 @@ export type DeckAgent = {
   attempt: number | null;
   label: string;
   startedAt: string | null; // ISO; the pane renders elapsed from it at draw time
+};
+
+// a fleet row with no task card to ride (scout, commit), kept after it ends as the web fleet keeps it
+export type DeckCrew = {
+  role: string;
+  label: string;
+  status: "in-flight" | "finished" | "abandoned";
+  startedAt: string | null; // ISO; in-flight elapsed is drawn from it
+  elapsedMs: number | null; // a finished row's duration
 };
 
 export type DeckSnapshot = {
@@ -40,5 +51,6 @@ export type DeckSnapshot = {
   currentWave: number | null; // 1-based: lowest wave holding a non-done task; null when no wave holds one (all done, or only unschedulable work left)
   tasks: Record<string, DeckTask>;
   agents: DeckAgent[]; // FleetRow.status === "in-flight" only, startedAt ascending
+  crew: DeckCrew[]; // the latest 3 taskless fleet rows of any status, newest first
   errors: number; // TreePayload.errors.length
 };

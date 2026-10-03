@@ -140,7 +140,7 @@ export function createDebouncer(
   };
 }
 
-function readRunId(planDir: string): string | undefined {
+export function readRunId(planDir: string): string | undefined {
   try {
     return readFileSync(join(planDir, "run.id"), "utf8").trim() || undefined;
   } catch {
