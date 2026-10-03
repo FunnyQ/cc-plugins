@@ -193,11 +193,6 @@ describe("waveRows", () => {
     expect(rows[9]).toBe("W10 t9 ○");
   });
 
-  test("a missing ref renders dim with ?", () => {
-    const s = snap({ waves: [["ghost"]] });
-    expect(waveRows(s, 40)[0][1]).toEqual({ text: "ghost ?", dim: true });
-  });
-
   test("a card wider than a line goes on its own line", () => {
     const long = "x".repeat(50);
     const s = snap({

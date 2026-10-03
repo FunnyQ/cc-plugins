@@ -22,26 +22,22 @@ export const COLOR: Record<DeckState, string | undefined> = {
   invalid: "#f85149",
 };
 
-const RED = "#f85149";
 const SEP = " · ";
 
 const width = (line: Line) => line.reduce((n, seg) => n + seg.text.length, 0);
 
+const styled = (state: DeckState, text: string): Seg => ({
+  text,
+  ...(COLOR[state] && { color: COLOR[state] }),
+  ...(state === "blocked" && { dim: true }),
+});
+
 export function card(task: DeckTask): Seg {
   const attempts = task.attempts > 1 ? String(task.attempts) : "";
-  const seg: Seg = {
-    text: `${task.ref} ${GLYPH[task.state]}${attempts}`,
+  return {
+    ...styled(task.state, `${task.ref} ${GLYPH[task.state]}${attempts}`),
     ref: task.ref,
   };
-  const color = COLOR[task.state];
-  if (color) seg.color = color;
-  if (task.state === "blocked") seg.dim = true;
-  return seg;
-}
-
-function cardFor(s: DeckSnapshot, ref: string): Seg {
-  const task = s.tasks[ref];
-  return task ? card(task) : { text: `${ref} ?`, dim: true };
 }
 
 export function endState(s: DeckSnapshot): "wave" | "done" | "stuck" {
@@ -57,7 +53,10 @@ function diagnostics(s: DeckSnapshot, stale: boolean): Line {
   const line: Line = [];
   if (stale) line.push({ text: "stale", dim: true }, { text: SEP });
   if (s.errors > 0)
-    line.push({ text: `${s.errors} errors`, color: RED }, { text: SEP });
+    line.push(
+      { text: `${s.errors} errors`, color: COLOR.invalid },
+      { text: SEP },
+    );
   return line;
 }
 
@@ -72,17 +71,14 @@ export function summary(s: DeckSnapshot, stale: boolean): Line[] {
   else
     first.push({
       text: `stuck · ${stuckRefs(s).length} unschedulable`,
-      color: RED,
+      color: COLOR.invalid,
     });
 
   const c = s.counts;
-  const pair = (state: DeckState, n: number): Seg => {
-    const seg: Seg = { text: `${GLYPH[state]}${n}` };
-    const color = state === "invalid" && n === 0 ? undefined : COLOR[state];
-    if (color) seg.color = color;
-    if (state === "blocked") seg.dim = true;
-    return seg;
-  };
+  const pair = (state: DeckState, n: number): Seg =>
+    state === "invalid" && n === 0
+      ? { text: `${GLYPH[state]}${n}` }
+      : styled(state, `${GLYPH[state]}${n}`);
   const second: Line = [
     ...diagnostics(s, stale),
     pair("in-progress", c.inProgress),
@@ -105,7 +101,7 @@ export function compactSummary(s: DeckSnapshot, stale: boolean): Line {
   if (state === "wave")
     line.push({ text: `W${s.currentWave}/${s.waves.length}` });
   else if (state === "done") line.push({ text: "all done" });
-  else line.push({ text: "stuck", color: RED });
+  else line.push({ text: "stuck", color: COLOR.invalid });
   line.push({ text: `${SEP}${s.slug}` });
   return line;
 }
@@ -137,7 +133,7 @@ export function waveRows(s: DeckSnapshot, w: number): Line[] {
     let used = labelW + 1;
     let empty = true;
     for (const ref of g.refs) {
-      const seg = cardFor(s, ref);
+      const seg = card(s.tasks[ref]!);
       if (!empty && used + 2 + seg.text.length > w) {
         lines.push(line);
         line = [{ text: indent }];
@@ -222,7 +218,7 @@ export function inline(s: DeckSnapshot, w: number, stale: boolean): Line[] {
     second = [{ text: label }];
     refs.forEach((ref, i) => {
       if (i > 0) second.push({ text: "  " });
-      second.push(cardFor(s, ref));
+      second.push(card(s.tasks[ref]!));
     });
   }
   return [clip(compactSummary(s, stale), w), clip(second, w)];

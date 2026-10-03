@@ -40,6 +40,20 @@ describe("planArg", () => {
     expect(planArg(command)).toBe(plan);
   });
 
+  test("reads the --plan of the flightdeck.ts call, not an earlier command's", () => {
+    expect(
+      planArg("bun prepare.ts --plan /abs/a && bun flightdeck.ts --plan /abs/b"),
+    ).toBe("/abs/b");
+    expect(
+      planArg("bun flightdeck.ts --no-open; bun other.ts --plan /abs/a"),
+    ).toBeNull();
+  });
+
+  test("is null for an unexpanded shell value", () => {
+    expect(planArg(`bun flightdeck.ts --plan "$PLAN"`)).toBeNull();
+    expect(planArg("bun flightdeck.ts --plan $(pwd)/docs/x")).toBeNull();
+  });
+
   test("is null without --plan", () => {
     expect(planArg("bun flightdeck.ts")).toBeNull();
     expect(planArg("bun flightdeck.ts --planned /abs/x")).toBeNull();

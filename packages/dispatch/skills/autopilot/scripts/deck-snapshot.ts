@@ -5,6 +5,7 @@ import type {
   DeckSnapshot,
   DeckTask,
 } from "../../../hooks/flightdeck/types.ts";
+import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet, type FleetRow } from "./fleet";
 import { detectSource, loadGraphPlan } from "./graph-source";
 import { buildTreePayload, loadPlan, type TreePayload } from "./tree-api";
@@ -55,14 +56,11 @@ export function buildDeckSnapshot(input: {
       title: view.title,
       state: view.state,
       attempts: view.attempts,
-      score:
-        score === null
-          ? null
-          : {
-              weighted: score.weighted,
-              threshold: score.threshold,
-              passed: score.passed,
-            },
+      score: score && {
+        weighted: score.weighted,
+        threshold: score.threshold,
+        passed: score.passed,
+      },
     };
   }
 
@@ -126,7 +124,7 @@ export async function latestPlan(root: string): Promise<string | null> {
   for (const name of dirs) {
     const dir = join(docs, name);
     try {
-      const { mtimeMs } = await stat(join(dir, ".flightlog", "run.jsonl"));
+      const { mtimeMs } = await stat(runLogPath(dir));
       if (best === null || mtimeMs > best.mtime) best = { dir, mtime: mtimeMs };
     } catch {
       // A plan never flown has no run log; it is not a candidate.
@@ -134,10 +132,6 @@ export async function latestPlan(root: string): Promise<string | null> {
   }
   return best?.dir ?? null;
 }
-
-// Distinct exit codes let the pane tell a missing plan (2) and no run at all (3) from a crash (1).
-const EXIT_NO_PLAN = 2;
-const EXIT_NO_RUN = 3;
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -147,7 +141,8 @@ async function main(): Promise<void> {
     const plan = await latestPlan(root);
     if (plan === null) {
       console.error(`no flightplan run under ${root}/docs`);
-      process.exit(EXIT_NO_RUN);
+      // 3, not 1: the pane answers "no run found" for this case alone
+      process.exit(3);
     }
     console.log(JSON.stringify({ plan }));
     return;
@@ -155,13 +150,13 @@ async function main(): Promise<void> {
 
   if (args[0] === undefined) {
     console.error("usage: deck-snapshot.ts <planDir> | --latest <dir>");
-    process.exit(EXIT_NO_PLAN);
+    process.exit(1);
   }
   const plan = resolve(args[0]);
   const deckSource = detectSource(plan);
   if (deckSource === "none") {
     console.error(`no tasks/ or graph.json in ${plan}`);
-    process.exit(EXIT_NO_PLAN);
+    process.exit(1);
   }
 
   const loaded =

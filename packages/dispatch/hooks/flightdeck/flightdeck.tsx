@@ -14,7 +14,6 @@ const INLINE_ROWS = 2;
 const TICK_MS = 2000;
 
 const EMPTY: FlightdeckDeck = {
-  plan: null,
   snapshot: null,
   stale: false,
   message: null,
@@ -26,12 +25,18 @@ let view: FlightdeckDeck = EMPTY;
 // bumped by every open and close; a snapshot or lookup that returns under an older value is dropped
 let generation = 0;
 let ticker: Timer | undefined;
+// the last snapshot stdout drawn; an identical tick skips the parse and the publish
+let lastOut = "";
 
 const publish = ($: EngineInterface) => update($, deck, () => view);
 
 const firstLine = (text: string) => text.split("\n")[0]?.trim() ?? "";
-const scriptPath = ($: EngineInterface, name: string) =>
-  `${$.plugin.root}/skills/autopilot/scripts/${name}`;
+const runScript = ($: EngineInterface, name: string, ...args: string[]) =>
+  $.process.run([
+    "bun",
+    `${$.plugin.root}/skills/autopilot/scripts/${name}`,
+    ...args,
+  ]);
 const isOpen = async ($: EngineInterface) =>
   (await $.ui.panes()).some((p) => p.id === PANE);
 
@@ -45,25 +50,35 @@ const toastText = (t: DeckTask) => {
 };
 
 const refresh = async ($: EngineInterface, gen: number, plan: string) => {
-  const r = await $.process.run([
-    "bun",
-    scriptPath($, "deck-snapshot.ts"),
-    plan,
-  ]);
+  const r = await runScript($, "deck-snapshot.ts", plan);
   if (gen !== generation) return;
-  view =
-    r.exitCode === 0
-      ? { plan, snapshot: JSON.parse(r.stdout), stale: false, message: null }
-      : { ...view, stale: true, message: firstLine(r.stderr) };
-  await publish($);
+  if (r.exitCode === 0) {
+    if (r.stdout !== lastOut || view.stale) {
+      lastOut = r.stdout;
+      view = {
+        snapshot: JSON.parse(r.stdout),
+        stale: false,
+        message: null,
+      };
+      await publish($);
+    }
+  } else {
+    const message = firstLine(r.stderr);
+    if (!view.stale || view.message !== message) {
+      view = { ...view, stale: true, message };
+      await publish($);
+    }
+  }
   // a tick whose snapshot did not change still moves the agents' elapsed times
-  $.ui.invalidate("ui.render");
+  if ((view.snapshot as DeckSnapshot | null)?.agents.length)
+    $.ui.invalidate("ui.render");
 };
 
 // only open and close touch the ticker, synchronously before their first await
 const openOn = async ($: EngineInterface, plan: string) => {
   const gen = ++generation;
-  view = { ...EMPTY, plan };
+  view = EMPTY;
+  lastOut = "";
   void publish($);
   ticker?.cancel();
   let isRunning = false;
@@ -129,12 +144,7 @@ export const flightdeck = (on: On) => {
     const gen = generation;
     const top = await $.process.run(["git", "rev-parse", "--show-toplevel"]);
     const root = top.exitCode === 0 ? top.stdout.trim() : await $.session.cwd();
-    const r = await $.process.run([
-      "bun",
-      scriptPath($, "deck-snapshot.ts"),
-      "--latest",
-      root,
-    ]);
+    const r = await runScript($, "deck-snapshot.ts", "--latest", root);
     if (r.exitCode === 3)
       return { text: `No flightplan run found under ${root}/docs` };
     if (r.exitCode !== 0) return { text: firstLine(r.stderr) };
@@ -169,21 +179,22 @@ export const flightdeck = (on: On) => {
         {line.length === 0 && <Text> </Text>}
         {line.map((seg) => {
           const task = seg.ref ? s?.tasks[seg.ref] : undefined;
-          if (!task || !seg.text.startsWith(task.ref))
+          if (!task)
             return (
               <Text color={seg.color} dimColor={seg.dim}>
                 {seg.text}
               </Text>
             );
-          // a Button takes no colour, so the ref is the pressable part and the coloured glyph rides beside it
-          const rest = seg.text.slice(task.ref.length);
+          // a Button takes no colour, so the ref is the pressable part and the coloured glyph rides beside it; a clip that cut into the ref leaves it all pressable
+          const head = seg.text.startsWith(task.ref) ? task.ref : seg.text;
+          const rest = seg.text.slice(head.length);
           return (
             <Box flexDirection="row">
               <Button
                 key={`card:${task.ref}`}
                 plain
                 dimColor={seg.dim}
-                label={task.ref}
+                label={head}
                 onPress={() => $.ui.toast(toastText(task))}
               />
               {rest && (
@@ -204,12 +215,7 @@ export const flightdeck = (on: On) => {
         <Box flexDirection="column">{inline(s, width, stale).map(row)}</Box>
       );
     const launch = async () => {
-      const r = await $.process.run([
-        "bun",
-        scriptPath($, "flightdeck.ts"),
-        "--plan",
-        s.plan,
-      ]);
+      const r = await runScript($, "flightdeck.ts", "--plan", s.plan);
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
     return (

@@ -452,10 +452,10 @@ describe("CLI", () => {
     expect(deck.waves).toEqual([["build/01"], ["build/02"]]);
   });
 
-  test("exits 2 on a dir with neither tasks/ nor graph.json", async () => {
+  test("exits 1 on a dir with neither tasks/ nor graph.json", async () => {
     const plan = await tempDir();
     const { stdout, stderr, code } = await run(plan);
-    expect(code).toBe(2);
+    expect(code).toBe(1);
     expect(stdout).toBe("");
     expect(stderr.trim()).toBe(`no tasks/ or graph.json in ${plan}`);
   });
