@@ -1,4 +1,4 @@
-// every rune; a new rune adds its name here, to DEFAULTS and to TEMPLATE, and gates its hooks on `config.enabled[name]`
+// every rune; a new rune adds its name here and to TEMPLATE, any settings to DEFAULTS, and gates its hooks on `config.enabled[name]`
 export const RUNES = [
   "clawd",
   "transcript",
@@ -9,7 +9,7 @@ export const RUNES = [
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
 
-export type Config = {
+type Config = {
   enabled: Record<Rune, boolean>;
   prompt: { color: string; icon: string; side: Side; fold_lines: number };
   reply: { color: string; icon: string; side: Side };
@@ -25,13 +25,7 @@ export type Config = {
 };
 
 export const DEFAULTS: Config = {
-  enabled: {
-    clawd: true,
-    transcript: true,
-    prompt: true,
-    reply: true,
-    bash: true,
-  },
+  enabled: Object.fromEntries(RUNES.map((r) => [r, true])) as Record<Rune, boolean>,
   // nf-md icon U+F064C, needs a Nerd Font
   prompt: { color: "#1b5ea6", icon: "\u{F064C}", side: "right", fold_lines: 6 },
   // nf-cod icon U+EC82, needs a Nerd Font
@@ -105,13 +99,10 @@ const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
 const RULES: {
   [S in keyof Config]: { [F in keyof Config[S]]: [Check, string] };
 } = {
-  enabled: {
-    clawd: [isBool, "true | false"],
-    transcript: [isBool, "true | false"],
-    prompt: [isBool, "true | false"],
-    reply: [isBool, "true | false"],
-    bash: [isBool, "true | false"],
-  },
+  enabled: Object.fromEntries(RUNES.map((r) => [r, [isBool, "true | false"]])) as Record<
+    Rune,
+    [Check, string]
+  >,
   prompt: {
     color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
