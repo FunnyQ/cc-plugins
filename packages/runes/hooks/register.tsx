@@ -1,7 +1,7 @@
 import type { Hook, Register } from "claude-code";
 
 import { mascot } from "./clawd/mascot";
-import { minimap } from "./minimap/minimap";
+import { isMapArg, minimap } from "./minimap/minimap";
 import {
   config,
   configPath,
@@ -28,7 +28,7 @@ import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
 
-const USAGE = `on|off|status|reload, or <${RUNES.join("|")}> on|off`;
+const USAGE = `[on|off|status|reload] or <${RUNES.join("|")}> [on|off]; bare toggles; minimap on|off also opens|closes the map, and bare toggles the map once on; minimap open [columns] | close`;
 const status = () =>
   RUNES.map((r) => `${r}: ${config.enabled[r] ? "on" : "off"}`).join(", ");
 
@@ -115,11 +115,6 @@ export const register: Register = (on) => {
         description: "Turn runes (UI mods) on or off",
         argumentHint: USAGE,
       }),
-      $.command.register({
-        name: "minimap",
-        description: "Open the transcript minimap (the minimap rune)",
-        argumentHint: "[columns] | off",
-      }),
     ]);
     const said = notice(loaded);
     // a toast raised during session.start is dropped (seen live after /reload-plugins), so it waits a beat
@@ -133,12 +128,12 @@ export const register: Register = (on) => {
     return next(e);
   });
 
-  on("command.run", { command: "runes" }, async ($, e) => {
-    const [first = "status", second] = e.args
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-    const isRune = (RUNES as readonly string[]).includes(first);
+  on("command.run", { command: "runes" }, async ($, e, next) => {
+    const [first, second] = e.args.trim().split(/\s+/).filter(Boolean);
+    // the minimap's own handler answers these; a switched-off minimap lets a bare `/runes minimap` toggle the switch on
+    if (first === "minimap" && isMapArg(second) && (second || config.enabled.minimap))
+      return next(e);
+    const isRune = (RUNES as readonly string[]).includes(first ?? "");
     const targets = isRune ? [first as Rune] : RUNES;
     const state = isRune ? second : first;
     if (!["on", "off", "status", "reload", undefined].includes(state))
@@ -150,11 +145,13 @@ export const register: Register = (on) => {
     const answer = (text: string) => ({
       text: said ? `${text}\n${said}` : text,
     });
-    if (state !== "on" && state !== "off") return answer(`Runes — ${status()}`);
+    if (state === "status" || state === "reload")
+      return answer(`Runes — ${status()}`);
     if (loaded.text === undefined)
       return answer("Runes — config.yaml did not parse, so nothing written");
 
-    const value = state === "on";
+    // no state toggles: on while any target is off, off once they are all on
+    const value = state ? state === "on" : targets.some((r) => !config.enabled[r]);
     const text = targets.reduce((t, r) => setSwitch(t, r, value), loaded.text);
     const want = { ...config.enabled };
     for (const r of targets) want[r] = value;
@@ -173,6 +170,11 @@ export const register: Register = (on) => {
     await $.fs.write(loaded.path, text);
     config.enabled = back;
     $.ui.invalidate("ui.render");
+    // naming the minimap also opens or closes its pane; queued until idle, so not awaited
+    if (first === "minimap")
+      void $.command
+        .run({ command: "runes", args: `minimap ${value ? "open" : "close"}` })
+        .catch(() => {});
     return answer(`Runes — ${status()}`);
   });
 

@@ -113,3 +113,13 @@ export const lines = (
   }
   return out;
 };
+
+// the kind drawn at one cell of a line's strip, for the sideways map that draws each line as a column
+export const kindAt = (line: Line, cell: number): string | undefined => {
+  let at = 0;
+  for (const s of line.segments) {
+    at += s.cells;
+    if (cell < at) return s.kind;
+  }
+  return undefined;
+};

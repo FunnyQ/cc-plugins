@@ -2,11 +2,13 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 
 import { config } from "../config";
-import { lines, type Row, stem } from "./rows";
+import { kindAt, lines, type Row, stem } from "./rows";
 
 export const PANE = "minimap";
 // the dock refuses to go narrower than 24 columns, so ask for exactly that
 const COLUMNS = 24;
+// the inline map's bars are this many blocks tall, the track under them one more row
+const BAR_ROWS = 3;
 // polls for on-screen changes every TICK ms and re-reads the transcript every REREAD ticks, only while the pane is open
 const TICK = 250;
 const REREAD = 12;
@@ -67,19 +69,27 @@ const startTicker = ($: EngineInterface) => {
   });
 };
 
+// the arguments of `/runes minimap` that open or close the pane; the rest stay with the switch
+export const isMapArg = (arg?: string) =>
+  arg === undefined || arg === "open" || arg === "close";
+
 export const minimap = (on: On) => {
-  on("command.run", { command: "minimap" }, async ($, e) => {
-    const arg = e.args.trim();
-    if (arg === "off") {
+  // `/runes minimap` opens the pane or shuts it when open, `open 30` asks for that many columns, `close` shuts it
+  on("command.run", { command: "runes" }, async ($, e, next) => {
+    const [first, arg, width] = e.args.trim().split(/\s+/);
+    if (first !== "minimap" || !isMapArg(arg)) return next(e);
+    const isOpen = (await $.ui.panes()).some((p) => p.id === PANE);
+    if (arg === "close" || (arg === undefined && isOpen)) {
       ticker?.cancel();
       await $.ui.close({ id: PANE });
       return { text: "Minimap closed." };
     }
     if (!config.enabled.minimap)
       return { text: "The minimap rune is off: /runes minimap on" };
-    // `/minimap 30` asks for that many columns; a width dragged by hand still wins
-    const columns = /^\d+$/.test(arg) ? Number(arg) : COLUMNS;
-    await $.ui.open({ id: PANE, title: "Map", columns, focus: true });
+    // a width dragged by hand still wins over the one asked for
+    const columns = /^\d+$/.test(width ?? "") ? Number(width) : COLUMNS;
+    // rows sizes the inline seat a narrow terminal gives it, where the map lies sideways above the prompt
+    await $.ui.open({ id: PANE, title: "Map", columns, rows: 4, focus: true });
     await reread($);
     startTicker($);
     return { text: "Minimap opened." };
@@ -100,27 +110,69 @@ export const minimap = (on: On) => {
     const list = await read($, rows);
     const here = new Set((await read($, shown)).map(stem));
     if (!list.length) return <Text dimColor>No messages yet.</Text>;
-    // the track takes one cell and one more is margin; the bar gets the rest of the pane
-    const bar = Math.max(4, (e.props.bodyColumns ?? COLUMNS) - 2);
+    const jump = (target: string) => () =>
+      void $.ui.scroll({ to: { requestId: target }, block: "start" });
     const height = e.props.scroll?.bodyRows ?? (e.viewport?.rows ?? 24) - 4;
-    const drawn = lines(list, here, height, bar);
+    const width = e.props.bodyColumns ?? COLUMNS;
+
+    // inline (a narrow terminal seats it above the prompt, over Clawd): one column per bucket, the track along the bottom
+    if (e.props.placement === "inline") {
+      const drawn = lines(list, here, Math.max(1, width - 1), BAR_ROWS);
+      lastLine = `line:${drawn.length - 1}`;
+      const strip = Array.from({ length: BAR_ROWS }, (_, i) => i);
+      return (
+        <Box flexDirection="column">
+          {strip.map((cell) => (
+            <Box flexDirection="row">
+              {drawn.map((line) => {
+                const kind = kindAt(line, cell);
+                return kind ? (
+                  <Text color={colorOf(kind)}>
+                    {line.isHere || cell > 0 ? "█" : "▆"}
+                  </Text>
+                ) : (
+                  <Text> </Text>
+                );
+              })}
+            </Box>
+          ))}
+          <Box flexDirection="row">
+            {drawn.map((line, i) =>
+              line.isHere ? (
+                <Text color="#ff8c00">▂</Text>
+              ) : (
+                <Button
+                  key={`line:${i}`}
+                  plain
+                  dimColor
+                  label="_"
+                  onPress={jump(line.target)}
+                />
+              ),
+            )}
+          </Box>
+        </Box>
+      );
+    }
+
+    // docked beside the transcript: one line per bucket, the track on the left and a one-cell margin on the right
+    const drawn = lines(list, here, height, Math.max(4, width - 2));
     lastLine = `line:${drawn.length - 1}`;
     return (
       <Box flexDirection="column">
         {drawn.map((line, i) => (
           <Box flexDirection="row">
-            <Button
-              key={`line:${i}`}
-              plain
-              dimColor={!line.isHere}
-              label={line.isHere ? "█" : "│"}
-              onPress={() =>
-                void $.ui.scroll({
-                  to: { requestId: line.target },
-                  block: "start",
-                })
-              }
-            />
+            {line.isHere ? (
+              <Text color="#ff8c00">█</Text>
+            ) : (
+              <Button
+                key={`line:${i}`}
+                plain
+                dimColor
+                label="│"
+                onPress={jump(line.target)}
+              />
+            )}
             {line.segments.map((s) => (
               <Text color={colorOf(s.kind)}>
                 {(line.isHere ? "█" : "▆").repeat(s.cells)}

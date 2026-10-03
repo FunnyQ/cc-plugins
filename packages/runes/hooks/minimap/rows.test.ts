@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { lines, rowsOf, stem } from "./rows";
+import { kindAt, lines, rowsOf, stem } from "./rows";
 
 const jsonl = (...entries: object[]) =>
   entries.map((e) => JSON.stringify(e)).join("\n");
@@ -88,4 +88,10 @@ test("a line points at its first prompt and is here when any of its rows is on s
 test("a bucket with more rows than cells keeps only what fits", () => {
   const [line] = lines(rows(30), new Set(), 1, 8);
   expect(line!.segments.reduce((n, s) => n + s.cells, 0)).toBe(8);
+});
+
+test("kindAt reads a line's segments as one strip, top to bottom when the map lies sideways", () => {
+  const line = { target: "a", isHere: false, segments: [{ kind: "prompt", cells: 2 }, { kind: "bash", cells: 1 }] };
+  expect([0, 1, 2].map((i) => kindAt(line, i))).toEqual(["prompt", "prompt", "bash"]);
+  expect(kindAt(line, 3)).toBeUndefined();
 });
