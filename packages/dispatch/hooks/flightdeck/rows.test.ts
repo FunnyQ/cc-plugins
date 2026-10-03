@@ -165,17 +165,19 @@ describe("waveCards", () => {
     const [g] = waveCards(s, 80, 0).groups;
     expect(g.label).toBe("W1 ");
     expect(g.cards.map((c) => [c.head, c.sub])).toEqual([
-      ["✓ a", "title a   4.6"],
-      ["● b", "title b    a2"],
+      ["✓ a", "title a       4.6"],
+      ["● b", "title b        a2"],
     ]);
     expect(g.cards[0].color).toBe(COLOR.done);
     expect(g.cards[1].color).toBe(COLOR["in-progress"]);
   });
 
-  test("every card in a snapshot shares one inner width", () => {
+  test("every card in a snapshot shares one inner width, 4 columns past its longest ref", () => {
+    const wide = snap({ waves: [["api/very-long-ref-01"]], tasks: tasksOf([task("api/very-long-ref-01", "ready")]) });
+    expect(waveCards(wide, 80, 0).inner).toBe("api/very-long-ref-01".length + 6);
     const s = snap({ waves: [six.map((t) => t.ref)], tasks: tasksOf(six) });
     const { inner, groups } = waveCards(s, 80, 0);
-    expect(inner).toBe(13);
+    expect(inner).toBe(17);
     for (const c of groups[0].cards) {
       expect(c.head.length).toBeLessThanOrEqual(inner);
       expect(c.sub.length).toBe(inner);

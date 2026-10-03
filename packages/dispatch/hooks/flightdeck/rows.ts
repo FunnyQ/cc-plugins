@@ -120,8 +120,10 @@ export function bucketBars(s: DeckSnapshot, w: number): Line[] {
   });
 }
 
-// a card's inner width never drops below "Final review" plus a score, so short refs still show their title
-const MIN_INNER = 13;
+// a card's inner width never drops below "Final review" plus a score and some slack, so short refs still show their title
+const MIN_INNER = 17;
+// columns past glyph + space + the longest ref, so the title line has room beside its score
+const SLACK = 4;
 
 export type CardModel = {
   ref: string;
@@ -154,7 +156,7 @@ export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
     groups.push({ label: "W?", refs: s.unschedulable });
   const labelW = Math.max(0, ...groups.map((g) => g.label.length)) + 1;
   const longest = Math.max(0, ...groups.flatMap((g) => g.refs.map((r) => r.length)));
-  const inner = Math.max(1, Math.min(Math.max(MIN_INNER, longest + 2), w - labelW - 2));
+  const inner = Math.max(1, Math.min(Math.max(MIN_INNER, longest + 2 + SLACK), w - labelW - 2));
 
   const model = (t: DeckTask): CardModel => {
     const meta = [
