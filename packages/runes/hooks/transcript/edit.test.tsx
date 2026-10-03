@@ -1,7 +1,14 @@
 import { expect, test, type Engine } from "claude-code/testing";
 
 import { xterm256 } from "./ansi";
-import { CONFIG, eventually, startSession, find, within, ran } from "./test-session";
+import {
+  CONFIG,
+  eventually,
+  startSession,
+  find,
+  within,
+  ran,
+} from "./test-session";
 
 const CALL = (
   tool: "Edit" | "Write",
@@ -24,8 +31,6 @@ const CALL = (
     },
     viewport: { columns: 60, rows: 40 },
   }) as never;
-
-
 
 const PATCH = {
   oldStart: 9,
@@ -95,32 +100,49 @@ test("two hunks are split by a divider", async ($, on) => {
   expect(await within($, edit, "edit", /^40 \+ $/)).toBeDefined();
 });
 
-test("a Write that creates a file draws a folded content card, numbered from line 1 once unfolded", async ($, on) => {
-  await startSession($, on);
-  const row = await $.ui.mount(
-    CALL(
-      "Write",
-      { file_path: "/new.txt", content: "one\ntwo\n" },
-      {
-        output: {
-          type: "create",
-          filePath: "/new.txt",
-          content: "one\ntwo\n",
-          structuredPatch: [],
-          originalFile: null,
-        },
+const CREATE = (content: string) =>
+  CALL(
+    "Write",
+    { file_path: "/new.txt", content },
+    {
+      output: {
+        type: "create",
+        filePath: "/new.txt",
+        content,
+        structuredPatch: [],
+        originalFile: null,
       },
-    ),
+    },
   );
+
+test("a Write that creates a short file draws all of it, numbered from line 1", async ($, on) => {
+  await startSession($, on);
+  const row = await $.ui.mount(CREATE("one\ntwo\n"));
   expect(await row.find({ key: "write" })).toBeDefined();
-  expect(await row.find({ type: "Text", text: /new\.txt · new/ })).toBeDefined();
-  expect(await row.find({ type: "Text", text: "two" })).toBeUndefined();
-  expect((await row.find({ key: "write:toggle" }))?.text.trim()).toBe("▸ 2 lines");
-  await row.press({ key: "write:toggle" });
+  expect(
+    await row.find({ type: "Text", text: /new\.txt · new/ }),
+  ).toBeDefined();
   expect(await row.find({ type: "Text", text: "1  " })).toBeDefined();
   expect(await row.find({ type: "Text", text: "two" })).toBeDefined();
+  expect(await row.find({ key: "diff:more:row" })).toBeUndefined();
   // a new file has nothing to compare, so no line carries a sign or a tint
   expect(await row.find({ type: "Text", text: /\+/ })).toBeUndefined();
+  await row.unmount();
+});
+
+test("a Write that creates a file taller than fold_lines shows its head and folds the rest", async ($, on) => {
+  await startSession($, on);
+  const lines = Array.from({ length: 20 }, (_, i) => `line ${i + 1}`);
+  const row = await $.ui.mount(CREATE(`${lines.join("\n")}\n`));
+  expect(await row.find({ type: "Text", text: "line 12" })).toBeDefined();
+  expect(await row.find({ type: "Text", text: "line 13" })).toBeUndefined();
+  expect((await row.find({ key: "diff:more" }))?.text.trim()).toBe(
+    "▸ 8 more lines",
+  );
+  await row.press({ key: "diff:more" });
+  expect(await row.find({ type: "Text", text: "line 20" })).toBeDefined();
+  await row.press({ key: "diff:more" });
+  expect(await row.find({ type: "Text", text: "line 13" })).toBeUndefined();
   await row.unmount();
 });
 
@@ -134,8 +156,12 @@ test("a Write over an existing file draws its diff in the write rune's colour", 
   expect(await find($, write, { key: "write" })).toBeDefined();
   expect(await within($, write, "write", /^10 \+ $/)).toBeDefined();
   // a plus would read as a new file, so a replacement takes replace_icon
-  expect(await find($, write, { type: "Text", text: /^\u{F11E7} {2}a\.txt/u })).toBeDefined();
-  expect(await within($, write, "write", /^╰─+╯$/)).toMatchObject({ props: { color: "#4f9a94" } });
+  expect(
+    await find($, write, { type: "Text", text: /^\u{F11E7} {2}a\.txt/u }),
+  ).toBeDefined();
+  expect(await within($, write, "write", /^╰─+╯$/)).toMatchObject({
+    props: { color: "#4f9a94" },
+  });
 });
 
 test("a Write that changed nothing says so", async ($, on) => {
@@ -177,7 +203,6 @@ test("an errored Edit draws the text the model read", async ($, on) => {
     await find($, edit, { type: "Text", text: "String to replace not found." }),
   ).toBeDefined();
 });
-
 
 test("a known language goes through glow and its colours land on the matching lines", async ($, on) => {
   const stdins: string[] = [];
@@ -254,7 +279,11 @@ test("enabled.edit: false hands Edit to the engine and leaves Write drawn", asyn
     files: new Map([[CONFIG, "edit:\n  enabled: false\n"]]),
   });
   expect(await find($, EDIT(), { key: "edit" })).toBeUndefined();
-  expect(await find($, CALL("Write", { file_path: "/a", content: "" }), { key: "write" })).toBeDefined();
+  expect(
+    await find($, CALL("Write", { file_path: "/a", content: "" }), {
+      key: "write",
+    }),
+  ).toBeDefined();
 });
 
 test("enabled.write: false hands Write to the engine", async ($, on) => {
@@ -265,7 +294,11 @@ test("enabled.write: false hands Write to the engine", async ($, on) => {
   await startSession($, on, {
     files: new Map([[CONFIG, "write:\n  enabled: false\n"]]),
   });
-  expect(await find($, CALL("Write", { file_path: "/a", content: "" }), { key: "write" })).toBeUndefined();
+  expect(
+    await find($, CALL("Write", { file_path: "/a", content: "" }), {
+      key: "write",
+    }),
+  ).toBeUndefined();
   expect(await find($, EDIT(), { key: "edit" })).toBeDefined();
 });
 
@@ -284,7 +317,9 @@ test("the engine's own result block under an Edit or Write is left empty, since 
       props: { tool_use_id: "e1", tool, output: { structuredPatch: [PATCH] } },
       viewport: { columns: 60, rows: 40 },
     } as never;
-    expect(await find($, result, { type: "Text", text: "engine" })).toBeUndefined();
+    expect(
+      await find($, result, { type: "Text", text: "engine" }),
+    ).toBeUndefined();
   }
 });
 
@@ -292,5 +327,7 @@ test("the card draws at full colour, with no muted rest and no hover group", asy
   await startSession($, on);
   const card = await find($, EDIT(), { key: "edit" });
   expect(card?.props?.alignSelf).toBeUndefined();
-  expect(await within($, EDIT(), "edit", /^╰─+╯$/)).toMatchObject({ props: { color: "#b8954a" } });
+  expect(await within($, EDIT(), "edit", /^╰─+╯$/)).toMatchObject({
+    props: { color: "#b8954a" },
+  });
 });

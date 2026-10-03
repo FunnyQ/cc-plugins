@@ -7,7 +7,6 @@ import {
   DIVIDER,
   errorRows,
   foldRows,
-  foldSection,
   hideResult,
   isLight,
   memo,
@@ -17,7 +16,7 @@ import {
 } from "./bubble";
 import { codeRows, highlight } from "./code";
 import { languageOf } from "./sniff";
-import { cells, innerWidth, plural, wrapRuns } from "./text";
+import { cells, innerWidth, wrapRuns } from "./text";
 import { shortPath } from "./where";
 
 type Hunk = { oldStart: number; newStart: number; lines: string[] };
@@ -85,8 +84,13 @@ export const edit = (on: On) => {
     hideResult(on, tool, rune);
     on("ui.render", { component: "ToolUse", props: { tool } }, ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
-      const { color, error_color, icon, side, fold_lines: foldLines } =
-        config[rune];
+      const {
+        color,
+        error_color,
+        icon,
+        side,
+        fold_lines: foldLines,
+      } = config[rune];
       const { Box, Text, Button } = $.ui.resolve(e);
       const { isRunning, isErrored, isInterrupted, output } = e.props;
       const { file_path = "" } = (e.props.input ?? {}) as {
@@ -116,32 +120,46 @@ export const edit = (on: On) => {
       const path = shortPath(file_path);
       const state = stateOf(e.props);
       if (typeof output === "string")
-        return card(`${path}${state}`, icon, errorRows(Text, output, inner, error_color));
+        return card(
+          `${path}${state}`,
+          icon,
+          errorRows(Text, output, inner, error_color),
+        );
 
       const o = (output ?? {}) as {
         type?: "create" | "update";
         content?: string;
         structuredPatch?: Hunk[];
       };
-      // a Write that creates a file sends no hunks and has nothing to compare, so it folds away like a Read
+      // a Write that creates a file sends no hunks and has nothing to compare, so it shows its head like a folded diff
       if (o.type === "create" && !o.structuredPatch?.length) {
         const content = o.content ?? "";
-        const count = content ? content.replace(/\n$/, "").split("\n").length : 0;
-        return card(
-          `${path} · new`,
-          icon,
-          content
-            ? foldSection(Button, {
-                key: rune,
-                label: plural(count, "line"),
-                isOpen: open.has(id),
+        if (!content)
+          return card(`${path} · new`, icon, [
+            ["empty", <Text color={palette().dim}>(empty file)</Text>],
+          ]);
+        // codeRows opens with a divider a card's first row does not need
+        const rows = codeRows(Text, {
+          id,
+          content,
+          start: 1,
+          path: file_path,
+          inner,
+        }).slice(1);
+        const key = `${id}:diff`;
+        const isLong = rows.length > foldLines;
+        return card(`${path} · new`, icon, [
+          ...(isLong && !open.has(key) ? rows.slice(0, foldLines) : rows),
+          ...(isLong
+            ? foldRows(Button, {
+                key: "diff",
+                isOpen: open.has(key),
+                hidden: rows.length - foldLines,
                 width: inner,
-                onPress: flip(id),
-                body: () =>
-                  codeRows(Text, { id, content, start: 1, path: file_path, inner }),
+                onPress: flip(key),
               })
-            : [["empty", <Text color={palette().dim}>(empty file)</Text>]],
-        );
+            : []),
+        ]);
       }
 
       const hunks = o.structuredPatch ?? [];
@@ -152,7 +170,9 @@ export const edit = (on: On) => {
       );
       const lang = languageOf(file_path);
       const colored =
-        lang && !isBad ? highlight(`${id}\0${codes.length}`, codes, lang) : null;
+        lang && !isBad
+          ? highlight(`${id}\0${codes.length}`, codes, lang)
+          : null;
       const theme = isLight() ? "light" : "dark";
       const { text: TEXT, dim: DIM } = palette();
       const diff = DIFF[theme];
@@ -229,7 +249,12 @@ export const edit = (on: On) => {
             })
           : []),
         ...(!isRunning && output !== undefined && !rows.length
-          ? [["empty", <Text color={DIM}>(no changes)</Text>] as [string, unknown]]
+          ? [
+              ["empty", <Text color={DIM}>(no changes)</Text>] as [
+                string,
+                unknown,
+              ],
+            ]
           : []),
       ]);
     });
