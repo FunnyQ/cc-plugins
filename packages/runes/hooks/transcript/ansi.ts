@@ -61,7 +61,9 @@ const apply = (style: Style, params: string): Style => {
     const c = codes[i];
     if (c === 38 || c === 48) {
       const [color, used] = extended(codes, i);
-      s = c === 38 ? { ...s, color } : { ...s, backgroundColor: color };
+      const k = c === 38 ? "color" : "backgroundColor";
+      if (color === undefined) delete s[k];
+      else s[k] = color;
       i += used;
       continue;
     }
@@ -82,14 +84,21 @@ const apply = (style: Style, params: string): Style => {
     else if (c >= 100 && c <= 107) s.backgroundColor = BASIC[c - 92];
     i++;
   }
-  for (const k of Object.keys(s) as (keyof Style)[])
-    if (s[k] === undefined) delete s[k];
   return s;
 };
 
 // key order differs with the order the codes came in, so compare field by field
 const same = (a: Style, b: Style) =>
-  (["color", "backgroundColor", "bold", "italic", "underline", "strikethrough"] as const).every((k) => a[k] === b[k]);
+  (
+    [
+      "color",
+      "backgroundColor",
+      "bold",
+      "italic",
+      "underline",
+      "strikethrough",
+    ] as const
+  ).every((k) => a[k] === b[k]);
 
 // one terminal line of SGR-styled text to runs; other escapes (OSC 8 links) are dropped
 export const parseAnsi = (line: string): Run[] => {

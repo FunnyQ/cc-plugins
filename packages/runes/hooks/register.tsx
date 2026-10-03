@@ -5,6 +5,7 @@ import { enabled, RUNES } from './switch'
 import { prompt } from './transcript/prompt'
 import { reply } from './transcript/reply'
 
+const USAGE = `on|off|status, or <${RUNES.join('|')}> on|off`
 const status = () => RUNES.map(r => `${r}: ${enabled[r] === false ? 'off' : 'on'}`).join(', ')
 
 // each switch persists across sessions in $.store as `rune:<name>`; a rune never switched off is on
@@ -15,7 +16,7 @@ export const register: Register = on => {
       $.command.register({
         name: 'runes',
         description: 'Turn runes (UI mods) on or off',
-        argumentHint: `on|off|status, or <${RUNES.join('|')}> on|off`,
+        argumentHint: USAGE,
       }),
     ])
     RUNES.forEach((r, i) => { enabled[r] = stored[i] !== false })
@@ -28,7 +29,7 @@ export const register: Register = on => {
     const targets = isRune ? [first] : RUNES
     const state = isRune ? second : first
     if (state === 'status' || state === undefined) return { text: `Runes — ${status()}` }
-    if (state !== 'on' && state !== 'off') return { text: `Usage: /runes on|off|status, or /runes <${RUNES.join('|')}> on|off` }
+    if (state !== 'on' && state !== 'off') return { text: `Usage: /runes ${USAGE}` }
     await Promise.all(targets.map(r => {
       enabled[r] = state === 'on'
       return $.store.set(`rune:${r}`, enabled[r])
