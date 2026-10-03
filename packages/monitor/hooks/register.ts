@@ -4,7 +4,7 @@ type Coords = { port: number; token: string };
 type Verdict = "allow" | "deny";
 type PendingCall = {
   tool: string;
-  input: string;
+  args: Record<string, unknown>;
   isOpen: boolean;
   open: () => void;
 };
@@ -13,7 +13,8 @@ type PendingCall = {
 const calls = new Map<string, PendingCall>();
 // Calls the dashboard approved: their second pass through tool.check must not ask again.
 const granted = new Set<string>();
-let coords: Coords | undefined;
+// The promise, not its value, so concurrent callers share one `ensure-daemon` spawn.
+let coords: Promise<Coords | undefined> | undefined;
 // The loop a session switch retires may still sit in a fetch parked on the old session id.
 let generation = 0;
 
@@ -24,15 +25,23 @@ const PREVIEW_CHARS = 2_000;
 const ID_SWITCH_POLL_MS = 100;
 const ID_SWITCH_TRIES = 50;
 
-async function daemon($: EngineInterface): Promise<Coords | undefined> {
+function daemon($: EngineInterface): Promise<Coords | undefined> {
   if (coords) return coords;
-  const run = await $.process.run([
-    `${$.plugin.root}/skills/cockpit/bin/cockpit`,
-    "ensure-daemon",
-  ]);
-  if (run.exitCode !== 0) return undefined;
-  coords = JSON.parse(run.stdout) as Coords;
-  return coords;
+  const pending = $.process
+    .run([`${$.plugin.root}/skills/cockpit/bin/cockpit`, "ensure-daemon"])
+    .then((run) =>
+      run.exitCode === 0 ? (JSON.parse(run.stdout) as Coords) : undefined,
+    );
+  coords = pending;
+  const forget = () => {
+    if (coords === pending) coords = undefined;
+  };
+  pending.then((c) => c || forget(), forget);
+  return pending;
+}
+
+function sleep($: EngineInterface, ms: number): Promise<void> {
+  return new Promise((resolve) => $.clock.after(ms, resolve));
 }
 
 async function request(
@@ -45,7 +54,10 @@ async function request(
   const started = Date.now();
   try {
     const res = await $.http.fetch(
-      `http://127.0.0.1:${c.port}${path}`,
+      // Every GET caller already carries a `?session=` query.
+      body
+        ? `http://127.0.0.1:${c.port}${path}`
+        : `http://127.0.0.1:${c.port}${path}&token=${c.token}`,
       body
         ? {
             method: "POST",
@@ -66,14 +78,12 @@ async function request(
 async function pollInbox($: EngineInterface, mine: number, endedId?: string) {
   // The engine switches the id after session.end resolves; a poll parked on the ended id would hold the new session off for 30s.
   for (let i = 0; i < ID_SWITCH_TRIES && (await $.session.id()) === endedId; i++) {
-    await new Promise<void>((resolve) => $.clock.after(ID_SWITCH_POLL_MS, resolve));
+    await sleep($, ID_SWITCH_POLL_MS);
   }
   let failures = 0;
   while (generation === mine) {
     const session = await $.session.id();
-    const c = await daemon($);
-    const body =
-      c && (await request($, `/api/inbox?session=${session}&token=${c.token}`));
+    const body = await request($, `/api/inbox?session=${session}`);
     if (body) {
       failures = 0;
       // Not awaited: the prompt waits for the session to go idle, and the daemon holds only one undelivered message.
@@ -83,7 +93,7 @@ async function pollInbox($: EngineInterface, mine: number, endedId?: string) {
       continue;
     }
     const delay = Math.min(1000 * 2 ** failures++, MAX_BACKOFF_MS);
-    await new Promise<void>((resolve) => $.clock.after(delay, resolve));
+    await sleep($, delay);
   }
 }
 
@@ -107,13 +117,7 @@ async function relay(
   });
   if (!sent) return undefined;
   while (!isSettled()) {
-    const c = await daemon($);
-    const body =
-      c &&
-      (await request(
-        $,
-        `/api/permission-pull?session=${session}&token=${c.token}`,
-      ));
+    const body = await request($, `/api/permission-pull?session=${session}`);
     if (body === "parked" || body?.timeout === true) continue;
     if (!body || body.abandoned === true) return undefined;
     if (
@@ -147,12 +151,13 @@ export const register: Register = (on) => {
       payload.rate_limits = Object.fromEntries(
         e.rateLimits.map((w) => [
           w.kind,
-          w.resetsAt === undefined
-            ? { used_percentage: w.percentUsed }
-            : {
-                used_percentage: w.percentUsed,
-                resets_at: Date.parse(w.resetsAt) / 1000,
-              },
+          {
+            used_percentage: w.percentUsed,
+            resets_at:
+              w.resetsAt === undefined
+                ? undefined
+                : Date.parse(w.resetsAt) / 1000,
+          },
         ]),
       );
     }
@@ -189,7 +194,7 @@ export const register: Register = (on) => {
         (c) => c.tool === e.tool_name && !c.isOpen,
       );
       (
-        waiting.find((c) => c.input === input) ??
+        waiting.find((c) => JSON.stringify(c.args) === input) ??
         (waiting.length === 1 ? waiting[0] : undefined)
       )?.open();
     }
@@ -228,7 +233,7 @@ export const register: Register = (on) => {
     const opened = new Promise<void>((resolve) => (open = resolve));
     const call: PendingCall = {
       tool,
-      input: JSON.stringify(args),
+      args,
       isOpen: false,
       open: () => {
         call.isOpen = true;
