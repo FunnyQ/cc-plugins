@@ -32,37 +32,53 @@ const TOOL_KIND: Record<string, string> = {
   Skill: "skill",
 };
 
-export const rowsOf = (jsonl: string): Row[] => {
+const rowsOfLine = (raw: string): Row[] => {
   const rows: Row[] = [];
-  for (const raw of jsonl.split("\n")) {
-    if (!raw) continue;
-    let e: Entry;
-    try {
-      e = JSON.parse(raw);
-    } catch {
-      continue;
-    }
-    if (e.isSidechain || e.isMeta || !e.uuid) continue;
-    const content = e.message?.content;
-    // a string starting with `<` is a slash command or a notice, not something the person typed
-    if (
-      e.type === "user" &&
-      typeof content === "string" &&
-      !content.startsWith("<")
-    )
-      rows.push({ id: e.uuid, kind: "prompt", size: content.length });
-    if (e.type === "assistant" && Array.isArray(content))
-      for (const b of content) {
-        if (b.type === "text" && b.text?.trim())
-          rows.push({ id: e.uuid, kind: "reply", size: b.text.length });
-        if (b.type === "tool_use" && b.id)
-          rows.push({
-            id: b.id,
-            kind: TOOL_KIND[b.name ?? ""] ?? "tool",
-            size: JSON.stringify(b.input ?? {}).length,
-          });
-      }
+  if (!raw) return rows;
+  let e: Entry;
+  try {
+    e = JSON.parse(raw);
+  } catch {
+    return rows;
   }
+  if (e.isSidechain || e.isMeta || !e.uuid) return rows;
+  const content = e.message?.content;
+  // a string starting with `<` is a slash command or a notice, not something the person typed
+  if (
+    e.type === "user" &&
+    typeof content === "string" &&
+    !content.startsWith("<")
+  )
+    rows.push({ id: e.uuid, kind: "prompt", size: content.length });
+  if (e.type === "assistant" && Array.isArray(content))
+    for (const b of content) {
+      if (b.type === "text" && b.text?.trim())
+        rows.push({ id: e.uuid, kind: "reply", size: b.text.length });
+      if (b.type === "tool_use" && b.id)
+        rows.push({
+          id: b.id,
+          kind: TOOL_KIND[b.name ?? ""] ?? "tool",
+          size: JSON.stringify(b.input ?? {}).length,
+        });
+    }
+  return rows;
+};
+
+export const rowsOf = (jsonl: string): Row[] =>
+  jsonl.split("\n").flatMap(rowsOfLine);
+
+// the same rows read one line at a time, so memory stays near one line rather than 5x the file
+export const rowsOfStream = async (
+  texts: AsyncIterable<string>,
+): Promise<Row[]> => {
+  const rows: Row[] = [];
+  let tail = "";
+  for await (const text of texts) {
+    const lines = (tail + text).split("\n");
+    tail = lines.pop() ?? "";
+    for (const line of lines) rows.push(...rowsOfLine(line));
+  }
+  rows.push(...rowsOfLine(tail));
   return rows;
 };
 

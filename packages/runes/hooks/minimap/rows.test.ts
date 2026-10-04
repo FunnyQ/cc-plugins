@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { kindAt, lines, rowsOf, stem } from "./rows";
+import { kindAt, lines, rowsOf, rowsOfStream, stem } from "./rows";
 
 const jsonl = (...entries: object[]) =>
   entries.map((e) => JSON.stringify(e)).join("\n");
@@ -94,4 +94,24 @@ test("kindAt reads a line's segments as one strip, top to bottom when the map li
   const line = { target: "a", isHere: false, segments: [{ kind: "prompt", cells: 2 }, { kind: "bash", cells: 1 }] };
   expect([0, 1, 2].map((i) => kindAt(line, i))).toEqual(["prompt", "prompt", "bash"]);
   expect(kindAt(line, 3)).toBeUndefined();
+});
+
+test("rowsOfStream gives rowsOf's rows however the text is cut, with or without a final newline", async () => {
+  const text = `${jsonl(
+    { type: "user", uuid: "u1", message: { content: "你好，世界" } },
+    {
+      type: "assistant",
+      uuid: "a1",
+      message: { content: [{ type: "text", text: "哈囉" }] },
+    },
+    { type: "user", uuid: "u2", message: { content: "last" } },
+  )}\n`;
+  for (const source of [text, text.trimEnd()])
+    for (const size of [1, 2, 7, source.length]) {
+      const chunks = (async function* () {
+        for (let at = 0; at < source.length; at += size)
+          yield source.slice(at, at + size);
+      })();
+      expect(await rowsOfStream(chunks)).toEqual(rowsOf(text));
+    }
 });
