@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.7.8] - 2026-10-04
+
+_tracks tag `runes-v0.7.8`_
+
+### Added
+- Bash output that the built-in sniffer cannot recognise, such as Markdown, JSON, diffs and code from `gh pr view` or `git show`, now renders through glow when TypeSafe's Jev judges it worth rendering. It is on by default and does nothing without `TYPESAFE_API_KEY`; with a key set, the command (secrets masked) and, when the command alone does not settle it, the first 800 characters of its output are sent to TypeSafe, except for commands that print secrets, such as `env` or `cat .env`. Set `transcript.bash.jev: false` in config.yaml to turn it off.
+
 ## [runes 0.7.7] - 2026-10-04
 
 _tracks tag `runes-v0.7.7`_
