@@ -124,10 +124,8 @@ export const register: Register = (on) => {
     if (said) $.clock.after(1000, () => $.ui.toast(said));
     $.ui.invalidate("ui.render");
     // the transcript bubbles' glow runs here, outside any draw, so no superseded redraw aborts it
-    glow.work(
-      (argv, init) => $.process.run(argv, init),
-      () => $.ui.invalidate("ui.render"),
-    );
+    const redraw = () => $.ui.invalidate("ui.render");
+    glow.work((argv, init) => $.process.run(argv, init), redraw);
     const apiKey = await $.env.get("TYPESAFE_API_KEY");
     // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it
     const post: Post = (url, init) =>
@@ -138,7 +136,6 @@ export const register: Register = (on) => {
           resolve({ ok: r.ok, text: r.text });
         }, reject);
       });
-    const redraw = () => $.ui.invalidate("ui.render");
     // Jev's verdicts on Bash output; no TYPESAFE_API_KEY leaves every draw as it was
     jev.work({ apiKey, post, redraw });
     teacher.work({
