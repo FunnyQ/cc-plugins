@@ -51,7 +51,7 @@ type Config = {
 };
 
 export const DEFAULTS: Config = {
-  // every rune starts on but the minimap, which opens a pane and so waits to be asked for
+  // every rune starts on but the minimap, which re-reads the transcript every 3s and so waits to be asked for
   enabled: Object.fromEntries(RUNES.map((r) => [r, r !== "minimap"])) as Record<
     Rune,
     boolean
@@ -175,7 +175,7 @@ transcript:
   glow:
     # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 minimap:
-  enabled: ${enabled.minimap}    # /minimap: the whole transcript as coloured bars in a pane; Enter jumps there
+  enabled: ${enabled.minimap}    # the whole transcript as coloured bars left of Clawd; click the line under a bar to jump there
 `;
 
 // the keys at each level in the order the template writes them; the bubbles and glow live under transcript

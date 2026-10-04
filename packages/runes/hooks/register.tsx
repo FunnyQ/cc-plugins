@@ -1,7 +1,7 @@
 import type { Hook, Register } from "claude-code";
 
 import { mascot } from "./clawd/mascot";
-import { isMapArg, minimap } from "./minimap/minimap";
+import { minimap } from "./minimap/minimap";
 import {
   config,
   configPath,
@@ -28,7 +28,7 @@ import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
 
-const USAGE = `[on|off|status|reload] or <${RUNES.join("|")}> [on|off]; bare toggles; minimap on|off also opens|closes the map, and bare toggles the map once on; minimap open [columns] | close`;
+const USAGE = `[on|off|status|reload] or <${RUNES.join("|")}> [on|off]; bare toggles`;
 const status = () =>
   RUNES.map((r) => `${r}: ${config.enabled[r] ? "on" : "off"}`).join(", ");
 
@@ -130,9 +130,6 @@ export const register: Register = (on) => {
 
   on("command.run", { command: "runes" }, async ($, e, next) => {
     const [first, second] = e.args.trim().split(/\s+/).filter(Boolean);
-    // the minimap's own handler answers these; a switched-off minimap lets a bare `/runes minimap` toggle the switch on
-    if (first === "minimap" && isMapArg(second) && (second || config.enabled.minimap))
-      return next(e);
     const isRune = (RUNES as readonly string[]).includes(first ?? "");
     const targets = isRune ? [first as Rune] : RUNES;
     const state = isRune ? second : first;
@@ -170,11 +167,6 @@ export const register: Register = (on) => {
     await $.fs.write(loaded.path, text);
     config.enabled = back;
     $.ui.invalidate("ui.render");
-    // naming the minimap also opens or closes its pane; queued until idle, so not awaited
-    if (first === "minimap")
-      void $.command
-        .run({ command: "runes", args: `minimap ${value ? "open" : "close"}` })
-        .catch(() => {});
     return answer(`Runes — ${status()}`);
   });
 

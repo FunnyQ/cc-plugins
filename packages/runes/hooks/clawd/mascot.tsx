@@ -1,9 +1,12 @@
+import { read } from 'claude-code'
 import type { On } from 'claude-code'
 
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
 import { config } from '../config'
+import { BAR_ROWS, inlineMap } from '../minimap/minimap'
+import { stem } from '../minimap/rows'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
@@ -14,6 +17,9 @@ const SVG_HEIGHT = 32
 
 // read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks
 const FRAME = { plugin: 'runes', key: 'frame' } as const
+// the minimap's atoms by their keys: the state scan needs literals written in the file that reads them
+const MAP_ROWS = { plugin: 'runes', key: 'minimapRows' } as const
+const MAP_SHOWN = { plugin: 'runes', key: 'minimapShown' } as const
 
 export const mascot = (on: On) => {
   const director = new Director()
@@ -118,10 +124,18 @@ export const mascot = (on: On) => {
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
     const { value: frame = { clip, index } } = await $.state.get(FRAME)
-    const { Box, Image, Svg, Text } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Image, Svg, Text } = ui
+    // the minimap fills the band's empty left side; Clawd sits on its bottom edge
+    const list = config.enabled.minimap ? (await read($, MAP_ROWS)) ?? [] : []
+    const here = new Set(((await read($, MAP_SHOWN)) ?? []).map(stem))
+    const room = (e.props.bodyColumns ?? 0) - IMAGE_COLUMNS - 2
+    const map = list.length && room > 4
+      ? inlineMap(ui, list, here, room, BAR_ROWS, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
+      : undefined
     // bodyColumns, not the viewport: a docked pane narrows the band
     const right = (sprite: ReturnType<typeof h>) => (
-      <Box key="clawd-row" flexDirection="row" justifyContent="flex-end" width={e.props.bodyColumns}>{sprite}</Box>
+      <Box key="clawd-row" flexDirection="row" justifyContent={map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{sprite}</Box>
     )
 
     if (e.surface === 'desktop') {
