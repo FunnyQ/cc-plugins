@@ -29,18 +29,21 @@ test('OCTANT maps the 2x4 bitmask to its glyph, reusing the older block characte
 
 test('octants draws every frame as 4 rows of 10 cells with the silhouette intact', () => {
   const glyph = new Map(OCTANT.map((cp, mask) => [cp, mask]))
+  // 440k bit checks, so mismatches are gathered and asserted once: an expect() per bit took 5s
+  const wrong: string[] = []
   for (const [clip, frames] of Object.entries(CLIPS)) frames.forEach((frame, index) => {
     const rows = octants(clip, index)
-    expect(rows.length).toBe(4)
+    if (rows.length !== 4) wrong.push(`${clip}/${index}: ${rows.length} rows`)
     rows.forEach((runs, r) => {
       const cells = runs.flatMap(run => [...run.text].map(ch => ({ mask: glyph.get(ch.codePointAt(0)!)!, bgOpaque: run.backgroundColor !== undefined })))
-      expect([clip, index, r, cells.length]).toEqual([clip, index, r, 10])
+      if (cells.length !== 10) wrong.push(`${clip}/${index} row ${r}: ${cells.length} cells`)
       cells.forEach(({ mask, bgOpaque }, c) => {
         for (let bit = 0; bit < 8; bit++) {
           const opaque = frame.grid[(r * 4 + (bit >> 1)) * 20 + c * 2 + (bit & 1)] !== '.'
-          expect([clip, index, r, c, bit, opaque]).toEqual([clip, index, r, c, bit, bgOpaque || !!(mask & (1 << bit))])
+          if (opaque !== (bgOpaque || !!(mask & (1 << bit)))) wrong.push(`${clip}/${index} row ${r} cell ${c} bit ${bit}`)
         }
       })
     })
   })
+  expect(wrong).toEqual([])
 })
