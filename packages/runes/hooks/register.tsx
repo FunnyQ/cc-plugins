@@ -20,6 +20,7 @@ import { agent } from "./transcript/agent";
 import { bash } from "./transcript/bash";
 import { edit } from "./transcript/edit";
 import { glow } from "./transcript/glow";
+import { jev } from "./transcript/jev";
 import { prompt } from "./transcript/prompt";
 import { peer } from "./transcript/peer";
 import { read } from "./transcript/read";
@@ -126,6 +127,20 @@ export const register: Register = (on) => {
       (argv, init) => $.process.run(argv, init),
       () => $.ui.invalidate("ui.render"),
     );
+    // Jev's verdicts on Bash output; no TYPESAFE_API_KEY leaves every draw as it was
+    jev.work({
+      apiKey: await $.env.get("TYPESAFE_API_KEY"),
+      // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it
+      post: (url, init) =>
+        new Promise((resolve, reject) => {
+          const timer = $.clock.after(5_000, () => reject(new Error("jev timeout")));
+          $.http.fetch(url, init).then((r) => {
+            timer.cancel();
+            resolve({ ok: r.ok, text: r.text });
+          }, reject);
+        }),
+      redraw: () => $.ui.invalidate("ui.render"),
+    });
     return next(e);
   });
 

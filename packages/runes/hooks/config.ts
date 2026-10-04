@@ -27,6 +27,7 @@ type Config = {
     output_icon: string;
     side: Side;
     fold_lines: number;
+    jev: boolean;
   };
   read: { color: string; error_color: string; icon: string; side: Side };
   edit: {
@@ -70,6 +71,8 @@ export const DEFAULTS: Config = {
     output_icon: "\u{EF11}",
     side: "left",
     fold_lines: 8,
+    // needs TYPESAFE_API_KEY; without one the output is drawn as it was before Jev
+    jev: true,
   },
   // nf-md-file_document U+F0219, needs a Nerd Font
   read: { color: "#6b8fb3", error_color: "#c94f4f", icon: "\u{F0219}", side: "left" },
@@ -136,6 +139,7 @@ transcript:
     # output_icon: "\\uEF11"   # Nerd Font glyph
     # side: ${DEFAULTS.bash.side}
     # fold_lines: ${DEFAULTS.bash.fold_lines}
+    # jev: ${DEFAULTS.bash.jev}            # ask TypeSafe's Jev whether output the sniffer cannot place goes through glow; needs TYPESAFE_API_KEY, and sends the (secret-masked) command and the head of its output unless the command looks risky
   read:
     enabled: ${enabled.read}    # Read calls
     # color: "${DEFAULTS.read.color}"
@@ -243,6 +247,7 @@ const RULES: {
     output_icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
     fold_lines: [isCount, "a whole number above 0"],
+    jev: [isBool, "true | false"],
   },
   read: {
     color: [isColor, "#rrggbb"],

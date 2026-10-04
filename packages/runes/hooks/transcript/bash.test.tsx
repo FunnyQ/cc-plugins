@@ -322,3 +322,56 @@ test("glow's light style switches the cards to the light palette", async ($, on)
     hover: { color: "#8e908c", scope: "t1:call" },
   });
 });
+
+// what Jev's command-only request answers: code in typescript, no risk
+const JEV = (over: { code?: number; risk?: number } = {}) => {
+  const code = over.code ?? 0.99;
+  return {
+    value: {
+      status: 200, ok: true, headers: {},
+      text: JSON.stringify({ answers: {
+        kind: { type: "choice", choice: "code", confidence: 1, probabilities: { markdown: 0, json: 0, diff: 0, code, plain: 1 - code } },
+        language: { type: "choice", choice: "typescript", confidence: 1, probabilities: { typescript: 1, other: 0 } },
+        risk: { type: "noul", noul: over.risk ?? 0.1 },
+      } }),
+    },
+  } as never;
+};
+
+const CMD = (command: string, stdout: string) => CALL({ command }, { output: OUT(stdout) });
+
+test("with no TYPESAFE_API_KEY nothing is sent and the output stays as it was", async ($, on) => {
+  const sent: string[] = [];
+  on("http.fetch", (_$, e) => (sent.push(e.url), JEV()));
+  await startSession($, on, { run: () => ran("") });
+  expect(await within($, CMD("make report", "const a = 1\nconst b = 2\n"), "bash:output", /^const a = 1$/)).toBeDefined();
+  await new Promise((r) => setTimeout(r, 30));
+  expect(sent).toEqual([]);
+});
+
+test("with a key, a command Jev is sure prints code goes through glow, and the output is never sent", async ($, on) => {
+  const bodies: string[] = [];
+  const stdins: string[] = [];
+  on("http.fetch", (_$, e) => (bodies.push(String(e.init?.body)), JEV()));
+  await startSession($, on, {
+    env: { TYPESAFE_API_KEY: "k" },
+    run: (e) => (stdins.push(e.init?.stdin ?? ""), ran("\n    \x1b[38;5;140mconst a\x1b[0m\n")),
+  });
+  const call = CMD("make report TOKEN=abcdef1234567890abcdef", "const a = 1\nconst b = 2\n");
+  expect(await eventually(async () => (await within($, call, "bash:output", /^const a$/)) !== undefined)).toBe(true);
+  expect(stdins.some((s) => s.startsWith("```typescript\n"))).toBe(true);
+  // one request, for the command, with its token masked and none of the output in it
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toContain("make report");
+  expect(bodies[0]).not.toContain("abcdef1234567890abcdef");
+  expect(bodies[0]).not.toContain("const a = 1");
+});
+
+test("a command the local list denies is never sent to Jev", async ($, on) => {
+  const sent: string[] = [];
+  on("http.fetch", (_$, e) => (sent.push(e.url), JEV()));
+  await startSession($, on, { env: { TYPESAFE_API_KEY: "k" }, run: () => ran("") });
+  expect(await within($, CMD("env", "HOME=/x\nPATH=/bin\n"), "bash:output", /^HOME=\/x$/)).toBeDefined();
+  await new Promise((r) => setTimeout(r, 30));
+  expect(sent).toEqual([]);
+});

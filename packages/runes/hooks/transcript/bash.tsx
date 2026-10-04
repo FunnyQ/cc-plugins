@@ -4,6 +4,7 @@ import { config } from "../config";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
 import { bubble, foldRows, isLight, memo, paint, PALETTES, runLine } from "./bubble";
 import { glow } from "./glow";
+import { jev } from "./jev";
 import { type Kind, layout } from "./shell";
 import { language } from "./sniff";
 import { innerWidth, wrapRuns } from "./text";
@@ -161,14 +162,22 @@ export const bash = (on: On) => {
             : `\`\`\`${lang}\n${stdout.replace(/\n+$/, "")}\n\`\`\``;
         return { lang, fence };
       });
-      const glowed = lang ? glow.view(inner - 2, fence) : null;
+      // output the sniffer could not place may still be code or Markdown, which Jev says once it has been asked
+      const guess = lang || isBad || !stdout ? undefined : jev.view(command, stdout);
+      const shown = lang ?? guess;
+      const fenced = guess
+        ? remember(`fence\0${id}\0${size}\0${guess}`, () =>
+            guess === "markdown" ? stdout : `\`\`\`${guess}\n${stdout.replace(/\n+$/, "")}\n\`\`\``,
+          )
+        : fence;
+      const glowed = shown ? glow.view(inner - 2, fenced) : null;
       // until glow has rendered, or with no language to give it, the output draws as plain text
       const out = remember(
         `out\0${id}\0${inner}\0${isBad}\0${size}\0${glowed?.length ? "glow" : "plain"}`,
         () => {
           const source: Run[][] = glowed?.length
             ? [
-                ...(lang === "markdown" ? glowed : dedent(glowed)),
+                ...(shown === "markdown" ? glowed : dedent(glowed)),
                 ...toRuns(o.stderr, error_color),
               ]
             : typeof output === "string"

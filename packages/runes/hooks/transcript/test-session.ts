@@ -41,7 +41,7 @@ type Run = Parameters<Hook<"process.run">>;
 // the kit has no store, fs, env or process; these stand in for the host's, and `run` answers every command but the YAML parse
 export const fakeHost = (
   on: On,
-  { files = new Map<string, string>(), run }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown } = {},
+  { files = new Map<string, string>(), run, env = {} }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown; env?: Record<string, string> } = {},
 ) => {
   const store = new Map<string, unknown>();
   const toasts: string[] = [];
@@ -54,7 +54,8 @@ export const fakeHost = (
     store.delete(e.key);
     return { value: undefined } as never;
   });
-  on("env.get", () => ({ value: HOME }) as never);
+  // HOME unless a test names the variable; any other is unset, as on a machine without it
+  on("env.get", (_$, e) => ({ value: env[e.name] ?? (e.name === "HOME" ? HOME : undefined) }) as never);
   on("fs.exists", (_$, e) => ({ value: files.has(e.path) }) as never);
   on("fs.read", (_$, e) => ({ value: files.get(e.path) }) as never);
   on("fs.write", (_$, e) => {

@@ -243,3 +243,13 @@ test("TEMPLATE lists the minimap's fields commented, so a changed default reache
   expect(text).toContain('\n  # gap: 2');
   expect(text).toContain('\n  # marker_color: "#ff8c00"');
 });
+
+test("bash.jev is on by default, is read as a switch, and an invalid value falls back alone", () => {
+  expect(DEFAULTS.bash.jev).toBe(true);
+  expect(normalize({ transcript: { bash: { jev: false } } }).config.bash.jev).toBe(false);
+  const { config, problems } = normalize({ transcript: { bash: { jev: "off", fold_lines: 4 } } });
+  expect(config.bash.jev).toBe(true);
+  expect(config.bash.fold_lines).toBe(4);
+  expect(problems.join("\n")).toContain("transcript.bash.jev");
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain("\n    # jev: true");
+});
