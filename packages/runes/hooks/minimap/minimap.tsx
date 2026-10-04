@@ -57,7 +57,8 @@ export const inlineMap = (
   jump: (target: string) => () => void,
 ) => {
   const drawn = lines(list, here, Math.max(1, width - 1), barRows);
-  const strip = Array.from({ length: barRows }, (_, i) => i);
+  // drawn top down, so the earliest cell (0) lands on the bottom row and a bar reads upward in time
+  const strip = Array.from({ length: barRows }, (_, i) => barRows - 1 - i);
   const node = (
     <Box flexDirection="column">
       {strip.map((cell) => (
@@ -66,7 +67,7 @@ export const inlineMap = (
             const kind = kindAt(line, cell);
             return kind ? (
               <Text color={colorOf(kind)}>
-                {line.isHere || cell > 0 ? "█" : "▆"}
+                {line.isHere || cell < barRows - 1 ? "█" : "▆"}
               </Text>
             ) : (
               <Text> </Text>
