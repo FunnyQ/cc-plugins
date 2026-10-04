@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.7.9] - 2026-10-05
+
+_tracks tag `runes-v0.7.9`_
+
+### Fixed
+- Folded errored or interrupted Bash output now keeps its tail, so the failures and summary a failing run prints at the end stay visible; successful output still folds to its head only, and unfolded sections show in full color instead of dimmed.
+
 ## [runes 0.7.8] - 2026-10-04
 
 _tracks tag `runes-v0.7.8`_
