@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.0] - 2026-10-05
+
+_tracks tag `runes-v0.8.0`_
+
+### Added
+- New teacher rune rewrites your English prompts in your own tone and shows the lesson beside a smoking Clawd and in a clickable band above the prompt, without touching the transcript or Claude's context (it stays silent without TYPESAFE_API_KEY).
+
 ## [runes 0.7.9] - 2026-10-05
 
 _tracks tag `runes-v0.7.9`_
