@@ -4,8 +4,6 @@ import type { EngineInterface, On } from "claude-code";
 import { config } from "../config";
 import { kindAt, lines, type Row } from "./rows";
 
-// the bars are this many blocks tall, the track under them one more row
-export const BAR_ROWS = 3;
 // polls for on-screen changes every TICK ms and re-reads the transcript every REREAD ticks, while the rune is on
 const TICK = 250;
 const REREAD = 12;
@@ -78,7 +76,7 @@ export const inlineMap = (
       <Box flexDirection="row">
         {drawn.map((line, i) =>
           line.isHere ? (
-            <Text color="#ff8c00">━</Text>
+            <Text color={config.minimap.marker_color}>━</Text>
           ) : (
             <Button
               key={`line:${i}`}

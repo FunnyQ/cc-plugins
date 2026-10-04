@@ -48,6 +48,7 @@ type Config = {
   skill: { color: string; error_color: string; icon: string; side: Side };
   peer: { color: string; icon: string; side: Side; fold_lines: number };
   glow: { style: string };
+  minimap: { bar_rows: number; gap: number; marker_color: string };
 };
 
 export const DEFAULTS: Config = {
@@ -97,6 +98,8 @@ export const DEFAULTS: Config = {
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   glow: { style: "dark" },
+  // gap is the columns kept clear between the map and Clawd
+  minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
 };
 
 export const configPath = (home: string) =>
@@ -176,6 +179,9 @@ transcript:
     # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 minimap:
   enabled: ${enabled.minimap}    # the whole transcript as coloured bars left of Clawd; click the line under a bar to jump there
+  # bar_rows: ${DEFAULTS.minimap.bar_rows}          # how many blocks tall the bars are
+  # gap: ${DEFAULTS.minimap.gap}               # columns kept clear between the map and Clawd
+  # marker_color: "${DEFAULTS.minimap.marker_color}"   # the mark for where you are
 `;
 
 // the keys at each level in the order the template writes them; the bubbles and glow live under transcript
@@ -278,6 +284,11 @@ const RULES: {
     fold_lines: [isCount, "a whole number above 0"],
   },
   glow: { style: [isText, "dark | light | a style file path"] },
+  minimap: {
+    bar_rows: [isCount, "a whole number above 0"],
+    gap: [isCount, "a whole number above 0"],
+    marker_color: [isColor, "#rrggbb"],
+  },
 };
 
 // where a section's fields are read from and the name a problem gives it: under transcript, or where 0.5.0 kept it,

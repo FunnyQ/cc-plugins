@@ -226,3 +226,20 @@ test("the minimap rune starts off and its section sits at the top level", () => 
   expect(DEFAULTS.enabled.minimap).toBe(false);
   expect(TEMPLATE(DEFAULTS.enabled)).toContain("\nminimap:\n  enabled: false");
 });
+
+test("the minimap's look is read from its own section, each invalid field falling back alone", () => {
+  const { config, problems } = normalize({
+    minimap: { enabled: true, bar_rows: 4, gap: 0, marker_color: "#112233" },
+  });
+  expect(config.minimap).toEqual({ bar_rows: 4, gap: 2, marker_color: "#112233" });
+  expect(config.enabled.minimap).toBe(true);
+  expect(problems.join("\n")).toContain("minimap.gap");
+  expect(normalize(null).config.minimap).toEqual({ bar_rows: 3, gap: 2, marker_color: "#ff8c00" });
+});
+
+test("TEMPLATE lists the minimap's fields commented, so a changed default reaches every file", () => {
+  const text = TEMPLATE(DEFAULTS.enabled);
+  expect(text).toContain('\n  # bar_rows: 3');
+  expect(text).toContain('\n  # gap: 2');
+  expect(text).toContain('\n  # marker_color: "#ff8c00"');
+});

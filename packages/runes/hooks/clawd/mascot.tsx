@@ -5,7 +5,7 @@ import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
 import { config } from '../config'
-import { BAR_ROWS, inlineMap } from '../minimap/minimap'
+import { inlineMap } from '../minimap/minimap'
 import { stem } from '../minimap/rows'
 
 const TICK_MS = 50
@@ -14,9 +14,8 @@ const DONE_MS = 5_000
 // 20x16 grid at 2 CSS px per pixel
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
-// the columns Clawd takes in each drawing, so the map keeps a gap of GAP columns from it: the octant text is 10 cells wide
+// the columns Clawd takes in each drawing, so the map keeps minimap.gap columns clear of it: the octant text is 10 cells wide
 const TEXT_COLUMNS = 10
-const GAP = 2
 
 // read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks
 const FRAME = { plugin: 'runes', key: 'frame' } as const
@@ -133,9 +132,9 @@ export const mascot = (on: On) => {
     const list = config.enabled.minimap && e.surface === 'terminal' ? (await read($, MAP_ROWS)) ?? [] : []
     const here = new Set(((await read($, MAP_SHOWN)) ?? []).map(stem))
     const spriteColumns = useText ? TEXT_COLUMNS : IMAGE_COLUMNS
-    const room = (e.props.bodyColumns ?? 0) - spriteColumns - GAP
+    const room = (e.props.bodyColumns ?? 0) - spriteColumns - config.minimap.gap
     const map = list.length && room > 4
-      ? inlineMap(ui, list, here, room, BAR_ROWS, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
+      ? inlineMap(ui, list, here, room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
       : undefined
     // bodyColumns, not the viewport: a docked pane narrows the band
     const right = (sprite: ReturnType<typeof h>) => (
