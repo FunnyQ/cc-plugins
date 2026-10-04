@@ -2,6 +2,8 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { noteRow } from "../minimap/minimap";
+import { lessonBubble, lessonRows } from "../teacher/lesson";
+import { teacher } from "../teacher/teacher";
 import { bubble, foldRows, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
 import { imageIds } from "./images";
@@ -36,7 +38,18 @@ export const prompt = (on: On) => {
     { component: "UserMessage", surface: "terminal", props: { origin: { kind: "composer" } } },
     async ($, e, next) => {
       noteRow(e.requestId, Boolean(e.props.onScreen));
-      if (!config.enabled.transcript || !config.enabled.prompt) return next(e);
+      teacher.seen(e.props.text, e.requestId);
+      const better = teacher.lesson(e.props.text);
+      if (!config.enabled.transcript || !config.enabled.prompt) {
+        if (!better) return next(e);
+        const { Box, Text } = $.ui.resolve(e);
+        return (
+          <Box flexDirection="column">
+            {await next(e)}
+            {lessonBubble({ Box, Text }, e.props.text, better, innerWidth(e.viewport?.columns), "left")}
+          </Box>
+        );
+      }
       // run the chain anyway so plugins beneath still see the row; its tree is discarded
       await next(e);
       // a prompt body taller than fold_lines folds to its head
@@ -136,7 +149,14 @@ export const prompt = (on: On) => {
 
       return bubble(
         { Box, Text },
-        { key: "prompt", color, icon, side, inner, rows: [...rows, ...images] },
+        {
+          key: "prompt",
+          color,
+          icon,
+          side,
+          inner,
+          rows: [...rows, ...images, ...(better ? lessonRows({ Box, Text }, e.props.text, better, inner) : [])],
+        },
       );
     },
   );

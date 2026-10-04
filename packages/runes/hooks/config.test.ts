@@ -27,6 +27,7 @@ const CURRENT = () => ({
     glow: null,
   },
   minimap: { enabled: true },
+  teacher: { enabled: true },
 });
 
 test("normalize fills every missing field from the defaults", () => {

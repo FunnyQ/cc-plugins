@@ -12,6 +12,7 @@ export const RUNES = [
   "skill",
   "peer",
   "minimap",
+  "teacher",
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
@@ -186,10 +187,12 @@ minimap:
   # bar_rows: ${DEFAULTS.minimap.bar_rows}          # how many blocks tall the bars are
   # gap: ${DEFAULTS.minimap.gap}               # columns kept clear between the map and Clawd
   # marker_color: "${DEFAULTS.minimap.marker_color}"   # the mark for where you are
+teacher:
+  enabled: ${enabled.teacher}    # the English teacher: a better phrasing under an English prompt that could read better; needs TYPESAFE_API_KEY, sends each (secret-masked) English-looking prompt to TypeSafe's Jev, and asks haiku for the rewrite
 `;
 
 // the keys at each level in the order the template writes them; the bubbles and glow live under transcript
-const TOP = ["clawd", "transcript", "minimap"] as const;
+const TOP = ["clawd", "transcript", "minimap", "teacher"] as const;
 const UNDER = [
   "prompt",
   "reply",

@@ -3,6 +3,7 @@ import type { Hook, Register } from "claude-code";
 import { band } from "./band";
 import { mascot } from "./clawd/mascot";
 import { minimap } from "./minimap/minimap";
+import { teach, teacher } from "./teacher/teacher";
 import {
   config,
   configPath,
@@ -20,7 +21,7 @@ import { agent } from "./transcript/agent";
 import { bash } from "./transcript/bash";
 import { edit } from "./transcript/edit";
 import { glow } from "./transcript/glow";
-import { jev } from "./transcript/jev";
+import { jev, type Post } from "./transcript/jev";
 import { prompt } from "./transcript/prompt";
 import { peer } from "./transcript/peer";
 import { read } from "./transcript/read";
@@ -127,19 +128,27 @@ export const register: Register = (on) => {
       (argv, init) => $.process.run(argv, init),
       () => $.ui.invalidate("ui.render"),
     );
+    const apiKey = await $.env.get("TYPESAFE_API_KEY");
+    // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it
+    const post: Post = (url, init) =>
+      new Promise((resolve, reject) => {
+        const timer = $.clock.after(5_000, () => reject(new Error("jev timeout")));
+        $.http.fetch(url, init).then((r) => {
+          timer.cancel();
+          resolve({ ok: r.ok, text: r.text });
+        }, reject);
+      });
+    const redraw = () => $.ui.invalidate("ui.render");
     // Jev's verdicts on Bash output; no TYPESAFE_API_KEY leaves every draw as it was
-    jev.work({
-      apiKey: await $.env.get("TYPESAFE_API_KEY"),
-      // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it
-      post: (url, init) =>
-        new Promise((resolve, reject) => {
-          const timer = $.clock.after(5_000, () => reject(new Error("jev timeout")));
-          $.http.fetch(url, init).then((r) => {
-            timer.cancel();
-            resolve({ ok: r.ok, text: r.text });
-          }, reject);
-        }),
-      redraw: () => $.ui.invalidate("ui.render"),
+    jev.work({ apiKey, post, redraw });
+    teacher.work({
+      apiKey,
+      post,
+      complete: async (text, system) => {
+        const r = await $.model.complete({ model: "haiku", prompt: text, system, effort: "low", timeoutMs: 15_000 });
+        return r.isAnswered ? r.text : undefined;
+      },
+      redraw,
     });
     return next(e);
   });
@@ -197,4 +206,5 @@ export const register: Register = (on) => {
   skill(on);
   peer(on);
   minimap(on);
+  teach(on);
 };
