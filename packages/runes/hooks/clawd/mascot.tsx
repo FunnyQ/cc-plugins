@@ -1,9 +1,10 @@
-import type { EngineInterface, On } from 'claude-code'
+import type { On } from 'claude-code'
 
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
 import { config } from '../config'
+import type { Ui } from '../ui'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
@@ -19,7 +20,7 @@ const TEXT_COLUMNS = 10
 const FRAME = { plugin: 'runes', key: 'frame' } as const
 
 // what the band (band.tsx) and the frame ticker below share: module values, since a rune may share nothing else
-export const clawd = {
+const INITIAL = {
   requestId: undefined as string | undefined,
   clip: 'living',
   index: 0,
@@ -28,14 +29,19 @@ export const clawd = {
   // the desktop has no blit, so each frame is a redraw of a static SVG (transparent, unlike an isInteractive frame)
   isDesktop: false,
 }
+export const clawd = { ...INITIAL }
+
+// the band reports each draw here, the only writer of what the frame ticker reads from it
+export const seen = (requestId: string, isDesktop: boolean) => {
+  clawd.requestId = requestId
+  if (isDesktop) clawd.isDesktop = true
+}
 
 export const spriteColumns = () => (clawd.useText ? TEXT_COLUMNS : IMAGE_COLUMNS)
 
-type Ui = ReturnType<EngineInterface['ui']['resolve']>
-
 // Clawd's picture in the drawing this surface and terminal take
-export const sprite = ({ Image, Svg, Text, Box }: Ui, surface: string, frame: { clip: string; index: number }) => {
-  if (surface === 'desktop') return <Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
+export const sprite = ({ Image, Svg, Text, Box }: Ui, isDesktop: boolean, frame: { clip: string; index: number }) => {
+  if (isDesktop) return <Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
   // Raster refuses non-BMP characters, so octants go out as plain coloured Text
   if (clawd.useText) {
     return (
@@ -46,12 +52,13 @@ export const sprite = ({ Image, Svg, Text, Box }: Ui, surface: string, frame: { 
       </Box>
     )
   }
+  // the live clip and index, not `frame`: the ticker moves them by blit, which redraws nothing
   return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clawd.clip, clawd.index)} />
 }
 
 export const mascot = (on: On) => {
   const director = new Director()
-  Object.assign(clawd, { requestId: undefined, clip: 'living', index: 0, useText: false, isDesktop: false })
+  Object.assign(clawd, INITIAL)
   let now = 0
   let isWorking = false
   let blocked = 0
@@ -74,11 +81,11 @@ export const mascot = (on: On) => {
     $.clock.every(TICK_MS, () => {
       now += TICK_MS
       elapsed += TICK_MS
-      const { requestId, clip, index } = clawd
-      if (!config.enabled.clawd || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
+      const { requestId } = clawd
+      if (!config.enabled.clawd || requestId === undefined || elapsed < CLIPS[clawd.clip]![clawd.index]!.ms) return
       elapsed = 0
       clawd.index += 1
-      if (clawd.index === CLIPS[clip]!.length) {
+      if (clawd.index === CLIPS[clawd.clip]!.length) {
         clawd.index = 0
         clawd.clip = director.next(inputs())
       }

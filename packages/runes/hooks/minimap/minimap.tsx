@@ -2,6 +2,7 @@ import { atom, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 
 import { config } from "../config";
+import type { Ui } from "../ui";
 import { kindAt, lines, type Row } from "./rows";
 
 // polls for on-screen changes every TICK ms and re-reads the transcript every REREAD ticks, while the rune is on
@@ -71,7 +72,7 @@ const rereadIfChanged = async ($: EngineInterface) => {
 
 // one column per bucket, `barRows` blocks tall, the track along the bottom as a line into an arrowhead, drawn mid-cell like `→` so they join; drawn in Clawd's band
 export const inlineMap = (
-  { Box, Text, Button }: ReturnType<EngineInterface["ui"]["resolve"]>,
+  { Box, Text, Button }: Ui,
   list: Row[],
   here: Set<string>,
   width: number,
@@ -119,6 +120,9 @@ export const inlineMap = (
 
 const startTicker = ($: EngineInterface) => {
   ticker?.cancel();
+  // a new session reads its own transcript, whatever the last one's stat says
+  transcript = lastSeen = undefined;
+  lastRows = "";
   let n = 0;
   ticker = $.clock.every(TICK, () => {
     if (isDirty) {

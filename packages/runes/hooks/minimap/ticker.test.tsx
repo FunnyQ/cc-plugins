@@ -37,3 +37,27 @@ test('an idle transcript is read once, and read again only when it changes', asy
   await clock.advance(9_000)
   expect(spawns).toBeGreaterThanOrEqual(failed + 3)
 })
+
+test('a new session reads its own transcript even when the old one has not changed', async ($, on) => {
+  const clock = mock.clock(on)
+  let spawns = 0
+  const out = JSON.stringify({ path: '/t.jsonl', rows: [{ id: 'u1', kind: 'prompt', size: 20 }] })
+  fakeHost(on, {
+    files: new Map([[CONFIG, 'minimap:\n  enabled: true\n']]),
+    run: ({ argv }) => {
+      if (argv[0] !== 'bun' || !argv[1]?.endsWith('minimap/index.ts')) return undefined
+      spawns += 1
+      return { value: { exitCode: 0, stdout: out, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    },
+  } as never)
+  on('session.id', () => ({ value: 's1' }) as never)
+  on('fs.stat', () => ({ value: { kind: 'file', size: 10, mtimeMs: 1, isLink: false } }) as never)
+  on('session.start', (_$, e) => e as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(30_000)
+  const before = spawns
+  // /resume into another session fires session.start again; the stat the old one left must not hide the new file
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(3_000)
+  expect(spawns).toBeGreaterThan(before)
+})

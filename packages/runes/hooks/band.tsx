@@ -1,7 +1,7 @@
 import { read } from 'claude-code'
 import type { On } from 'claude-code'
 
-import { clawd, sprite, spriteColumns } from './clawd/mascot'
+import { clawd, seen, sprite, spriteColumns } from './clawd/mascot'
 import { config } from './config'
 import { inlineMap } from './minimap/minimap'
 import { stem } from './minimap/rows'
@@ -18,7 +18,7 @@ export const band = (on: On) => {
     const hasMap = config.enabled.minimap && e.surface === 'terminal'
     if ((!config.enabled.clawd && !hasMap) || e.props.hasSurvey) return next(e)
 
-    clawd.requestId = e.requestId
+    seen(e.requestId, e.surface === 'desktop')
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
     const ui = $.ui.resolve(e)
     const { Box } = ui
@@ -28,19 +28,17 @@ export const band = (on: On) => {
       hasMap ? read($, MAP_ROWS) : undefined,
       hasMap ? read($, MAP_SHOWN) : undefined,
     ])
-    // the columns Clawd and its gap take off the map's width
+    // the columns Clawd and its gap take off the map's width; bodyColumns, not the viewport, since a docked pane narrows the band
     const reserved = config.enabled.clawd ? spriteColumns() + config.minimap.gap : 0
     const room = (e.props.bodyColumns ?? 0) - reserved
     const map = list?.length && room > 4
       ? inlineMap(ui, list, new Set((shown ?? []).map(stem)), room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' }))
       : undefined
-    // bodyColumns, not the viewport
     const row = (picture?: ReturnType<typeof h>) => (
       <Box key="clawd-row" flexDirection="row" justifyContent={!picture ? 'flex-start' : map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{picture}</Box>
     )
 
     if (!config.enabled.clawd) return map ? row() : next(e)
-    if (e.surface === 'desktop') clawd.isDesktop = true
-    return row(sprite(ui, e.surface, frame))
+    return row(sprite(ui, e.surface === 'desktop', frame))
   })
 }
