@@ -30,8 +30,10 @@ const distance = (a: number, b: number) =>
 export type Run = { text: string; color?: string; backgroundColor?: string }
 
 // a cell holds two colours; a third goes to the commonest so the silhouette survives (1.3% of pixels lost)
-export const octants = memo((clip, index): Run[][] => {
-  const grid = CLIPS[clip]![index]!.grid
+export const octants = memo((clip, index): Run[][] => octantsOf(CLIPS[clip]![index]!.grid))
+
+// any 20x16 grid as 10x4 octant runs, so a still picture can be drawn from a hand-edited frame
+export const octantsOf = (grid: string): Run[][] => {
   const rows = Array.from({ length: 4 }, (_, r) => {
     const runs: Run[] = []
     for (let c = 0; c < 10; c++) {
@@ -55,7 +57,7 @@ export const octants = memo((clip, index): Run[][] => {
     return runs
   })
   return rows
-})
+}
 
 // The terminal stretches a picture to its box with linear filtering, so the blocks are
 // scaled here, nearest-neighbour, to about the box's own pixel size and stay sharp.
