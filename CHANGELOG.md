@@ -1,5 +1,19 @@
 # Changelog
 
+## [runes 0.7.7] - 2026-10-04
+
+_tracks tag `runes-v0.7.7`_
+
+### Added
+- The minimap's bar height, its gap from Clawd, and its current-position marker colour can now be set in the `minimap` section of config.yaml, with an invalid value falling back alone and showing a toast.
+
+### Changed
+- An idle session no longer starts a background process every 3 seconds for the minimap, which now re-reads the transcript only when its size or modification time changes, and retries after a failed read.
+
+### Fixed
+- The minimap now loads the new conversation after a session restarts, for example after /resume, instead of showing stale content.
+- The minimap keeps drawing when the Clawd mascot is switched off.
+
 ## [runes 0.7.6] - 2026-10-04
 
 _tracks tag `runes-v0.7.6`_
