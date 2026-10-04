@@ -121,7 +121,9 @@ export const mascot = (on: On) => {
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    if (!config.enabled.clawd || e.props.hasSurvey) return next(e)
+    // the band serves the map too, so Clawd off leaves it drawing when the minimap is on
+    const hasMap = config.enabled.minimap && e.surface === 'terminal'
+    if ((!config.enabled.clawd && !hasMap) || e.props.hasSurvey) return next(e)
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
@@ -129,25 +131,26 @@ export const mascot = (on: On) => {
     const ui = $.ui.resolve(e)
     const { Box, Image, Svg, Text } = ui
     // the minimap fills the band's empty left side; Clawd sits on its bottom edge
-    const list = config.enabled.minimap && e.surface === 'terminal' ? (await read($, MAP_ROWS)) ?? [] : []
+    const list = hasMap ? (await read($, MAP_ROWS)) ?? [] : []
     const here = new Set(((await read($, MAP_SHOWN)) ?? []).map(stem))
-    const spriteColumns = useText ? TEXT_COLUMNS : IMAGE_COLUMNS
-    const room = (e.props.bodyColumns ?? 0) - spriteColumns - config.minimap.gap
+    const spriteColumns = !config.enabled.clawd ? 0 : useText ? TEXT_COLUMNS : IMAGE_COLUMNS
+    const room = (e.props.bodyColumns ?? 0) - spriteColumns - (config.enabled.clawd ? config.minimap.gap : 0)
     const map = list.length && room > 4
       ? inlineMap(ui, list, here, room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
       : undefined
     // bodyColumns, not the viewport: a docked pane narrows the band
-    const right = (sprite: ReturnType<typeof h>) => (
-      <Box key="clawd-row" flexDirection="row" justifyContent={map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{sprite}</Box>
+    const row = (sprite?: ReturnType<typeof h>) => (
+      <Box key="clawd-row" flexDirection="row" justifyContent={!sprite ? 'flex-start' : map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{sprite}</Box>
     )
 
+    if (!config.enabled.clawd) return map ? row() : next(e)
     if (e.surface === 'desktop') {
       isDesktop = true
-      return right(<Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
+      return row(<Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
     }
     // Raster refuses non-BMP characters, so octants go out as plain coloured Text
     if (useText) {
-      return right(
+      return row(
         <Box key="clawd" flexDirection="column">
           {octants(frame.clip, frame.index).map((runs, y) => (
             <Text key={String(y)}>{runs.map((run, x) => <Text key={String(x)} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
@@ -156,6 +159,6 @@ export const mascot = (on: On) => {
       )
     }
 
-    return right(<Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />)
+    return row(<Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />)
   })
 }

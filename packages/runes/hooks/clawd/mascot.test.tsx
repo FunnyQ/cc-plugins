@@ -114,3 +114,32 @@ test('the minimap fills the left of the band on the terminal and never on the de
   expect((await desk.find({ key: 'clawd-row' }))?.props).toMatchObject({ justifyContent: 'flex-end' })
   await desk.unmount()
 })
+
+test('with Clawd off, the minimap still draws in the band on the terminal, and the desktop has nothing', async ($, on) => {
+  const clock = mock.clock(on)
+  const rows = JSON.stringify([
+    { id: 'u1', kind: 'prompt', size: 20 },
+    { id: 'a1', kind: 'reply', size: 200 },
+  ])
+  fakeHost(on, {
+    files: new Map([[CONFIG, 'clawd:\n  enabled: false\nminimap:\n  enabled: true\n']]),
+    run: ({ argv }) => (argv[0] === 'bun' && argv[1]?.endsWith('minimap/index.ts')
+      ? { value: { exitCode: 0, stdout: rows, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+      : undefined) as never,
+  } as never)
+  on('session.id', () => ({ value: 's1' }) as never)
+  on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
+  on('session.start', (_$, e) => e as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(5_000)
+  const term = await $.ui.mount({ plugin: 'runes', surface: 'terminal', ...BAND })
+  const row = await term.find({ key: 'clawd-row' })
+  expect(row?.props).toMatchObject({ justifyContent: 'flex-start', width: 80 })
+  expect(await term.find({ key: 'clawd' })).toBeUndefined()
+  expect(await term.find({ key: 'line:0' })).toBeDefined()
+  await term.unmount()
+  // runes draws nothing there: the mount is refused, or it shows the engine's stub and no row of ours
+  const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND }).catch(() => undefined)
+  expect(await desk?.find({ key: 'clawd-row' })).toBeUndefined()
+  await desk?.unmount()
+})
