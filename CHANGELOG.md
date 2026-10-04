@@ -1,5 +1,16 @@
 # Changelog
 
+## [runes 0.7.5] - 2026-10-04
+
+_tracks tag `runes-v0.7.5`_
+
+### Added
+- The minimap now draws inside Clawd's band, left of the mascot, as a 3-block-tall track ending in an arrow, and clicking the track jumps to that message.
+- The minimap's separate pane and its `/runes minimap open|close|<columns>` commands are gone, so `/runes minimap on|off` is now a plain switch (default still off).
+
+### Fixed
+- The minimap shows only in the terminal, so the desktop band shows Clawd alone, and it leaves enough room for Clawd so the arrow no longer touches the mascot in herdr or Ghostty.
+
 ## [dispatch 5.7.1] - 2026-10-04
 
 _tracks tag `dispatch-v5.7.1`_
