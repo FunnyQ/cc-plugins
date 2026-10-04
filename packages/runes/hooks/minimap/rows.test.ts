@@ -1,11 +1,19 @@
 import { expect, test } from "claude-code/testing";
 
-import { kindAt, lines, rowsOf, rowsOfStream, stem } from "./rows";
+import { kindAt, lines, rowsOfStream, stem } from "./rows";
 
 const jsonl = (...entries: object[]) =>
   entries.map((e) => JSON.stringify(e)).join("\n");
 
-test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the rest", () => {
+// the whole text as one chunk: the uncut reading every cut must match
+const rowsOf = (text: string) =>
+  rowsOfStream(
+    (async function* () {
+      yield text;
+    })(),
+  );
+
+test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the rest", async () => {
   const text = jsonl(
     { type: "user", uuid: "u1", message: { content: "hello" } },
     { type: "user", uuid: "m1", isMeta: true, message: { content: "meta" } },
@@ -43,7 +51,7 @@ test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the r
       message: { content: [{ type: "tool_result" }] },
     },
   );
-  expect(rowsOf(text)).toEqual([
+  expect(await rowsOf(text)).toEqual([
     { id: "u1", kind: "prompt", size: 5 },
     { id: "a1", kind: "reply", size: 4 },
     { id: "toolu_1", kind: "bash", size: 16 },
@@ -51,9 +59,9 @@ test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the r
   ]);
 });
 
-test("rowsOf skips a line that does not parse", () => {
+test("rowsOf skips a line that does not parse", async () => {
   expect(
-    rowsOf(
+    await rowsOf(
       `{oops\n${jsonl({ type: "user", uuid: "u1", message: { content: "x" } })}`,
     ),
   ).toHaveLength(1);
@@ -112,6 +120,6 @@ test("rowsOfStream gives rowsOf's rows however the text is cut, with or without 
         for (let at = 0; at < source.length; at += size)
           yield source.slice(at, at + size);
       })();
-      expect(await rowsOfStream(chunks)).toEqual(rowsOf(text));
+      expect(await rowsOfStream(chunks)).toEqual(await rowsOf(text));
     }
 });

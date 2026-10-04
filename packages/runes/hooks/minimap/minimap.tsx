@@ -35,6 +35,9 @@ const COLOR: Record<string, () => string> = {
 };
 const colorOf = (kind: string) => COLOR[kind]?.() ?? "#808080";
 
+// the last rows read, so an unchanged transcript redraws nothing
+let lastRows = "";
+
 // a bun child, because a transcript outgrows the mod's 4 MiB $.fs.read cap
 const reread = async ($: EngineInterface) => {
   const { exitCode, stdout } = await $.process.run([
@@ -42,7 +45,9 @@ const reread = async ($: EngineInterface) => {
     `${$.plugin.root}/hooks/minimap/index.ts`,
     await $.session.id(),
   ]);
-  if (exitCode === 0) await update($, rows, () => JSON.parse(stdout) as Row[]);
+  if (exitCode !== 0 || stdout === lastRows) return;
+  lastRows = stdout;
+  await update($, rows, () => JSON.parse(stdout) as Row[]);
 };
 
 // one column per bucket, `barRows` blocks tall, the track along the bottom as a line into an arrowhead, drawn mid-cell like `→` so they join; drawn in Clawd's band
@@ -57,7 +62,7 @@ export const inlineMap = (
   const drawn = lines(list, here, Math.max(1, width - 1), barRows);
   // drawn top down, so the earliest cell (0) lands on the bottom row and a bar reads upward in time
   const strip = Array.from({ length: barRows }, (_, i) => barRows - 1 - i);
-  const node = (
+  return (
     <Box flexDirection="column">
       {strip.map((cell) => (
         <Box flexDirection="row">
@@ -91,7 +96,6 @@ export const inlineMap = (
       </Box>
     </Box>
   );
-  return { node, count: drawn.length };
 };
 
 const startTicker = ($: EngineInterface) => {

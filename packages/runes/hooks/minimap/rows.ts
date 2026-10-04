@@ -64,9 +64,6 @@ const rowsOfLine = (raw: string): Row[] => {
   return rows;
 };
 
-export const rowsOf = (jsonl: string): Row[] =>
-  jsonl.split("\n").flatMap(rowsOfLine);
-
 // the same rows read one line at a time, so memory stays near one line rather than 5x the file
 export const rowsOfStream = async (
   texts: AsyncIterable<string>,

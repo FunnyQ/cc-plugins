@@ -127,18 +127,21 @@ export const mascot = (on: On) => {
 
     requestId = e.requestId
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
-    const { value: frame = { clip, index } } = await $.state.get(FRAME)
     const ui = $.ui.resolve(e)
     const { Box, Image, Svg, Text } = ui
     // the minimap fills the band's empty left side; Clawd sits on its bottom edge
-    const list = hasMap ? (await read($, MAP_ROWS)) ?? [] : []
-    const here = new Set(((await read($, MAP_SHOWN)) ?? []).map(stem))
-    const spriteColumns = !config.enabled.clawd ? 0 : useText ? TEXT_COLUMNS : IMAGE_COLUMNS
-    const room = (e.props.bodyColumns ?? 0) - spriteColumns - (config.enabled.clawd ? config.minimap.gap : 0)
-    const map = list.length && room > 4
-      ? inlineMap(ui, list, here, room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
+    const [{ value: frame = { clip, index } }, list, shown] = await Promise.all([
+      $.state.get(FRAME),
+      hasMap ? read($, MAP_ROWS) : undefined,
+      hasMap ? read($, MAP_SHOWN) : undefined,
+    ])
+    // the columns Clawd and its gap take off the map's width
+    const reserved = config.enabled.clawd ? (useText ? TEXT_COLUMNS : IMAGE_COLUMNS) + config.minimap.gap : 0
+    const room = (e.props.bodyColumns ?? 0) - reserved
+    const map = list?.length && room > 4
+      ? inlineMap(ui, list, new Set((shown ?? []).map(stem)), room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' }))
       : undefined
-    // bodyColumns, not the viewport: a docked pane narrows the band
+    // bodyColumns, not the viewport
     const row = (sprite?: ReturnType<typeof h>) => (
       <Box key="clawd-row" flexDirection="row" justifyContent={!sprite ? 'flex-start' : map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{sprite}</Box>
     )
