@@ -8,8 +8,8 @@
 
 import { config } from "../config";
 
-const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-const MODEL = "jev-latest";
+export const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
+export const MODEL = "jev-latest";
 // the call never blocks a draw, so this is generous next to the measured max of 1.5 s
 const TIMEOUT_MS = 5_000;
 const COMMAND_CHARS = 300;
