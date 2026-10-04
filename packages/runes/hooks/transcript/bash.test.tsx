@@ -2,7 +2,14 @@ import { expect, test, type Engine } from "claude-code/testing";
 
 import { mute } from "./bubble";
 import { xterm256 } from "./ansi";
-import { CONFIG, eventually, startSession, find, within, ran } from "./test-session";
+import {
+  CONFIG,
+  eventually,
+  startSession,
+  find,
+  within,
+  ran,
+} from "./test-session";
 
 const CALL = (
   input: Record<string, unknown>,
@@ -43,8 +50,6 @@ const OUT = (stdout: string, stderr = "") => ({
   interrupted: false,
 });
 
-
-
 test("a Bash call draws its description in the header and the command after a $", async ($, on) => {
   await startSession($, on);
   const call = CALL({
@@ -76,6 +81,136 @@ test("a Bash call taller than fold_lines folds to its head", async ($, on) => {
   const call = CALL({ command: "a\nb\nc\nd" });
   expect(await find($, call, { type: "Text", text: "  c" })).toBeUndefined();
   expect(await find($, call, { key: "cmd:more:row" })).toBeDefined();
+});
+
+test("a successful Bash result taller than fold_lines folds to its head", async ($, on) => {
+  await startSession($, on, {
+    files: new Map([[CONFIG, "bash:\n  fold_lines: 3\n"]]),
+  });
+  const row = await $.ui.mount(RESULT(OUT("1\n2\n3\n4\n5\n6\n7\n")));
+  expect(await row.find({ key: "out:2" })).toBeDefined();
+  for (const key of ["out:3", "out:after", "out:6"])
+    expect(await row.find({ key })).toBeUndefined();
+  await row.unmount();
+});
+
+test("an unfolded card draws at full colour with no hover until it folds again", async ($, on) => {
+  await startSession($, on, {
+    files: new Map([[CONFIG, "bash:\n  fold_lines: 3\n"]]),
+  });
+  const result = RESULT(OUT("1\n2\n3\n4\n5\n6\n7\n"));
+  // the fold state is the module's, so a press on one mount shows in the next draw
+  const toggle = async () => {
+    const row = await $.ui.mount(result);
+    await row.press({ key: "out:more" });
+    await row.unmount();
+  };
+  expect(await within($, result, "bash:output", /^1$/)).toMatchObject({
+    props: { color: mute("#d4d4d4") },
+  });
+  await toggle();
+  const open = await within($, result, "bash:output", /^7$/);
+  expect(open).toMatchObject({ props: { color: "#d4d4d4" } });
+  expect((open as { hover?: unknown }).hover).toBeUndefined();
+  await toggle();
+  expect(await within($, result, "bash:output", /^1$/)).toMatchObject({
+    props: { color: mute("#d4d4d4") },
+  });
+});
+
+// the output card's lines as drawn, a divider as "—", so a tail on the wrong side of the fold fails
+const outLines = async ($: Engine, event: never) => {
+  const card = await find($, event, { key: "bash:output" });
+  return (card?.text.match(/├─+┤|│[^│]*│/g) ?? []).map((l) =>
+    l.startsWith("├") ? "—" : l.slice(1, -1).trim(),
+  );
+};
+const SEVEN = OUT("1\n2\n3\n4\n5\n6\n7\n");
+const fold = (lines: number) => ({
+  files: new Map([[CONFIG, `bash:\n  fold_lines: ${lines}\n`]]),
+});
+
+test("unfolding the command lights only the command card", async ($, on) => {
+  await startSession($, on, fold(2));
+  const event = CALL(
+    { command: "a\nb\nc\nd" },
+    { output: { stdout: "1\n2\n3\n", stderr: "" } },
+  );
+  const row = await $.ui.mount(event);
+  await row.press({ key: "cmd:more" });
+  await row.unmount();
+  // `d` reads as a command name, so its full colour is the bash green
+  expect(await within($, event, "bash", /^d$/)).toEqual({
+    type: "Text",
+    props: { bold: true, color: "#5f8f6a" },
+    children: ["d"],
+  });
+  expect(await within($, event, "bash", /^╰─+┬─+╯$/)).toMatchObject({
+    props: { color: "#5f8f6a" },
+  });
+  // the output is folded still, so it stays dim
+  expect(await within($, event, "bash:output", /^1$/)).toMatchObject({
+    props: { color: mute("#d4d4d4") },
+  });
+});
+
+test("an errored Bash result taller than fold_lines folds to its head and its tail around the fold row", async ($, on) => {
+  await startSession($, on, fold(3));
+  const result = RESULT(SEVEN, true);
+  const toggle = async () => {
+    const row = await $.ui.mount(result);
+    await row.press({ key: "out:more" });
+    await row.unmount();
+  };
+  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+  await toggle();
+  expect(await outLines($, result)).toEqual(["1", "2", "3", "4", "5", "6", "7", "—", "▾ fold"]);
+  await toggle();
+  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+});
+
+test("an errored Bash result with fold_lines 1 keeps only its last line", async ($, on) => {
+  await startSession($, on, fold(1));
+  expect(await outLines($, RESULT(SEVEN, true))).toEqual(["▸ 6 more lines", "—", "7"]);
+});
+
+test("an errored Bash result with fold_lines 2 keeps one head and one tail line", async ($, on) => {
+  await startSession($, on, fold(2));
+  expect(await outLines($, RESULT(SEVEN, true))).toEqual(["1", "—", "▸ 5 more lines", "—", "7"]);
+});
+
+test("an errored Bash result at fold_lines draws whole, and one past it folds", async ($, on) => {
+  await startSession($, on, fold(3));
+  expect(await outLines($, RESULT(OUT("1\n2\n3\n"), true))).toEqual(["1", "2", "3"]);
+  expect(await outLines($, RESULT(OUT("1\n2\n3\n4\n"), true))).toEqual(["1", "2", "—", "▸ 1 more lines", "—", "4"]);
+});
+
+test("an interrupted Bash result keeps its tail too", async ($, on) => {
+  await startSession($, on, fold(3));
+  const result = CALL({ command: "ls" }, { output: SEVEN, isInterrupted: true });
+  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+});
+
+test("the tail of an errored result is the text the model read, stderr last", async ($, on) => {
+  await startSession($, on, fold(3));
+  expect(await outLines($, RESULT("Exit code 1\na\nb\nc\nfatal: boom", true))).toEqual([
+    "Exit code 1",
+    "a",
+    "—",
+    "▸ 2 more lines",
+    "—",
+    "fatal: boom",
+  ]);
+  const both = RESULT(OUT("1\n2\n3\n4\n5\n", "warn: x\nerror: y"), true);
+  expect(await outLines($, both)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "error: y"]);
+  expect(await within($, both, "bash:output", /^error: y$/)).toMatchObject({
+    props: { color: mute("#c94f4f") },
+  });
+});
+
+test("a successful Bash result at fold_lines 1 still folds to its head alone", async ($, on) => {
+  await startSession($, on, fold(1));
+  expect(await outLines($, RESULT(SEVEN))).toEqual(["1", "—", "▸ 6 more lines"]);
 });
 
 test("a Bash result draws its own card, linked to the call above it", async ($, on) => {
@@ -251,7 +386,6 @@ test("a card is only as wide as its frame, so the pointer beside it does not lig
   });
 });
 
-
 test("a JSON result goes through glow as a json fence and draws its colours, muted", async ($, on) => {
   const stdins: string[] = [];
   await startSession($, on, {
@@ -328,23 +462,51 @@ const JEV = (over: { code?: number; risk?: number } = {}) => {
   const code = over.code ?? 0.99;
   return {
     value: {
-      status: 200, ok: true, headers: {},
-      text: JSON.stringify({ answers: {
-        kind: { type: "choice", choice: "code", confidence: 1, probabilities: { markdown: 0, json: 0, diff: 0, code, plain: 1 - code } },
-        language: { type: "choice", choice: "typescript", confidence: 1, probabilities: { typescript: 1, other: 0 } },
-        risk: { type: "noul", noul: over.risk ?? 0.1 },
-      } }),
+      status: 200,
+      ok: true,
+      headers: {},
+      text: JSON.stringify({
+        answers: {
+          kind: {
+            type: "choice",
+            choice: "code",
+            confidence: 1,
+            probabilities: {
+              markdown: 0,
+              json: 0,
+              diff: 0,
+              code,
+              plain: 1 - code,
+            },
+          },
+          language: {
+            type: "choice",
+            choice: "typescript",
+            confidence: 1,
+            probabilities: { typescript: 1, other: 0 },
+          },
+          risk: { type: "noul", noul: over.risk ?? 0.1 },
+        },
+      }),
     },
   } as never;
 };
 
-const CMD = (command: string, stdout: string) => CALL({ command }, { output: OUT(stdout) });
+const CMD = (command: string, stdout: string) =>
+  CALL({ command }, { output: OUT(stdout) });
 
 test("with no TYPESAFE_API_KEY nothing is sent and the output stays as it was", async ($, on) => {
   const sent: string[] = [];
   on("http.fetch", (_$, e) => (sent.push(e.url), JEV()));
   await startSession($, on, { run: () => ran("") });
-  expect(await within($, CMD("make report", "const a = 1\nconst b = 2\n"), "bash:output", /^const a = 1$/)).toBeDefined();
+  expect(
+    await within(
+      $,
+      CMD("make report", "const a = 1\nconst b = 2\n"),
+      "bash:output",
+      /^const a = 1$/,
+    ),
+  ).toBeDefined();
   await new Promise((r) => setTimeout(r, 30));
   expect(sent).toEqual([]);
 });
@@ -355,10 +517,21 @@ test("with a key, a command Jev is sure prints code goes through glow, and the o
   on("http.fetch", (_$, e) => (bodies.push(String(e.init?.body)), JEV()));
   await startSession($, on, {
     env: { TYPESAFE_API_KEY: "k" },
-    run: (e) => (stdins.push(e.init?.stdin ?? ""), ran("\n    \x1b[38;5;140mconst a\x1b[0m\n")),
+    run: (e) => (
+      stdins.push(e.init?.stdin ?? ""),
+      ran("\n    \x1b[38;5;140mconst a\x1b[0m\n")
+    ),
   });
-  const call = CMD("make report TOKEN=abcdef1234567890abcdef", "const a = 1\nconst b = 2\n");
-  expect(await eventually(async () => (await within($, call, "bash:output", /^const a$/)) !== undefined)).toBe(true);
+  const call = CMD(
+    "make report TOKEN=abcdef1234567890abcdef",
+    "const a = 1\nconst b = 2\n",
+  );
+  expect(
+    await eventually(
+      async () =>
+        (await within($, call, "bash:output", /^const a$/)) !== undefined,
+    ),
+  ).toBe(true);
   expect(stdins.some((s) => s.startsWith("```typescript\n"))).toBe(true);
   // one request, for the command, with its token masked and none of the output in it
   expect(bodies).toHaveLength(1);
@@ -370,8 +543,18 @@ test("with a key, a command Jev is sure prints code goes through glow, and the o
 test("a command the local list denies is never sent to Jev", async ($, on) => {
   const sent: string[] = [];
   on("http.fetch", (_$, e) => (sent.push(e.url), JEV()));
-  await startSession($, on, { env: { TYPESAFE_API_KEY: "k" }, run: () => ran("") });
-  expect(await within($, CMD("env", "HOME=/x\nPATH=/bin\n"), "bash:output", /^HOME=\/x$/)).toBeDefined();
+  await startSession($, on, {
+    env: { TYPESAFE_API_KEY: "k" },
+    run: () => ran(""),
+  });
+  expect(
+    await within(
+      $,
+      CMD("env", "HOME=/x\nPATH=/bin\n"),
+      "bash:output",
+      /^HOME=\/x$/,
+    ),
+  ).toBeDefined();
   await new Promise((r) => setTimeout(r, 30));
   expect(sent).toEqual([]);
 });

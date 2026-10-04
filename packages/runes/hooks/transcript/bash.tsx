@@ -2,7 +2,16 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
-import { bubble, foldRows, isLight, memo, paint, PALETTES, runLine } from "./bubble";
+import {
+  bubble,
+  DIVIDER,
+  foldRows,
+  isLight,
+  memo,
+  paint,
+  PALETTES,
+  runLine,
+} from "./bubble";
 import { glow } from "./glow";
 import { jev } from "./jev";
 import { type Kind, layout } from "./shell";
@@ -83,7 +92,7 @@ export const bash = (on: On) => {
       const fold = (
         part: string,
         total: number,
-        scope: string,
+        scope: string | undefined,
         width: number,
       ) => {
         const key = `${id}:${part}`;
@@ -93,7 +102,7 @@ export const bash = (on: On) => {
           isOpen: open.has(key),
           hidden: total - foldLines,
           width,
-          hover: { color: tint, scope },
+          ...(scope ? { hover: { color: tint, scope } } : {}),
           onPress: () => {
             open.has(key) ? open.delete(key) : open.add(key);
             $.ui.invalidate("ui.render");
@@ -103,8 +112,9 @@ export const bash = (on: On) => {
       const visible = <T,>(part: string, all: T[]) =>
         open.has(`${id}:${part}`) ? all : all.slice(0, foldLines);
       // each card is one hover group, so the pointer anywhere on it lights all of it
-      const callScope = `${id}:call`;
-      const outScope = `${id}:out`;
+      // an unfolded card is being read, so it stays at full colour until it folds again
+      const callScope = open.has(`${id}:cmd`) ? undefined : `${id}:call`;
+      const outScope = open.has(`${id}:out`) ? undefined : `${id}:out`;
       const theme = isLight() ? "light" : "dark";
       const { text: TEXT, dim: DIM } = PALETTES[theme];
       const tokenStyle = ({ kind }: { kind: Kind }): object => {
@@ -120,8 +130,9 @@ export const bash = (on: On) => {
         : isRunning
           ? " · running"
           : "";
-      const lines = remember(`cmd\0${id}\0${callInner}\0${command.length}`, () =>
-        layout(command, callInner),
+      const lines = remember(
+        `cmd\0${id}\0${callInner}\0${command.length}`,
+        () => layout(command, callInner),
       );
       const call = bubble(
         { Box, Text },
@@ -135,7 +146,7 @@ export const bash = (on: On) => {
           rows: [
             ...visible("cmd", lines).map((line, i): [string, unknown] => [
               `cmd:${i}`,
-              runLine(Text, line, tokenStyle, { hover: { scope: callScope } }),
+              runLine(Text, line, tokenStyle, callScope ? { hover: { scope: callScope } } : {}),
             ]),
             ...fold("cmd", lines.length, callScope, callInner),
           ],
@@ -163,11 +174,14 @@ export const bash = (on: On) => {
         return { lang, fence };
       });
       // output the sniffer could not place may still be code or Markdown, which Jev says once it has been asked
-      const guess = lang || isBad || !stdout ? undefined : jev.view(command, stdout);
+      const guess =
+        lang || isBad || !stdout ? undefined : jev.view(command, stdout);
       const shown = lang ?? guess;
       const fenced = guess
         ? remember(`fence\0${id}\0${size}\0${guess}`, () =>
-            guess === "markdown" ? stdout : `\`\`\`${guess}\n${stdout.replace(/\n+$/, "")}\n\`\`\``,
+            guess === "markdown"
+              ? stdout
+              : `\`\`\`${guess}\n${stdout.replace(/\n+$/, "")}\n\`\`\``,
           )
         : fence;
       const glowed = shown ? glow.view(inner - 2, fenced) : null;
@@ -188,19 +202,32 @@ export const bash = (on: On) => {
           );
         },
       );
+      const outRow = (runs: Run[], i: number): [string, unknown] => [
+        `out:${i}`,
+        runLine(
+          Text,
+          runs,
+          ({ text: _, color: c, ...style }) => ({
+            ...style,
+            ...paint(c ?? TEXT, outScope),
+          }),
+          outScope ? { hover: { scope: outScope } } : {},
+        ),
+      ];
+      // a folded error keeps its tail too, where a failing run prints its failures and its summary
+      const isFolded = out.length > foldLines && !open.has(`${id}:out`);
+      // at fold_lines 1 the one line kept is the last
+      const tail = isFolded && isBad ? Math.max(1, Math.floor(foldLines / 2)) : 0;
+      const tailRows: [string, unknown][] = tail
+        ? [
+            ["out:after", DIVIDER],
+            ...out
+              .slice(out.length - tail)
+              .map((runs, i) => outRow(runs, out.length - tail + i)),
+          ]
+        : [];
       const outRows: [string, unknown][] = [
-        ...visible("out", out).map((runs, i): [string, unknown] => [
-          `out:${i}`,
-          runLine(
-            Text,
-            runs,
-            ({ text: _, color: c, ...style }) => ({
-              ...style,
-              ...paint(c ?? TEXT, outScope),
-            }),
-            { hover: { scope: outScope } },
-          ),
-        ]),
+        ...(isFolded ? out.slice(0, foldLines - tail) : out).map(outRow),
         ...(out.length
           ? []
           : [
@@ -213,7 +240,11 @@ export const bash = (on: On) => {
                 </Text>,
               ] as [string, unknown],
             ]),
-        ...fold("out", out.length, outScope, inner - 2),
+        // with no head above it, the fold row needs no divider over it
+        ...fold("out", out.length, outScope, inner - 2).filter(
+          ([key]) => foldLines > tail || key !== "out:divider",
+        ),
+        ...tailRows,
       ];
       return (
         <Box key="bash:pair" flexDirection="column">
