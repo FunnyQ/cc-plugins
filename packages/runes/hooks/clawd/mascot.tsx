@@ -14,6 +14,9 @@ const DONE_MS = 5_000
 // 20x16 grid at 2 CSS px per pixel
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
+// the columns Clawd takes in each drawing, so the map keeps a gap of GAP columns from it: the octant text is 10 cells wide
+const TEXT_COLUMNS = 10
+const GAP = 2
 
 // read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks
 const FRAME = { plugin: 'runes', key: 'frame' } as const
@@ -127,9 +130,10 @@ export const mascot = (on: On) => {
     const ui = $.ui.resolve(e)
     const { Box, Image, Svg, Text } = ui
     // the minimap fills the band's empty left side; Clawd sits on its bottom edge
-    const list = config.enabled.minimap ? (await read($, MAP_ROWS)) ?? [] : []
+    const list = config.enabled.minimap && e.surface === 'terminal' ? (await read($, MAP_ROWS)) ?? [] : []
     const here = new Set(((await read($, MAP_SHOWN)) ?? []).map(stem))
-    const room = (e.props.bodyColumns ?? 0) - IMAGE_COLUMNS - 2
+    const spriteColumns = useText ? TEXT_COLUMNS : IMAGE_COLUMNS
+    const room = (e.props.bodyColumns ?? 0) - spriteColumns - GAP
     const map = list.length && room > 4
       ? inlineMap(ui, list, here, room, BAR_ROWS, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' })).node
       : undefined

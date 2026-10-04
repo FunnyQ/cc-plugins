@@ -89,3 +89,28 @@ test("Clawd's frames redraw the band alone, never the transcript", async ($, on)
   expect(alts.size).toBeGreaterThan(1)
   expect(rows).toBe(before)
 })
+
+test('the minimap fills the left of the band on the terminal and never on the desktop', async ($, on) => {
+  const clock = mock.clock(on)
+  const rows = JSON.stringify([
+    { id: 'u1', kind: 'prompt', size: 20 },
+    { id: 'a1', kind: 'reply', size: 200 },
+  ])
+  fakeHost(on, {
+    files: new Map([[CONFIG, 'minimap:\n  enabled: true\n']]),
+    run: ({ argv }) => (argv[0] === 'bun' && argv[1]?.endsWith('minimap/index.ts')
+      ? { value: { exitCode: 0, stdout: rows, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+      : undefined) as never,
+  } as never)
+  on('session.id', () => ({ value: 's1' }) as never)
+  on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
+  on('session.start', (_$, e) => e as never)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  await clock.advance(5_000)
+  const term = await $.ui.mount({ plugin: 'runes', surface: 'terminal', ...BAND })
+  expect((await term.find({ key: 'clawd-row' }))?.props).toMatchObject({ justifyContent: 'space-between' })
+  await term.unmount()
+  const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND })
+  expect((await desk.find({ key: 'clawd-row' }))?.props).toMatchObject({ justifyContent: 'flex-end' })
+  await desk.unmount()
+})
