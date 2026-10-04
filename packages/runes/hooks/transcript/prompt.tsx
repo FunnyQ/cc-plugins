@@ -33,7 +33,7 @@ export const prompt = (on: On) => {
 
   on(
     "ui.render",
-    { component: "UserMessage", props: { origin: { kind: "composer" } } },
+    { component: "UserMessage", surface: "terminal", props: { origin: { kind: "composer" } } },
     async ($, e, next) => {
       noteRow(e.requestId, Boolean(e.props.onScreen));
       if (!config.enabled.transcript || !config.enabled.prompt) return next(e);

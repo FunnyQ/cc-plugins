@@ -55,7 +55,7 @@ export const bash = (on: On) => {
   // the engine draws ToolResult inside its own ToolUse row, so a hook that replaces the row draws the output too
   on(
     "ui.render",
-    { component: "ToolUse", props: { tool: "Bash" } },
+    { component: "ToolUse", surface: "terminal", props: { tool: "Bash" } },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.bash) return next(e);
       const {

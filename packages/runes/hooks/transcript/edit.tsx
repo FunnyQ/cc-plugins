@@ -82,7 +82,7 @@ export const edit = (on: On) => {
     ["Write", "write"],
   ] as const) {
     hideResult(on, tool, rune);
-    on("ui.render", { component: "ToolUse", props: { tool } }, ($, e, next) => {
+    on("ui.render", { component: "ToolUse", surface: "terminal", props: { tool } }, ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
       const {
         color,

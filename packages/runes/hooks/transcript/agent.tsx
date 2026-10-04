@@ -83,7 +83,7 @@ export const agent = (on: On) => {
 
   on(
     "ui.render",
-    { component: "ToolUse", props: { tool: "Agent" } },
+    { component: "ToolUse", surface: "terminal", props: { tool: "Agent" } },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.agent) return next(e);
       const { color, error_color, icon, side } = config.agent;

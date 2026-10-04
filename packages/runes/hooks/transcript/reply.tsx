@@ -8,7 +8,7 @@ import { bubble, runLine } from "./bubble";
 import { innerWidth, wrap } from "./text";
 
 export const reply = (on: On) => {
-  on("ui.render", { component: "AssistantMessage" }, async ($, e, next) => {
+  on("ui.render", { component: "AssistantMessage", surface: "terminal" }, async ($, e, next) => {
     noteRow(e.requestId, Boolean(e.props.onScreen));
     if (!config.enabled.transcript || !config.enabled.reply) return next(e);
     // run the chain anyway so plugins beneath still see the row; its tree is discarded

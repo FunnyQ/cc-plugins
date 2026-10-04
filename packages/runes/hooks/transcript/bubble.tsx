@@ -87,7 +87,7 @@ export const errorRows = (
 export const hideResult = (on: On, tool: string, rune: Rune) =>
   on(
     "ui.render",
-    { component: "ToolResult", props: { tool } },
+    { component: "ToolResult", surface: "terminal", props: { tool } },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
       const { Box } = $.ui.resolve(e);

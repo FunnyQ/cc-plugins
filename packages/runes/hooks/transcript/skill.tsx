@@ -69,7 +69,7 @@ export const skill = (on: On) => {
 
   on(
     "ui.render",
-    { component: "ToolUse", props: { tool: "Skill" } },
+    { component: "ToolUse", surface: "terminal", props: { tool: "Skill" } },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.skill) return next(e);
       const { color, error_color, icon, side } = config.skill;

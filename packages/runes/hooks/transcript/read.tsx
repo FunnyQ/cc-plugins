@@ -64,7 +64,7 @@ export const read = (on: On) => {
 
   on(
     "ui.render",
-    { component: "ToolUse", props: { tool: "Read" } },
+    { component: "ToolUse", surface: "terminal", props: { tool: "Read" } },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.read) return next(e);
       const { color, error_color, icon, side } = config.read;

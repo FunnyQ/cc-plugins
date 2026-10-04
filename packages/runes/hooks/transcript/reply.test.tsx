@@ -136,3 +136,14 @@ test("a drawn bubble still runs the chain, so a plugin beneath sees the row", as
   expect(await draws($, REPLY("x", "row-1"), { key: "reply" })).toBe(true);
   expect(host.beneath).toContain("row-1");
 });
+
+test("the desktop keeps the engine's own reply: runes draws nothing there", async ($, on) => {
+  await startSession($, on, { run: () => ran(0, GLOW) });
+  // mount refuses a surface where the plugin drew nothing
+  await expect(
+    $.ui.mount({ ...(REPLY("hi") as object), surface: "desktop" } as never),
+  ).rejects.toThrow("runes drew nothing on the desktop surface");
+  const term = await $.ui.mount(REPLY("hi"));
+  expect(await term.find({ key: "reply" })).toBeDefined();
+  await term.unmount();
+});
