@@ -5,10 +5,10 @@ import { clawd, seen, sprite, spriteColumns } from './clawd/mascot'
 import { config } from './config'
 import { inlineMap } from './minimap/minimap'
 import { stem } from './minimap/rows'
-import { TEACHER_COLOR } from './teacher/lesson'
-import { teacher, wrapWords } from './teacher/teacher'
+import { TEACHER_COLOR, TEACHER_ICON } from './teacher/lesson'
+import { teacher } from './teacher/teacher'
 import { bubble } from './transcript/bubble'
-import { innerWidth } from './transcript/text'
+import { innerWidth, wrapWords } from './transcript/text'
 
 // the band's state by their keys: the state scan needs literals written in the file that reads them, and `claude plugin validate` fails a key types/index.d.ts does not declare
 const FRAME = { plugin: 'runes', key: 'frame' } as const
@@ -52,7 +52,7 @@ export const band = (on: On) => {
     const notice = !lesson || !term ? undefined : bubble({ Box: term.Box, Text: term.Text }, {
       key: 'teacher',
       color: TEACHER_COLOR,
-      icon: '\u{F0890}',
+      icon: TEACHER_ICON,
       title: 'Your English Teacher',
       side: 'left',
       bar: false,

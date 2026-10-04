@@ -1,6 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
-import { changes, isWorthAsking, needsLesson, same, teacher, titleOf, TITLES, wrapWords } from "./teacher";
+import { changes, isWorthAsking, needsLesson, same, teacher, titleOf, TITLES } from "./teacher";
+import { wrapWords } from "../transcript/text";
 
 test("a short prompt, a slash command, a shell escape, or a wall of text is never asked about", () => {
   expect(isWorthAsking("fix it")).toBe(false);

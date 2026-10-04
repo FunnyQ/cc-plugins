@@ -66,3 +66,44 @@ export const wrapRuns = <R extends Styled>(runs: R[], width: number, lead?: R): 
 
 export const plural = (n: number, one: string, many = `${one}s`) =>
   `${n} ${n === 1 ? one : many}`;
+
+// styled runs wrapped between words: wrapRuns cuts at any character, which split "remove" across two lines; a
+// newline starts a line, and only a word wider than the whole line is cut
+export const wrapWords = <R extends { text: string }>(runs: R[], width: number): R[][] => {
+  const lines: R[][] = [[]];
+  let used = 0;
+  let space: R | undefined;
+  const line = () => lines[lines.length - 1]!;
+  const next = () => {
+    lines.push([]);
+    used = 0;
+    space = undefined;
+  };
+  for (const run of runs)
+    for (const token of run.text.split(/(\s+)/)) {
+      if (!token) continue;
+      if (/^\s/.test(token)) {
+        const breaks = token.split("\n").length - 1;
+        for (let i = 0; i < breaks; i++) next();
+        if (!breaks && used) space = { ...run, text: " " };
+        continue;
+      }
+      const w = cells(token);
+      if (used && used + (space ? 1 : 0) + w > width) next();
+      if (space) line().push(space);
+      used += space ? 1 : 0;
+      space = undefined;
+      if (w <= width) {
+        line().push({ ...run, text: token });
+        used += w;
+        continue;
+      }
+      const pieces = wrapRuns([{ ...run, text: token }], width);
+      pieces.forEach((piece, i) => {
+        if (i) next();
+        line().push(...piece);
+        used = cells(piece.map((r) => r.text).join(""));
+      });
+    }
+  return lines;
+};

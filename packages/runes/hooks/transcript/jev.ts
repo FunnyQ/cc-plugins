@@ -8,8 +8,8 @@
 
 import { config } from "../config";
 
-export const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-export const MODEL = "jev-latest";
+const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
+const MODEL = "jev-latest";
 // the call never blocks a draw, so this is generous next to the measured max of 1.5 s
 const TIMEOUT_MS = 5_000;
 const COMMAND_CHARS = 300;
@@ -147,14 +147,19 @@ const remember = (key: string, lang: string | undefined) => {
   if (verdicts.size > CACHE_SIZE) verdicts.delete(verdicts.keys().next().value!);
 };
 
-const ask = async (t: Transport, body: object) => {
+// one Jev call, its answers by question name; the teacher asks through it too
+export const systemOne = async (t: { post: Post; apiKey: string }, body: object) => {
   const r = await t.post(ENDPOINT, {
     method: "POST",
     headers: { Authorization: `Bearer ${t.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: MODEL, ...body }),
   });
   if (!r.ok) throw new Error("jev refused");
-  const { answers } = JSON.parse(r.text) as { answers: Record<string, { probabilities?: Probs; noul?: number }> };
+  return (JSON.parse(r.text) as { answers: Record<string, { probabilities?: Probs; noul?: number }> }).answers;
+};
+
+const ask = async (t: Transport, body: object) => {
+  const answers = await systemOne(t, body);
   return {
     kind: answers.kind?.probabilities ?? {},
     language: answers.language?.probabilities ?? {},

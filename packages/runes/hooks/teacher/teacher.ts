@@ -5,8 +5,7 @@
 import type { On } from "claude-code";
 
 import { config } from "../config";
-import { ENDPOINT, MODEL, type Post, scrub } from "../transcript/jev";
-import { cells, wrapRuns } from "../transcript/text";
+import { type Post, scrub, systemOne } from "../transcript/jev";
 
 // literals, so a boundary compares exactly; unmeasured, tune them against hand-labelled prompts
 const ENGLISH = 0.7;
@@ -81,47 +80,6 @@ export const titleOf = (text: string) => {
   return TITLES[h % TITLES.length]!;
 };
 
-// styled runs wrapped between words: wrapRuns cuts at any character, which split "remove" across two lines; a
-// newline starts a line, and only a word wider than the whole line is cut
-export const wrapWords = <R extends { text: string }>(runs: R[], width: number): R[][] => {
-  const lines: R[][] = [[]];
-  let used = 0;
-  let space: R | undefined;
-  const line = () => lines[lines.length - 1]!;
-  const next = () => {
-    lines.push([]);
-    used = 0;
-    space = undefined;
-  };
-  for (const run of runs)
-    for (const token of run.text.split(/(\s+)/)) {
-      if (!token) continue;
-      if (/^\s/.test(token)) {
-        const breaks = token.split("\n").length - 1;
-        for (let i = 0; i < breaks; i++) next();
-        if (!breaks && used) space = { ...run, text: " " };
-        continue;
-      }
-      const w = cells(token);
-      if (used && used + (space ? 1 : 0) + w > width) next();
-      if (space) line().push(space);
-      used += space ? 1 : 0;
-      space = undefined;
-      if (w <= width) {
-        line().push({ ...run, text: token });
-        used += w;
-        continue;
-      }
-      const pieces = wrapRuns([{ ...run, text: token }], width);
-      pieces.forEach((piece, i) => {
-        if (i) next();
-        line().push(...piece);
-        used = cells(piece.map((r) => r.text).join(""));
-      });
-    }
-  return lines;
-};
-
 // a rewrite far longer than the prompt, or holding a fence, is haiku answering the prompt instead of correcting it
 export const isRewrite = (better: string, text: string) =>
   better.length <= 2 * text.length + 40 && !better.includes("```");
@@ -178,18 +136,7 @@ const keep = <V>(map: Map<string, V>, key: string, value: V) => {
 };
 
 const coach = async (t: Transport, text: string) => {
-  const r = await t.post(ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${t.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, ...questions(scrub(text)) }),
-  });
-  if (!r.ok) return undefined;
-  const { answers } = JSON.parse(r.text) as {
-    answers: Record<string, { noul?: number }>;
-  };
+  const answers = await systemOne(t, questions(scrub(text)));
   if (
     !needsLesson({
       english: answers.english?.noul ?? 0,
@@ -210,7 +157,11 @@ export const teacher = {
     const better = current === undefined ? undefined : teacher.lesson(current);
     return better ? { better, requestId: rows.get(current!) } : undefined;
   },
-  seen: (text: string, requestId: string) => keep(rows, keyOf(text), requestId),
+  seen(text: string, requestId: string) {
+    const key = keyOf(text);
+    // every redraw reports its row, so only a new one pays for the LRU reorder
+    if (rows.get(key) !== requestId) keep(rows, key, requestId);
+  },
   submit(text: string) {
     const key = keyOf(text);
     current = key;
@@ -234,12 +185,7 @@ export const teacher = {
       });
   },
   // run from session.start, which holds `$`; no key leaves the teacher silent
-  work(next: {
-    apiKey: string | undefined;
-    post: Post;
-    complete: Complete;
-    redraw: () => void;
-  }) {
+  work(next: Omit<Transport, "apiKey"> & { apiKey: string | undefined }) {
     // a cleared or resumed session starts with no notice pointing at a row it no longer has
     current = undefined;
     transport = next.apiKey ? { ...next, apiKey: next.apiKey } : undefined;
