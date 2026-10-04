@@ -1,5 +1,16 @@
 # Changelog
 
+## [runes 0.7.6] - 2026-10-04
+
+_tracks tag `runes-v0.7.6`_
+
+### Changed
+- The minimap now streams the transcript line by line, cutting peak memory on a 35.8 MB transcript from 185 MB to 75 MB with identical output.
+- Minimap bars now read upward in time, with the earliest message on the bottom row and the newest on top.
+
+### Fixed
+- The Claude desktop app no longer shows garbled glyphs and cut-off lines from runes transcript bubbles, because they now draw only in the terminal.
+
 ## [runes 0.7.5] - 2026-10-04
 
 _tracks tag `runes-v0.7.5`_
