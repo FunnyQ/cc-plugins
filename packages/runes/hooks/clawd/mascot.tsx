@@ -1,12 +1,9 @@
-import { read } from 'claude-code'
-import type { On } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
 
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
 import { CLIPS } from './frames'
 import { config } from '../config'
-import { inlineMap } from '../minimap/minimap'
-import { stem } from '../minimap/rows'
 
 const TICK_MS = 50
 // a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
@@ -17,15 +14,44 @@ const SVG_HEIGHT = 32
 // the columns Clawd takes in each drawing, so the map keeps minimap.gap columns clear of it: the octant text is 10 cells wide
 const TEXT_COLUMNS = 10
 
-// read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks
+// read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks.
+// band.tsx reads it under a literal of its own (the state scan needs one in the file that reads); validate fails a key that drifts from types/index.d.ts
 const FRAME = { plugin: 'runes', key: 'frame' } as const
-// the minimap's atoms by their keys: the state scan needs literals written in the file that reads them
-const MAP_ROWS = { plugin: 'runes', key: 'minimapRows' } as const
-const MAP_SHOWN = { plugin: 'runes', key: 'minimapShown' } as const
+
+// what the band (band.tsx) and the frame ticker below share: module values, since a rune may share nothing else
+export const clawd = {
+  requestId: undefined as string | undefined,
+  clip: 'living',
+  index: 0,
+  // terminals without kitty Unicode placeholders (herdr's libghostty) deny Image blits
+  useText: false,
+  // the desktop has no blit, so each frame is a redraw of a static SVG (transparent, unlike an isInteractive frame)
+  isDesktop: false,
+}
+
+export const spriteColumns = () => (clawd.useText ? TEXT_COLUMNS : IMAGE_COLUMNS)
+
+type Ui = ReturnType<EngineInterface['ui']['resolve']>
+
+// Clawd's picture in the drawing this surface and terminal take
+export const sprite = ({ Image, Svg, Text, Box }: Ui, surface: string, frame: { clip: string; index: number }) => {
+  if (surface === 'desktop') return <Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
+  // Raster refuses non-BMP characters, so octants go out as plain coloured Text
+  if (clawd.useText) {
+    return (
+      <Box key="clawd" flexDirection="column">
+        {octants(frame.clip, frame.index).map((runs, y) => (
+          <Text key={String(y)}>{runs.map((run, x) => <Text key={String(x)} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
+        ))}
+      </Box>
+    )
+  }
+  return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clawd.clip, clawd.index)} />
+}
 
 export const mascot = (on: On) => {
   const director = new Director()
-  let requestId: string | undefined
+  Object.assign(clawd, { requestId: undefined, clip: 'living', index: 0, useText: false, isDesktop: false })
   let now = 0
   let isWorking = false
   let blocked = 0
@@ -33,14 +59,7 @@ export const mascot = (on: On) => {
   let turnStartedAt = 0
   let doneAt = -Infinity
   let lastActiveAt = 0
-  let clip = 'living'
-  let index = 0
   let elapsed = 0
-  // terminals without kitty Unicode placeholders (herdr's libghostty) deny Image blits
-  let useText = false
-  // the desktop has no blit, so each frame is a redraw of a static SVG (transparent, unlike an isInteractive frame)
-  let isDesktop = false
-
   const inputs = () => ({
     blocked,
     busy: (isWorking ? 1 : 0) + subagents,
@@ -51,25 +70,26 @@ export const mascot = (on: On) => {
 
   // register.tsx holds the unmatched session.start; a mascot only matters where someone watches
   on('session.start', { isInteractive: true }, async ($, e, next) => {
-    clip = director.next(inputs())
+    clawd.clip = director.next(inputs())
     $.clock.every(TICK_MS, () => {
       now += TICK_MS
       elapsed += TICK_MS
+      const { requestId, clip, index } = clawd
       if (!config.enabled.clawd || requestId === undefined || elapsed < CLIPS[clip]![index]!.ms) return
       elapsed = 0
-      index += 1
-      if (index === CLIPS[clip]!.length) {
-        index = 0
-        clip = director.next(inputs())
+      clawd.index += 1
+      if (clawd.index === CLIPS[clip]!.length) {
+        clawd.index = 0
+        clawd.clip = director.next(inputs())
       }
-      if (isDesktop || useText) {
-        void $.state.set(FRAME, { clip, index })
+      if (clawd.isDesktop || clawd.useText) {
+        void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
         return
       }
-      $.ui.blit({ requestId, key: 'clawd', source: pixels(clip, index) }).then(r => {
+      $.ui.blit({ requestId, key: 'clawd', source: pixels(clawd.clip, clawd.index) }).then(r => {
         if (!('deny' in r)) return
-        useText = true
-        void $.state.set(FRAME, { clip, index })
+        clawd.useText = true
+        void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
       })
     })
 
@@ -118,50 +138,5 @@ export const mascot = (on: On) => {
     subagents = Math.max(0, subagents - 1)
     lastActiveAt = now
     return next(e)
-  })
-
-  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
-    // the band serves the map too, so Clawd off leaves it drawing when the minimap is on
-    const hasMap = config.enabled.minimap && e.surface === 'terminal'
-    if ((!config.enabled.clawd && !hasMap) || e.props.hasSurvey) return next(e)
-
-    requestId = e.requestId
-    if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
-    const ui = $.ui.resolve(e)
-    const { Box, Image, Svg, Text } = ui
-    // the minimap fills the band's empty left side; Clawd sits on its bottom edge
-    const [{ value: frame = { clip, index } }, list, shown] = await Promise.all([
-      $.state.get(FRAME),
-      hasMap ? read($, MAP_ROWS) : undefined,
-      hasMap ? read($, MAP_SHOWN) : undefined,
-    ])
-    // the columns Clawd and its gap take off the map's width
-    const reserved = config.enabled.clawd ? (useText ? TEXT_COLUMNS : IMAGE_COLUMNS) + config.minimap.gap : 0
-    const room = (e.props.bodyColumns ?? 0) - reserved
-    const map = list?.length && room > 4
-      ? inlineMap(ui, list, new Set((shown ?? []).map(stem)), room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' }))
-      : undefined
-    // bodyColumns, not the viewport
-    const row = (sprite?: ReturnType<typeof h>) => (
-      <Box key="clawd-row" flexDirection="row" justifyContent={!sprite ? 'flex-start' : map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{sprite}</Box>
-    )
-
-    if (!config.enabled.clawd) return map ? row() : next(e)
-    if (e.surface === 'desktop') {
-      isDesktop = true
-      return row(<Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />)
-    }
-    // Raster refuses non-BMP characters, so octants go out as plain coloured Text
-    if (useText) {
-      return row(
-        <Box key="clawd" flexDirection="column">
-          {octants(frame.clip, frame.index).map((runs, y) => (
-            <Text key={String(y)}>{runs.map((run, x) => <Text key={String(x)} color={run.color} backgroundColor={run.backgroundColor}>{run.text}</Text>)}</Text>
-          ))}
-        </Box>
-      )
-    }
-
-    return row(<Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clip, index)} />)
   })
 }

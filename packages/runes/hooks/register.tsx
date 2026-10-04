@@ -1,5 +1,6 @@
 import type { Hook, Register } from "claude-code";
 
+import { band } from "./band";
 import { mascot } from "./clawd/mascot";
 import { minimap } from "./minimap/minimap";
 import {
@@ -171,6 +172,7 @@ export const register: Register = (on) => {
   });
 
   mascot(on);
+  band(on);
   prompt(on);
   reply(on);
   bash(on);

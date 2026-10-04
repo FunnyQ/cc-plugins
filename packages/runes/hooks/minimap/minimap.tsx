@@ -35,19 +35,38 @@ const COLOR: Record<string, () => string> = {
 };
 const colorOf = (kind: string) => COLOR[kind]?.() ?? "#808080";
 
+// the transcript's path, learned from the first read, and its size and mtime as last read
+let transcript: string | undefined;
+let lastSeen: string | undefined;
 // the last rows read, so an unchanged transcript redraws nothing
 let lastRows = "";
 
-// a bun child, because a transcript outgrows the mod's 4 MiB $.fs.read cap
+// a bun child, because a transcript outgrows the mod's 4 MiB $.fs.read cap; true once the transcript has been read
 const reread = async ($: EngineInterface) => {
   const { exitCode, stdout } = await $.process.run([
     "bun",
     `${$.plugin.root}/hooks/minimap/index.ts`,
     await $.session.id(),
   ]);
-  if (exitCode !== 0 || stdout === lastRows) return;
-  lastRows = stdout;
-  await update($, rows, () => JSON.parse(stdout) as Row[]);
+  if (exitCode !== 0) return false;
+  const read = JSON.parse(stdout) as { path: string; rows: Row[] };
+  transcript = read.path;
+  if (stdout !== lastRows) {
+    lastRows = stdout;
+    await update($, rows, () => read.rows);
+  }
+  return true;
+};
+
+// a stat of the transcript is one file-system call; the spawn it spares is a process and up to 76 MB.
+// A stat counts as seen only once its read succeeded, so a failed read is tried again
+const rereadIfChanged = async ($: EngineInterface) => {
+  const stat = transcript
+    ? await $.fs.stat(transcript).catch(() => undefined)
+    : undefined;
+  const seen = stat && `${stat.size}:${stat.mtimeMs}`;
+  if (seen !== undefined && seen === lastSeen) return;
+  lastSeen = (await reread($)) ? seen : undefined;
 };
 
 // one column per bucket, `barRows` blocks tall, the track along the bottom as a line into an arrowhead, drawn mid-cell like `→` so they join; drawn in Clawd's band
@@ -107,7 +126,7 @@ const startTicker = ($: EngineInterface) => {
       void update($, shown, () => [...onScreen]);
     }
     if (++n % REREAD) return;
-    if (config.enabled.minimap) void reread($).catch(() => {});
+    if (config.enabled.minimap) void rereadIfChanged($).catch(() => {});
   });
 };
 

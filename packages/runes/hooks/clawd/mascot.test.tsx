@@ -92,10 +92,10 @@ test("Clawd's frames redraw the band alone, never the transcript", async ($, on)
 
 test('the minimap fills the left of the band on the terminal and never on the desktop', async ($, on) => {
   const clock = mock.clock(on)
-  const rows = JSON.stringify([
+  const rows = JSON.stringify({ path: '/t.jsonl', rows: [
     { id: 'u1', kind: 'prompt', size: 20 },
     { id: 'a1', kind: 'reply', size: 200 },
-  ])
+  ] })
   fakeHost(on, {
     files: new Map([[CONFIG, 'minimap:\n  enabled: true\n']]),
     run: ({ argv }) => (argv[0] === 'bun' && argv[1]?.endsWith('minimap/index.ts')
@@ -117,10 +117,10 @@ test('the minimap fills the left of the band on the terminal and never on the de
 
 test('with Clawd off, the minimap still draws in the band on the terminal, and the desktop has nothing', async ($, on) => {
   const clock = mock.clock(on)
-  const rows = JSON.stringify([
+  const rows = JSON.stringify({ path: '/t.jsonl', rows: [
     { id: 'u1', kind: 'prompt', size: 20 },
     { id: 'a1', kind: 'reply', size: 200 },
-  ])
+  ] })
   fakeHost(on, {
     files: new Map([[CONFIG, 'clawd:\n  enabled: false\nminimap:\n  enabled: true\n']]),
     run: ({ argv }) => (argv[0] === 'bun' && argv[1]?.endsWith('minimap/index.ts')
