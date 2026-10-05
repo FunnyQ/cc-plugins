@@ -23,6 +23,8 @@ type BubbleProps = {
   indent?: number;
   // a hover group: every edge rests muted and lights to `color` while the pointer is on any of it
   scope?: string;
+  // a press target set into the top edge, at the end away from the icon
+  action?: { key: string; label: string; onPress: () => void };
 };
 
 const SATURATION = 0.5;
@@ -235,7 +237,12 @@ export const runLine = <R extends { text: string }>(
 
 // every bubble shares this frame; every edge is drawn by hand, since Box borders refuse single sides and hid an absolute label
 export const bubble = (
-  { Box, Text }: Pick<Elements["terminal"], "Box" | "Text">,
+  {
+    Box,
+    Text,
+    Button,
+  }: Pick<Elements["terminal"], "Box" | "Text"> &
+    Partial<Pick<Elements["terminal"], "Button">>,
   {
     color,
     icon,
@@ -248,6 +255,7 @@ export const bubble = (
     bar = true,
     indent = 0,
     scope,
+    action,
   }: BubbleProps,
 ) => {
   const ink = paint(color, scope);
@@ -256,8 +264,14 @@ export const bubble = (
     ? `${wrap(`${icon}  ${title}`, inner - 3)[0]} `
     : `${icon}${side === "right" ? " " : "  "}`;
   const mid = link ? link.at - indent : -1;
-  // what the header's rule fills: the frame less its corners, the label and its padding
-  const fill = inner - cells(label);
+  const act =
+    action && Button ? (
+      <Button key={action.key} plain {...ink} onPress={action.onPress}>
+        {action.label}
+      </Button>
+    ) : null;
+  // what the header's rule fills: the frame less its corners, the label, its padding and the action
+  const fill = inner - cells(label) - (act ? cells(action!.label) : 0);
   // a rule starting at column `from` takes the link's ┴ when the middle falls inside it
   const rule = (from: number) => {
     const line = [..."─".repeat(Math.max(0, fill))];
@@ -273,12 +287,14 @@ export const bubble = (
           {label}
         </Text>
         {rule(3 + cells(label))}
+        {act}
         <Text {...ink}>{"╮"}</Text>
       </Box>
     ) : (
       <Box flexDirection="row">
         <Text {...ink}>{"╭"}</Text>
-        {rule(1)}
+        {act}
+        {rule(1 + (act ? cells(action!.label) : 0))}
         <Text bold {...ink}>
           {` ${label}`}
         </Text>

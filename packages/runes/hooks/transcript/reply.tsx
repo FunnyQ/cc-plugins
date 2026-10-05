@@ -21,11 +21,20 @@ export const reply = (on: On) => {
     const lines: Run[][] = rendered?.length
       ? rendered
       : wrap(e.props.text, inner).map((l) => (l ? [{ text: l }] : []));
-    const { Box, Text } = $.ui.resolve(e);
+    const { Box, Text, Button } = $.ui.resolve(e);
+    // the bubble's borders ride along with a mouse selection, so the raw markdown opens where it selects clean
+    const openRaw = async () => {
+      const script = `${$.plugin.root}/hooks/transcript/open-raw.ts`;
+      const { exitCode, stderr } = await $.process.run(["bun", script, e.requestId], {
+        stdin: e.props.text,
+      });
+      if (exitCode !== 0) $.ui.toast(stderr.trim() || "could not open the raw reply");
+    };
     return bubble(
-      { Box, Text },
+      { Box, Text, Button },
       {
         key: "reply",
+        action: { key: "reply:raw", label: " ⧉ raw ", onPress: openRaw },
         color,
         icon,
         side,

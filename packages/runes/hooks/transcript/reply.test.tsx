@@ -147,3 +147,20 @@ test("the desktop keeps the engine's own reply: runes draws nothing there", asyn
   expect(await term.find({ key: "reply" })).toBeDefined();
   await term.unmount();
 });
+
+test("the header's raw button hands the reply's markdown to open-raw.ts", async ($, on) => {
+  const calls: { argv: readonly string[]; stdin?: string }[] = [];
+  await startSession($, on, {
+    run: (e) => {
+      calls.push({ argv: e.argv, stdin: e.init?.stdin });
+      return ran(1, "");
+    },
+  });
+  const row = await $.ui.mount(REPLY("**hi** there", "r9"));
+  await row.press({ key: "reply:raw" });
+  await row.unmount();
+  const opened = () => calls.find((c) => /hooks\/transcript\/open-raw\.ts$/.test(c.argv[1] ?? ""));
+  expect(await eventually(async () => opened() !== undefined)).toBe(true);
+  expect(opened()!.argv.slice(2)).toEqual(["r9"]);
+  expect(opened()!.stdin).toBe("**hi** there");
+});
