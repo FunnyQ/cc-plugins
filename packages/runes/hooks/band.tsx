@@ -43,10 +43,10 @@ export const band = (on: On) => {
       <Box key="clawd-row" flexDirection="row" justifyContent={!picture ? 'flex-start' : map ? 'space-between' : 'flex-end'} alignItems="flex-end" width={e.props.bodyColumns}>{map}{picture}</Box>
     )
 
-    // the latest prompt's lesson, one framed line above the band; the whole line is one Button, so a press anywhere
-    // on it scrolls to the full lesson, which is why its changes stay unmarked here
+    // the latest prompt's quip, or its rewrite when haiku gave none, one framed line above the band; the whole line is
+    // one Button, so a press anywhere on it scrolls to the full lesson, which is why its changes stay unmarked here
     const inner = innerWidth(e.props.bodyColumns)
-    const [first = [], ...rest] = lesson ? wrapWords([{ text: lesson.better.replace(/\s+/g, ' ') }], inner - 3) : []
+    const [first = [], ...rest] = lesson ? wrapWords([{ text: (lesson.quip ?? lesson.better).replace(/\s+/g, ' ') }], inner - 3) : []
     // resolved on the terminal alone: the desktop's Button and Text are other types, and the notice never draws there
     const term = e.surface === 'terminal' ? $.ui.resolve(e) : undefined
     const notice = !lesson || !term ? undefined : bubble({ Box: term.Box, Text: term.Text }, {

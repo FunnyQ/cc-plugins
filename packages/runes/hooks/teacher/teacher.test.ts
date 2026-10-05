@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { changes, isWorthAsking, needsLesson, same, teacher, titleOf, TITLES } from "./teacher";
+import { changes, isWorthAsking, needsLesson, parseReply, same, teacher, titleOf, TITLES } from "./teacher";
 import { wrapWords } from "../transcript/text";
 
 test("a short prompt, a slash command, a shell escape, or a wall of text is never asked about", () => {
@@ -38,7 +38,7 @@ test("a flagged prompt gets the rewrite, the latest lesson clears on the next su
         }),
       };
     },
-    complete: async () => "Can you check why the test is failing?",
+    complete: async () => "<quip>Checking? Bold tense.</quip>\nCan you check why the test is failing?",
     redraw: () => redraws++,
   });
   teacher.submit("can you checking why test is fail");
@@ -47,9 +47,11 @@ test("a flagged prompt gets the rewrite, the latest lesson clears on the next su
   expect(teacher.lesson("can you checking why test is fail")).toBe(
     "Can you check why the test is failing?",
   );
+  expect(teacher.latest()?.quip).toBe("Checking? Bold tense.");
   expect(teacher.latest()?.better).toBe(
     "Can you check why the test is failing?",
   );
+  expect(teacher.title("can you checking why test is fail")).toBe("Checking? Bold tense.");
   expect(redraws).toBeGreaterThan(0);
   expect(bodies[0]).toContain("can you checking why test is fail");
 
@@ -80,6 +82,32 @@ test("changes marks the words the rewrite added or changed, keeping spaces and m
   const runs = changes("can u checking why the test is fail", "Can you check why the test is failing?");
   expect(runs.filter((r) => r.isChanged).map((r) => r.text.trim())).toEqual(["you", "check", "failing?"]);
   expect(runs.map((r) => r.text).join("")).toBe("Can you check why the test is failing?");
+});
+
+test("parseReply splits the quip off the rewrite, and drops a missing, empty, or too-long quip", () => {
+  expect(parseReply("<quip>“Fail” is a verb now?</quip>\nWhy is the test failing?\nFix it.")).toEqual({
+    better: "Why is the test failing?\nFix it.",
+    quip: "“Fail” is a verb now?",
+  });
+  expect(parseReply("Why is the test failing?")).toEqual({ better: "Why is the test failing?", quip: undefined });
+  expect(parseReply("<quip> </quip>\nWhy is it failing?").quip).toBe(undefined);
+  expect(parseReply(`<quip>${"so ".repeat(20)}</quip>\nWhy is it failing?`)).toEqual({
+    better: "Why is it failing?",
+    quip: undefined,
+  });
+});
+
+test("a lesson without a quip falls back to a stock title", async () => {
+  teacher.work({
+    apiKey: "k",
+    post: async () => ({ ok: true, text: JSON.stringify({ answers: { english: { noul: 0.95 }, improve: { noul: 0.9 } } }) }),
+    complete: async () => "Please make this faster.",
+    redraw: () => {},
+  });
+  teacher.submit("please making this more faster");
+  for (let i = 0; i < 50 && !teacher.latest(); i++) await new Promise((r) => setTimeout(r, 1));
+  expect(teacher.lesson("please making this more faster")).toBe("Please make this faster.");
+  expect(teacher.title("please making this more faster")).toBe(titleOf("please making this more faster"));
 });
 
 test("titleOf picks one of the titles per prompt, the same one on every draw", () => {

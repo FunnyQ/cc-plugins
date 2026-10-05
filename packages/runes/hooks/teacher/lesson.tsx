@@ -5,7 +5,7 @@ import { bubble, DIVIDER, memo, runLine } from "../transcript/bubble";
 import { cells, wrapWords } from "../transcript/text";
 import { octantsOf } from "../clawd/encode";
 import { CLIPS } from "../clawd/frames";
-import { changes, keyOf, titleOf } from "./teacher";
+import { changes, keyOf, teacher } from "./teacher";
 
 export const TEACHER_COLOR = "#4f9a6a";
 // nf-md U+F0890, needs a Nerd Font
@@ -55,7 +55,7 @@ export const lessonRows = (
   better: string,
   inner: number,
 ): [string, unknown][] => {
-  const title = titleOf(text);
+  const title = teacher.title(text);
   const say = (key: string, line: string): [string, unknown] => [key, <Text color={TEACHER_COLOR}>{line}</Text>];
   const lines = betterLines(text, better, inner - SMOKER_COLUMNS - 1).map((line) => runLine(Text, line));
   const height = Math.max(lines.length, TALKER.length);
@@ -96,7 +96,7 @@ export const lessonBubble = (
       key: "teacher",
       color: TEACHER_COLOR,
       icon: TEACHER_ICON,
-      title: titleOf(text),
+      title: teacher.title(text),
       side,
       inner,
       rows: betterLines(text, better, inner).map((line, j): [string, unknown] => [`teacher:${j}`, runLine(Text, line)]),
