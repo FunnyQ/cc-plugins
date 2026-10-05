@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.2] - 2026-10-06
+
+_tracks tag `runes-v0.8.2`_
+
+### Added
+- The teacher bubble now gets a short haiku-written roast of your specific prompt mistake as its title, falling back to the stock title when the quip is missing or too long, and the band notice shows the quip too.
+
 ## [runes 0.8.1] - 2026-10-05
 
 _tracks tag `runes-v0.8.1`_
