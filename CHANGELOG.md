@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.1] - 2026-10-05
+
+_tracks tag `runes-v0.8.1`_
+
+### Added
+- Reply bubbles now have a raw button that opens the original markdown in Quick Look, so you can select and copy text without picking up the bubble's box-drawing borders.
+
 ## [runes 0.8.0] - 2026-10-05
 
 _tracks tag `runes-v0.8.0`_
