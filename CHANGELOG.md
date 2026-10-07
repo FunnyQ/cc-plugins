@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.3] - 2026-10-07
+
+_tracks tag `runes-v0.8.3`_
+
+### Changed
+- The English teacher's roast quip drops the "X called, it wants Y back" joke and no longer bans "close" or "nice try", and its improvement check now asks whether a native speaker would phrase the prompt differently while skipping terse shorthand such as "ur" and "pls".
+
 ## [runes 0.8.2] - 2026-10-06
 
 _tracks tag `runes-v0.8.2`_
