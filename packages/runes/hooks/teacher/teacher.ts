@@ -23,7 +23,7 @@ Reply in exactly this shape, nothing else:
 <quip>a roast under 40 characters</quip>
 the rewrite
 
-The quip roasts the one specific mistake and names the actual word. Pick one move: fake outrage, a mock obituary for the grammar, a "X called, it wants Y back", a "bold strategy", or bone-dry deadpan. Be a little mean. Never encouraging, never generic: no "tricky", "oops", "close", "friend", "nice try", "huh?". No emoji. Do not explain the fix; the rewrite already does.`;
+The quip roasts the one specific mistake and names the actual word. Pick one move: fake outrage, a mock obituary for the grammar, a "bold strategy", or bone-dry deadpan. Be a little mean. Never encouraging, never generic: no "tricky", "oops", "friend", "huh?". No emoji. Do not explain the fix; the rewrite already does.`;
 
 export const isWorthAsking = (text: string) => {
   const t = text.trim();
@@ -58,17 +58,26 @@ export const changes = (text: string, better: string) => {
   const was = text.split(/\s+/).filter(Boolean).map(bare);
   const parts = better.split(/(\s+)/).filter(Boolean);
   const now = parts.filter((p) => !/^\s/.test(p)).map(bare);
-  const lcs = Array.from({ length: was.length + 1 }, () => new Array<number>(now.length + 1).fill(0));
+  const lcs = Array.from({ length: was.length + 1 }, () =>
+    new Array<number>(now.length + 1).fill(0),
+  );
   for (let i = was.length - 1; i >= 0; i--)
     for (let j = now.length - 1; j >= 0; j--)
-      lcs[i]![j] = was[i] === now[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+      lcs[i]![j] =
+        was[i] === now[j]
+          ? lcs[i + 1]![j + 1]! + 1
+          : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
   const kept = new Set<number>();
   for (let i = 0, j = 0; i < was.length && j < now.length; )
-    if (was[i] === now[j]) (kept.add(j), i++, j++);
+    if (was[i] === now[j]) kept.add(j), i++, j++;
     else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) i++;
     else j++;
   let word = -1;
-  return parts.map((p) => (/^\s/.test(p) ? { text: p, isChanged: false } : { text: p, isChanged: !kept.has(++word) }));
+  return parts.map((p) =>
+    /^\s/.test(p)
+      ? { text: p, isChanged: false }
+      : { text: p, isChanged: !kept.has(++word) },
+  );
 };
 
 // a reply without the quip tag is all rewrite, so a haiku that skips the format still teaches
@@ -122,10 +131,10 @@ const questions = (prompt: string) => ({
     improve: {
       type: "noul",
       instructions:
-        "Does the English prose in this `prompt` have grammar mistakes, wrong word choices, or phrasing a native speaker would say differently? Casual tone, lowercase, and missing end punctuation are fine and do not count.",
+        "Would a native English speaker phrase the prose in this `prompt` differently? Casual tone, lowercase, shorthand, and missing end punctuation are fine and do not count.",
       criteria: {
-        true: "It has errors or unnatural phrasing worth correcting",
-        false: "It reads as natural English, casual or not",
+        true: "A native speaker would word it differently",
+        false: "It reads like a native speaker wrote it, casual or not",
       },
     },
   },
@@ -182,7 +191,13 @@ export const teacher = {
   // the latest prompt's lesson for the band, with the row it sits under once prompt.tsx has drawn it
   latest() {
     const better = current === undefined ? undefined : teacher.lesson(current);
-    return better ? { better, quip: lessons.get(current!)?.quip, requestId: rows.get(current!) } : undefined;
+    return better
+      ? {
+          better,
+          quip: lessons.get(current!)?.quip,
+          requestId: rows.get(current!),
+        }
+      : undefined;
   },
   seen(text: string, requestId: string) {
     const key = keyOf(text);
