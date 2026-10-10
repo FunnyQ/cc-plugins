@@ -145,7 +145,7 @@ describe("codex-run model selection", () => {
   // default for both modes would silently undo that on every flight.
   test("defaults per mode — sol writes, astra reviews", async () => {
     for (const [mode, model] of [
-      ["delegate", "gpt-5.6-sol"],
+      ["delegate", "gpt-6.1-sol"],
       ["review", "gpt-6-astra"],
     ]) {
       expect(spawn([mode!]).success).toBe(true);
@@ -156,9 +156,9 @@ describe("codex-run model selection", () => {
   });
 
   test("--model overrides the default", async () => {
-    expect(spawn(["review", "--model", "gpt-5.6-sol"]).success).toBe(true);
+    expect(spawn(["review", "--model", "gpt-6.1-sol"]).success).toBe(true);
     const logged = await loggedArgs();
-    expect(logged[logged.indexOf("-m") + 1]).toBe("gpt-5.6-sol");
+    expect(logged[logged.indexOf("-m") + 1]).toBe("gpt-6.1-sol");
   });
 
   test("CODEX_MODEL overrides the default, and --model overrides it", async () => {

@@ -22,7 +22,7 @@
  *
  * Model (`-m provider/model`): `--model` flag > `OPENCODE_MODEL` env > relay's
  * config (`models.opencode.<mode>`) > per-mode default (delegate
- * `opencode-go/kimi-k2.7-code`, review `opencode-go/qwen3.7-max`). Relay's
+ * `opencode-go/deepseek-v4.1-flash`, review `opencode-go/gpt-6-luna`). Relay's
  * `cli-default` omits `-m`, as relay itself does.
  *
  * The prompt comes from `--prompt-file <path>` or, if omitted, stdin — the same
@@ -50,8 +50,8 @@ const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode";
 type Mode = "delegate" | "review";
 
 const DEFAULT_MODEL: Record<Mode, string> = {
-  delegate: "opencode-go/kimi-k2.7-code",
-  review: "opencode-go/qwen3.7-max",
+  delegate: "opencode-go/deepseek-v4.1-flash",
+  review: "opencode-go/gpt-6-luna",
 };
 
 // Prepended to the prompt in review mode. opencode can't enforce read-only at the

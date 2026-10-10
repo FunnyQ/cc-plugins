@@ -52,7 +52,7 @@ type Mode = "delegate" | "review";
 // dev≠reviewer asymmetry autopilot already builds across vendors, applied within
 // codex. A reviewer weaker than the author would rubber-stamp its own blind spots.
 const DEFAULT_MODEL: Record<Mode, string> = {
-  delegate: "gpt-5.6-sol",
+  delegate: "gpt-6.1-sol",
   review: "gpt-6-astra",
 };
 
