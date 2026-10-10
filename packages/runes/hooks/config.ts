@@ -104,7 +104,7 @@ export const DEFAULTS: Config = {
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   // the tools a run leaves drawn, comma-separated; an Edit or Write is what a review reads
-  fold: { keep: "Edit,Write", min_calls: 2 },
+  fold: { keep: "Edit,Write", min_calls: 1 },
   glow: { style: "dark" },
   // gap is the columns kept clear between the map and Clawd
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
@@ -187,7 +187,7 @@ transcript:
   fold:
     enabled: ${enabled.fold}    # a run of finished calls between two replies folds to one summary row; press it to unfold
     # keep: "${DEFAULTS.fold.keep}"    # tools left drawn, comma-separated; "" folds every tool
-    # min_calls: ${DEFAULTS.fold.min_calls}         # a run with fewer foldable calls stays drawn
+    # min_calls: ${DEFAULTS.fold.min_calls}         # a finished run with fewer foldable calls is drawn as its cards
   glow:
     # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 minimap:

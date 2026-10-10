@@ -92,6 +92,28 @@ export const runsOf = (
   return members;
 };
 
+// a band of lit cells that sweeps a running title, then a dark gap before it comes round again
+const BAND = 3;
+const GAP = 3;
+export const shimmer = (text: string, tick: number) => {
+  const chars = [...text];
+  const at = tick % (chars.length + GAP);
+  const runs: { text: string; isLit: boolean }[] = [];
+  chars.forEach((c, i) => {
+    const isLit = i <= at && i > at - BAND;
+    const last = runs.at(-1);
+    if (last && last.isLit === isLit) last.text += c;
+    else runs.push({ text: c, isLit });
+  });
+  return runs;
+};
+
+// written by the ticker and read only by a summary with a running call, so a frame redraws that row alone
+const SHIMMER = { plugin: "runes", key: "shimmer" } as const;
+// the transcript redraws ten times a second at most, so speed comes from the cells a frame moves, not the frame rate
+const TICK_MS = 100;
+const STEP = 2;
+
 // nf-oct-search U+F422 and nf-fa-wrench U+F0AD, need a Nerd Font
 export const SEARCH_ICON = "\u{F422}";
 const TOOL_ICON = "\u{F0AD}";
@@ -119,6 +141,14 @@ const iconOf = (tool: string) => {
 let members = new Map<string, Member>();
 // the main loop's calls this turn, from tool.call; a turn's end clears them, by when the transcript holds each
 let pending: Pending[] = [];
+// the main loop's calls still running, and the ticker that shimmers their titles while any is
+let inFlight = 0;
+let ticker: { cancel: () => void } | undefined;
+let tick = 0;
+const stopTicker = () => {
+  ticker?.cancel();
+  ticker = undefined;
+};
 const open = new Set<string>();
 // a run's first call that the engine drew inside its own ToolGroup: the group draws the summary, so the call's row does not
 const inGroup = new Set<string>();
@@ -143,6 +173,9 @@ async function refresh($: $) {
 async function head($: Render[0], e: Render[1], next: Render[2], m: Member) {
   const isOpen = open.has(m.run);
   const { Box, Button, Text } = $.ui.resolve(e);
+  // only a run with a call still running reads the frame, so a finished run never redraws for it
+  const frame =
+    !isOpen && m.titles.some((t) => t.isRunning) ? ((await $.state.get(SHIMMER)).value ?? 0) : 0;
   const width = innerWidth(e.viewport?.columns);
   const scope = `fold:${m.run}`;
   const summary = (
@@ -167,12 +200,17 @@ async function head($: Render[0], e: Render[1], next: Render[2], m: Member) {
           const { icon, color } = iconOf(tool);
           const text = isRunning ? `${title} · running` : title;
           const line = wrap(text, width - 7)[0] ?? "";
+          const shown = `${line}${cells(line) < cells(text) ? "…" : ""}`;
           return (
             <Box key={`fold:title:${i}`}>
               <Text {...paint(color, scope)}>{`  ${icon}  `}</Text>
-              <Text
-                {...paint(palette().dim, scope)}
-              >{`${line}${cells(line) < cells(text) ? "…" : ""}`}</Text>
+              {isRunning ? (
+                shimmer(shown, frame).map((r) => (
+                  <Text color={r.isLit ? palette().text : palette().dim}>{r.text}</Text>
+                ))
+              ) : (
+                <Text {...paint(palette().dim, scope)}>{shown}</Text>
+              )}
             </Box>
           );
         })}
@@ -196,7 +234,8 @@ export const fold = (on: On) => {
   // by a call, every message before it is stored, so a reply that closed the last run is in the list
   on("tool.call", async ($, e, next) => {
     // a subagent's calls draw in its own transcript, not this one
-    if (e.tool_use_id && !e.agentId) {
+    const isMain = Boolean(e.tool_use_id) && !e.agentId;
+    if (isMain) {
       const {
         tool,
         tool_use_id,
@@ -204,13 +243,21 @@ export const fold = (on: On) => {
         requestMeta: __,
         ...input
       } = e as typeof e & Record<string, unknown>;
-      pending.push({ tool_use_id, tool, input });
+      pending.push({ tool_use_id: tool_use_id!, tool, input });
+      inFlight += 1;
+      ticker ??= $.clock.every(TICK_MS, () => {
+        tick += STEP;
+        void $.state.set(SHIMMER, tick);
+      });
     }
     void refresh($);
-    const r = await next(e);
-    // the call's end takes its running mark off, or drops it from the run when it failed
-    void refresh($);
-    return r;
+    try {
+      return await next(e);
+    } finally {
+      // the call's end takes its running mark off, or drops it from the run when it failed
+      if (isMain && --inFlight === 0) stopTicker();
+      void refresh($);
+    }
   });
   // every way a turn ends clears its pending calls, or one an abort cut before it was stored runs on forever;
   // clawd holds the unmatched turn.complete, so each reason is its own matcher
@@ -220,6 +267,9 @@ export const fold = (on: On) => {
       // a subagent's turn ends inside the main one
       if (e.agentId) return r;
       pending = [];
+      // an abort can end a turn without every call coming back through tool.call
+      inFlight = 0;
+      stopTicker();
       void refresh($);
       return r;
     });

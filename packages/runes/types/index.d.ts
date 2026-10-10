@@ -3,6 +3,6 @@ export type MinimapRow = { id: string; kind: string; size: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    runes: { frame: Frame; minimapRows: MinimapRow[]; minimapShown: string[] }
+    runes: { frame: Frame; minimapRows: MinimapRow[]; minimapShown: string[]; shimmer: number }
   }
 }

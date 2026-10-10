@@ -2,7 +2,7 @@ import { expect, test, type Engine } from "claude-code/testing";
 import type { On, SessionMessage } from "claude-code";
 
 import { DEFAULTS } from "../config";
-import { SEARCH_ICON, runsOf } from "./fold";
+import { SEARCH_ICON, runsOf, shimmer } from "./fold";
 import { CONFIG, eventually, find, startSession } from "./test-session";
 
 const use = (
@@ -277,4 +277,26 @@ test("fold.keep empty folds an Edit too", async ($, on) => {
       await find($, ROW("b1", "Bash", { command: "ls" }), { key: "fold" })
     )?.text.trim(),
   ).toBe("▸ 4 calls · Bash 2 · Grep 1 · Edit 1");
+});
+
+test("shimmer lights a three-cell band that sweeps across the text and wraps after a gap", () => {
+  const lit = (tick: number) =>
+    shimmer("abcdef", tick)
+      .filter((r) => r.isLit)
+      .map((r) => r.text)
+      .join("");
+  expect(shimmer("abcdef", 0).map((r) => r.text).join("")).toBe("abcdef");
+  expect(lit(0)).toBe("a");
+  expect(lit(2)).toBe("abc");
+  expect(lit(5)).toBe("def");
+  // past the end the band leaves the text dark before it comes round again
+  expect(lit(8)).toBe("");
+  expect(lit(9)).toBe("a");
+});
+
+test("a running call's title is drawn whole while it shimmers", async ($, on) => {
+  const running = [said("user", "go"), called({ tool_use_id: "b1", tool: "Bash", input: { command: "sleep 9" } } as never)];
+  await start($, on, running);
+  const head = ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true });
+  expect((await find($, head, { key: "fold:title:0" }))?.text.trim()).toBe(`${DEFAULTS.bash.icon}  Bash sleep 9 · running`);
 });
