@@ -135,14 +135,6 @@ export const runsOf = (
   return members;
 };
 
-const FRAMES = [..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"];
-export const spinner = (tick: number) => FRAMES[tick % FRAMES.length]!;
-
-// written by the ticker and read only by a running call's title, so a frame redraws that row alone
-const SPINNER = { plugin: "runes", key: "spinner" } as const;
-// the transcript redraws ten times a second at most
-const TICK_MS = 100;
-
 // nf-oct-search U+F422 and nf-fa-wrench U+F0AD, need a Nerd Font
 export const SEARCH_ICON = "\u{F422}";
 const TOOL_ICON = "\u{F0AD}";
@@ -170,14 +162,6 @@ const iconOf = (tool: string) => {
 let members = new Map<string, Member>();
 // the main loop's calls this turn, from tool.call; a turn's end clears them, by when the transcript holds each
 let pending: Pending[] = [];
-// the main loop's calls still running, and the ticker that spins their titles' spinners while any is
-let inFlight = 0;
-let ticker: { cancel: () => void } | undefined;
-let tick = 0;
-const stopTicker = () => {
-  ticker?.cancel();
-  ticker = undefined;
-};
 // the calls drawn as their card under their title
 const open = new Set<string>();
 const isOn = () => config.enabled.transcript && config.enabled.fold;
@@ -199,23 +183,21 @@ async function refresh($: $) {
 
 // a call's title line, pressed to draw its card under it, then any answers it got; a ToolGroup draws several, so
 // it suffixes each key with the call's place in the group
-async function titleLines(
+function titleLines(
   $: Render[0],
   e: Render[1],
   id: string,
   m: Member,
   suffix = "",
 ) {
-  const { Box, Button, Text } = $.ui.resolve(e);
+  const { Box, Button, Client, Text } = $.ui.resolve(e);
   const { tool, text: title, isRunning, answers = [] } = m.title;
-  // only a running call reads the frame, so a finished one never redraws for it
-  const frame = isRunning ? ((await $.state.get(SPINNER)).value ?? 0) : 0;
   const width = innerWidth(e.viewport?.columns);
   const scope = `fold:${id}`;
   const { icon, color } = iconOf(tool);
+  // the spinner's two cells, or a dot holding them, so every title starts in one column
   const lead = `  ${icon}  `;
-  const spin = isRunning ? `${spinner(frame)} ` : "";
-  const room = width - cells(lead) - cells(spin);
+  const room = width - cells(lead);
   const line = wrap(title, room - 2)[0] ?? "";
   const shown = `${line}${cells(line) < cells(title) ? "…" : ""}`;
   // an answer sits two cells further in than the title's text
@@ -223,8 +205,17 @@ async function titleLines(
   return [
     // the blank line between rows belongs to the engine's own row, so the run's first line sets its own
     <Box key={`fold:title${suffix}`} marginTop={m.ids[0] === id ? 1 : 0}>
-      <Text {...paint(color, scope)}>{lead}</Text>
-      {spin && <Text color={palette().text}>{spin}</Text>}
+      {isRunning ? (
+        <Client
+          key={`fold:spinner${suffix}`}
+          module="./spinner.tsx"
+          props={{ color: palette().text }}
+          width={2}
+        />
+      ) : (
+        <Text {...paint(palette().dim, scope)}>{"· "}</Text>
+      )}
+      <Text {...paint(color, scope)}>{lead.slice(2)}</Text>
       <Button
         key={`fold:open${suffix}`}
         plain
@@ -291,18 +282,12 @@ export const fold = (on: On) => {
         ...input
       } = e as typeof e & Record<string, unknown>;
       pending.push({ tool_use_id: tool_use_id!, tool, input });
-      inFlight += 1;
-      ticker ??= $.clock.every(TICK_MS, () => {
-        tick += 1;
-        void $.state.set(SPINNER, tick);
-      });
     }
     void refresh($);
     try {
       return await next(e);
     } finally {
       // the call's end takes its running mark off, or drops it from the run when it failed
-      if (isMain && --inFlight === 0) stopTicker();
       void refresh($);
     }
   });
@@ -314,9 +299,6 @@ export const fold = (on: On) => {
       // a subagent's turn ends inside the main one
       if (e.agentId) return r;
       pending = [];
-      // an abort can end a turn without every call coming back through tool.call
-      inFlight = 0;
-      stopTicker();
       void refresh($);
       return r;
     });
@@ -332,7 +314,7 @@ export const fold = (on: On) => {
       const { Box } = $.ui.resolve(e);
       return (
         <Box key="fold:call" flexDirection="column">
-          {await titleLines($, e, id, m)}
+          {titleLines($, e, id, m)}
           {open.has(id) ? await next(e) : null}
           {m.isLast ? summary($, e, m) : null}
         </Box>
@@ -365,9 +347,7 @@ export const fold = (on: On) => {
       if (!first || ms.some((m) => m?.run !== first.run)) return next(e);
       if (ids.some((id) => open.has(id))) return next(e);
       const { Box } = $.ui.resolve(e);
-      const lines = await Promise.all(
-        ids.map((id, i) => titleLines($, e, id, ms[i]!, `:${i}`)),
-      );
+      const lines = ids.map((id, i) => titleLines($, e, id, ms[i]!, `:${i}`));
       const last = ms.at(-1)!;
       return (
         <Box key="fold:group" flexDirection="column">

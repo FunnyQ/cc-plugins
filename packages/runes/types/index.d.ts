@@ -7,7 +7,6 @@ declare module "claude-code" {
       frame: Frame;
       minimapRows: MinimapRow[];
       minimapShown: string[];
-      spinner: number;
     };
   }
 }

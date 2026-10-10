@@ -2,7 +2,7 @@ import { expect, test, type Engine } from "claude-code/testing";
 import type { On, SessionMessage } from "claude-code";
 
 import { DEFAULTS } from "../config";
-import { SEARCH_ICON, runsOf, spinner } from "./fold";
+import { SEARCH_ICON, runsOf } from "./fold";
 import { CONFIG, eventually, find, startSession } from "./test-session";
 
 const use = (
@@ -202,7 +202,7 @@ test("each folded row draws its own title in place of its card, and the run's la
   await start($, on, RUN);
   // each title leads with its tool's rune icon, a search its own
   expect((await find($, B1, { key: "fold:title" }))?.text.trim()).toBe(
-    `${DEFAULTS.bash.icon}  List the files`,
+    `· ${DEFAULTS.bash.icon}  List the files`,
   );
   expect(await find($, B1, { key: "bash" })).toBeUndefined();
   expect(await find($, B1, { key: "fold" })).toBeUndefined();
@@ -210,7 +210,7 @@ test("each folded row draws its own title in place of its card, and the run's la
     (
       await find($, ROW("g1", "Grep", { pattern: "x" }), { key: "fold:title" })
     )?.text.trim(),
-  ).toBe(`${SEARCH_ICON}  Grep x`);
+  ).toBe(`· ${SEARCH_ICON}  Grep x`);
   expect((await find($, E1, { key: "fold" }))?.text.trim()).toBe(
     "▸ 4 calls · Bash 2 · Grep 1 · Edit 1",
   );
@@ -225,7 +225,7 @@ test("pressing a title unfolds that call alone, under its title, and pressing it
   const row = await $.ui.mount(B2);
   await row.press({ key: "fold:open" });
   expect((await row.find({ key: "fold:title" }))?.text.trim()).toBe(
-    `${DEFAULTS.bash.icon}  Bash pwd`,
+    `· ${DEFAULTS.bash.icon}  Bash pwd`,
   );
   expect(await row.find({ key: "bash" })).toBeDefined();
   expect(await find($, B1, { key: "bash" })).toBeUndefined();
@@ -279,7 +279,7 @@ test("a folded ToolGroup draws its calls' titles itself, and hands back to the e
     ]),
   );
   expect((await group.find({ key: "fold:title:1" }))?.text.trim()).toBe(
-    `${SEARCH_ICON}  Grep x`,
+    `· ${SEARCH_ICON}  Grep x`,
   );
   // the kit has no engine beneath a group to redraw it with, so the hand-back shows in the unfolded call's own row
   await group.press({ key: "fold:open:0" }).catch(() => {});
@@ -312,13 +312,7 @@ test("transcript.fold.enabled false draws every row as before", async ($, on) =>
   expect(await find($, B2, { key: "bash" })).toBeDefined();
 });
 
-test("spinner steps through its frames and wraps", () => {
-  expect(spinner(0)).toBe("⠋");
-  expect(spinner(1)).toBe("⠙");
-  expect(spinner(10)).toBe("⠋");
-});
-
-test("a running call's title starts with a spinner after its icon", async ($, on) => {
+test("a running call's spinner sits left of its icon and turns on its own frame clock, with no hook event", async ($, on) => {
   const running = [
     said("user", "go"),
     called({
@@ -329,9 +323,20 @@ test("a running call's title starts with a spinner after its icon", async ($, on
   ];
   await start($, on, running);
   const head = ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true });
-  expect((await find($, head, { key: "fold:title" }))?.text.trim()).toBe(
-    `${DEFAULTS.bash.icon}  ⠋ Bash sleep 9`,
+  const row = await $.ui.mount(head);
+  // the Client draws its own tree, read with `in`, so its text is not the title Box's
+  expect((await row.find({ key: "fold:title" }))?.text).toStartWith(
+    `${DEFAULTS.bash.icon}  Bash sleep 9`,
   );
+  const frame = async () =>
+    (await row.find({ type: "Text", in: "fold:spinner" }))?.text;
+  expect(await frame()).toBe("⠋ ");
+  await row.advance(80);
+  expect(await frame()).toBe("⠙ ");
+  // ten frames come round to the first
+  await row.advance(720);
+  expect(await frame()).toBe("⠋ ");
+  await row.unmount();
 });
 
 const ask = (
