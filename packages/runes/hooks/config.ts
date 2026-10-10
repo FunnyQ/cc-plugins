@@ -11,6 +11,7 @@ export const RUNES = [
   "agent",
   "skill",
   "peer",
+  "fold",
   "minimap",
   "teacher",
 ] as const;
@@ -49,6 +50,7 @@ type Config = {
   agent: { color: string; error_color: string; icon: string; side: Side };
   skill: { color: string; error_color: string; icon: string; side: Side };
   peer: { color: string; icon: string; side: Side; fold_lines: number };
+  fold: { keep: string; min_calls: number };
   glow: { style: string };
   minimap: { bar_rows: number; gap: number; marker_color: string };
 };
@@ -101,6 +103,8 @@ export const DEFAULTS: Config = {
   skill: { color: "#d4a72c", error_color: "#c94f4f", icon: "\u{F0FD7}", side: "left" },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
+  // the tools a run leaves drawn, comma-separated; an Edit or Write is what a review reads
+  fold: { keep: "Edit,Write", min_calls: 2 },
   glow: { style: "dark" },
   // gap is the columns kept clear between the map and Clawd
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
@@ -180,6 +184,10 @@ transcript:
     # icon: "\\U000F06A9"   # Nerd Font glyph
     # side: ${DEFAULTS.peer.side}
     # fold_lines: ${DEFAULTS.peer.fold_lines}
+  fold:
+    enabled: ${enabled.fold}    # a run of finished calls between two replies folds to one summary row; press it to unfold
+    # keep: "${DEFAULTS.fold.keep}"    # tools left drawn, comma-separated; "" folds every tool
+    # min_calls: ${DEFAULTS.fold.min_calls}         # a run with fewer foldable calls stays drawn
   glow:
     # style: ${DEFAULTS.glow.style}          # glow -s: dark | light | a style file path
 minimap:
@@ -203,6 +211,7 @@ const UNDER = [
   "agent",
   "skill",
   "peer",
+  "fold",
   "glow",
 ] as const;
 type Section = Rune | "glow";
@@ -226,6 +235,7 @@ const isColor: Check = (v) =>
 const isText: Check = (v) => typeof v === "string" && v.length > 0;
 const isSide: Check = (v) => v === "left" || v === "right";
 const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
+const isList: Check = (v) => typeof v === "string";
 
 const RULES: {
   [S in Exclude<keyof Config, "enabled">]: {
@@ -290,6 +300,10 @@ const RULES: {
     icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
     fold_lines: [isCount, "a whole number above 0"],
+  },
+  fold: {
+    keep: [isList, "tool names, comma-separated"],
+    min_calls: [isCount, "a whole number above 0"],
   },
   glow: { style: [isText, "dark | light | a style file path"] },
   minimap: {

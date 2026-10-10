@@ -20,6 +20,7 @@ import {
 import { agent } from "./transcript/agent";
 import { bash } from "./transcript/bash";
 import { edit } from "./transcript/edit";
+import { fold } from "./transcript/fold";
 import { glow } from "./transcript/glow";
 import { jev, type Post } from "./transcript/jev";
 import { prompt } from "./transcript/prompt";
@@ -196,6 +197,8 @@ export const register: Register = (on) => {
   band(on);
   prompt(on);
   reply(on);
+  // ahead of the card runes, so a folded row is answered before any of them builds its card
+  fold(on);
   bash(on);
   read(on);
   edit(on);

@@ -24,6 +24,7 @@ const CURRENT = () => ({
     agent: { enabled: true },
     skill: { enabled: true },
     peer: { enabled: true },
+    fold: { enabled: true },
     glow: null,
   },
   minimap: { enabled: true },

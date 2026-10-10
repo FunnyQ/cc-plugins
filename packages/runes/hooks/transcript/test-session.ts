@@ -41,7 +41,12 @@ type Run = Parameters<Hook<"process.run">>;
 // the kit has no store, fs, env or process; these stand in for the host's, and `run` answers every command but the YAML parse
 export const fakeHost = (
   on: On,
-  { files = new Map<string, string>(), run, env = {} }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown; env?: Record<string, string> } = {},
+  {
+    files = new Map<string, string>(),
+    run,
+    env = {},
+    messages = [],
+  }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown; env?: Record<string, string>; messages?: unknown[] } = {},
 ) => {
   const store = new Map<string, unknown>();
   const toasts: string[] = [];
@@ -79,6 +84,8 @@ export const fakeHost = (
     } as never;
   });
   on("command.register", () => ({ value: undefined }) as never);
+  // the transcript the fold rune reads its runs from; a test that folds hands its own
+  on("session.messages", () => ({ value: messages }) as never);
   return { files, store, toasts };
 };
 
