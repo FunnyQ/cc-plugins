@@ -1,5 +1,20 @@
 # Changelog
 
+## [runes 0.8.5] - 2026-10-10
+
+_tracks tag `runes-v0.8.5`_
+
+### Added
+- Folded runs now show one clickable title per call, and clicking one unfolds just that call's card; the "▸ N calls" summary moves under the last call and unfolds or folds the whole run.
+- AskUserQuestion titles show the question and the answers picked.
+- Running calls show a braille spinner left of the tool icon, and idle calls show a dim dot so titles line up in one column.
+
+### Changed
+- fold.keep now defaults to empty, so Edit and Write calls fold too; set keep: "Edit,Write" in config.yaml to keep their diffs on screen.
+
+### Fixed
+- The fold spinner no longer lags or freezes while Claude is working, because it now animates on the drawing thread's own frame clock.
+
 ## [runes 0.8.4] - 2026-10-10
 
 _tracks tag `runes-v0.8.4`_
