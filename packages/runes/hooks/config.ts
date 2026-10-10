@@ -78,7 +78,12 @@ export const DEFAULTS: Config = {
     jev: true,
   },
   // nf-md-file_document U+F0219, needs a Nerd Font
-  read: { color: "#6b8fb3", error_color: "#c94f4f", icon: "\u{F0219}", side: "left" },
+  read: {
+    color: "#6b8fb3",
+    error_color: "#c94f4f",
+    icon: "\u{F0219}",
+    side: "left",
+  },
   // nf-md-pencil U+F03EB, needs a Nerd Font
   edit: {
     color: "#b8954a",
@@ -98,13 +103,23 @@ export const DEFAULTS: Config = {
     fold_lines: 12,
   },
   // nf-md-robot_outline U+F167A, needs a Nerd Font; peer's filled robot draws the hand-back
-  agent: { color: "#7f8fd1", error_color: "#c94f4f", icon: "\u{F167A}", side: "left" },
+  agent: {
+    color: "#7f8fd1",
+    error_color: "#c94f4f",
+    icon: "\u{F167A}",
+    side: "left",
+  },
   // nf-md-arm_flex U+F0FD7, needs a Nerd Font
-  skill: { color: "#d4a72c", error_color: "#c94f4f", icon: "\u{F0FD7}", side: "left" },
+  skill: {
+    color: "#d4a72c",
+    error_color: "#c94f4f",
+    icon: "\u{F0FD7}",
+    side: "left",
+  },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   // the tools a run leaves drawn, comma-separated; an Edit or Write is what a review reads
-  fold: { keep: "Edit,Write", min_calls: 1 },
+  fold: { keep: "", min_calls: 1 },
   glow: { style: "dark" },
   // gap is the columns kept clear between the map and Clawd
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },

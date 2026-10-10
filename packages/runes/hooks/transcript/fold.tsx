@@ -5,7 +5,12 @@ import { paint, palette, pressRow } from "./bubble";
 import { cells, innerWidth, plural, wrap } from "./text";
 import { shortPath } from "./where";
 
-export type Title = { tool: string; text: string; isRunning?: true };
+export type Title = {
+  tool: string;
+  text: string;
+  isRunning?: true;
+  answers?: string[];
+};
 export type Pending = {
   tool_use_id: string;
   tool: string;
@@ -13,9 +18,10 @@ export type Pending = {
 };
 export type Member = {
   run: string;
-  isHead: boolean;
+  ids: string[];
+  isLast: boolean;
   label: string;
-  titles: Title[];
+  title: Title;
 };
 type $ = Parameters<Hook<"tool.call">>[0];
 type Render = Parameters<Hook<"ui.render">>;
@@ -23,8 +29,34 @@ type Render = Parameters<Hook<"ui.render">>;
 // an MCP tool's full name repeats its server on every call
 const nameOf = (tool: string) => tool.replace(/^mcp__.+?__/, "");
 
+type Question = { question?: unknown; header?: unknown };
+const questionsOf = (input: Record<string, unknown>) =>
+  (Array.isArray(input.questions) ? input.questions : []) as Question[];
+
+// what the person picked for each question; several questions name their headers, so each answer says which it is
+const answersOf = (input: Record<string, unknown>, result: unknown) => {
+  const given =
+    (result as
+      | { answers?: Record<string, unknown>; response?: unknown }
+      | undefined) ?? {};
+  const qs = questionsOf(input);
+  const answers = qs.flatMap((q) => {
+    const a = given.answers?.[String(q.question)];
+    if (typeof a !== "string" || !a) return [];
+    return [qs.length > 1 ? `${String(q.header)}: ${a}` : a];
+  });
+  return answers.length || typeof given.response !== "string"
+    ? answers
+    : [given.response];
+};
+
 // a call's own description when it has one, else its tool and the input that tells it apart
 const titleOf = (tool: string, input: Record<string, unknown>) => {
+  if (tool === "AskUserQuestion") {
+    const qs = questionsOf(input);
+    if (qs.length === 1) return String(qs[0]!.question);
+    if (qs.length > 1) return qs.map((q) => String(q.header)).join(" · ");
+  }
   const s = (k: string) =>
     typeof input[k] === "string" ? (input[k] as string) : undefined;
   const description = s("description");
@@ -60,23 +92,34 @@ export const runsOf = (
         plural(run.length, "call"),
         ...[...counts].map(([t, n]) => `${t} ${n}`),
       ].join(" · ");
-      for (const id of run)
-        members.set(id, { run: run[0]!, isHead: id === run[0], label, titles });
+      const ids = run;
+      ids.forEach((id, i) =>
+        members.set(id, {
+          run: ids[0]!,
+          ids,
+          isLast: i === ids.length - 1,
+          label,
+          title: titles[i]!,
+        }),
+      );
     }
     run = [];
     tools = [];
     titles = [];
   };
   const seen = new Set<string>();
-  const add = (u: Pending, isRunning: boolean) => {
+  const add = (u: Pending & { result?: unknown }, isRunning: boolean) => {
     seen.add(u.tool_use_id);
     if (keep.includes(u.tool)) return;
     run.push(u.tool_use_id);
     tools.push(nameOf(u.tool));
+    const answers =
+      u.tool === "AskUserQuestion" ? answersOf(u.input, u.result) : [];
     titles.push({
       tool: u.tool,
       text: titleOf(u.tool, u.input),
       ...(isRunning ? { isRunning: true as const } : {}),
+      ...(answers.length ? { answers } : {}),
     });
   };
   for (const m of messages) {
@@ -92,27 +135,13 @@ export const runsOf = (
   return members;
 };
 
-// a band of lit cells that sweeps a running title, then a dark gap before it comes round again
-const BAND = 3;
-const GAP = 3;
-export const shimmer = (text: string, tick: number) => {
-  const chars = [...text];
-  const at = tick % (chars.length + GAP);
-  const runs: { text: string; isLit: boolean }[] = [];
-  chars.forEach((c, i) => {
-    const isLit = i <= at && i > at - BAND;
-    const last = runs.at(-1);
-    if (last && last.isLit === isLit) last.text += c;
-    else runs.push({ text: c, isLit });
-  });
-  return runs;
-};
+const FRAMES = [..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"];
+export const spinner = (tick: number) => FRAMES[tick % FRAMES.length]!;
 
-// written by the ticker and read only by a summary with a running call, so a frame redraws that row alone
-const SHIMMER = { plugin: "runes", key: "shimmer" } as const;
-// the transcript redraws ten times a second at most, so speed comes from the cells a frame moves, not the frame rate
+// written by the ticker and read only by a running call's title, so a frame redraws that row alone
+const SPINNER = { plugin: "runes", key: "spinner" } as const;
+// the transcript redraws ten times a second at most
 const TICK_MS = 100;
-const STEP = 2;
 
 // nf-oct-search U+F422 and nf-fa-wrench U+F0AD, need a Nerd Font
 export const SEARCH_ICON = "\u{F422}";
@@ -141,7 +170,7 @@ const iconOf = (tool: string) => {
 let members = new Map<string, Member>();
 // the main loop's calls this turn, from tool.call; a turn's end clears them, by when the transcript holds each
 let pending: Pending[] = [];
-// the main loop's calls still running, and the ticker that shimmers their titles while any is
+// the main loop's calls still running, and the ticker that spins their titles' spinners while any is
 let inFlight = 0;
 let ticker: { cancel: () => void } | undefined;
 let tick = 0;
@@ -149,9 +178,8 @@ const stopTicker = () => {
   ticker?.cancel();
   ticker = undefined;
 };
+// the calls drawn as their card under their title
 const open = new Set<string>();
-// a run's first call that the engine drew inside its own ToolGroup: the group draws the summary, so the call's row does not
-const inGroup = new Set<string>();
 const isOn = () => config.enabled.transcript && config.enabled.fold;
 
 // reads the whole transcript per call, a cursor over new messages if long sessions make it slow
@@ -169,57 +197,76 @@ async function refresh($: $) {
   $.ui.invalidate("ui.render");
 }
 
-// the run's summary row, and under it, unfolded, the row it stands at
-async function head($: Render[0], e: Render[1], next: Render[2], m: Member) {
-  const isOpen = open.has(m.run);
+// a call's title line, pressed to draw its card under it, then any answers it got; a ToolGroup draws several, so
+// it suffixes each key with the call's place in the group
+async function titleLines(
+  $: Render[0],
+  e: Render[1],
+  id: string,
+  m: Member,
+  suffix = "",
+) {
   const { Box, Button, Text } = $.ui.resolve(e);
-  // only a run with a call still running reads the frame, so a finished run never redraws for it
-  const frame =
-    !isOpen && m.titles.some((t) => t.isRunning) ? ((await $.state.get(SHIMMER)).value ?? 0) : 0;
+  const { tool, text: title, isRunning, answers = [] } = m.title;
+  // only a running call reads the frame, so a finished one never redraws for it
+  const frame = isRunning ? ((await $.state.get(SPINNER)).value ?? 0) : 0;
   const width = innerWidth(e.viewport?.columns);
-  const scope = `fold:${m.run}`;
-  const summary = (
-    <Box key="fold:row" marginTop={1}>
+  const scope = `fold:${id}`;
+  const { icon, color } = iconOf(tool);
+  const lead = `  ${icon}  `;
+  const spin = isRunning ? `${spinner(frame)} ` : "";
+  const room = width - cells(lead) - cells(spin);
+  const line = wrap(title, room - 2)[0] ?? "";
+  const shown = `${line}${cells(line) < cells(title) ? "…" : ""}`;
+  // an answer sits two cells further in than the title's text
+  const indent = " ".repeat(cells(lead) + 2);
+  return [
+    // the blank line between rows belongs to the engine's own row, so the run's first line sets its own
+    <Box key={`fold:title${suffix}`} marginTop={m.ids[0] === id ? 1 : 0}>
+      <Text {...paint(color, scope)}>{lead}</Text>
+      {spin && <Text color={palette().text}>{spin}</Text>}
+      <Button
+        key={`fold:open${suffix}`}
+        plain
+        dimColor
+        hover={{ color: palette().text, scope }}
+        onPress={() => {
+          open.has(id) ? open.delete(id) : open.add(id);
+          $.ui.invalidate("ui.render");
+        }}
+      >
+        {`${shown}${" ".repeat(Math.max(0, room - cells(shown)))}`}
+      </Button>
+    </Box>,
+    ...answers.map((answer, j) => {
+      const cut = wrap(answer, width - indent.length)[0] ?? "";
+      return (
+        <Box key={`fold:answer${suffix}:${j}`}>
+          <Text {...paint(palette().text, scope)}>
+            {`${indent}${cut}${cells(cut) < cells(answer) ? "…" : ""}`}
+          </Text>
+        </Box>
+      );
+    }),
+  ];
+}
+
+// the summary under the run's last call, pressed to unfold every call, or fold them all once each is unfolded
+function summary($: Render[0], e: Render[1], m: Member) {
+  const { Box, Button } = $.ui.resolve(e);
+  const isAllOpen = m.ids.every((id) => open.has(id));
+  return (
+    <Box key="fold:row">
       {pressRow(Button, {
         key: "fold",
-        text: `${isOpen ? "▾" : "▸"} ${m.label}`,
-        width,
-        hover: { color: palette().text, scope },
+        text: `${isAllOpen ? "▾" : "▸"} ${m.label}`,
+        width: innerWidth(e.viewport?.columns),
+        hover: { color: palette().text, scope: `fold:${m.run}` },
         onPress: () => {
-          open.has(m.run) ? open.delete(m.run) : open.add(m.run);
+          for (const id of m.ids) isAllOpen ? open.delete(id) : open.add(id);
           $.ui.invalidate("ui.render");
         },
       })}
-    </Box>
-  );
-  if (!isOpen)
-    return (
-      <Box key="fold:closed" flexDirection="column">
-        {summary}
-        {m.titles.map(({ tool, text: title, isRunning }, i) => {
-          const { icon, color } = iconOf(tool);
-          const text = isRunning ? `${title} · running` : title;
-          const line = wrap(text, width - 7)[0] ?? "";
-          const shown = `${line}${cells(line) < cells(text) ? "…" : ""}`;
-          return (
-            <Box key={`fold:title:${i}`}>
-              <Text {...paint(color, scope)}>{`  ${icon}  `}</Text>
-              {isRunning ? (
-                shimmer(shown, frame).map((r) => (
-                  <Text color={r.isLit ? palette().text : palette().dim}>{r.text}</Text>
-                ))
-              ) : (
-                <Text {...paint(palette().dim, scope)}>{shown}</Text>
-              )}
-            </Box>
-          );
-        })}
-      </Box>
-    );
-  return (
-    <Box key="fold:open" flexDirection="column">
-      {summary}
-      {await next(e)}
     </Box>
   );
 }
@@ -246,8 +293,8 @@ export const fold = (on: On) => {
       pending.push({ tool_use_id: tool_use_id!, tool, input });
       inFlight += 1;
       ticker ??= $.clock.every(TICK_MS, () => {
-        tick += STEP;
-        void $.state.set(SHIMMER, tick);
+        tick += 1;
+        void $.state.set(SPINNER, tick);
       });
     }
     void refresh($);
@@ -279,13 +326,17 @@ export const fold = (on: On) => {
     "ui.render",
     { component: "ToolUse", surface: "terminal" },
     async ($, e, next) => {
-      const m = isOn() ? members.get(e.props.tool_use_id) : undefined;
+      const id = e.props.tool_use_id;
+      const m = isOn() ? members.get(id) : undefined;
       if (!m) return next(e);
-      if (m.isHead && !inGroup.has(e.props.tool_use_id))
-        return head($, e, next, m);
-      if (open.has(m.run)) return next(e);
       const { Box } = $.ui.resolve(e);
-      return <Box key="fold:hidden" />;
+      return (
+        <Box key="fold:call" flexDirection="column">
+          {await titleLines($, e, id, m)}
+          {open.has(id) ? await next(e) : null}
+          {m.isLast ? summary($, e, m) : null}
+        </Box>
+      );
     },
   );
 
@@ -295,31 +346,35 @@ export const fold = (on: On) => {
     { component: "ToolResult", surface: "terminal" },
     ($, e, next) => {
       const m = isOn() ? members.get(e.props.tool_use_id) : undefined;
-      if (!m || open.has(m.run)) return next(e);
+      if (!m || open.has(e.props.tool_use_id)) return next(e);
       const { Box } = $.ui.resolve(e);
       return <Box key="fold:result" />;
     },
   );
 
-  // the engine's own fold of reads and searches sits inside a run too, and may hold the run's first call
+  // the engine's own fold of reads and searches sits inside a run too: folded, it draws its calls' titles itself, since
+  // their rows inside it are not drawn, and once one is unfolded the engine draws the group and each row its own line
   on(
     "ui.render",
     { component: "ToolGroup", surface: "terminal" },
     async ($, e, next) => {
       if (!isOn()) return next(e);
-      const ms = e.props.calls.map((c) =>
-        c.tool_use_id ? members.get(c.tool_use_id) : undefined,
-      );
+      const ids = e.props.calls.map((c) => c.tool_use_id ?? "");
+      const ms = ids.map((id) => members.get(id));
       const first = ms[0];
       if (!first || ms.some((m) => m?.run !== first.run)) return next(e);
-      const lead = ms.find((m) => m!.isHead);
-      if (lead) {
-        inGroup.add(lead.run);
-        return head($, e, next, lead);
-      }
-      if (open.has(first.run)) return next(e);
+      if (ids.some((id) => open.has(id))) return next(e);
       const { Box } = $.ui.resolve(e);
-      return <Box key="fold:group" />;
+      const lines = await Promise.all(
+        ids.map((id, i) => titleLines($, e, id, ms[i]!, `:${i}`)),
+      );
+      const last = ms.at(-1)!;
+      return (
+        <Box key="fold:group" flexDirection="column">
+          {lines.flat()}
+          {last.isLast ? summary($, e, last) : null}
+        </Box>
+      );
     },
   );
 };

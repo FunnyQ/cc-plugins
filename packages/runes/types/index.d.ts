@@ -1,8 +1,13 @@
-export type Frame = { clip: string; index: number }
-export type MinimapRow = { id: string; kind: string; size: number }
+export type Frame = { clip: string; index: number };
+export type MinimapRow = { id: string; kind: string; size: number };
 
-declare module 'claude-code' {
+declare module "claude-code" {
   interface PluginState {
-    runes: { frame: Frame; minimapRows: MinimapRow[]; minimapShown: string[]; shimmer: number }
+    runes: {
+      frame: Frame;
+      minimapRows: MinimapRow[];
+      minimapShown: string[];
+      spinner: number;
+    };
   }
 }
