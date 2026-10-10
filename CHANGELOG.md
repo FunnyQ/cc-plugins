@@ -1,5 +1,13 @@
 # Changelog
 
+## [runes 0.8.4] - 2026-10-10
+
+_tracks tag `runes-v0.8.4`_
+
+### Added
+- A new fold rune collapses the tool calls between two replies into one pressable summary row, keeping the transcript clean while Edit and Write calls stay visible by default.
+- Running tool calls in a folded summary now shimmer, and single calls fold by default (fold.min_calls is 1), so a lone call no longer jumps from folded to a card when the turn ends.
+
 ## [runes 0.8.3] - 2026-10-07
 
 _tracks tag `runes-v0.8.3`_
