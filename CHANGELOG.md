@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.6] - 2026-10-14
+
+_tracks tag `runes-v0.8.6`_
+
+### Added
+- Unfolded fold cards now draw under a dim left rail with a ▾ marker on the title, so an opened call reads as a child of its title row.
+
 ## [runes 0.8.5] - 2026-10-10
 
 _tracks tag `runes-v0.8.5`_
