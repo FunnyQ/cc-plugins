@@ -164,6 +164,8 @@ let members = new Map<string, Member>();
 let pending: Pending[] = [];
 // the calls drawn as their card under their title
 const open = new Set<string>();
+// the rail's drawn length; a card taller than this shows a gap at its top
+const RAIL = 200;
 const isOn = () => config.enabled.transcript && config.enabled.fold;
 
 // reads the whole transcript per call, a cursor over new messages if long sessions make it slow
@@ -213,7 +215,9 @@ function titleLines(
           width={2}
         />
       ) : (
-        <Text {...paint(palette().dim, scope)}>{"· "}</Text>
+        <Text {...paint(palette().dim, scope)}>
+          {open.has(id) ? "▾ " : "· "}
+        </Text>
       )}
       <Text {...paint(color, scope)}>{lead.slice(2)}</Text>
       <Button
@@ -311,11 +315,44 @@ export const fold = (on: On) => {
       const id = e.props.tool_use_id;
       const m = isOn() ? members.get(id) : undefined;
       if (!m) return next(e);
-      const { Box } = $.ui.resolve(e);
+      const { Box, Text } = $.ui.resolve(e);
       return (
         <Box key="fold:call" flexDirection="column">
           {titleLines($, e, id, m)}
-          {open.has(id) ? await next(e) : null}
+          {open.has(id) ? (
+            // the rail spans the card whatever its height: absolute, so its glyphs never stretch the row, and
+            // column-reverse, so the overflow it clips is above and its corner sits on the card's last line;
+            // the tint stops at the title, so the pressable line reads apart from what it opened
+            <Box
+              key="fold:rail"
+              paddingLeft={1}
+              backgroundColor={palette().surface}
+            >
+              <Box
+                position="absolute"
+                top={0}
+                bottom={0}
+                left={0}
+                width={1}
+                overflow="hidden"
+                flexDirection="column-reverse"
+              >
+                <Text {...paint(palette().dim, `fold:${id}`)}>
+                  {`${"│\n".repeat(RAIL)}╰`}
+                </Text>
+              </Box>
+              {
+                await next({
+                  ...e,
+                  // the card sizes itself to the viewport, so it is handed the column the rail takes off
+                  viewport: e.viewport && {
+                    ...e.viewport,
+                    columns: e.viewport.columns - 1,
+                  },
+                })
+              }
+            </Box>
+          ) : null}
           {m.isLast ? summary($, e, m) : null}
         </Box>
       );

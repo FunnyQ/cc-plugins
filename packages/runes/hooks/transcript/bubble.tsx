@@ -45,6 +45,7 @@ export const PALETTES = {
     str: "#b5bd68",
     var: "#b294bb",
     op: "#de935f",
+    surface: "#121a20",
   },
   light: {
     text: "#4d4d4c",
@@ -52,6 +53,7 @@ export const PALETTES = {
     str: "#718c00",
     var: "#8959a8",
     op: "#f5871f",
+    surface: "#efefef",
   },
 };
 
@@ -109,7 +111,9 @@ export const mute = (color: string, light = isLight()) => {
   const out = hex(
     ...rgb.map((c) => {
       const flat = c + (grey - c) * SATURATION;
-      return Math.round(light ? 255 - (255 - flat) * BRIGHTNESS : flat * BRIGHTNESS);
+      return Math.round(
+        light ? 255 - (255 - flat) * BRIGHTNESS : flat * BRIGHTNESS,
+      );
     }),
   );
   muted.set(key, out);
@@ -175,7 +179,14 @@ export const foldRows = (
     [`${key}:divider`, DIVIDER],
     [
       `${key}:more:row`,
-      pressRow(Button, { key: `${key}:more`, text, width, onPress, hover, align: "center" }),
+      pressRow(Button, {
+        key: `${key}:more`,
+        text,
+        width,
+        onPress,
+        hover,
+        align: "center",
+      }),
     ],
   ];
 };
@@ -213,7 +224,13 @@ export const foldSection = (
   return [
     toggle,
     ...body(),
-    ...foldRows(Button, { key: `${key}:end`, isOpen: true, hidden: 0, width, onPress }),
+    ...foldRows(Button, {
+      key: `${key}:end`,
+      isOpen: true,
+      hidden: 0,
+      width,
+      onPress,
+    }),
   ];
 };
 

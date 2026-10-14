@@ -2,6 +2,7 @@ import { expect, test, type Engine } from "claude-code/testing";
 import type { On, SessionMessage } from "claude-code";
 
 import { DEFAULTS } from "../config";
+import { PALETTES } from "./bubble";
 import { SEARCH_ICON, runsOf } from "./fold";
 import { CONFIG, eventually, find, startSession } from "./test-session";
 
@@ -225,15 +226,23 @@ test("pressing a title unfolds that call alone, under its title, and pressing it
   const row = await $.ui.mount(B2);
   await row.press({ key: "fold:open" });
   expect((await row.find({ key: "fold:title" }))?.text.trim()).toBe(
-    `· ${DEFAULTS.bash.icon}  Bash pwd`,
+    `▾ ${DEFAULTS.bash.icon}  Bash pwd`,
   );
   expect(await row.find({ key: "bash" })).toBeDefined();
+  // the card sits on a tinted surface, the pressable title off it
+  const rail = (await row.find({ key: "fold:rail" })) as
+    | { props?: { backgroundColor?: string } }
+    | undefined;
+  expect(rail?.props?.backgroundColor).toBeDefined();
+  expect(rail?.props?.backgroundColor).toBe(PALETTES.dark.surface);
+  expect(await row.find({ key: "fold:opened" })).toBeUndefined();
   expect(await find($, B1, { key: "bash" })).toBeUndefined();
   expect((await find($, E1, { key: "fold" }))?.text.trim()).toBe(
     "▸ 4 calls · Bash 2 · Grep 1 · Edit 1",
   );
   await row.press({ key: "fold:open" });
   expect(await row.find({ key: "bash" })).toBeUndefined();
+  expect(await row.find({ key: "fold:rail" })).toBeUndefined();
   await row.unmount();
 });
 
