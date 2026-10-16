@@ -1,4 +1,4 @@
-import type { On } from 'claude-code'
+import type { Hook, On } from 'claude-code'
 
 import { Director } from './director'
 import { IMAGE_COLUMNS, IMAGE_ROWS, octants, pixels, svg } from './encode'
@@ -56,6 +56,29 @@ export const sprite = ({ Image, Svg, Text, Box }: Ui, isDesktop: boolean, frame:
   return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clawd.clip, clawd.index)} />
 }
 
+// moves Clawd one frame per clip step, once per session
+function animate($: Parameters<Hook<'session.start'>>[0], nextClip: () => string, isDue: () => boolean) {
+  clawd.clip = nextClip()
+  $.clock.every(TICK_MS, () => {
+    const { requestId } = clawd
+    if (!isDue() || requestId === undefined) return
+    clawd.index += 1
+    if (clawd.index === CLIPS[clawd.clip]!.length) {
+      clawd.index = 0
+      clawd.clip = nextClip()
+    }
+    if (clawd.isDesktop || clawd.useText) {
+      void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
+      return
+    }
+    $.ui.blit({ requestId, key: 'clawd', source: pixels(clawd.clip, clawd.index) }).then(r => {
+      if (!('deny' in r)) return
+      clawd.useText = true
+      void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
+    })
+  })
+}
+
 export const mascot = (on: On) => {
   const director = new Director()
   Object.assign(clawd, INITIAL)
@@ -75,31 +98,27 @@ export const mascot = (on: On) => {
     idleFor: isWorking ? 0 : (now - lastActiveAt) / 1000,
   })
 
-  // register.tsx holds the unmatched session.start; a mascot only matters where someone watches
-  on('session.start', { isInteractive: true }, async ($, e, next) => {
-    clawd.clip = director.next(inputs())
-    $.clock.every(TICK_MS, () => {
-      now += TICK_MS
-      elapsed += TICK_MS
-      const { requestId } = clawd
-      if (!config.enabled.clawd || requestId === undefined || elapsed < CLIPS[clawd.clip]![clawd.index]!.ms) return
-      elapsed = 0
-      clawd.index += 1
-      if (clawd.index === CLIPS[clawd.clip]!.length) {
-        clawd.index = 0
-        clawd.clip = director.next(inputs())
-      }
-      if (clawd.isDesktop || clawd.useText) {
-        void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
-        return
-      }
-      $.ui.blit({ requestId, key: 'clawd', source: pixels(clawd.clip, clawd.index) }).then(r => {
-        if (!('deny' in r)) return
-        clawd.useText = true
-        void $.state.set(FRAME, { clip: clawd.clip, index: clawd.index })
-      })
-    })
+  let isTicking = false
+  const nextClip = () => director.next(inputs())
+  const isDue = () => {
+    now += TICK_MS
+    elapsed += TICK_MS
+    if (!config.enabled.clawd || clawd.requestId === undefined || elapsed < CLIPS[clawd.clip]![clawd.index]!.ms) return false
+    elapsed = 0
+    return true
+  }
 
+  // register.tsx holds the unmatched session.start; a mascot only matters where someone watches
+  on('session.start', { isInteractive: true }, ($, e, next) => {
+    if (!isTicking) animate($, nextClip, isDue)
+    isTicking = true
+    return next(e)
+  })
+
+  // the desktop app runs Claude through the SDK, a non-interactive session; its first draw attaches it, a headless run never does
+  on('session.attach', { surface: 'desktop' }, ($, e, next) => {
+    if (!isTicking) animate($, nextClip, isDue)
+    isTicking = true
     return next(e)
   })
 

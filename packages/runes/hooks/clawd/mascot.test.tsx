@@ -90,6 +90,30 @@ test("Clawd's frames redraw the band alone, never the transcript", async ($, on)
   expect(rows).toBe(before)
 })
 
+// the desktop app runs Claude through the SDK, so its session starts non-interactive with no surface
+test('Clawd animates once the desktop attaches, and never ticks in a headless run', async ($, on) => {
+  const clock = mock.clock(on)
+  fakeHost(on)
+  on('ui.render', ($, e) => { const { Text } = $.ui.resolve(e); return <Text key="engine">engine</Text> })
+  on('session.start', (_$, e) => e as never)
+  on('session.attach', (_$, e) => ({ clientId: e.clientId }) as never)
+  await $.session.start({ cwd: '/', surface: null, isInteractive: false })
+  const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND })
+  const frames = async () => {
+    const seen = new Set<string>()
+    for (let i = 0; i < 20; i++) {
+      await clock.advance(500)
+      seen.add(JSON.stringify((await desk.find({ type: 'Svg' }))?.props.source))
+    }
+    return seen.size
+  }
+  expect(await frames()).toBe(1)
+
+  await $.session.attach({ surface: 'desktop', clientId: 'desktop:default' })
+  expect(await frames()).toBeGreaterThan(1)
+  await desk.unmount()
+})
+
 test('the minimap fills the left of the band on the terminal and never on the desktop', async ($, on) => {
   const clock = mock.clock(on)
   const rows = JSON.stringify({ path: '/t.jsonl', rows: [
