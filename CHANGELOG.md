@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.8.7] - 2026-10-16
+
+_tracks tag `runes-v0.8.7`_
+
+### Fixed
+- Clawd now animates in the Claude desktop app instead of staying on its first frame; headless runs still start no animation timer.
+
 ## [runes 0.8.6] - 2026-10-14
 
 _tracks tag `runes-v0.8.6`_
