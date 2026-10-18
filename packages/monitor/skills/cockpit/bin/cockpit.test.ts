@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { chmodSync, cpSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 const source = join(import.meta.dir, "cockpit");
@@ -16,7 +17,7 @@ afterEach(() => { for (const cleanup of cleanups.splice(0).reverse()) cleanup();
 
 function fixture(options: { wrongHash?: boolean; missing?: boolean; delay?: number; assetDelay?: number; version?: string; assetsDir?: string } = {}) {
   const version = options.version ?? "9.9.9";
-  const root = mkdtempSync(join(import.meta.dir, ".test-"));
+  const root = mkdtempSync(join(tmpdir(), "cockpit-test-"));
   cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   const plugin = join(root, "monitor");
   const shim = join(plugin, "skills/cockpit/bin/cockpit");
@@ -192,7 +193,7 @@ test("Concurrent lock", async () => {
 // musl build needs cargo-zigbuild; covered by CI.
 test.skipIf(!hasCargo || os !== "Darwin")("release script assets are shim-compatible", async () => {
   const version = readFileSync(join(crate, "Cargo.toml"), "utf8").match(/^version = "([^"]+)"/m)![1]!;
-  const assetsDir = mkdtempSync(join(import.meta.dir, ".test-assets-"));
+  const assetsDir = mkdtempSync(join(tmpdir(), "cockpit-test-assets-"));
   cleanups.push(() => rmSync(assetsDir, { recursive: true, force: true }));
   for (const args of [[target, assetsDir], ["--sums", assetsDir]]) {
     const proc = Bun.spawn([releaseScript, ...args], { stdout: "pipe", stderr: "pipe" });
@@ -206,7 +207,7 @@ test.skipIf(!hasCargo || os !== "Darwin")("release script assets are shim-compat
 }, 180000);
 
 test.skipIf(!hasCargo)("release version entries preserve Cargo.lock for --locked builds", async () => {
-  const root = mkdtempSync(join(import.meta.dir, ".test-bump-"));
+  const root = mkdtempSync(join(tmpdir(), "cockpit-test-bump-"));
   cleanups.push(() => rmSync(root, { recursive: true, force: true }));
   cpSync(crate, root, { recursive: true, filter: (path) => path !== join(crate, "target") });
   const config = JSON.parse(readFileSync(join(crate, "../../../.chronicle/release.json"), "utf8"));
