@@ -93,6 +93,7 @@ const PELE_VARS = [
   "--pele-accent",
   "--pele-critical",
   "--pele-error",
+  ...Array.from({ length: 8 }, (_, i) => `--pele-series-${i + 1}`),
 ];
 
 // A downloaded file loses the page CSS variables its colours come from, and on

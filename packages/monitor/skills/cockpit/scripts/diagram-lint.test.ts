@@ -171,6 +171,24 @@ stateDiagram-v2
     expect(await lintDiagram(src)).toEqual([]);
   });
 
+  // The reference is what agents copy from, so a broken example there teaches
+  // every agent to write a diagram the CLI then rejects.
+  test("every example in references/diagram.md passes", async () => {
+    const doc = await Bun.file(
+      `${import.meta.dir}/../references/diagram.md`,
+    ).text();
+    const examples = [...doc.matchAll(/```mermaid\n([\s\S]*?)```/g)].map(
+      (m) => m[1],
+    );
+    expect(examples.length).toBeGreaterThanOrEqual(5);
+    for (const src of examples) {
+      expect({ src, problems: await lintDiagram(src) }).toEqual({
+        src,
+        problems: [],
+      });
+    }
+  });
+
   test("non-flowchart types the renderer supports pass the type check", async () => {
     const fixtures = [
       "kanban\n  Todo\n    task1[Fix the bug]",

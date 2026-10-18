@@ -1729,6 +1729,14 @@ svg.pele {
   --pele-accent: var(--aurora);
   --pele-critical: var(--danger);
   --pele-error: var(--danger);
+  --pele-series-1: var(--aurora);
+  --pele-series-2: var(--signal);
+  --pele-series-3: var(--positive);
+  --pele-series-4: var(--danger);
+  --pele-series-5: var(--lit-edge);
+  --pele-series-6: var(--idle);
+  --pele-series-7: var(--signal-strong);
+  --pele-series-8: var(--ink-muted);
 }
 .decision-card__diagram svg {
   display: block;
