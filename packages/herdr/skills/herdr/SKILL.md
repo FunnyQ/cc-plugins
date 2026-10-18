@@ -16,7 +16,7 @@ version: 3
 
 Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file. If you need customization, add `~/.config/herdr/config.toml`.
 
-Docs: <https://herdr.dev/docs/>. For an agent-readable index pinned to the installed release, fetch <https://herdr.dev/llms.txt> and open only the page the task needs. Run `herdr --skill` for the agent guide bundled with the installed binary; it is authoritative when this skill and the live CLI disagree.
+Docs: <https://herdr.dev/docs/>. For an agent-readable index pinned to the installed release, fetch <https://herdr.dev/llms.txt> and open only the page the task needs. This skill is the source of truth for driving Herdr. Do not load `herdr --skill`; it is a generic guide this skill already covers.
 
 ## Orchestrating agents — use the `herd` wrapper first
 

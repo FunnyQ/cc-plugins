@@ -1,6 +1,6 @@
 # Herdr CLI Reference
 
-This document is verified against herdr 0.9.3. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.3. This skill is the source of truth. If a command here fails against the installed CLI, check `herdr --help` for the current flags.
 
 **Neither discovery surface is complete, and they truncate different things.** A bare group listing (`herdr pane`) abbreviates long option lists — it drops `--source detection` from `pane read` and `--session-start-source` from `pane report-agent-session`. A subcommand's `--help` (`herdr workspace close --help`) can omit an option the group listing shows, such as `--group`. Check both before concluding a flag is gone.
 
@@ -35,7 +35,7 @@ herdr config reset-keys
 
 Every TUI launch attaches to a background server. Detach and the panes keep running; run `herdr server stop` to end the session instead.
 
-`herdr --help` routes AI agents to two more sources. Read https://herdr.dev/agent-guide.md to help a human set Herdr up for the first time. Read https://herdr.dev/llms.txt to debug Herdr itself. Skip `herdr --skill` while this skill is in context.
+`herdr --help` routes AI agents to two more sources. Read https://herdr.dev/agent-guide.md to help a human set Herdr up for the first time. Read https://herdr.dev/llms.txt to debug Herdr itself. Do not load `herdr --skill`; this skill covers it.
 
 ## Server
 ```bash

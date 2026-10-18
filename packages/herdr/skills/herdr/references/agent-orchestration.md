@@ -1,6 +1,6 @@
 # Herdr Agent Orchestration
 
-This document is verified against herdr 0.9.3. If live CLI output disagrees with this doc, trust `herdr --skill` / `herdr --help`.
+This document is verified against herdr 0.9.3. This skill is the source of truth. If a command here fails against the installed CLI, check `herdr --help` for the current flags.
 
 Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
 

@@ -85,7 +85,8 @@ export const USAGE = `browser.ts <command> [args] [--view ID]
 
   open <url> [--new] [--split right|left|down|up] [--ratio 0.4]
                               loads the url in the live browser; --new, or no
-                              live browser, opens one in a pane beside you
+                              live browser, opens one in its own Herdr tab;
+                              --split carves the focused pane instead
   status                      url, title, then the tab list
   tabs | new-tab <url> | activate <n> | close <n>
   text                        page text
