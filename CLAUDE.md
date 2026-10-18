@@ -356,7 +356,7 @@ count is zero.
 - Use `type` over `interface`.
 - Frontend uses petite-vue, not full Vue. Charts use Chart.js.
 - Take no external npm dependencies at runtime. Vendor libraries are committed in `dashboard/dist/vendor/`. `devDependencies` may carry types-only packages — `@types/bun` is there so the typecheck above resolves Bun's globals.
-- Vendor mermaid as the UMD bundle (`mermaid.min.js`, ~3.3MB, sets `globalThis.mermaid`). The ESM build is code-split and cannot ship as one file. `modules/diagram.js` lazy-loads it on the first diagram render, themes it with concrete hex (mermaid's khroma engine cannot parse `oklch()`), and sanitizes the SVG through DOMPurify's SVG profile.
+- Render Mermaid source with pele, vendored as its single-file ESM build (`vendor/pele.js`, ~680KB, MIT banner prepended). `modules/diagram.js` lazy-imports it on the first diagram render and sanitizes the SVG through DOMPurify's SVG profile. pele's colours come from `--pele-*` CSS variables, which `style.css` maps onto the OKLCH tokens on `svg.pele`. The `:::class` palette rides inside each SVG as a `<style>` in concrete hex, so a downloaded file keeps it. `scripts/diagram-lint.ts` imports the same file to parse, so the lint and the renderer cannot disagree; pele needs no DOM.
 - Price per 1M tokens in USD.
 - Put scratch that outlives its process under `/tmp/q-lab/<plugin>/<skill>/`, or `/tmp/q-lab/<plugin>/` for a plugin with no skills. The `q-lab` segment keeps a third-party plugin of the same name out of our files. A path an agent writes with the Write tool must end in a `mktemp -d` leaf: Write refuses to overwrite a file it has not read, so a fixed path hands the next run the last run's file. Keep a `mkdtemp` scratch that the same process deletes in `os.tmpdir()`.
 

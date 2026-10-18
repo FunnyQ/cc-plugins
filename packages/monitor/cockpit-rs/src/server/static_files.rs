@@ -133,7 +133,7 @@ pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> R
         return not_found();
     };
     if gzip {
-        // Off the single runtime thread: gzipping the 3.3 MB mermaid bundle would stall every open stream.
+        // Off the single runtime thread: gzipping the ~1 MB vendor bundles would stall every open stream.
         let compressed = tokio::task::spawn_blocking(move || gzip6(&body)).await;
         let Ok(Ok(compressed)) = compressed else {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();

@@ -10,7 +10,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { cockpitChecks } from "./setup";
 
 const SCRIPT = join(import.meta.dir, "setup.ts");
 const CHANNEL_SCRIPT = resolve(
@@ -94,7 +93,7 @@ describe("--check", () => {
     // cockpit side — with no leftover entry it's green
     expect(stdout).toContain("cockpit shim exists and is executable");
     expect(stdout).toContain("✓ no leftover cockpit-channel entry");
-    expect(stdout).toContain("mermaid diagram lint (happy-dom)");
+    expect(stdout).not.toContain("happy-dom");
   });
 
   test("flags a leftover hand-wired cockpit-channel entry", () => {
@@ -116,40 +115,6 @@ describe("--check", () => {
     const { code, stdout } = run();
     expect(code).toBe(1);
     expect(stdout).toContain("Required checks failed");
-  });
-});
-
-describe("cockpitChecks", () => {
-  test("reports happy-dom as an optional cockpit precheck", () => {
-    const checks = cockpitChecks();
-    const check = checks.find(
-      (c) => c.label === "mermaid diagram lint (happy-dom)",
-    );
-
-    expect(check).toBeDefined();
-    expect(check?.level).toBe("optional");
-  });
-
-  test("marks happy-dom ok when it resolves from cockpit scripts", () => {
-    const checks = cockpitChecks(() => "/fake/happy-dom.js");
-    const check = checks.find(
-      (c) => c.label === "mermaid diagram lint (happy-dom)",
-    );
-
-    expect(check?.ok).toBe(true);
-  });
-
-  test("includes a hint when happy-dom does not resolve", () => {
-    const checks = cockpitChecks(() => {
-      throw new Error("missing");
-    });
-    const check = checks.find(
-      (c) => c.label === "mermaid diagram lint (happy-dom)",
-    );
-
-    expect(check?.ok).toBe(false);
-    expect(check?.hint).toContain("falls back to weaker heuristics");
-    expect(check?.hint).toContain("bun install");
   });
 });
 
@@ -257,7 +222,9 @@ describe("--apply", () => {
       true,
     );
     expect(
-      names(join(home, ".claude")).some((f) => f.startsWith("settings.json.bak-")),
+      names(join(home, ".claude")).some((f) =>
+        f.startsWith("settings.json.bak-"),
+      ),
     ).toBe(true);
   });
 
@@ -290,9 +257,14 @@ describe("--apply", () => {
 
 describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () => {
   test("recognizes and removes a hand-wired shim channel", () => {
-    writeFileSync(join(home, ".claude.json"), JSON.stringify({
-      mcpServers: { "cockpit-channel": { command: COCKPIT_SHIM, args: ["channel"] } },
-    }));
+    writeFileSync(
+      join(home, ".claude.json"),
+      JSON.stringify({
+        mcpServers: {
+          "cockpit-channel": { command: COCKPIT_SHIM, args: ["channel"] },
+        },
+      }),
+    );
     expect(run().stdout).toContain("○ no leftover cockpit-channel entry");
     run(["--migrate"]);
     expect(claudeJson().mcpServers["cockpit-channel"]).toBeUndefined();
@@ -325,7 +297,9 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
     });
     expect(sj.theme).toBe("dark");
     expect(
-      names(join(home, ".claude")).some((f) => f.startsWith("settings.json.bak-")),
+      names(join(home, ".claude")).some((f) =>
+        f.startsWith("settings.json.bak-"),
+      ),
     ).toBe(true);
     // Channel was never configured — migrate must NOT create it.
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
@@ -338,7 +312,9 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
   });
 
   test("unwraps a wrapped collector to the command it wrapped", () => {
-    statusLine(`TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline' ${COLLECTOR_COMMAND}`);
+    statusLine(
+      `TOKEN_ATLAS_STATUSLINE_COMMAND='npx claude-powerline' ${COLLECTOR_COMMAND}`,
+    );
     run(["--migrate"]);
     expect(settingsJson().statusLine.command).toBe("npx claude-powerline");
   });
@@ -456,14 +432,19 @@ describe("--session-check (marker-gated)", () => {
       writeFileSync(
         SETTINGS(),
         JSON.stringify({
-          statusLine: { type: "command", command: `${HUD} '${COLLECTOR_COMMAND}'` },
+          statusLine: {
+            type: "command",
+            command: `${HUD} '${COLLECTOR_COMMAND}'`,
+          },
         }),
       );
 
       const { code, out } = run(["--session-check"]);
 
       expect(code).toBe(0);
-      expect(settingsJson().statusLine.command).toBe(`${HUD} '${DEFAULT_INNER}'`);
+      expect(settingsJson().statusLine.command).toBe(
+        `${HUD} '${DEFAULT_INNER}'`,
+      );
       const lines = out.split("\n").filter(Boolean);
       expect(lines).toHaveLength(1);
       const message = JSON.parse(lines[0]!).systemMessage as string;
@@ -491,7 +472,9 @@ describe("--session-check (marker-gated)", () => {
       writeFileSync(SETTINGS(), "{ not json");
       run(["--session-check"]);
       expect(readFileSync(SETTINGS(), "utf-8")).toBe("{ not json");
-      expect(names(join(home, ".claude")).some((f) => f.includes(".bak"))).toBe(false);
+      expect(names(join(home, ".claude")).some((f) => f.includes(".bak"))).toBe(
+        false,
+      );
     });
 
     test("never adds a statusLine block that was absent", () => {
@@ -566,7 +549,10 @@ describe("--session-check drift watch (every session, read-only)", () => {
     run(["--session-check"]); // stamps the version marker + a clean drift signature
     // Same version, so the migrate gate is closed — the drift watch must still see this.
     unapproved();
-    const before = readFileSync(join(home, ".claude", "settings.json"), "utf-8");
+    const before = readFileSync(
+      join(home, ".claude", "settings.json"),
+      "utf-8",
+    );
 
     const { stdout } = run(["--session-check"]);
 

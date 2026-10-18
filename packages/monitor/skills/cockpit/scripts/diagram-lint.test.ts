@@ -1,13 +1,11 @@
-// Tests for the --diagram write-time lint. The lint runs Mermaid's real parser
-// headless (happy-dom + the vendored bundle), so these tests are the renderer's
+// Tests for the --diagram write-time lint. The lint runs the vendored pele
+// parser — the dashboard's own renderer — so these tests are the renderer's
 // verdict, not an approximation of it. The lint must stay conservative —
 // legitimate syntax (sequence async arrows, cylinder shapes, quoted labels,
 // frontmatter, `<br>` in a label) must pass.
 // Run: bun test packages/monitor/skills/cockpit/scripts/diagram-lint.test.ts
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { DIAGRAM_TYPES, lintDiagram } from "./diagram-lint";
+import { lintDiagram } from "./diagram-lint";
 import { SEMANTIC_NODES } from "../dashboard/dist/modules/diagram.js";
 
 describe("lintDiagram", () => {
@@ -184,16 +182,6 @@ stateDiagram-v2
     ];
     for (const src of fixtures) {
       expect(await lintDiagram(src)).toEqual([]);
-    }
-  });
-
-  test("every whitelisted type exists in the vendored mermaid bundle", () => {
-    const bundle = readFileSync(
-      join(import.meta.dir, "../dashboard/dist/vendor/mermaid.min.js"),
-      "utf8",
-    );
-    for (const type of DIAGRAM_TYPES) {
-      expect(bundle.includes(type)).toBe(true);
     }
   });
 

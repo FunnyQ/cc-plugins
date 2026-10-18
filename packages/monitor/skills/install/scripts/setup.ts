@@ -55,13 +55,6 @@ const COCKPIT_SHIM = resolve(
   "bin",
   "cockpit",
 );
-const COCKPIT_SCRIPTS = resolve(
-  import.meta.dir,
-  "..",
-  "..",
-  "cockpit",
-  "scripts",
-);
 const CLAUDE_JSON = join(HOME, ".claude.json");
 
 // Pre-approve `bun <q-lab-marketplace plugin script>.ts` in permissions.allow.
@@ -104,12 +97,6 @@ function claudeVersion(): string | null {
   }
 }
 
-type ResolveDependency = (specifier: string, from: string) => string;
-
-function defaultResolve(specifier: string, from: string): string {
-  return Bun.resolveSync(specifier, from);
-}
-
 // A leftover cockpit-channel entry in ~/.claude.json from an older version that
 // hand-wired the channel, or null if there's none. The channel no longer exists,
 // so any such entry points at a dead command and should be removed.
@@ -122,7 +109,8 @@ function channelConfiguredPath(): string | null {
     typeof entry?.command === "string" &&
     /(?:^|[/\\])skills[/\\]cockpit[/\\]bin[/\\]cockpit$/.test(entry.command) &&
     args[0] === "channel"
-  ) return entry.command;
+  )
+    return entry.command;
   return (
     args.find(
       (a) => typeof a === "string" && a.endsWith("cockpit-channel.ts"),
@@ -168,27 +156,6 @@ function cockpitCliChecks(): Check[] {
     `Found a hand-wired cockpit-channel in ~/.claude.json — the channel was removed, so it is a leftover.\n   Run: bun ${import.meta.path} --migrate to remove it.`,
   );
   return checks;
-}
-
-export function cockpitChecks(
-  resolveDep: ResolveDependency = defaultResolve,
-): Check[] {
-  let happyDomResolves = false;
-  try {
-    resolveDep("happy-dom", COCKPIT_SCRIPTS);
-    happyDomResolves = true;
-  } catch {
-    happyDomResolves = false;
-  }
-
-  return [
-    {
-      label: "mermaid diagram lint (happy-dom)",
-      ok: happyDomResolves,
-      level: "optional",
-      hint: "Mermaid --diagram lint falls back to weaker heuristics that can pass source the dashboard cannot render.\n   Run bun install in the plugin directory, or let Bun auto-install it from ~/.bun/install/cache on first use (needs network once).",
-    },
-  ];
 }
 
 // --- cleanup: remove a leftover hand-wired cockpit-channel from ~/.claude.json --
@@ -475,7 +442,6 @@ function main() {
   const { requiredFailed } = printReport([
     ...dashboardChecks(),
     ...cockpitCliChecks(),
-    ...cockpitChecks(),
     ...scriptPermissionChecks(),
   ]);
   console.log();

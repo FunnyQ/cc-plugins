@@ -215,12 +215,12 @@ body {
 }
 /* Stop the warp/beacon/lead motion when collapsed (canvas paused via JS). */
 .viewport.is-collapsed
-  :is(
-    .lead-underline,
-    .lead-connector,
-    .viewport__beacon-ring,
-    .viewport__beacon-core
-  ) {
+:is(
+  .lead-underline,
+  .lead-connector,
+  .viewport__beacon-ring,
+  .viewport__beacon-core
+) {
   animation-play-state: paused;
 }
 .viewport__warp,
@@ -1715,6 +1715,20 @@ body {
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
   overflow-x: auto;
+}
+/* pele paints through these, so the diagram takes the tokens directly. Set on
+   the SVG root, not the card, so the lightbox copy is themed too. */
+svg.pele {
+  --pele-bg: var(--space);
+  --pele-fg: var(--starlight);
+  --pele-muted: var(--ink-muted);
+  --pele-line: var(--ink-faint);
+  --pele-surface: var(--hull-2);
+  --pele-surface-alt: var(--hull);
+  --pele-border: var(--aurora);
+  --pele-accent: var(--aurora);
+  --pele-critical: var(--danger);
+  --pele-error: var(--danger);
 }
 .decision-card__diagram svg {
   display: block;
