@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 8.1.0] - 2026-10-18
+
+_tracks tag `monitor-v8.1.0`_
+
+### Changed
+- Cockpit dashboard diagrams now render with pele instead of Mermaid, cutting the bundled renderer from 3.3MB to 677KB while keeping the same Mermaid diagram syntax; node positions may differ slightly because pele uses its own layout.
+
 ## [runes 0.8.7] - 2026-10-16
 
 _tracks tag `runes-v0.8.7`_
