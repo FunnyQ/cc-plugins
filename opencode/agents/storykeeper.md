@@ -85,7 +85,7 @@ the command runs against `/`.
      per-decision diagrams in. Diagram-first, not diagram-always: skip the
      diagram for a flat change.
      - **Self-contained colour only.** GitHub and GitLab render with their own
-       default Mermaid, without the cockpit dashboard's `themeCSS` palette, so
+       default Mermaid, without the cockpit dashboard's predefined node palette, so
        the cockpit `:::ok` / `:::bad` / `:::fix` / `:::info` class tags render
        flat there. For colour, define it inline with `classDef` — for example,
        `classDef bad fill:#5b1a1a,stroke:#e5605f,color:#fff;` then `node:::bad`.

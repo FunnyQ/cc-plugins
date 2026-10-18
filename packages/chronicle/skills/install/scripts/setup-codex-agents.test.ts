@@ -59,24 +59,20 @@ describe("setup-codex-agents", () => {
     expect(config).toContain("[agents.chronicle_annalist]");
 
     const installed = Object.fromEntries(
-      [
-        "lawspeaker",
-        "storykeeper",
-        "annalist",
-        "codifier",
-        "barrowkeeper",
-      ].map((role) => [
-        role,
-        readFileSync(
-          join(codexHome, "agents", "chronicle", `${role}.toml`),
-          "utf8",
-        ),
-      ]),
+      ["lawspeaker", "storykeeper", "annalist", "codifier", "barrowkeeper"].map(
+        (role) => [
+          role,
+          readFileSync(
+            join(codexHome, "agents", "chronicle", `${role}.toml`),
+            "utf8",
+          ),
+        ],
+      ),
     );
     expect(installed.lawspeaker).toContain('model = "gpt-5.6-terra"');
     expect(installed.lawspeaker).toContain("commit.ts apply");
     expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
-    expect(installed.storykeeper).toContain("request-creator.ts --material");
+    expect(installed.storykeeper).toContain('request-creator.ts" --material');
     expect(installed.storykeeper).not.toContain("chronicle_skald");
     expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
     expect(installed.codifier).toContain('model = "gpt-5.6-terra"');
