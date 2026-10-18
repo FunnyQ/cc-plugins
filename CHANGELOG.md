@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.7.2] - 2026-10-18
+
+_tracks tag `dispatch-v5.7.2`_
+
+### Changed
+- Autopilot now delegates to newer default models: Codex uses gpt-6.1-sol, and OpenCode uses deepseek-v4.1-flash for delegation and gpt-6-luna for review.
+
 ## [monitor 8.1.0] - 2026-10-18
 
 _tracks tag `monitor-v8.1.0`_
