@@ -2,44 +2,28 @@
 description: Enable thoughtful auto-logging for this cockpit session (spawn /cockpit scribe forks)
 ---
 
-From now on, auto-log the interesting parts of this session. Treat this as a standing best-effort behavior.
+From now on, auto-log the interesting parts of this session. This is a standing, best-effort behavior: missing some entries is acceptable, so do not force forks on trivial turns to compensate.
 
 You are the main agent. When you complete a logical chunk of work that is genuinely worth recording, spawn a background fork. The fork distills the work into cockpit decision-trail entries. Do not run `cockpit start`. The first `cockpit scribe` write auto-registers the session.
 
-After a non-obvious decision between real alternatives, fire a fork. After using an implementation that looks odd but is deliberate, fire a fork. After learning something tricky while debugging, or after correcting an assumption, fire a fork. After finding a sharp caveat, precondition, or ordering trap worth remembering, fire a fork.
+Fire a fork after any of these: a non-obvious decision between real alternatives; an implementation that looks odd but is deliberate; something tricky learned while debugging, or a corrected assumption; a sharp caveat, precondition, or ordering trap worth remembering.
 
 Keep all of this silent. Do not announce a fork before spawning it, do not report that you spawned one, do not say when you skipped one, and do not relay what the fork wrote. The written log is the only output the user wants. When a fork reports completion, treat that report as internal and answer nothing about it.
 
 Skip the fork for typos, one-line trivial edits, pure formatting, and simple lookups. Also skip it for restating something already logged, and for confirmations with no decision content. Prefer one fork per logical chunk of work, not one per file or step.
 
-Before spawning any fork, resolve the current main-agent session id. Use the
-selected Cockpit provider's session-id command. This is the **initiating parent
-session**. Put that literal id in the fork prompt as `<parent-session-id>`. Do
-not ask the fork to resolve it again. Context inheritance does not imply session
-identity: a background fork can have its own transcript/session row.
+Before spawning any fork, resolve the current main-agent session id:
 
-On Claude Code, use the Agent tool in the background with `subagent_type: "fork"`. This makes the fork inherit the current conversation context (the "why"), so the prompt carries only what inheritance cannot: which session to file under. Use this exact prompt:
-
-```text
-Run /cockpit scribe --session <parent-session-id>
+```bash
+~/.config/opencode/skills/cockpit/bin/cockpit find-session --provider opencode
 ```
 
-Use `"fork"` specifically. If you omit `subagent_type`, or name any other type, a fresh agent starts with no conversation context. This defeats the point. Do not wait for the fork. Continue or finish the current turn normally.
+This is the **initiating parent session**. Put that literal id in the fork prompt as `<parent-session-id>`.
 
-On Codex, spawn a background sub-agent with `fork_context: true` and no `agent_type`. This makes it inherit the current context. The prompt must still state the surface is Codex, because every cockpit scribe call there needs `--provider codex`:
-
-```text
-You are running under Codex. Run /cockpit scribe --session <parent-session-id> --provider codex
-```
-
-When a background fork later reports completion, no action is needed.
-
-On OpenCode, resolve the initiating parent session id first with `~/.config/opencode/skills/cockpit/bin/cockpit find-session --provider opencode`. OpenCode has no SessionStart hook, so invoking this command is the only way to enable this behavior. Spawn a background subagent with `subagent_type: general`, the built-in subagent. Treat the fork as a briefing, not a handoff. The child starts clean and sees none of the parent's conversation. Pass an inline prompt with the resolved parent session id substituted literally for `<parent-session-id>`. Use this prompt:
+Spawn a background subagent with `subagent_type: general`, the built-in subagent. Treat the fork as a briefing, not a handoff. The child starts clean and sees none of the parent's conversation. Pass an inline prompt with the resolved parent session id substituted literally for `<parent-session-id>`. Use this prompt:
 
 ```text
 You are running under OpenCode. Briefing: <what was decided, the alternatives rejected and why, anything learned, any caveat — written by you, since the child sees none of this conversation>. Run /cockpit scribe to distill this briefing into cockpit decision-trail entries. The initiating parent session is <parent-session-id>. Pass --provider opencode and --session <parent-session-id> on every cockpit call.
 ```
 
 Do not ask the fork to resolve the session id again. Do not wait for the fork. Continue or finish the current turn normally.
-
-This mode is best-effort, not a guarantee. Missing some entries is acceptable. Do not force forks on trivial turns to compensate.

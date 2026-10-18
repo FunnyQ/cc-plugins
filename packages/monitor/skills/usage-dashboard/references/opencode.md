@@ -11,8 +11,8 @@ dashboard runs from the sibling cockpit skill's shim, at
 ## OpenCode usage data needs no integration
 
 The dashboard already reads OpenCode **natively**, from
-`${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` through the shared
-reader at `packages/monitor/skills/shared/scripts/opencode.ts`. Nothing has to
+`${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` through
+`cockpit atlas`'s OpenCode reader (`cockpit-rs/src/atlas/opencode.rs`). Nothing has to
 be installed for OpenCode sessions, tokens, and cost to show up. If they are
 missing, the cause is the database, not a missing integration.
 
