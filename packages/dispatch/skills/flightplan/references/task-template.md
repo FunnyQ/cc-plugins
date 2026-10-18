@@ -176,7 +176,7 @@ The tag position is fixed because `lint-task.ts` and autopilot's verifier agent 
 
 What the tag does, and what it does not do:
 
-- Autopilot's verifier does not attempt the item and does not fail the task for it. It reports the item as pending, and the run surfaces it as needing a person instead of parking the task after two attempts. Untagged items are unchanged: the verifier runs them, and any non-zero exit fails the attempt.
+- Autopilot's verifier does not attempt the item and does not fail the task for it. It reports the item as pending, and the run surfaces it as needing a person instead of parking the task once it exhausts its attempts. Untagged items are unchanged: the verifier runs them, and any non-zero exit fails the attempt.
 - The tag exempts one item. It never exempts the task, and it never softens a neighbouring item.
 - **`lint-task.ts` rejects a gate section whose items are all `(human)`** — rule `human-gate`. A section with nothing machine-checkable leaves the binary gate no work, so the task would advance on an assertion alone. Keep at least one item per section that a verifier can run itself.
 - `mark-done.ts` ticks a `(human)` box like any other when the task passes. So the task file alone cannot tell you a person still owes a check — `RUNLOG.md` and autopilot's run result are where that lives.

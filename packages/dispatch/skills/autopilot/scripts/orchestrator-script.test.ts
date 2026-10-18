@@ -138,6 +138,11 @@ type Scenario = {
     string,
     ({ ok: boolean; status: string; error?: string } | Throws | null)[]
   >;
+  /** Keyed by lens key (`codex`, `reuse`, ...); the review lens's structured result per attempt. */
+  review?: Record<
+    string,
+    ({ reviewed: boolean; reason: string } | Throws | null)[]
+  >;
   /** Keyed by ref; models a park that reports failure, or returns nothing at all. */
   park?: Record<
     string,
@@ -250,6 +255,7 @@ async function runOrchestrator(
             | "park"
             | "worktree"
             | "devReply"
+            | "review"
         ] ?? {})[ref] ?? undefined;
       queues.set(key, source ? [...source] : []);
     }
@@ -360,6 +366,9 @@ async function runOrchestrator(
         await scenario.parkHolds[ref];
       }
       return take("park", ref, { ok: true, status: "blocked" });
+    }
+    if (role === "review") {
+      return take("review", refOf(rest), { reviewed: true, reason: "" });
     }
     if (label.startsWith("dev:") || label.startsWith("dev-")) {
       const ref = refOf(rest);
@@ -1417,6 +1426,78 @@ describe("orchestrator cross-vendor review lens", () => {
     );
     return promptFor(log, "review:codex#1");
   };
+
+  test("returns whether the review ran through a structured result", async () => {
+    const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
+    const schema = log.schemas[log.labels.indexOf("review:codex#1")]!;
+
+    expect(schema.required).toEqual(["reviewed", "reason"]);
+    expect(schema.properties!.reviewed.type).toBe("boolean");
+  });
+
+  test("an unreachable cross-vendor review fails the attempt in code", async () => {
+    const log = await runOrchestrator({
+      scouts: [finalWave, complete(1)],
+      review: { codex: [{ reviewed: false, reason: "codex exited 127" }] },
+    });
+
+    // The fixer still runs, but no verifier or judge can pass the un-reviewed round.
+    expect(log.labels).toContain("fix:integration/01#1");
+    expect(log.labels).not.toContain("verify:integration/01#1");
+    expect(log.labels).not.toContain("judge:integration/01#1");
+    expect(promptFor(log, "fix:integration/01#2")).toContain(
+      "CODEX UNREACHABLE: cross-vendor review did not run — codex exited 127",
+    );
+    expect(log.result.completed).toEqual(["integration/01"]);
+  });
+
+  test("an unreachable review at the cap escalates as a failed Final review, not infrastructure", async () => {
+    const log = await runOrchestrator({
+      scouts: [finalWave],
+      review: {
+        codex: [
+          { reviewed: false, reason: "codex exited 127" },
+          { reviewed: false, reason: "codex timed out" },
+        ],
+      },
+    });
+
+    expect(log.result.completed).toEqual([]);
+    const [esc] = log.result.escalations;
+    expect(esc.task).toBe("integration/01");
+    expect(esc.attempt).toBe(2);
+    expect(esc.infrastructure).toBeFalsy();
+    expect(esc.reason).toContain(
+      "CODEX UNREACHABLE: cross-vendor review did not run — codex timed out",
+    );
+    expect(log.labels.some((l) => l.startsWith("verify:"))).toBe(false);
+  });
+
+  test("a lens that returns nothing or throws counts as not reviewed", async () => {
+    for (const missing of [null, THROWS] as const) {
+      const log = await runOrchestrator({
+        scouts: [finalWave, complete(1)],
+        review: { codex: [missing] },
+      });
+
+      expect(log.labels).not.toContain("verify:integration/01#1");
+      expect(promptFor(log, "fix:integration/01#2")).toContain(
+        "CODEX UNREACHABLE: cross-vendor review did not run",
+      );
+    }
+  });
+
+  test("a review that ran leaves the gate to the verifier and judge", async () => {
+    const log = await runOrchestrator({
+      scouts: [finalWave, complete(1)],
+      review: { codex: [{ reviewed: true, reason: "" }] },
+    });
+
+    expect(log.labels).toContain("verify:integration/01#1");
+    expect(log.labels).toContain("judge:integration/01#1");
+    expect(log.labels).not.toContain("fix:integration/01#2");
+    expect(log.result.completed).toEqual(["integration/01"]);
+  });
 
   test("defaults to the headless wrapper", async () => {
     const prompt = await reviewPrompt();
