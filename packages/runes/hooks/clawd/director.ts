@@ -15,12 +15,10 @@ const CELEBRATIONS = ['happy', 'success', 'doubleJump']
 const IDLE_BASES = ['follow', 'living', 'look']
 const IDLES = ['reading', 'music', 'smoking', 'doze']
 const REACTIONS = ['annoyed', 'panic', 'dragged', 'lookLeft', 'lookRight']
-// Clip lengths in tenths of a second, the frames' own resolution, so stints count down exactly.
 const TENTHS: Record<string, number> = Object.fromEntries(
   Object.entries(CLIPS).map(([name, frames]) => [name, Math.round(frames.reduce((sum, f) => sum + f.ms, 0) / 100)]),
 )
-// A special repeats until it has run 8 s, so a 2 s clip reads as more than a blip.
-const SPECIAL_STINT = 80
+export const SPECIAL_STINT_TENTHS = 80
 
 export const mood = ({ blocked, busy, done, longestTurn }: Inputs): Mood => {
   if (blocked > 0) return 'call'
@@ -35,7 +33,6 @@ export class Director {
   private current: string | undefined
   private cheering = false
   private reacting = false
-  // The base or special now looping, with the tenths it has left to run.
   private stint: { clip: string; left: number } | undefined
   private lastSpecial: string | undefined
 
@@ -49,7 +46,6 @@ export class Director {
   }
 
   private choose(m: Mood, idleFor: number, random: () => number): string {
-    // A click wakes a sleeping Clawd before it reacts.
     if (this.current === 'collapse' || this.current === 'sleeping') return m === 'idle' && !this.reacting ? 'sleeping' : 'wake'
     if (this.reacting) {
       this.reacting = false
@@ -74,8 +70,6 @@ export class Director {
     }
   }
 
-  // Loops the current stint while it lasts and still suits the mood; a spent base hands over to a
-  // special, and a spent special, or one the mood no longer has, back to a base.
   private rotate(bases: string[], specials: string[], random: () => number): string {
     const stint = this.stint
     if (stint && stint.left > 0 && [...bases, ...specials].includes(stint.clip)) {
@@ -85,8 +79,7 @@ export class Director {
     const isSpecial = stint ? bases.includes(stint.clip) : false
     const clip = isSpecial ? pick(specials.filter(c => c !== this.lastSpecial), random) : pick(bases, random)
     if (isSpecial) this.lastSpecial = clip
-    // A base runs 20 to 40 s between specials.
-    const length = isSpecial ? SPECIAL_STINT : 200 + Math.floor(random() * 200)
+    const length = isSpecial ? SPECIAL_STINT_TENTHS : 200 + Math.floor(random() * 200)
     this.stint = { clip, left: length - TENTHS[clip]! }
     return clip
   }

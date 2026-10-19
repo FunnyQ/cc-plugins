@@ -13,7 +13,6 @@ const OLDER_BLOCKS: Record<number, number> = {
 let nextOctant = 0x1cd00
 export const OCTANT = Array.from({ length: 256 }, (_, mask) => OLDER_BLOCKS[mask] ?? nextOctant++)
 
-// every frame is drawn once per clip and index, then served from the cache
 const memo = <T>(draw: (clip: string, index: number) => T) => {
   const cache = new Map<string, T>()
   return (clip: string, index: number): T => {
@@ -32,7 +31,6 @@ export type Run = { text: string; color?: string; backgroundColor?: string }
 // a cell holds two colours; a third goes to the commonest so the silhouette survives (1.3% of pixels lost)
 export const octants = memo((clip, index): Run[][] => octantsOf(CLIPS[clip]![index]!.grid))
 
-// any 20x16 grid as 10x4 octant runs, so a still picture can be drawn from a hand-edited frame
 export const octantsOf = (grid: string): Run[][] => {
   const rows = Array.from({ length: 4 }, (_, r) => {
     const runs: Run[] = []
@@ -84,7 +82,6 @@ export const pixels = memo((clip, index) => {
   return { rgba: toBase64(bytes), width: CANVAS_WIDTH, height: CANVAS_HEIGHT }
 })
 
-// One <rect> per horizontal run of a colour; crispEdges keeps the pixels square when scaled.
 export const svg = memo((clip, index): string => {
   const grid = CLIPS[clip]![index]!.grid
   const rects: string[] = []
