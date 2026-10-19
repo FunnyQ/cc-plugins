@@ -1,31 +1,4 @@
 #!/usr/bin/env bun
-/**
- * herd.ts — a small, typed wrapper over the raw `herdr` CLI for in-session
- * agent orchestration. Collapses herdr's multi-step recipes (create pane → start →
- * prompt → wait → read) into ten verbs an agent can call without re-deriving the
- * CLI's sharp edges:
- *
- *   spawn   — start an agent in a fresh pane under a collision-proof name
- *   tell    — hand work to an ALREADY-RUNNING agent, addressed by project label
- *   ask     — like tell, but waits for and returns the answer via a result-file contract
- *   collect — redeem a pending `ask`'s answer later, without re-asking
- *   send    — write a prompt to a running agent AND submit it (Enter)
- *   keys    — send bare key chords to the agent's pane
- *   wait    — block until the agent reaches a status
- *   read    — read a pane's recent output as clean text
- *   list    — the current agents as a typed array
- *   close   — close an agent's pane
- *
- * Design notes:
- * - Targets are addressed by NAME, never by pane id. Names follow an agent when
- *   a cross-workspace move gives its pane a new workspace-qualified id.
- * - One `agent prompt` command handles text, paste mode, submission timing, and Enter.
- * - `agent start` launches only in an existing pane, so `spawn` creates the pane
- *   first and puts environment variables on that pane.
- * - Runnable both as a CLI (`bun herd.ts <verb> …`) and as a module
- *   (`import { createHerd } from "./herd.ts"`) so relay can consume the same
- *   layer for a future live-pane strategy.
- */
 
 import {
   compareProjects,
@@ -44,10 +17,8 @@ import { join } from "node:path";
 export type RunResult = { stdout: string; stderr: string; code: number };
 export type Runner = (args: string[]) => Promise<RunResult>;
 
-/** Host herdr binary — honor HERDR_BIN_PATH (set inside herdr/plugin envs), else PATH. */
 const HERDR_BIN = process.env.HERDR_BIN_PATH || "herdr";
 
-/** The real herdr CLI runner. Injectable so tests can mock it. */
 export const herdrRunner: Runner = async (args) => {
   const proc = Bun.spawn([HERDR_BIN, ...args], {
     stdout: "pipe",
@@ -70,7 +41,6 @@ export class HerdrError extends Error {
   }
 }
 
-/** herdr's JSON envelope, or null when the output is not JSON. */
 function envelope(raw: string): any {
   try {
     return raw ? JSON.parse(raw) : null;
@@ -79,7 +49,6 @@ function envelope(raw: string): any {
   }
 }
 
-/** The one error ladder: herdr's own message, then whichever stream spoke. */
 function failure(args: string[], result: RunResult, parsed: any): HerdrError {
   return new HerdrError(
     parsed?.error?.message ||
@@ -94,7 +63,6 @@ function failure(args: string[], result: RunResult, parsed: any): HerdrError {
  *  pane has not been looked at — codex parks there instead of returning to `idle`. */
 export type AgentStatus = "idle" | "working" | "blocked" | "done" | "unknown";
 
-/** Normalized agent record — the shape callers actually want. */
 export type AgentInfo = {
   name: string | null; // manual name given at `agent start`, if any
   type: string | null; // detected agent type (claude/codex/opencode), if any
@@ -127,8 +95,6 @@ export type SpawnOpts = {
 
 export type SpawnResult = AgentInfo & {
   name: string;
-  /** Set when `agent start` saw a blocked screen during startup. The agent is
-   *  live and the name resolves; clear the dialog before prompting it. */
   startBlocked?: true;
   task?: { sent: boolean; reason?: string };
 };
@@ -157,8 +123,6 @@ export type AgentLocation = AgentInfo & {
   tabLabel: string | null;
 };
 
-/** Bookkeeping for a pane `tell`/`ask` spawned themselves — set only when no
- *  live agent matched and the project registry or zoxide resolved one instead. */
 export type SpawnedAgent = {
   workspaceId: string;
   paneId: string;
@@ -211,14 +175,6 @@ function normAgent(a: any): AgentInfo {
   };
 }
 
-/** Strip herdr's leading nerd-font glyph from a tab/workspace label.
- *  Scoped to the private-use planes on purpose: a broader "leading punctuation"
- *  strip would eat the dot in a legitimate `.config` label.
- *
- *  All THREE private-use blocks are covered because herdr uses more than one —
- *  live tab labels here carry both U+EACD (BMP) and U+F09D1, which Nerd Fonts v3
- *  assigns in the supplementary plane. Narrowing this to the BMP would silently
- *  stop cleaning the most common label of all. */
 export function cleanLabel(label: unknown): string | null {
   if (typeof label !== "string") return null;
   const trimmed = label
@@ -230,7 +186,6 @@ export function cleanLabel(label: unknown): string | null {
   return trimmed || null;
 }
 
-/** How a human addresses this agent back — `workspace/tab`, else the pane id. */
 export function addressOf(agent: AgentLocation): string {
   if (agent.name) return agent.name;
   if (agent.workspaceLabel) {
@@ -297,7 +252,6 @@ export function matchAgents(
   });
 }
 
-/** Clock seam so the shell-readiness retry loop is testable without wall time. */
 export type HerdDeps = {
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -307,7 +261,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms));
 
-  /** Run a herdr command that returns a JSON envelope; unwrap `.result`, throw on error. */
   async function callJson(args: string[]): Promise<any> {
     const result = await run(args);
     const parsed = envelope(result.stdout.trim() || result.stderr.trim());
@@ -317,11 +270,9 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return parsed?.result ?? parsed;
   }
 
-  /** Run a read command whose successful stdout is terminal text, not JSON. */
   async function callText(args: string[]): Promise<string> {
     const result = await run(args);
     if (result.code === 0) return result.stdout;
-    // Failure order is the reverse of callJson's: the error rides stderr here.
     throw failure(
       args,
       result,
@@ -329,10 +280,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     );
   }
 
-  /** Run a herdr command that prints nothing on success (send-text/send-keys/run).
-   *  Shares callText's failure path so these errors carry herdr's error code —
-   *  an `error.code === "agent_pane_busy"` check cannot fire without it, and
-   *  keys() reaches herdr only through here. */
   async function callVoid(args: string[]): Promise<void> {
     await callText(args);
   }
@@ -398,7 +345,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     fragment: string,
     opts: {
       selfPaneId?: string;
-      /** Test seam — overrides the registry path read_registry() defaults to. */
       registryPath?: string;
     } = {},
   ): Promise<Resolved> {
@@ -406,9 +352,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
     const matches = matchAgents(agents, fragment, { selfPaneId });
 
-    // Everything a caller needs to put these in front of a human: the readable
-    // address, the exact handle to retell with, and the two facts that tell two
-    // agents in one project apart. A picker built from this needs no second lookup.
     const listed = (found: AgentLocation[]) =>
       found
         .map((a) => `  ${addressOf(a)}  [${a.paneId}]  ${a.status}  ${a.cwd}`)
@@ -424,7 +367,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       return { kind: "agent", agent: matches[0]! };
     }
 
-    // No live agent — try known-but-closed projects.
     const registry = await readRegistry(opts.registryPath);
     const projectMatches = matchProjects(registry, fragment).sort(
       compareProjects,
@@ -458,11 +400,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       );
     }
 
-    // A renamed tab can still be reachable at this cwd even though its label
-    // missed the fragment — never spawn a second agent onto a project that
-    // already has one. Collect every match, not just the first: two tabs can
-    // share a cwd, and silently picking one would be exactly the ambiguity
-    // the agent-match branch above already refuses to guess through.
     const liveAtPath = agents.filter(
       (a) =>
         a.paneId !== selfPaneId &&
@@ -480,11 +417,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { kind: "project", path: resolved.path, name: resolved.name };
   }
 
-  /** The two shapes every caller needs from a project-fallback spawn: an
-   *  `AgentLocation` labelled with the resolved project's name (there is no
-   *  real workspace/tab label lookup to do — it was just created), and the
-   *  bare bookkeeping ref for the `spawned` field. Shared by `tell` and `ask`
-   *  so the field list can't drift between their two spawn branches. */
   function locateSpawned(
     started: SpawnResult,
     projectName: string,
@@ -504,15 +436,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     };
   }
 
-  /**
-   * Fire-and-forget hand-off: resolve a human-typed fragment (see
-   * `resolveProjectOrAgent`) then submit the text. No wait — the point is to
-   * drop work on another project's agent and carry on.
-   *
-   * A `project` result gets spawned WITH `task: text` — spawn's own
-   * wait-for-idle-then-send-then-report-blocked handling covers exactly what
-   * a fire-and-forget hand-off needs in one atomic step.
-   */
   async function tell(
     fragment: string,
     text: string,
@@ -556,10 +479,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     };
   }
 
-  /** How often `ask`/`collect` poll for settlement + the result file, and how
-   *  long `ask` waits by default before reporting `pending` instead of a
-   *  failure — long enough to cover a real task, short enough that a caller
-   *  running it via a backgrounded process gets a bounded wait. */
   const ASK_POLL_INTERVAL_MS = 5_000;
   const ASK_DEFAULT_TIMEOUT_MS = 10 * 60_000;
   const ASK_SPAWN_IDLE_WAIT_MS = 20_000;
@@ -614,17 +533,11 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { pending: true };
   }
 
-  /** Wraps a value in single quotes for safe interpolation into a shell
-   *  command, escaping any single quote it contains. */
   function shellQuote(value: string): string {
     return `'${value.replace(/'/g, `'\\''`)}'`;
   }
 
   function pendingReport(target: string, resultPath: string): string {
-    // A bare `bun herd.ts collect ...` only resolves from this script's own
-    // directory. The caller's cwd is a different project entirely (that's
-    // the whole point of ask's fallback), so the report must carry this
-    // script's own absolute path, not a name that only worked by accident.
     const script = shellQuote(import.meta.path);
     return (
       `ask timed out waiting for an answer from "${target}" — it may still be working.\n` +
@@ -633,10 +546,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     );
   }
 
-  /** The one place that shapes an `AskOutcome` into the public `AskResult` —
-   *  shared by `ask` and `collect` so their pending/success arms can't drift
-   *  apart. `spawned` stays `undefined` for `collect`, which never knows
-   *  whether the pane it polled was one `ask` spawned. */
   function buildAskResult(
     target: string,
     agent: AgentLocation,
@@ -712,16 +621,11 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
           status: "idle",
           timeoutMs: ASK_SPAWN_IDLE_WAIT_MS,
         });
-      } catch {
-        /* best-effort — proceed and let the question itself surface trouble */
-      }
+      } catch {}
       ({ agent, spawned } = locateSpawned(started, resolved.name));
     }
 
     const target = agent.name ?? agent.paneId;
-    // opts.resultDir is a test seam: given, it's used AS the run dir
-    // (deterministic path, so a test can pre-write result.md); absent, a
-    // fresh randomly-named one is created under the default base.
     const dir = createAskRunDir(opts.resultDir);
     const resultPath = join(dir, "result.md");
     const questionPath = join(dir, "question.md");
@@ -737,17 +641,11 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     if (!("pending" in outcome) && spawned && !opts.keepPane) {
       try {
         await close(target);
-      } catch {
-        /* best-effort — the answer already landed */
-      }
+      } catch {}
     }
     return buildAskResult(target, agent, outcome, resultPath, spawned);
   }
 
-  /** Redeem a `pending` `ask` result later, without re-sending the question —
-   *  re-asking would collide with a target that may still be working on the
-   *  first one. Never closes the pane: `collect` doesn't know whether `ask`
-   *  spawned it, so closing here could take down someone else's session. */
   async function collect(
     target: string,
     resultPath: string,
@@ -774,9 +672,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return (await get(target)).paneId;
   }
 
-  /** Derive a collision-resistant agent name from a human role, e.g. "reviewer" → "reviewer-a3f9".
-   *  The random suffix keeps concurrent sessions from picking the same name; the list check
-   *  additionally avoids clashing with agents already alive in THIS session. */
   async function genName(role: string): Promise<string> {
     const base =
       role
@@ -821,8 +716,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   ): Promise<any> {
     const statuses =
       opts.status === undefined ? ["idle"] : asStatuses(opts.status);
-    // A bare `agent wait` would silently fall back to herdr's idle|done|blocked
-    // default, which is not what an empty array asked for. Fail instead.
     if (statuses.length === 0) {
       throw new HerdrError("wait requires at least one status");
     }
@@ -900,9 +793,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     };
   }
 
-  /** Send bare key chords to a target's pane (no text) — e.g. keys(name, "enter")
-   *  to submit whatever sits in the input box, or keys(name, "ctrl+a", "ctrl+k")
-   *  to clear a line. Wraps `pane send-keys`; re-resolves name → pane id first. */
   async function keys(
     target: string,
     ...keyNames: string[]
@@ -915,8 +805,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { target, paneId, keys: keyNames };
   }
 
-  /** The currently-focused tab id, or null. Used to restore focus after a
-   *  new-tab spawn. */
   async function focusedTabId(): Promise<string | null> {
     try {
       const r = await callJson(["tab", "list"]);
@@ -927,14 +815,10 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     }
   }
 
-  /** How long to keep re-trying `agent start` while the target pane is still
-   *  booting its shell, and the backoff between attempts. */
   const SHELL_READY_TIMEOUT_MS = 10_000;
   const SHELL_RETRY_MIN_MS = 150;
   const SHELL_RETRY_MAX_MS = 1_000;
 
-  /** True for the one error that means "the pane exists but hasn't reached its
-   *  interactive shell prompt yet" — the only condition worth re-trying. */
   function isPaneNotReady(error: unknown): boolean {
     if (!(error instanceof HerdrError)) return false;
     return (
@@ -1023,7 +907,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return env.flatMap((e) => ["--env", e]);
   }
 
-  /** Start the agent in a FRESH tab instead of splitting the caller's pane. */
   async function startInNewTab(name: string, opts: SpawnOpts): Promise<any> {
     // Only needed to restore focus at the end, and `--no-focus` cannot move it
     // meanwhile — so this round trip runs alongside the create/start, not before.
@@ -1038,8 +921,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     if (workspace) createArgs.push("--workspace", workspace);
     if (opts.cwd) createArgs.push("--cwd", opts.cwd);
     createArgs.push(...newPaneEnvArgs(opts));
-    // Label the tab so the caller can tell at a glance what it's for. Defaults
-    // to the generated agent name (which encodes role + a unique suffix).
     createArgs.push("--label", opts.tabLabel ?? name);
     const created = await callJson(createArgs);
     const paneId: string | undefined = created.root_pane?.pane_id;
@@ -1047,27 +928,15 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
       throw new HerdrError("tab create did not return a root pane id");
 
     const started = await startAgentInPane(name, paneId, opts);
-    // Give focus back to where the caller was.
     const prevTab = await prevTabQuery;
     if (prevTab) {
       try {
         await callVoid(["tab", "focus", prevTab]);
-      } catch {
-        /* best-effort */
-      }
+      } catch {}
     }
     return started;
   }
 
-  /** Start the agent in a FRESH workspace instead of the caller's — the only
-   *  option for an agent that must land in a DIFFERENT project's workspace,
-   *  since `tell` addresses by workspace label and one workspace holds one
-   *  project. Unlike startInNewTab, focus is never claimed back: a workspace
-   *  create is the least likely of the three spawn shapes to be requested
-   *  from a pane whose focus the caller wants preserved (`tell`'s own
-   *  auto-spawn fallback runs from the CALLING project's pane while opening
-   *  a workspace for a DIFFERENT one), and workspace focus follows
-   *  `--no-focus` cleanly where tab focus does not always. */
   async function startInNewWorkspace(
     name: string,
     opts: SpawnOpts,
@@ -1083,7 +952,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return startAgentInPane(name, paneId, opts);
   }
 
-  /** Resolve an existing pane to split when the caller targets a tab/workspace. */
   async function splitTargetPane(opts: SpawnOpts): Promise<string | null> {
     if (!opts.tab && !opts.workspace) return null;
 
@@ -1125,8 +993,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         opts.split ?? "down",
         "--no-focus",
       ];
-      // With no explicit scope, preserve herdr's default of splitting the
-      // current pane. A scoped spawn must split a pane found in that scope.
       if (targetPaneId) splitArgs.push("--pane", targetPaneId);
       if (opts.cwd) splitArgs.push("--cwd", opts.cwd);
       splitArgs.push(...newPaneEnvArgs(opts));
@@ -1141,19 +1007,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
 
     let task: { sent: boolean; reason?: string } | undefined;
     if (opts.task && startBlocked) {
-      // Prompting a blocked agent can only fail. Skip the settle wait too — it
-      // would burn its full timeout waiting for an idle that needs a human.
       task = { sent: false, reason: "agent_not_ready" };
     } else if (opts.task) {
-      // Best-effort: wait for the agent to settle, then submit the task.
       try {
         await wait(name, {
           status: "idle",
           timeoutMs: opts.waitTimeoutMs ?? 20000,
         });
-      } catch {
-        /* proceed to send regardless */
-      }
+      } catch {}
       // herdr 0.8.2 rejects a prompt to a blocked agent with `agent_blocked` and
       // sends nothing. Throwing here would strand a pane the caller cannot name,
       // so report the block in the result and let them read + clear the dialog.
@@ -1167,8 +1028,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
         task = { sent: false, reason: "agent_blocked" };
       }
     }
-    // Generated name is authoritative — spread info first so a null name from the
-    // envelope can't clobber it.
     return { ...info, name, startBlocked, task };
   }
 
@@ -1196,10 +1055,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
 function assertHerdrEnv(): void {
   if (process.env.HERDR_ENV !== "1") {
     console.error(
@@ -1209,19 +1064,10 @@ function assertHerdrEnv(): void {
   }
 }
 
-/** Flags that never take a value (so a following token — even one starting with `--` — is not consumed). */
 const BOOLEAN_FLAGS = new Set(["new-tab", "new-workspace"]);
 
-/** Flags that may be given more than once. The second occurrence turns the value
- *  into an array instead of overwriting the first — `herdr agent wait` takes a
- *  repeated `--until`, so `--status idle --status done` has to survive the parse. */
 const REPEATABLE_FLAGS = new Set(["status"]);
 
-/** Minimal flag parser: returns { positionals, flags, rest } where rest is everything after a bare `--`.
- *  Value-flags always consume the next token as their value — including values that start with `--`
- *  (e.g. `--task "--check src"`); only BOOLEAN_FLAGS and a missing token yield a boolean.
- *  A REPEATABLE_FLAGS key collects into an array once it appears twice; every other key keeps the
- *  last value. Exported for unit testing. */
 export function parseArgs(argv: string[]): {
   positionals: string[];
   flags: Record<string, string | boolean | string[]>;
@@ -1267,9 +1113,6 @@ export function parseArgs(argv: string[]): {
  *  --help`); these are the three this wrapper is used with. */
 const AGENT_KINDS = "claude|codex|opencode";
 
-/** One block per verb, so `herd <verb> --help` and the full usage screen are
- *  printed from the same text and can never drift. A caller must never have to
- *  read this file to learn a verb's flags. */
 export const VERB_USAGE: Record<string, string> = {
   list: `  herd list                            # every agent, with its workspace/tab address`,
   spawn: `  herd spawn <role> --agent <kind> [--cwd P] [--split down|right] [--new-tab] [--new-workspace] [--tab-label TEXT]
@@ -1313,19 +1156,39 @@ Run \`herd <verb> --help\` for one verb's flags.
 
 ${FOOTER}`;
 
-/** True when `--help`/`-h` sits in the LEADING flag run. Verbs like `ask` and
- *  `send` take free text from the first positional onward, so scanning the whole
- *  argv would print usage for a question that merely mentions `--help`. */
 export function wantsVerbHelp(rest: string[]): boolean {
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i]!;
     if (a === "--help" || a === "-h") return true;
     if (!a.startsWith("--")) return false;
-    // A flag's value may be any token; skip it to stay inside the flag run.
     const next = rest[i + 1];
     if (next && !next.startsWith("--")) i++;
   }
   return false;
+}
+
+export function parseLeadingFlags(
+  verb: string,
+  rest: string[],
+  valued: string[],
+  booleans: string[] = [],
+): { flags: Record<string, string[] | true>; head?: string; text: string } {
+  const flags: Record<string, string[] | true> = {};
+  let i = 0;
+  while (i < rest.length && rest[i]!.startsWith("--")) {
+    const key = rest[i]!.slice(2);
+    if (booleans.includes(key)) {
+      flags[key] = true;
+      i += 1;
+    } else if (valued.includes(key)) {
+      const prev = flags[key];
+      flags[key] = [...(Array.isArray(prev) ? prev : []), rest[i + 1]!];
+      i += 2;
+    } else {
+      throw new HerdrError(`${verb}: unknown flag ${rest[i]}`);
+    }
+  }
+  return { flags, head: rest[i], text: rest.slice(i + 1).join(" ") };
 }
 
 async function main() {
@@ -1357,14 +1220,10 @@ async function main() {
   try {
     switch (verb) {
       case "list": {
-        // The CLI is the human/model discovery surface, so it prints the
-        // labelled directory — the addresses `tell` accepts. The module-level
-        // `list()` stays the bare, one-round-trip shape relay consumes.
         console.log(JSON.stringify(await herd.directory(), null, 2));
         break;
       }
       case "tell": {
-        // Raw argv, for the same reason send uses it: prompt text may contain `--`.
         const [fragment, ...textParts] = rest;
         const text = textParts.join(" ");
         if (!fragment || !text)
@@ -1398,31 +1257,17 @@ async function main() {
         break;
       }
       case "send": {
-        // Parse from raw argv (not the generic flag parser) so prompt text that
-        // starts with or contains `--` (e.g. "--please fix this") survives intact.
-        // Flags are therefore only recognised BEFORE <target>; everything from
-        // <target> onward is positional.
+        const {
+          flags: f,
+          head: target,
+          text,
+        } = parseLeadingFlags("send", rest, ["status", "timeout"], ["wait"]);
         const sendOpts: SendOpts = {};
-        const statuses: AgentStatus[] = [];
-        let i = 0;
-        while (i < rest.length && rest[i]!.startsWith("--")) {
-          const flag = rest[i]!;
-          if (flag === "--wait") {
-            sendOpts.wait = true;
-            i += 1;
-          } else if (flag === "--status") {
-            statuses.push(rest[++i] as AgentStatus);
-            i += 1;
-          } else if (flag === "--timeout") {
-            sendOpts.timeoutMs = Number(rest[++i]);
-            i += 1;
-          } else {
-            throw new HerdrError(`send: unknown flag ${flag}`);
-          }
-        }
-        if (statuses.length) sendOpts.status = statuses;
-        const target = rest[i];
-        const text = rest.slice(i + 1).join(" ");
+        if (f.wait) sendOpts.wait = true;
+        if (Array.isArray(f.status))
+          sendOpts.status = f.status as AgentStatus[];
+        if (Array.isArray(f.timeout))
+          sendOpts.timeoutMs = Number(f.timeout.at(-1));
         if (!target || !text)
           throw new HerdrError("send requires <target> and <text>");
         const res = await herd.send(target, text, sendOpts);
@@ -1430,32 +1275,20 @@ async function main() {
         break;
       }
       case "ask": {
-        // Same reasoning as send: parse leading flags by hand so a question
-        // that starts with or contains `--` survives intact. Everything from
-        // <fragment> onward is positional.
+        const {
+          flags: f,
+          head: fragment,
+          text: question,
+        } = parseLeadingFlags("ask", rest, ["agent", "timeout"], ["keep-pane"]);
         const askOpts: {
           spawnAgent?: string;
           timeoutMs?: number;
           keepPane?: boolean;
         } = {};
-        let i = 0;
-        while (i < rest.length && rest[i]!.startsWith("--")) {
-          const flag = rest[i]!;
-          if (flag === "--agent") {
-            askOpts.spawnAgent = rest[++i];
-            i += 1;
-          } else if (flag === "--timeout") {
-            askOpts.timeoutMs = Number(rest[++i]);
-            i += 1;
-          } else if (flag === "--keep-pane") {
-            askOpts.keepPane = true;
-            i += 1;
-          } else {
-            throw new HerdrError(`ask: unknown flag ${flag}`);
-          }
-        }
-        const fragment = rest[i];
-        const question = rest.slice(i + 1).join(" ");
+        if (Array.isArray(f.agent)) askOpts.spawnAgent = f.agent.at(-1);
+        if (Array.isArray(f.timeout))
+          askOpts.timeoutMs = Number(f.timeout.at(-1));
+        if (f["keep-pane"]) askOpts.keepPane = true;
         if (!fragment || !question)
           throw new HerdrError("ask requires <fragment> and <question>");
         const res = await herd.ask(fragment, question, askOpts);
@@ -1487,9 +1320,6 @@ async function main() {
         const target = positionals[0];
         if (!target) throw new HerdrError("wait requires <target>");
         const res = await herd.wait(target, {
-          // `--status` is repeatable, so parseArgs hands back a string OR an
-          // array. Leave it undefined when absent so wait() applies its own
-          // default rather than this layer duplicating it.
           status: flags.status as AgentStatus | AgentStatus[] | undefined,
           timeoutMs: flags.timeout ? Number(flags.timeout) : undefined,
         });

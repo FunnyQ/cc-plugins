@@ -6,17 +6,18 @@ import { ASK_RESULT_END_MARKER } from "./ask-contract.ts";
 import {
   addressOf,
   type AgentLocation,
+  cleanLabel,
   createHerd,
   HerdrError,
   matchAgents,
   parseArgs,
+  parseLeadingFlags,
   type RunResult,
   type Runner,
   VERB_USAGE,
   wantsVerbHelp,
 } from "./herd.ts";
 
-/** A mock runner that records argv and replies from a scripted table. */
 function mockRunner(
   handler: (args: string[]) => Partial<RunResult> | undefined,
 ): { run: Runner; calls: string[][] } {
@@ -243,7 +244,6 @@ describe("spawn", () => {
     });
     const herd = createHerd(run);
     const res = await herd.spawn({ role: "worker", agent: "claude" });
-    // even in the astronomically unlikely case randHex hits "aaaa", the name must differ
     expect(res.name).not.toBe("worker-aaaa");
     expect(res.name).toMatch(/^worker-[0-9a-f]{4}$/);
   });
@@ -423,7 +423,6 @@ describe("spawn", () => {
     expect(res.name).toMatch(/^reviewer-[0-9a-f]{4}$/);
     expect(res.paneId).toBe("w3:pAgent");
 
-    // The tab is labelled with the generated agent name by default.
     const createCall = seen.find((c) => c[0] === "tab" && c[1] === "create")!;
     expect(createCall[createCall.indexOf("--label") + 1]).toBe(res.name);
 
@@ -436,8 +435,6 @@ describe("spawn", () => {
     ).toBe(true);
   });
 
-  // Shared mock for the workspace-pinning tests below: a caller spawns a new
-  // tab; we only care about which --workspace lands on `tab create`.
   function newTabRunner(seen: string[][]) {
     return mockRunner((a) => {
       seen.push(a);
@@ -555,9 +552,6 @@ describe("spawn", () => {
     expect(createCall[createCall.indexOf("--label") + 1]).toBe("PR #42 review");
   });
 
-  // A pane returned by `pane split` / `tab create` is not yet at its shell
-  // prompt, and `agent start --pane` rejects it with `agent_pane_busy` until it
-  // is. These tests pin the retry loop that closes that window.
   const paneBusy = {
     code: 1,
     stdout: JSON.stringify({
@@ -568,7 +562,6 @@ describe("spawn", () => {
     }),
   };
 
-  /** Fake clock + sleep: advances instantly so retry tests cost no wall time. */
   function fakeClock() {
     let t = 0;
     return {
@@ -579,9 +572,9 @@ describe("spawn", () => {
     };
   }
 
-  test("retries agent start until the fresh pane reaches its shell prompt", async () => {
+  test("retries agent start until the fresh pane reaches its shell prompt, splitting the pane only once", async () => {
     let startAttempts = 0;
-    const { run } = mockRunner((a) => {
+    const { run, calls } = mockRunner((a) => {
       if (a[1] === "list") return { stdout: listEnvelope([]) };
       if (a[0] === "pane" && a[1] === "split")
         return {
@@ -609,7 +602,9 @@ describe("spawn", () => {
 
     expect(startAttempts).toBe(3);
     expect(res.paneId).toBe("w1:pZ");
-    // The pane is split exactly once — retries re-run `agent start` only.
+    expect(
+      calls.filter((c) => c[0] === "pane" && c[1] === "split"),
+    ).toHaveLength(1);
     expect(res.name).toMatch(/^worker-[0-9a-f]{4}$/);
   });
 
@@ -659,7 +654,6 @@ describe("spawn", () => {
 
     expect(startAttempts).toBe(2);
     expect(res.paneId).toBe("w3:pAgent");
-    // One tab only — a retry must not create a second tab.
     expect(
       calls.filter((c) => c[0] === "tab" && c[1] === "create"),
     ).toHaveLength(1);
@@ -858,7 +852,35 @@ describe("spawn", () => {
     expect(res.name).toStartWith("worker-");
   });
 
-  test("agent_not_ready returns the live agent instead of stranding the pane", async () => {
+  test("the generated name wins over a null name in the start envelope", async () => {
+    const { run } = mockRunner((a) => {
+      if (a[1] === "list") return { stdout: listEnvelope([]) };
+      if (a[0] === "pane" && a[1] === "split")
+        return {
+          stdout: JSON.stringify({ result: { pane: { pane_id: "w2:p3" } } }),
+        };
+      if (a[1] === "start")
+        return { stdout: agentEnvelope({ name: null, pane_id: "w2:p3" }) };
+      return undefined;
+    });
+    const res = await createHerd(run).spawn({ role: "worker", agent: "codex" });
+    expect(res.name).toMatch(/^worker-[0-9a-f]{4}$/);
+  });
+
+  test("newWorkspace never claims focus back, unlike newTab", async () => {
+    const { run, calls } = projectFallbackRunner("/repo");
+    await createHerd(run).spawn({
+      role: "worker",
+      agent: "claude",
+      newWorkspace: true,
+    });
+    expect(calls.some((c) => c[0] === "workspace" && c[1] === "create")).toBe(
+      true,
+    );
+    expect(calls.some((c) => c[0] === "tab")).toBe(false);
+  });
+
+  test("agent_not_ready returns the live agent instead of stranding the pane, skipping a settle wait that would burn its whole timeout", async () => {
     const { run, calls } = mockRunner((a) => {
       if (a[1] === "list") return { stdout: listEnvelope([]) };
       if (a[0] === "pane" && a[1] === "split")
@@ -898,7 +920,6 @@ describe("spawn", () => {
     expect(res.paneId).toBe("w2:p3");
     expect(res.name).toStartWith("worker-");
     expect(res.task).toEqual({ sent: false, reason: "agent_not_ready" });
-    // No settle wait and no prompt: both can only fail while the dialog is up.
     expect(calls.some((c) => c[1] === "wait" || c[1] === "prompt")).toBe(false);
   });
 });
@@ -1004,6 +1025,26 @@ describe("keys", () => {
       "w9:pB",
       "shift+tab",
     ]);
+  });
+
+  test("a send-keys failure carries herdr's error code, which an agent_pane_busy check needs", async () => {
+    const { run } = mockRunner((a) => {
+      if (a[1] === "get")
+        return { stdout: agentEnvelope({ name: "rev-1", pane_id: "w9:pB" }) };
+      if (a[0] === "pane" && a[1] === "send-keys")
+        return {
+          code: 1,
+          stderr: JSON.stringify({
+            error: { code: "agent_pane_busy", message: "busy" },
+          }),
+        };
+      return undefined;
+    });
+    const err = await createHerd(run)
+      .keys("rev-1", "enter")
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(HerdrError);
+    expect((err as HerdrError).code).toBe("agent_pane_busy");
   });
 
   test("rejects an empty key list", async () => {
@@ -1140,8 +1181,6 @@ describe("parseArgs", () => {
   });
 });
 
-// --- tell -------------------------------------------------------------------
-
 const located = (o: Partial<AgentLocation>): AgentLocation => ({
   name: null,
   type: "claude",
@@ -1237,8 +1276,6 @@ describe("matchAgents", () => {
   });
 
   test("a pane id resolves exactly, even against identical addresses", () => {
-    // Two tabs may carry the same label, which makes addressOf() identical for
-    // both. The pane id is the only handle that still splits them.
     const twins = [
       located({ paneId: "w8:p1", workspaceLabel: "twin", tabLabel: "main" }),
       located({ paneId: "w8:p2", workspaceLabel: "twin", tabLabel: "main" }),
@@ -1251,8 +1288,6 @@ describe("matchAgents", () => {
   });
 
   test("an exact pane id beats the pane id it is a prefix of", () => {
-    // Pane numbers are unpadded, so a substring match would return BOTH here and
-    // the escape hatch would fail in exactly the busy workspace that needs it.
     const busy = [
       located({ paneId: "w6:p1", workspaceLabel: "busy" }),
       located({ paneId: "w6:p10", workspaceLabel: "busy" }),
@@ -1261,7 +1296,6 @@ describe("matchAgents", () => {
     expect(matchAgents(busy, "w6:p10").map((a) => a.paneId)).toEqual([
       "w6:p10",
     ]);
-    // A genuine prefix that is nobody's id still matches both, as a fragment should.
     expect(matchAgents(busy, "w6:p").map((a) => a.paneId)).toEqual([
       "w6:p1",
       "w6:p10",
@@ -1293,10 +1327,6 @@ describe("matchAgents", () => {
   });
 });
 
-/** The three calls `directory()` joins, answered from raw CLI-shaped rows.
- *  Parameterized so each test states only the fleet it cares about, and so the
- *  workspace and tab branches stay told apart by argv[0] — `list` is argv[1] for
- *  both commands, so matching on it alone is a coincidence, not a contract. */
 function directoryRunner(
   agents: Record<string, unknown>[],
   workspaces: Record<string, unknown>[] = [],
@@ -1315,7 +1345,6 @@ function directoryRunner(
   });
 }
 
-/** One reachable project plus the caller's own pane. */
 const fleetRunner = () =>
   directoryRunner(
     [
@@ -1361,8 +1390,6 @@ describe("addressOf", () => {
   });
 
   test("falls back to the pane id for an unlabelled workspace", () => {
-    // Reachable whenever `workspace list` omits a label, so it must not throw
-    // or render "null/main" into a candidate list a human has to read.
     expect(addressOf(located({ paneId: "w4:p2" }))).toBe("w4:p2");
     expect(addressOf(located({ paneId: "w4:p2", tabLabel: "main" }))).toBe(
       "w4:p2",
@@ -1375,7 +1402,6 @@ describe("directory", () => {
     const { run } = fleetRunner();
     const agents = await createHerd(run).directory();
     expect(agents[0]?.workspaceLabel).toBe("api-service");
-    // The nerd-font glyph herdr prefixes every tab label with is stripped.
     expect(agents[0]?.tabLabel).toBe("main");
   });
 });
@@ -1434,7 +1460,6 @@ describe("tell", () => {
     const p = createHerd(run).tell("web-app", "hi");
     await expect(p).rejects.toThrow(/matches 2 agents/);
     await expect(p).rejects.toThrow(/Dashboard Launcher/);
-    // Everything a picker needs rides along, so the retry needs no second lookup.
     await expect(p).rejects.toThrow(/\[w6E:p4\]/);
     await expect(p).rejects.toThrow(/working/);
     await expect(p).rejects.toThrow(/Projects\/web-app/);
@@ -1450,10 +1475,6 @@ describe("tell", () => {
   });
 });
 
-/** No live agent ever matches; `workspace create` + `agent start` stand in
- *  for a project the registry knows about but nothing has open. Pass `extra`
- *  to answer additional CLI calls a caller needs (e.g. `ask`'s `agent get` /
- *  `pane close`) without duplicating this whole table. */
 function projectFallbackRunner(
   cwd: string,
   extra?: (a: string[]) => Partial<RunResult> | undefined,
@@ -1621,9 +1642,6 @@ describe("tell — registry/zoxide fallback", () => {
   });
 
   test("a registry hit reachable by TWO live agents refuses instead of picking the first", async () => {
-    // Two tabs at the same cwd, neither matching the fragment by label — the
-    // only way this pair is found at all is the live-cwd recheck. Silently
-    // picking agents[0] here would send to the wrong one half the time.
     const cwd = "/Users/dev/Projects/renamed";
     const { run, calls } = mockRunner((a) => {
       if (a[0] === "agent" && a[1] === "list")
@@ -1703,8 +1721,6 @@ describe("tell — registry/zoxide fallback", () => {
   test("no live agent, no registry hit, and a too-short fragment skips zoxide too", async () => {
     const { run, calls } = fleetRunner();
     await withRegistryFile({}, async (registryPath) => {
-      // "z" is below the two-character minimum, so the zoxide lookup never
-      // shells out — this stays hermetic without depending on a real zoxide.
       const p = createHerd(run).tell("z", "hi", { registryPath });
       await expect(p).rejects.toThrow(/no agent matches/);
       await expect(p).rejects.toThrow(/registry and zoxide/);
@@ -1713,8 +1729,6 @@ describe("tell — registry/zoxide fallback", () => {
   });
 });
 
-/** Fake clock + sleep: ask/collect's poll loop advances instantly instead of
- *  costing 5s of wall time per iteration. */
 function fakeAskClock() {
   let t = 0;
   return {
@@ -1796,15 +1810,12 @@ describe("ask", () => {
       const prompt = calls.find((c) => c[0] === "agent" && c[1] === "prompt")!;
       expect(prompt[2]).toBe("w7P:p1");
       expect(prompt[3]).toContain(join(resultDir, "question.md"));
-      // Live agents are never closed, no matter what.
       expect(calls.some((c) => c[0] === "pane" && c[1] === "close")).toBe(
         false,
       );
     });
   });
 
-  /** `ask` needs two more CLI calls answered than `tell`'s fallback: `agent
-   *  get` for its poll loop, `pane close` for its post-success cleanup. */
   function askFallbackRunner(cwd: string) {
     return projectFallbackRunner(cwd, (a) => {
       if (a[0] === "agent" && a[1] === "get")
@@ -1840,6 +1851,54 @@ describe("ask", () => {
           expect(calls.some((c) => c[0] === "agent" && c[1] === "wait")).toBe(
             true,
           );
+        },
+      );
+    });
+  });
+
+  test("a spawned agent whose idle wait fails still gets the pointer prompt", async () => {
+    const cwd = "/Users/dev/Projects/diqi";
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "ok");
+      await withRegistryFile(
+        { [cwd]: { name: "diqi" } },
+        async (registryPath) => {
+          const { run: base, calls } = askFallbackRunner(cwd);
+          const run: Runner = async (a) =>
+            a[0] === "agent" && a[1] === "wait"
+              ? { stdout: "", stderr: "timeout", code: 1 }
+              : base(a);
+          const res = await createHerd(run, fakeAskClock()).ask("diqi", "q", {
+            resultDir,
+            registryPath,
+          });
+          expect(res.pending).toBe(false);
+          expect(calls.some((c) => c[0] === "agent" && c[1] === "prompt")).toBe(
+            true,
+          );
+        },
+      );
+    });
+  });
+
+  test("a failed close of the spawned pane still returns the answer that landed", async () => {
+    const cwd = "/Users/dev/Projects/diqi";
+    await withResultDir(async (resultDir) => {
+      await writeResult(resultDir, "ok");
+      await withRegistryFile(
+        { [cwd]: { name: "diqi" } },
+        async (registryPath) => {
+          const { run: base } = askFallbackRunner(cwd);
+          const run: Runner = async (a) =>
+            a[0] === "pane" && a[1] === "close"
+              ? { stdout: "", stderr: "gone", code: 1 }
+              : base(a);
+          const res = await createHerd(run, fakeAskClock()).ask("diqi", "q", {
+            resultDir,
+            registryPath,
+          });
+          expect(res.pending).toBe(false);
+          if (!res.pending) expect(res.answer).toBe("ok");
         },
       );
     });
@@ -1911,7 +1970,7 @@ describe("ask", () => {
     });
   });
 
-  test("still working at the timeout returns pending with a collect command, never throws", async () => {
+  test("still working at the timeout returns pending with a collect command on herd.ts's absolute path, since the caller's cwd is another project", async () => {
     await withResultDir(async (resultDir) => {
       const { run } = mockRunner((a) => {
         if (a[0] === "agent" && a[1] === "list")
@@ -1959,9 +2018,6 @@ describe("ask", () => {
         expect(res.resultPath).toBe(join(resultDir, "result.md"));
         expect(res.report).toContain("collect");
         expect(res.report).toContain(res.resultPath);
-        // The report must carry herd.ts's own absolute path — a bare "bun
-        // herd.ts collect ..." only resolves from this script's own
-        // directory, never from the caller's (a different project's) cwd.
         expect(res.report).toContain(
           import.meta.resolve("./herd.ts").replace("file://", ""),
         );
@@ -1998,7 +2054,7 @@ describe("collect", () => {
     });
   });
 
-  test("still pending stays pending and never closes the pane", async () => {
+  test("still pending stays pending and never closes the pane, which collect cannot know ask spawned", async () => {
     await withResultDir(async (resultDir) => {
       const { run, calls } = mockRunner((a) => {
         if (a[0] === "agent" && a[1] === "get")
@@ -2082,5 +2138,61 @@ describe("verb help", () => {
       false,
     );
     expect(wantsVerbHelp([])).toBe(false);
+  });
+});
+
+describe("cleanLabel", () => {
+  test("keeps a leading dot, which a broader punctuation strip would eat", () => {
+    expect(cleanLabel(".config")).toBe(".config");
+  });
+
+  test("strips both the BMP and the supplementary-plane glyphs herdr puts on live labels", () => {
+    expect(cleanLabel("\u{eacd} main")).toBe("main");
+    expect(cleanLabel("\u{f09d1}  main")).toBe("main");
+  });
+});
+
+describe("parseLeadingFlags", () => {
+  test("send: flags only lead, so text after <target> containing `--` stays text", () => {
+    expect(
+      parseLeadingFlags(
+        "send",
+        [
+          "--wait",
+          "--status",
+          "idle",
+          "--status",
+          "done",
+          "rev-1",
+          "--please",
+          "fix",
+          "--timeout",
+          "5",
+        ],
+        ["status", "timeout"],
+        ["wait"],
+      ),
+    ).toEqual({
+      flags: { wait: true, status: ["idle", "done"] },
+      head: "rev-1",
+      text: "--please fix --timeout 5",
+    });
+  });
+
+  test("ask: a question that starts with `--` survives", () => {
+    expect(
+      parseLeadingFlags(
+        "ask",
+        ["--keep-pane", "api", "--help", "me"],
+        ["agent", "timeout"],
+        ["keep-pane"],
+      ),
+    ).toEqual({ flags: { "keep-pane": true }, head: "api", text: "--help me" });
+  });
+
+  test("an unknown leading flag throws rather than becoming the target", () => {
+    expect(() => parseLeadingFlags("send", ["--nope", "x", "y"], [])).toThrow(
+      /send: unknown flag --nope/,
+    );
   });
 });

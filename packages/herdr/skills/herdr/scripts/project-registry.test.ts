@@ -182,14 +182,12 @@ describe("compareProjects", () => {
 
 describe("queryZoxide", () => {
   test("returns the top path on success", async () => {
-    // A real, non-temp directory — mkdtemp's own parent is itself a temp
-    // path and would get filtered by the isTempPath check this exercises.
-    const dir = import.meta.dir;
+    const nonTempDir = import.meta.dir;
     const path = await queryZoxide("query-text", async () => ({
-      stdout: `${dir}\n`,
+      stdout: `${nonTempDir}\n`,
       code: 0,
     }));
-    expect(path).toBe(dir);
+    expect(path).toBe(nonTempDir);
   });
 
   test("a missing zoxide binary degrades to null", async () => {

@@ -36,9 +36,6 @@ export const REGISTRY_PATH =
   process.env.HERDR_PROJECT_REGISTRY ??
   join(homedir(), ".local/state/herdr-projects/registry.json");
 
-/** Reads the registry file into candidates. Any failure — missing file, bad
- *  JSON, an unsupported version, a hidden entry — degrades to an empty list
- *  rather than throwing, so a broken or absent registry never breaks `tell`. */
 export async function readRegistry(
   path: string = REGISTRY_PATH,
 ): Promise<ProjectCandidate[]> {
@@ -77,8 +74,6 @@ export function isTempPath(path: string): boolean {
   );
 }
 
-/** Same fragment rule as matchAgents: split on `/`, every part must appear
- *  case-insensitively somewhere in the name, an alias, or the path. */
 export function matchProjects(
   candidates: ProjectCandidate[],
   fragment: string,
@@ -101,9 +96,6 @@ export function compareProjects(
   a: ProjectCandidate,
   b: ProjectCandidate,
 ): number {
-  // An unstamped entry sorts as if used at the dawn of time, so it always
-  // sinks below every stamped one without a separate branch for "only one
-  // side has a timestamp".
   const av = a.lastUsedAt ?? -Infinity;
   const bv = b.lastUsedAt ?? -Infinity;
   return bv - av || a.name.localeCompare(b.name);
@@ -134,10 +126,6 @@ const defaultZoxideRunner: ZoxideRunner = async (args) => {
   }
 };
 
-/** The single highest-frecency path zoxide knows for `query`, or null when
- *  zoxide is missing, has no match, or the match no longer resolves to a real
- *  directory. Never throws — a missing/broken zoxide is a silent no-op, same
- *  as workbench's query_zoxide. */
 export async function queryZoxide(
   query: string,
   run: ZoxideRunner = defaultZoxideRunner,
