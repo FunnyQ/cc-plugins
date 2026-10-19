@@ -1,14 +1,6 @@
-/**
- * ask-contract.ts — the file contract `ask`/`collect` use to retrieve an
- * answer from another agent's pane. Pane text is not trustworthy on its own:
- * a TUI's own chrome and a mid-turn snapshot both look like "an answer" to a
- * naive reader. So the target writes its final answer to a file instead, and
- * the reader only accepts it once the file's last line is the sentinel below
- * — proof the write is complete, not partial.
- *
- * This mirrors relay's relay-prompt.ts contract in spirit only, not in code:
- * relay is a separately-versioned plugin, so nothing here imports from it.
- */
+// Pane text is not trustworthy on its own:
+// a TUI's own chrome and a mid-turn snapshot both look like "an answer" to a
+// naive reader. So the target writes its final answer to a file instead.
 
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
@@ -16,9 +8,6 @@ import { join } from "node:path";
 
 export const ASK_RESULT_END_MARKER = "==== ASK RESULT END ====";
 
-/** Appends the result-file instructions to a question. The target must write
- *  its COMPLETE final answer to `resultPath`, ending with the sentinel — the
- *  poller in herd.ts treats the file as final only once that line lands. */
 export function appendFileContract(
   question: string,
   resultPath: string,
@@ -34,8 +23,6 @@ export function appendFileContract(
   );
 }
 
-/** The result file is final only when its last non-empty line is the
- *  sentinel. Marker absent means mid-write, or not started yet — keep polling. */
 export function extractFinalText(content: string): string | null {
   const trimmed = content.trimEnd();
   const lines = trimmed.split("\n");
@@ -43,12 +30,6 @@ export function extractFinalText(content: string): string | null {
   return lines.slice(0, -1).join("\n").trimEnd();
 }
 
-/** The scratch directory for one ask/collect run's question.md + result.md.
- *  Given `exactDir` (a test seam — a deterministic path a test can pre-write
- *  result.md into), that directory is created and used as-is; otherwise a
- *  fresh randomly-named one is created under the default base. Either way
- *  this is the one place that creates the directory — never call `mkdirSync`
- *  on a result dir anywhere else. */
 export function createAskRunDir(exactDir?: string): string {
   const dir =
     exactDir ??

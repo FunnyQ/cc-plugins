@@ -62,3 +62,28 @@ describe("createAskRunDir", () => {
     await rm(b, { recursive: true, force: true });
   });
 });
+
+describe("package boundaries", () => {
+  const herdrRoot = join(import.meta.dir, "../../..");
+  const sources = [...new Bun.Glob("**/*.ts").scanSync(herdrRoot)].filter(
+    (path) => !path.includes("node_modules"),
+  );
+  const read = (path: string) => Bun.file(join(herdrRoot, path)).text();
+
+  test("nothing in herdr imports relay, since relay versions separately", async () => {
+    for (const path of sources) {
+      expect([path, await read(path)]).not.toEqual([
+        path,
+        expect.stringMatching(/from\s+["'][^"']*relay[^"']*["']/),
+      ]);
+    }
+  });
+
+  test("only createAskRunDir creates a result dir, so no caller bypasses its seam", async () => {
+    const callers = [];
+    for (const path of sources.filter((p) => p.startsWith("skills/herdr/scripts/") && !p.endsWith(".test.ts"))) {
+      if ((await read(path)).includes("mkdirSync")) callers.push(path);
+    }
+    expect(callers).toEqual(["skills/herdr/scripts/ask-contract.ts"]);
+  });
+});

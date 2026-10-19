@@ -20,7 +20,6 @@ afterEach(() => {
   for (const repo of tempRepos.splice(0)) execFileSync("trash", [repo]);
 });
 
-/** A schema stub with only the parts the script reads. */
 const schemaFixture = (protocol = 19) => ({
   protocol,
   schemas: {
@@ -157,6 +156,34 @@ describe("extractLiterals", () => {
       join(repo, ".herdr-protocol.json"),
       '{"responses":{"wait_matched":{}}}\n',
     );
+    execFileSync("git", ["-C", repo, "add", "."]);
+
+    expect(sourceLiterals(repo)).toEqual(new Set(["pane.split"]));
+  });
+
+  test("git grep and RegExp read the one pattern alike, so a dotted method is never silently missed", () => {
+    const repo = mkdtempSync(join(tmpdir(), "protocol-check-"));
+    tempRepos.push(repo);
+    execFileSync("git", ["init", "-q", repo]);
+    const source =
+      'call("ping"); call(\'client.window_title.set\'); call(`a.b.c_d`);\n';
+    writeFileSync(join(repo, "client.ts"), source);
+    execFileSync("git", ["-C", repo, "add", "."]);
+
+    expect(sourceLiterals(repo)).toEqual(extractLiterals(source));
+    expect(sourceLiterals(repo)).toContain("client.window_title.set");
+    expect(sourceLiterals(repo)).toContain("a.b.c_d");
+  });
+
+  test("source scan skips prose, since docs describe the whole API and would widen the check", () => {
+    const repo = mkdtempSync(join(tmpdir(), "protocol-check-"));
+    tempRepos.push(repo);
+    execFileSync("git", ["init", "-q", repo]);
+    writeFileSync(join(repo, "client.ts"), 'call("pane.split");\n');
+    writeFileSync(join(repo, "README.md"), '"tab.create"\n');
+    writeFileSync(join(repo, "notes.txt"), '"tab.close"\n');
+    execFileSync("mkdir", [join(repo, "docs")]);
+    writeFileSync(join(repo, "docs", "api.ts"), '"pane.close"\n');
     execFileSync("git", ["-C", repo, "add", "."]);
 
     expect(sourceLiterals(repo)).toEqual(new Set(["pane.split"]));

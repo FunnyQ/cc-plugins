@@ -1,13 +1,7 @@
 #!/usr/bin/env bun
-// Answers one question: did a Herdr protocol upgrade break THIS plugin?
-//
-// It compares the running server's API schema against a committed baseline,
-// narrowed to the request methods the plugin actually sends. Reading full
+// Reading full
 // schemas into an agent's context costs tens of thousands of tokens and invites
 // a guess; a diff against a baseline is usually empty and costs a few hundred.
-//
-// The schema-shaping and diff logic is exported and pure. Only main() touches
-// subprocesses, so the interesting behaviour is testable without a live server.
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { relative } from "node:path";
@@ -70,7 +64,6 @@ function normalizedSchema(
   return result;
 }
 
-/** Sorted and dereferenced so reordering and $ref placement do not hide changes. */
 export const shapeOf = (node: any, defs: Record<string, any> = {}): Shape => {
   const props = Object.keys(node?.properties ?? {}).sort();
   return {
@@ -85,7 +78,6 @@ export const shapeOf = (node: any, defs: Record<string, any> = {}): Shape => {
   };
 };
 
-/** Every method the server accepts, mapped to the $defs name of its params. */
 export function serverMethods(schema: any): Record<string, string> {
   const found: Record<string, string> = {};
   for (const variant of schema?.schemas?.request?.oneOf ?? []) {
@@ -100,11 +92,8 @@ export function serverMethods(schema: any): Record<string, string> {
   return found;
 }
 
-/**
- * The methods this plugin sends: the server's list intersected with the string
- * literals in its source. Deriving it beats a hand-kept list, because a new call
- * site cannot silently fall outside the check.
- */
+// Deriving it beats a hand-kept list, because a new call
+// site cannot silently fall outside the check.
 export function usedMethods(schema: any, literals: Set<string>): string[] {
   return Object.keys(serverMethods(schema))
     .filter((method) => literals.has(method))
@@ -120,8 +109,6 @@ const IRREGULAR_RESPONSES: Record<string, string> = {
   "events.wait": "wait_matched",
 };
 
-// Source literals alone miss every result a client decodes by struct without
-// spelling its type, so a sent method pulls in its result by name.
 export function responseFor(
   method: string,
   variants: Set<string>,
@@ -178,8 +165,6 @@ function compare(
   kind: string,
   was: Record<string, Shape>,
   now: Record<string, Shape>,
-  // A request gaining a required field invalidates the plugin's existing calls.
-  // A response gaining one only means the server always sends it, which is safe.
   newRequiredBreaks: boolean,
 ): string[] {
   const breaks: string[] = [];
@@ -292,7 +277,6 @@ function schemaBreaks(
   return false;
 }
 
-/** Additions are ignored throughout: they are what a safe protocol bump looks like. */
 export function diff(base: Baseline, current: Baseline): string[] {
   const legacy = Object.values(base.methods).some(
     (shape) => shape.schemas === undefined,
@@ -329,13 +313,8 @@ export function summary(
   ];
 }
 
-/** One pattern, fed to both `git grep -E` and RegExp. Kept to the dialects'
- *  common subset: POSIX ERE has no `(?:`, so the group stays capturing and
- *  extractLiterals reads group 1. Two copies would drift, and a narrowed
- *  pattern silently stops detecting methods — which is this script's whole job. */
 const METHOD_LITERAL = "[\"'`]([a-z_]+(\\.[a-z_]+)*)[\"'`]";
 
-/** Quoted identifiers in tracked source, including single and multi-part methods. */
 export function extractLiterals(source: string): Set<string> {
   return new Set(
     [...source.matchAll(new RegExp(METHOD_LITERAL, "g"))].map(
@@ -348,17 +327,12 @@ export function sourceLiterals(
   repo: string,
   baselinePath?: string,
 ): Set<string> {
-  // The baseline names every method it tracks, so grepping it would feed those
-  // names back in and widen the check to methods the plugin never sends. The
-  // path is the caller's to decide (--baseline), hence not hardcoded here.
   const baseline = relative(
     repo,
     baselinePath ?? `${repo}/.herdr-protocol.json`,
   );
   let matches = "";
   try {
-    // Prose is excluded deliberately: a plugin's docs tend to describe Herdr's
-    // whole API surface, which would widen the check to uncalled methods.
     matches = execFileSync(
       "git",
       [
