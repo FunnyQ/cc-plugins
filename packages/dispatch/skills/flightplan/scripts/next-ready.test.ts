@@ -10,7 +10,6 @@ import {
 } from "./next-ready";
 import { refToString } from "./lib/parse-task";
 
-/** A real `done` task carries ticked gate boxes; anything else carries empty ones. */
 const box = (status: string) => (status === "done" ? "[x]" : "[ ]");
 
 const FINAL_TASK = (
@@ -60,11 +59,9 @@ A line.
 - ${box(status)} Check
 `;
 
-/** `Status: done` over an unticked Verification box — the malformed fingerprint. */
 const MALFORMED_DONE = (bucket: string, nn: string, deps: string) =>
   TASK(bucket, nn, deps, "done").replace("- [x] Check", "- [ ] Check");
 
-/** A decorated Status value — not a status at all, so the task is invalid. */
 const DECORATED_STATUS = (bucket: string, nn: string, deps: string) =>
   TASK(bucket, nn, deps, "todo").replace(
     "> **Status**: todo",
@@ -195,7 +192,7 @@ describe("malformed completion state", () => {
     await rm(root, { recursive: true });
   });
 
-  test("a decorated Status fails readiness instead of vanishing from the graph", async () => {
+  test("a decorated Status fails readiness but stays in byRef for the dashboard to render", async () => {
     const root = await writeScenario({
       "ui/01.md": DECORATED_STATUS("ui", "01", "none"),
       "ui/02.md": TASK("ui", "02", "ui/01", "todo"),
@@ -211,9 +208,9 @@ describe("malformed completion state", () => {
 });
 
 describe("--json CLI", () => {
-  const run = async (tasksDir: string) => {
+  const run = async (tasksDir: string, ...flags: string[]) => {
     const proc = Bun.spawn(
-      ["bun", join(import.meta.dir, "next-ready.ts"), tasksDir, "--json"],
+      ["bun", join(import.meta.dir, "next-ready.ts"), tasksDir, ...flags],
       { stdout: "pipe", stderr: "pipe" },
     );
     const out = await new Response(proc.stdout).text();
@@ -222,12 +219,12 @@ describe("--json CLI", () => {
     return { out: out.trim(), err, code };
   };
 
-  test("fails loudly on a malformed completion state", async () => {
+  test.each([["--json"], []])("fails loudly on a malformed completion state, printing no ready set (%p)", async (...flags) => {
     const root = await writeScenario({
       "ui/01.md": MALFORMED_DONE("ui", "01", "none"),
       "ui/02.md": TASK("ui", "02", "ui/01", "todo"),
     });
-    const { out, err, code } = await run(join(root, "tasks"));
+    const { out, err, code } = await run(join(root, "tasks"), ...flags);
     expect(code).toBe(1);
     expect(out).toBe("");
     expect(err).toContain("ui/01");
@@ -241,7 +238,7 @@ describe("--json CLI", () => {
       "ui/01.md": TASK("ui", "01", "none", "done"),
       "ui/02.md": TASK("ui", "02", "none", "done"),
     });
-    const { out, code } = await run(join(root, "tasks"));
+    const { out, code } = await run(join(root, "tasks"), "--json");
     expect(code).toBe(0);
     expect(out).toBe("[]");
     expect(JSON.parse(out)).toEqual([]);
@@ -253,7 +250,7 @@ describe("--json CLI", () => {
       "ui/01.md": TASK("ui", "01", "none", "todo"),
       "ui/02-final.md": FINAL_TASK("ui", "02", "ui/01", "todo"),
     });
-    const { out, code } = await run(join(root, "tasks"));
+    const { out, code } = await run(join(root, "tasks"), "--json");
     expect(code).toBe(0);
     expect(JSON.parse(out)).toEqual([
       {
@@ -364,7 +361,6 @@ describe("summarizeTree", () => {
     return { ...snapshot, invalid };
   };
 
-  /** The identity the wave loop asserts before trusting any bucket. */
   const sumsToTotal = (c: {
     total: number;
     todo: number;
@@ -401,7 +397,6 @@ describe("summarizeTree", () => {
   });
 
   test("a resumed tree counts earlier-run done tasks toward completion", async () => {
-    // Only ui/03 is left; a current-run `completed` array would hold 0 entries.
     const { ready, counts } = await summarize({
       "ui/01.md": TASK("ui", "01", "none", "done"),
       "ui/02.md": TASK("ui", "02", "ui/01", "done"),
@@ -422,7 +417,6 @@ describe("summarizeTree", () => {
     expect(counts.done).not.toBe(counts.total);
     expect(counts.inProgress).toBe(1);
     expect(counts.todo).toBe(1);
-    // The escalation needs the refs, not just the counts.
     expect(unfinished).toEqual([
       { ref: "ui/01", state: "inProgress" },
       { ref: "ui/02", state: "todo" },
@@ -536,7 +530,6 @@ describe("summarizeTree", () => {
       invalid: 0,
     });
     expect(payload.ready.map((r: { ref: string }) => r.ref)).toEqual(["ui/02"]);
-    // No PLAN.md beside tasks/: nothing declared, so nothing caps the wave.
     expect(payload.maxParallel).toBeNull();
     await rm(root, { recursive: true });
   });
@@ -561,8 +554,6 @@ describe("summarizeTree", () => {
     return { exitCode, payload: JSON.parse(out) };
   };
 
-  // The scout carries the cap off disk every wave, so the orchestrator honours
-  // the plan without the main agent having to copy it into CFG.
   test("--summary carries the PLAN.md Max parallel cap", async () => {
     const { exitCode, payload } = await summaryWithPlan(
       "# Plan\n\n> **Status**: approved\n> **Max parallel**: 1\n",
@@ -571,10 +562,7 @@ describe("summarizeTree", () => {
     expect(payload.maxParallel).toBe(1);
   });
 
-  // Only a missing PLAN.md means "nothing declared". A plan that exists but
-  // cannot be read may declare a cap, so treating it as absent would run a
-  // serial plan in parallel with no error anywhere.
-  test("--summary reports an unreadable PLAN.md as a tree error", async () => {
+  test("--summary reports an unreadable PLAN.md as a tree error, never as no cap", async () => {
     const root = await writeScenario({
       "ui/01.md": TASK("ui", "01", "none", "todo"),
     });

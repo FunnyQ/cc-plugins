@@ -54,14 +54,10 @@ const DEFAULT_MODEL: Record<Mode, string> = {
   review: "opencode-go/gpt-6-luna",
 };
 
-// Prepended to the prompt in review mode. opencode can't enforce read-only at the
-// sandbox level, so this guard is the only thing keeping the review lens from
-// editing the tree — keep it loud and unambiguous.
 const REVIEW_GUARD =
   "READ-ONLY REVIEW. Analyze only — do NOT modify, create, or delete any file, " +
   "and do not run any command that writes to disk. Report findings only.\n\n";
 
-// null means omit `-m`.
 function resolveModel(mode: Mode, args: string[]): string | null {
   const explicit = flagValue(args, "--model") ?? process.env.OPENCODE_MODEL;
   if (explicit !== undefined) return explicit;
@@ -84,23 +80,18 @@ export function parseJsonl(raw: string): string {
       const obj = JSON.parse(trimmed);
       if (obj.type === "text" && obj.part?.text) textParts.push(obj.part.text);
     } catch {
-      // Ignore malformed lines silently.
       continue;
     }
   }
   return textParts.join("");
 }
 
-// Returns the process exit code. Never calls process.exit itself — so any caller
-// wrapping this stays in control of teardown (mirrors codex-run's contract).
 function run(mode: Mode, prompt: string, model: string | null): number {
   if (!prompt.trim()) {
     process.stderr.write("Empty prompt — nothing to send to opencode\n");
     return 2;
   }
 
-  // REVIEW_GUARD stays first: it is opencode's only read-only enforcement, with
-  // no sandbox behind it, so nothing may push it down the prompt.
   const message =
     (mode === "review" ? REVIEW_GUARD : "") + NO_ASK_CONTRACT + prompt;
 

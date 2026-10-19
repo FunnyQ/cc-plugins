@@ -54,7 +54,7 @@ describe("markDone", () => {
     expect(out).toContain("- [x] Manual smoke check");
   });
 
-  test("leaves boxes in other sections untouched", () => {
+  test("leaves boxes in other sections untouched, since only the gate sections mean it passed", () => {
     const out = markDone(TASK);
     expect(out).toContain(
       "- [ ] this is NOT a checkbox to tick (prose bullet in notes)",
@@ -81,7 +81,7 @@ describe("markDone", () => {
     }
   });
 
-  test("rejects a decorated status without producing content", () => {
+  test("rejects a decorated status before rewriting, so no half-applied done reaches readiness", () => {
     const input = TASK.replace(
       "**Status**: in-progress",
       "**Status**: in-progress (attempt 3)",

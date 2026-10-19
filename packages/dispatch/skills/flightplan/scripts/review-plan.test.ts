@@ -62,7 +62,7 @@ describe("collectPlanFiles", () => {
     await rm(root, { recursive: true });
   });
 
-  test("tasks/README.md is collected right after PLAN.md", async () => {
+  test("tasks/README.md is collected right after PLAN.md, so the reviewer sees its Known gaps before the tree", async () => {
     const root = await newRoot();
     await mkdir(join(root, "tasks/ui"), { recursive: true });
     await writeFile(join(root, "PLAN.md"), "# Plan\n");
@@ -320,7 +320,7 @@ describe("parseArgs", () => {
     expect(out.priorPasses).toBeUndefined();
   });
 
-  test("rejects --prior-passes without --narrow", () => {
+  test("rejects --prior-passes without --narrow rather than silently running the broad prompt", () => {
     expect(() => parseArgs(["docs/p", "--prior-passes", "8"])).toThrow(
       /--prior-passes requires --narrow/,
     );
@@ -353,13 +353,12 @@ describe("narrowInstructions", () => {
     const text = narrowInstructions(4);
     expect(text).toContain("Report at most five.");
     expect(text).toContain("No blocking findings.");
-    // The narrow phase has no P2 channel — the caller counts P1s only.
     expect(text).not.toContain("P2");
   });
 });
 
 describe("--print (integration)", () => {
-  test("emits the instructions+bundle with no file-list header", async () => {
+  test("emits the instructions+bundle with no file-list header, clean for the Opus reviewer", async () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
 
@@ -369,20 +368,16 @@ describe("--print (integration)", () => {
     });
     expect(res.success).toBe(true);
     const out = res.stdout.toString();
-    // The exact review criteria bundle — same source all engines share.
     expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(
       true,
     );
     expect(out).toContain("Goal: ship it.");
-    // --print must be clean: no "Flightplan review — N file(s)" header.
     expect(out).not.toContain("Flightplan review");
 
     await rm(root, { recursive: true });
   });
 
-  // The Opus engine reviews whatever --print emits, so it must reach the narrow
-  // phase too; without this the post-cap phase would be codex/opencode-only.
-  test("--print honors --narrow", async () => {
+  test("--print honors --narrow, so the Opus engine reaches the post-cap phase too", async () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
 
@@ -413,7 +408,6 @@ describe("buildReviewPrompt (narrow)", () => {
     expect(broad).toContain("Focus on:");
     expect(narrow).not.toContain("Focus on:");
     expect(narrow).toContain("Report a finding only if it meets this bar");
-    // Same tree, either way.
     expect(narrow).toContain("Goal: ship it.");
 
     await rm(root, { recursive: true });
@@ -462,5 +456,45 @@ describe("formatCodexReviewOutput", () => {
     expect(formatCodexReviewOutput("", "error details\n")).toBe(
       "error details\n",
     );
+  });
+});
+
+describe("review-plan CLI exit codes", () => {
+  test("an empty plan dir exits 2, never the reviewer's 1, and names the working directory", async () => {
+    const root = await newRoot();
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(res.exitCode).toBe(2);
+    expect(res.stderr.toString()).toContain(
+      `Working directory: ${process.cwd()}`,
+    );
+    await rm(root, { recursive: true });
+  });
+
+  test("an unreadable --prior-findings exits 2 instead of falling back to a first-round bundle", async () => {
+    const root = await newRoot();
+    await writeFile(join(root, "PLAN.md"), "# Plan\n");
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--print", "--prior-findings", join(root, "nope.md")],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(res.exitCode).toBe(2);
+    expect(res.stdout.toString()).toBe("");
+    await rm(root, { recursive: true });
+  });
+
+  test("an unreachable opencode warns and skips the gate with exit 0, like a missing codex", async () => {
+    const root = await newRoot();
+    await writeFile(join(root, "PLAN.md"), "# Plan\n");
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--engine", "opencode"], {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, OPENCODE_BIN: join(root, "no-opencode") },
+    });
+    expect(res.exitCode).toBe(0);
+    expect(res.stderr.toString()).toContain("opencode unreachable");
+    await rm(root, { recursive: true });
   });
 });

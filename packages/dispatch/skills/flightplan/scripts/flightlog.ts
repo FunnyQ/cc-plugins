@@ -31,7 +31,6 @@ import {
 } from "./lib/flightlog";
 import { resumePoint, tasksIn } from "./lib/resume-point";
 
-/** Build a flightlog note entry from narrative metadata (pure). */
 export function buildNoteEntry(meta: {
   task: string;
   role: string;
@@ -53,7 +52,6 @@ export function buildNoteEntry(meta: {
   };
 }
 
-/** Build a node declaration from caller-stamped metadata (pure). */
 export function buildStateEntry(meta: {
   task: string;
   state: "done" | "blocked" | "failed";
@@ -71,10 +69,6 @@ export function buildStateEntry(meta: {
   };
 }
 
-/**
- * Derive a display slug from a log file path: the dir that contains
- * `.flightlog/`, e.g. `docs/my-plan/.flightlog/run.jsonl` → `my-plan`.
- */
 export function slugFromLogPath(logFile: string): string {
   const dir = dirname(logFile);
   if (basename(dir) === FLIGHTLOG_DIRNAME) {
@@ -90,7 +84,6 @@ async function main() {
     if (!logFile) usage();
     const task = flagValue(rest, "--task");
     const role = flagValue(rest, "--role");
-    // Free text — a note may legitimately open with `--`.
     const message = flagValue(rest, "--message", { allowDashValue: true });
     const phase = flagValue(rest, "--phase");
     if (phase !== undefined && phase !== "start" && phase !== "end") {
@@ -172,8 +165,6 @@ async function main() {
 
     const point = resumePoint(entries, task);
     if (!point) {
-      // Not an error: a task that never ran has nothing to resume from, and the
-      // caller needs to tell that apart from a trail it failed to read.
       console.log(`no attempts recorded for ${task}`);
       return;
     }
@@ -217,7 +208,6 @@ async function main() {
   usage();
 }
 
-/** Every CLI rejection leaves through here, so all of them exit 2. */
 function fail(message: string): never {
   console.error(message);
   process.exit(2);

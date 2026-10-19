@@ -74,7 +74,6 @@ function rootOf(options: Options): string {
   return join(dirname(repo), `.${basename(repo)}-autopilot`, options.slug);
 }
 
-// The plan dir, repo-relative with "/" separators, as git pathspecs and ls-files output spell it.
 function planOf(options: Options): string {
   const repo = resolve(options.repo);
   const plan = relative(repo, resolve(repo, options.planDir ?? `docs/${options.slug}`));
@@ -84,7 +83,6 @@ function planOf(options: Options): string {
   return plan.split(sep).join("/");
 }
 
-// A bucket may contain "-" but never "/", and NN never contains "-", so the last "-" is the separator.
 const dirNameOf = (ref: string) => ref.replace("/", "-");
 const refOfDir = (dir: string) => dir.replace(/-([^-]+)$/, "/$1");
 
@@ -146,7 +144,6 @@ function snapshot(root: string, plan: string): string {
   }
 }
 
-// Only land, rebase, and create need a commit; fingerprints stay commit-free.
 function commitOf(root: string, tree: string, slug: string): string {
   return git(root, ["commit-tree", tree, "-p", "HEAD", "-m", `autopilot snapshot ${slug}`]).trim();
 }
@@ -238,7 +235,6 @@ function removePath(repo: string, path: string, registered: Set<string>): boolea
     return true;
   }
   if (existsSync(path)) {
-    // A prior interrupted cleanup can leave an unregistered directory under our root.
     rmSync(path, { recursive: true, force: true });
     return true;
   }
@@ -260,7 +256,6 @@ export function create(options: RefOptions): Location {
   mkdirSync(root, { recursive: true });
   git(options.repo, ["worktree", "add", "--detach", path, base]);
   seedIgnored(options.repo, path, planOf(options));
-  // Tasks read plan assets (design/ mocks) by repo-relative path; a link stays live and snapshots drop it.
   const link = join(path, planOf(options));
   mkdirSync(dirname(link), { recursive: true });
   symlinkSync(join(resolve(options.repo), planOf(options)), link);
@@ -327,7 +322,6 @@ export function rebase(options: OpOptions): RebaseResult {
   return record(options, state, { path, base: ours, conflicted: merged.conflicted, tree: merged.tree });
 }
 
-// Restores the exact post-rebase state so a retried resolver starts from the markers again.
 export function reset(options: OpOptions): { reset: false } | { reset: true; path: string; tree: string } {
   const path = pathOf(options);
   if (!options.op) throw new ArgumentError("--op is required");

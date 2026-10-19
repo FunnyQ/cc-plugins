@@ -111,17 +111,6 @@ function escapeCell(s: string): string {
   return s.replace(/\|/g, "\\|");
 }
 
-/**
- * Render every task as a single global tree.
- *
- * Each task hangs under its **primary parent** — the first entry in its
- * `Depends on:` list that resolves to a task in this set. Tasks with no
- * resolvable primary parent become roots. Any task whose tree-edge does
- * not capture all its dependencies gets a `*` marker so the reader knows
- * to consult the task-index table for the full picture.
- *
- * Sorting is stable: bucket alphabetical, then NN ascending.
- */
 export function renderGlobalGraph(allTasks: ParsedTask[]): {
   graph: string;
   hasMultiParent: boolean;
@@ -134,7 +123,6 @@ export function renderGlobalGraph(allTasks: ParsedTask[]): {
 
   const refs = new Set(allTasks.map(refToString));
 
-  // Primary parent = first dep that exists in this task set.
   const primaryParent = new Map<string, string>();
   for (const t of allTasks) {
     for (const dep of t.dependsOn) {
@@ -174,8 +162,6 @@ export function renderGlobalGraph(allTasks: ParsedTask[]): {
     kids.forEach((kid, i) => {
       const isLast = i === kids.length - 1;
       const branch = isLast ? "└─→ " : "├─→ ";
-      // Tree shows one edge — primary parent → kid. Any other deps the kid
-      // has are "extra" relative to that visible edge.
       const extraDeps = kid.dependsOn.length > 1;
       if (extraDeps) hasMultiParent = true;
       lines.push(
@@ -187,9 +173,6 @@ export function renderGlobalGraph(allTasks: ParsedTask[]): {
   };
 
   for (const root of roots) {
-    // A root with any deps at all has deps invisible in the tree (its deps
-    // point outside this set or it's a true start). Mark it `*` only when
-    // it actually has deps — true starts stay clean.
     const rootHasExtra = root.dependsOn.length > 0;
     if (rootHasExtra) hasMultiParent = true;
     lines.push(`${refToString(root)}${rootHasExtra ? " *" : ""}`);
@@ -214,10 +197,6 @@ function collectCrossBucket(
   return out;
 }
 
-/**
- * Splice the generated block into an existing README body. If the markers are
- * present, replace between them; otherwise append the block at the end.
- */
 export function spliceGenerated(existing: string, generated: string): string {
   const wrapped = `${GEN_START}\n${generated}\n${GEN_END}`;
   if (existing.includes(GEN_START) && existing.includes(GEN_END)) {
@@ -229,11 +208,6 @@ export function spliceGenerated(existing: string, generated: string): string {
   return `${existing}${sep}${wrapped}\n`;
 }
 
-/**
- * Default skeleton for a brand-new README. Mirrors the structure documented in
- * references/readme-template.md so the human-authored sections are already
- * scaffolded — executors only need to fill in the topic-specific bits.
- */
 export function defaultSkeleton(topic: string): string {
   return [
     `# ${topic} — Task System`,
@@ -291,8 +265,6 @@ async function main() {
   }
 
   const readmePath = join(tasksDir, "README.md");
-  // `invalid` is ignored on purpose: the README indexes whatever parsed, and a
-  // task with a malformed execution state still belongs in the index.
   const { byRef: tasks, errors } = await loadAllTasks(tasksDir);
 
   if (errors.length > 0) {

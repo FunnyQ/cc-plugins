@@ -11,7 +11,6 @@ import {
 import { parseLog } from "./lib/flightlog";
 import type { Rubric } from "./lib/parse-task";
 
-// Mirrors a typical rubric: 0–5, pass > 4.0, Correctness < 4 vetoes.
 const RUBRIC: Rubric = {
   passThreshold: 4.0,
   passOp: ">",
@@ -39,7 +38,6 @@ describe("scoreTask", () => {
   });
 
   test("weighted average uses the weights", () => {
-    // (4×3 + 5×2 + 4×1 + 4×1) / 7 = 30/7 ≈ 4.2857
     const r = scoreTask(RUBRIC, {
       Correctness: 4,
       "Test coverage": 5,
@@ -51,7 +49,6 @@ describe("scoreTask", () => {
   });
 
   test("hard-fail veto: Correctness < 4 fails despite a high average", () => {
-    // (3×3 + 5×2 + 5×1 + 5×1) / 7 = 29/7 ≈ 4.14 — above 4.0, but vetoed.
     const r = scoreTask(RUBRIC, {
       Correctness: 3,
       "Test coverage": 5,
@@ -131,7 +128,6 @@ describe("buildScoreEntry", () => {
     expect(entry.task).toBe("ui/03");
     expect(entry.attempt).toBe(2);
     expect(entry.passed).toBe(result.passed);
-    // breakdown is trimmed to name/weight/score (no contribution noise)
     expect(entry.breakdown[0]).toEqual({
       name: "Correctness",
       weight: 3,
@@ -153,7 +149,7 @@ describe("buildScoreEntry", () => {
     expect(entry.attempt).toBe(1);
   });
 
-  test("records a trimmed rationale, and omits the key without one", () => {
+  test("records a trimmed rationale, and omits the key when absent or whitespace-only alike", () => {
     const result = scoreTask(RUBRIC, {
       Correctness: 5,
       "Test coverage": 5,
@@ -168,8 +164,6 @@ describe("buildScoreEntry", () => {
         rationale: "\nGrounded in the gate.\n",
       }).rationale,
     ).toBe("Grounded in the gate.");
-    // Absent and whitespace-only both leave the key off, so an old trail and a
-    // judge that wrote an empty file render identically.
     expect(buildScoreEntry(result, meta)).not.toHaveProperty("rationale");
     expect(
       buildScoreEntry(result, { ...meta, rationale: "   \n" }),
@@ -310,6 +304,45 @@ describe("score-task CLI", () => {
     const entries = parseLog(await readFile(logFile, "utf-8"));
     expect(entries).toHaveLength(1);
     expect(entries[0].kind).toBe("score");
+
+    await rm(root, { recursive: true });
+  });
+
+  test("an unreadable --rationale-file warns, still logs the entry without a rationale, and exits with the gate code", async () => {
+    const root = await mkdtemp(join(tmpdir(), "score-task-rationale-"));
+    const taskFile = join(root, "03-sample.md");
+    const scoresFile = join(root, "scores.json");
+    const logFile = join(root, ".flightlog", "run.jsonl");
+    await writeFile(taskFile, SAMPLE_TASK);
+    await writeFile(
+      scoresFile,
+      JSON.stringify({
+        Correctness: 5,
+        "Test coverage": 4,
+        "Interface & readability": 4,
+        "Assumptions & docs": 4,
+      }),
+    );
+
+    const proc = Bun.spawn(
+      [
+        "bun",
+        join(import.meta.dir, "score-task.ts"),
+        taskFile,
+        scoresFile,
+        "--log",
+        logFile,
+        "--rationale-file",
+        join(root, "missing.md"),
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const err = await new Response(proc.stderr).text();
+    expect(await proc.exited).toBe(0);
+    expect(err).toContain("Cannot read --rationale-file");
+    const entries = parseLog(await readFile(logFile, "utf-8"));
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).not.toHaveProperty("rationale");
 
     await rm(root, { recursive: true });
   });

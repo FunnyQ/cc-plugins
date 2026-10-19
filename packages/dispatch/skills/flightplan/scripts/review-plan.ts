@@ -56,10 +56,6 @@ export type ReviewArgs = {
   priorPasses?: number;
 };
 
-/**
- * Parse the CLI argv (pure, for tests). `--engine` defaults to codex; `--print`
- * emits the bundle without invoking any CLI (the Opus subagent path).
- */
 export function parseArgs(argv: string[]): ReviewArgs {
   const out: ReviewArgs = { engine: "codex", print: false, narrow: false };
   for (let i = 0; i < argv.length; i++) {
@@ -99,9 +95,6 @@ export function parseArgs(argv: string[]): ReviewArgs {
       throw new Error(`Unexpected argument: ${a}`);
     }
   }
-  // A pass count with no narrow phase is a typo, not a preference: the broad
-  // instructions have nowhere to put it, so honoring it silently would run the
-  // wrong prompt for a caller who believes they asked for the narrow one.
   if (out.priorPasses !== undefined && !out.narrow) {
     throw new Error("--prior-passes requires --narrow");
   }
@@ -203,12 +196,6 @@ For each finding give: the file, the section or field, what the two sides say (o
 `.trim();
 }
 
-// Every finding the author dispositioned instead of fixing is banked in
-// tasks/README.md's "Known gaps". A reviewer that cannot see it re-files the
-// same finding as P1 every pass, and the loop — which exits only on a P1-clean
-// pass — never converges. So the file ships in the bundle, right after PLAN.md,
-// where the reviewer reads the intent before the tree. Bucket-level READMEs
-// stay excluded: they are not task content.
 const PRIOR_FINDINGS_RULE = `
 # Findings already reported
 
@@ -222,35 +209,25 @@ unfixed defect. Rank findings NEW to this pass above repeats.
 export async function collectPlanFiles(planDir: string): Promise<string[]> {
   const files: string[] = [];
 
-  // PLAN.md
   try {
     await stat(join(planDir, "PLAN.md"));
     files.push(join(planDir, "PLAN.md"));
-  } catch {
-    // skip if missing
-  }
+  } catch {}
 
   const tasksDir = join(planDir, "tasks");
 
-  // tasks/README.md — carries the Known gaps the reviewer must not re-raise
   try {
     await stat(join(tasksDir, "README.md"));
     files.push(join(tasksDir, "README.md"));
-  } catch {
-    // skip if missing
-  }
+  } catch {}
 
-  // _context files
   try {
     const contextFiles = await readdir(join(tasksDir, "_context"));
     for (const f of contextFiles.sort()) {
       if (f.endsWith(".md")) files.push(join(tasksDir, "_context", f));
     }
-  } catch {
-    // no _context dir
-  }
+  } catch {}
 
-  // task files across all buckets (excludes README.md)
   try {
     const buckets = await readdir(tasksDir, { withFileTypes: true });
     for (const bucket of buckets.sort((a, b) => a.name.localeCompare(b.name))) {
@@ -263,9 +240,7 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
         }
       }
     }
-  } catch {
-    // no tasks dir
-  }
+  } catch {}
 
   return files;
 }
@@ -329,7 +304,6 @@ export function formatCodexReviewOutput(
   return collapseDuplicateReviewOutput(output);
 }
 
-// codex engine: pipe the inline bundle to codex's native `review` over stdin.
 function runCodexReview(prompt: string): number {
   const result = spawnSync("codex", ["review", "-"], {
     input: prompt,
@@ -370,8 +344,6 @@ function runOpencodeReview(prompt: string, model?: string): number {
     });
 
     const stderr = result.stderr ?? "";
-    // Treat a missing/unreachable opencode the same as a missing codex: warn and
-    // skip the gate (exit 0) rather than failing the whole plan write.
     if (result.error || stderr.includes("OPENCODE UNREACHABLE")) {
       console.warn(
         "opencode unreachable — skipping review (install opencode CLI to enable: `opencode --version` to verify).\n" +
@@ -410,10 +382,6 @@ async function main() {
 
   const files = await collectPlanFiles(args.planDir);
   if (files.length === 0) {
-    // Exit 2, not 1. This script's exit code mirrors the reviewer's verdict, so
-    // a 1 here is indistinguishable from "the reviewer found blocking issues" —
-    // a caller looping on the exit code reads a wrong cwd as a failed review and
-    // starts fixing a tree that was never opened.
     console.error(
       `No plan files found in ${resolve(args.planDir)} — run scaffold.ts first.` +
         `\nWorking directory: ${process.cwd()}`,
@@ -421,9 +389,6 @@ async function main() {
     process.exit(2);
   }
 
-  // A prior-findings path that cannot be read is a hard error, never a silent
-  // fall-back to a first-round bundle: the reviewer would re-file every already
-  // dispositioned finding as P1 and the caller would loop on it again.
   let prior: string | undefined;
   if (args.priorFindings) {
     try {
@@ -441,8 +406,6 @@ async function main() {
     priorPasses: args.priorPasses,
   });
 
-  // --print: emit the exact instructions+bundle and stop. The Opus reviewer
-  // subagent consumes this, so it must be clean (no file-list header on stdout).
   if (args.print) {
     process.stdout.write(prompt);
     process.exit(0);

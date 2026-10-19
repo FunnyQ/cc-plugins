@@ -12,6 +12,7 @@ import {
   rm,
   writeFile,
   readFile,
+  readdir,
   chmod,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -24,9 +25,6 @@ let originalHome: string | undefined;
 let fakeCodex: string;
 let argsLog: string;
 
-// A fake `codex` CLI: records its argv + stdin, then writes a canned "last
-// message" to the path after `-o`. Lets us assert the wrapper's contract
-// (mode flags, stdin piping, -o capture) without the real CLI.
 const FAKE = `#!/usr/bin/env bun
 import { writeFileSync, readFileSync } from "node:fs";
 const argv = process.argv.slice(2);
@@ -36,12 +34,14 @@ const oi = argv.indexOf("-o");
 if (oi !== -1) writeFileSync(argv[oi + 1], "CODEX SAYS: did the thing");
 `;
 
-beforeAll(async () => {
-  dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
-  // Every spawn inherits this HOME, so the developer's own relay config never
-  // reaches a test that expects the wrapper default.
+function isolateHomeFromDeveloperRelayConfig() {
   originalHome = process.env.HOME;
   process.env.HOME = dir;
+}
+
+beforeAll(async () => {
+  dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
+  isolateHomeFromDeveloperRelayConfig();
   fakeCodex = join(dir, "fake-codex.ts");
   argsLog = join(dir, "args.json");
   await writeFile(fakeCodex, FAKE);
@@ -53,7 +53,6 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-// CODEX_BIN must be a single executable; wrap the fake bun script as one.
 let codexBin: string;
 beforeAll(async () => {
   codexBin = join(dir, "codex");
@@ -133,20 +132,20 @@ describe("codex-run model selection", () => {
       stdin: Buffer.from("x"),
       stdout: "pipe",
       stderr: "pipe",
-      // CODEX_MODEL is cleared rather than inherited: a developer who exports it
-      // would otherwise see the default test pass against their own value.
-      env: {
-        ...process.env,
-        CODEX_BIN: codexBin,
-        ARGS_LOG: argsLog,
-        CODEX_MODEL: model ?? "",
-      },
+      env: envIgnoringDeveloperCodexModel(model),
     });
   }
 
-  // The split is the point: the cheap model writes, the strong one reviews. A single
-  // default for both modes would silently undo that on every flight.
-  test("defaults per mode — sol writes, astra reviews", async () => {
+  function envIgnoringDeveloperCodexModel(model?: string) {
+    return {
+      ...process.env,
+      CODEX_BIN: codexBin,
+      ARGS_LOG: argsLog,
+      CODEX_MODEL: model ?? "",
+    };
+  }
+
+  test("defaults per mode — the cheap model writes, the strong one reviews", async () => {
     for (const [mode, model] of [
       ["delegate", "gpt-6.1-sol"],
       ["review", "gpt-6-astra"],
@@ -204,7 +203,6 @@ describe("codex-run model selection", () => {
       }
     });
 
-    // The flag is how a model picked at autopilot's setup question arrives.
     test("--model and CODEX_MODEL both beat the relay config", async () => {
       await writeRelayConfig({ codex: { delegate: "gpt-6.1-sol" } });
       expect(spawn(["delegate", "--model", "gpt-6-astra"]).success).toBe(true);
@@ -258,6 +256,18 @@ describe("codex-run errors", () => {
     expect(res.stderr.toString()).toContain("Usage:");
   });
 
+  test("a failing run still removes its scratch dir, so run never calls process.exit", async () => {
+    const tmp = await mkdtemp(join(dir, "tmp-"));
+    const res = Bun.spawnSync(["bun", SCRIPT, "delegate"], {
+      stdin: Buffer.from("   \n"),
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, TMPDIR: tmp, CODEX_BIN: codexBin, ARGS_LOG: argsLog },
+    });
+    expect(res.exitCode).toBe(2);
+    expect(await readdir(tmp)).toEqual([]);
+  });
+
   test("empty prompt → exit 2", () => {
     const res = Bun.spawnSync(["bun", SCRIPT, "delegate"], {
       stdin: Buffer.from("   \n"),
@@ -269,9 +279,6 @@ describe("codex-run errors", () => {
   });
 });
 
-// The wrappers are autopilot's headless path and nothing else calls them, so the
-// contract is unconditional here — relay's --no-ask covers the live path, and
-// between them no agent is left to paraphrase the rule away.
 describe("codex-run unattended contract", () => {
   test("every prompt reaches the CLI carrying the no-ask contract", async () => {
     for (const mode of ["delegate", "review"]) {

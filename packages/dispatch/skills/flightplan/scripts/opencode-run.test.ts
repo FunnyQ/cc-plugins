@@ -25,10 +25,6 @@ let originalHome: string | undefined;
 let fakeOpencode: string;
 let argsLog: string;
 
-// A fake `opencode` CLI: records its argv, then emits a JSONL event stream on
-// stdout (the same shape `opencode run --format json` produces). Lets us assert
-// the wrapper's contract (run flags, model, prompt positional, JSONL parsing)
-// without the real CLI.
 const FAKE = `#!/usr/bin/env bun
 import { writeFileSync } from "node:fs";
 writeFileSync(process.env.ARGS_LOG, JSON.stringify(process.argv.slice(2)));
@@ -55,7 +51,6 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-// OPENCODE_BIN must be a single executable; wrap the fake bun script as one.
 let opencodeBin: string;
 beforeAll(async () => {
   opencodeBin = join(dir, "opencode");
@@ -80,7 +75,6 @@ describe("opencode-run delegate", () => {
     );
     expect(res.success).toBe(true);
     const out = res.stdout.toString();
-    // JSONL text parts are concatenated by parseJsonl.
     expect(out).toContain("OPENCODE SAYS: did the thing");
     expect(out).toContain("changed files (git status --short)");
 
@@ -89,7 +83,6 @@ describe("opencode-run delegate", () => {
     expect(args).toContain(DEFAULT_MODEL.delegate);
     expect(args).toContain("--format");
     expect(args).toContain("json");
-    // delegate sends the raw prompt as the final positional (no read-only guard).
     expect(args[args.length - 1]).toContain("implement task UI-03");
   });
 
@@ -190,7 +183,6 @@ describe("opencode-run model resolution", () => {
       expect(args).not.toContain(DEFAULT_MODEL.review);
     });
 
-    // The flag is how a model picked at autopilot's setup question arrives.
     test("--model beats the relay config", async () => {
       await writeRelayConfig({ opencode: { delegate: "acme/relay-pick" } });
       expect(spawn(["delegate", "--model", "acme/custom-1"]).success).toBe(

@@ -167,6 +167,25 @@ describe("flightlog CLI", () => {
   });
 });
 
+describe("progress CLI", () => {
+  test("an unrecorded task prints no attempts and exits 0, not an error", async () => {
+    const root = await mkdtemp(join(tmpdir(), "flightlog-progress-"));
+    const logFile = join(root, "run.jsonl");
+    const log = Bun.spawn(
+      ["bun", SCRIPT, "log", logFile, "--task", "ui/01", "--role", "dev", "--message", "hi"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(await log.exited).toBe(0);
+    const proc = Bun.spawn(["bun", SCRIPT, "progress", logFile, "--task", "ui/02"], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(await proc.exited).toBe(0);
+    expect(await new Response(proc.stdout).text()).toContain("no attempts recorded for ui/02");
+    await rm(root, { recursive: true });
+  });
+});
+
 describe("state CLI", () => {
   test("buildStateEntry preserves caller metadata without agent-turn fields", () => {
     const meta = { task: "ui/03", state: "blocked", ts: "fixed", agentLabel: "workflow", message: "Waiting" } satisfies Parameters<typeof buildStateEntry>[0];

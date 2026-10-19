@@ -453,6 +453,16 @@ describe("worktree lifecycle", () => {
     ).toBe(2);
   });
 
+  test("create replaces an unregistered leftover directory at its path", () => {
+    const options = fixture();
+    const path = join(rootOf(options), "work-tree-01");
+    put(path, "stale.txt", "stale\n");
+    const wt = create(options);
+    expect(wt.path).toBe(path);
+    expect(existsSync(join(path, "stale.txt"))).toBe(false);
+    expect(readFileSync(join(path, "a.txt"), "utf8")).toBe("base\n");
+  });
+
   test("sweep keep-all leaves state and registrations untouched; keep scopes removals to this slug", () => {
     const options = fixture();
     const first = create(options);

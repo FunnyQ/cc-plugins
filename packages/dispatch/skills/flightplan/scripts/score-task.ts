@@ -34,21 +34,16 @@ export type DimensionScore = {
   name: string;
   weight: number;
   score: number;
-  /** score × weight — the dimension's contribution to the weighted sum. */
   contribution: number;
 };
 
 export type ScoreResult = {
-  /** Weighted average on the 0–scaleMax scale. */
   weighted: number;
   passThreshold: number;
   passOp: ">" | ">=";
-  /** True only if the average meets the line, no veto fired, nothing missing. */
   passed: boolean;
-  /** True if the rubric's hard-fail dimension is at/below its veto value. */
   hardFailed: boolean;
   breakdown: DimensionScore[];
-  /** Dimensions declared by the rubric but absent from the scores input. */
   missing: string[];
 };
 
@@ -66,7 +61,6 @@ export function toJsonResult(result: ScoreResult): ScoreJsonResult {
   };
 }
 
-/** Apply a rubric's weighting + hard-fail veto to a set of per-dimension scores. */
 export function scoreTask(
   rubric: Rubric,
   scores: Record<string, number>,
@@ -121,7 +115,6 @@ export function scoreTask(
   };
 }
 
-/** Build a flightlog score entry from a verdict + run metadata (pure). */
 export function buildScoreEntry(
   result: ScoreResult,
   meta: {
@@ -154,13 +147,6 @@ export function buildScoreEntry(
   };
 }
 
-/**
- * Read the judge's rationale, warning rather than failing when it is missing.
- *
- * The verdict is already computed by the time this runs, and the judge call is
- * deliberately not retried (see the orchestrator's `resilient()` notes). Exiting
- * here would park a task that passed its rubric over a missing narrative field.
- */
 async function readRationale(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf-8");

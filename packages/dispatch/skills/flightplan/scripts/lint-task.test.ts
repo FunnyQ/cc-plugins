@@ -7,6 +7,7 @@ import {
   collectTaskFiles,
   inferRefFromPath,
   checkFinalReview,
+  resolveFinalReview,
   testCommandsIn,
   checkFinalReviewTestNet,
   extractTestPaths,
@@ -16,7 +17,6 @@ import {
 } from "./lint-task";
 import { parseTask, type ParsedTask } from "./lib/parse-task";
 
-// Minimal ParsedTask for graph checks — bucket/nn/dependsOn/finalReview read.
 const mk = (
   bucket: string,
   nn: string,
@@ -342,8 +342,6 @@ describe("lintFile", () => {
   });
 
   test("body with a deeper file path (not a sibling ref) → no violation", async () => {
-    // `assets/icons/03-logo.svg` has a bucket-like middle segment but is a real
-    // asset path, not a sibling task — the lookbehind must keep it off the radar.
     const ok = VALID_TASK.replace(
       "One sentence.",
       "Render the sprite from `assets/icons/03-logo.svg`.",
@@ -358,7 +356,6 @@ describe("lintFile", () => {
   });
 
   test("H1 bucket/NN mismatches file path → violation", async () => {
-    // File path says ui/01 but H1 claims API-99
     const bad = VALID_TASK.replace(
       "# UI-01: Fixture state shell",
       "# API-99: Bogus claim",
@@ -537,6 +534,18 @@ describe("lintFile", () => {
 });
 
 describe("testCommandsIn", () => {
+  test("counts a hyphen-suffixed runner such as pytest-cov, since a tighter boundary would also reject go test ./...", () => {
+    const task = VALID_TASK.replace(
+      "- [ ] Run `bun test`",
+      "- [ ] Run `pytest-cov src` and `go test ./...`",
+    );
+    const parsed = parseTask(task);
+    expect(parsed.ok && testCommandsIn(parsed.task)).toEqual([
+      "pytest-cov src",
+      "go test ./...",
+    ]);
+  });
+
   test("finds bun test command in Verification", () => {
     const task = VALID_TASK.replace(
       "- [ ] Run `bun test`",
@@ -809,19 +818,24 @@ describe("CLI test-net report", () => {
     await rm(root, { recursive: true });
   });
 
-  test("nonexistent path is an invocation error, not a violation tally", async () => {
+  test("nonexistent path exits 2 naming the cwd, not a violation tally that sends the caller to the task files", async () => {
     const result = await runCli(join(import.meta.dir, "no-such-tree/tasks"));
-    // Exit 2 separates "that path is not there" from exit 1's "your tree is
-    // bad". Reporting a missing path as "1 violation(s) in 1 file(s)" sent a
-    // caller whose cwd had drifted looking at task files instead of at cwd.
     expect(result.exitCode).toBe(2);
     expect(result.stderr).toContain("Not a lint failure");
     expect(result.stderr).not.toContain("violation(s) in");
-    // The absolute path and the cwd are what make the drift diagnosable.
     expect(result.stderr).toContain(
       join(import.meta.dir, "no-such-tree/tasks"),
     );
     expect(result.stderr).toContain("Working directory:");
+  });
+});
+
+describe("resolveFinalReview", () => {
+  test("picks the first marker in document order among equally-covering ones", () => {
+    const first = mk("review", "01", [["ui", "01"]], true);
+    const second = mk("qa", "01", [["ui", "01"]], true);
+    const tasks = [mk("ui", "01"), first, second];
+    expect(resolveFinalReview(tasks)?.task).toBe(first);
   });
 });
 
@@ -911,11 +925,7 @@ describe("checkFinalReview", () => {
     expect(v[0].rule).toBe("final-review-location");
   });
 
-  /**
-   * Coverage is the load-bearing rule; location is presentational. Reporting
-   * both at once would bury the one that actually breaks autopilot.
-   */
-  test("a miscovered final review reports coverage, not location", () => {
+  test("a miscovered final review reports coverage, not location, since coverage breaks the gate and location only obscures it", () => {
     const tasks = [
       mk("ui", "01"),
       mk("ingestion", "01"),
@@ -1027,10 +1037,7 @@ describe("checkFinalReviewTestNet", () => {
     expect(violations[0].detail).toContain("npm test");
   });
 
-  // Two markers: the stray one runs a test, the covering one does not. Judging
-  // the first marker in document order would call this tree clean and let the
-  // real closing gate ship with no test at all.
-  test("judges the covering marker, not the first one, when a tree has two", () => {
+  test("judges the covering marker, not the first one, when a tree has two, so the closing review cannot ship untested", () => {
     const tasks: ParsedTask[] = [
       {
         ...mk("feat", "01", [], false),
@@ -1142,10 +1149,7 @@ describe("scope-git-status rule", () => {
     expect(violations.some((v) => v.rule === "scope-git-status")).toBe(true);
   });
 
-  // The shape task-template.md used to recommend. It survives an exclusivity
-  // regex by wording alone, yet it still reads the whole tree — a parallel
-  // sibling's uncommitted edits fail a correct implementation.
-  test("flags a whole-tree check that only judges the other paths", async () => {
+  test("flags the old template's whole-tree check that only judges the other paths, which a parallel sibling's edits fail", async () => {
     const violations = await lintOne(
       withVerification(
         "- [ ] Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation.",
@@ -1239,9 +1243,7 @@ describe("scope-git-status rule", () => {
   });
 });
 
-// Autopilot commits between waves, so by the time the Final review runs every
-// earlier task's edits are committed and `git status` no longer lists them.
-describe("final-review-git-status rule", () => {
+describe("final-review-git-status rule: earlier waves are committed by the Final review", () => {
   const lintOne = async (body: string) => {
     const root = await writeTree({ "tasks/review/01-close.md": body });
     const violations = await lintFile(join(root, "tasks/review/01-close.md"));
@@ -1328,8 +1330,7 @@ describe("report-path rule", () => {
     expect(violations.some((v) => v.rule === "report-path")).toBe(false);
   });
 
-  // Outside the Final review, "the report" is usually a program's output, such as a CLI's stdout.
-  test("ignores a report criterion in a non-final task", async () => {
+  test("ignores a report criterion in a non-final task, where the report is usually a program's output", async () => {
     const violations = await lintOne(
       "- [ ] The report is written to **stdout** in whole-tree mode.",
       false,
@@ -1347,11 +1348,6 @@ describe("report-path rule", () => {
   });
 });
 
-// Declared file count is the one task-size proxy that predicted retries in the
-// field: over one 47-task flight the first-attempt retry rate rose monotonically
-// with it — 43% at <=8 declared files, 56% at 9-11, 70% at 12-14, 89% at >=15.
-// It counts what the PLANNER declared, not what the executor touched, because
-// the point is to regulate the plan while it is still cheap to split.
 describe("task-size advisory", () => {
   const filesSection = (n: number) =>
     Array.from({ length: n }, (_, i) => `- f${i}.ts (new) — thing ${i}`).join(
@@ -1394,8 +1390,6 @@ describe("task-size advisory", () => {
     const hit = violations.find((v) => v.rule === "task-size");
 
     expect(hit).toBeDefined();
-    // The message must name the fix, not just the number — the author is the
-    // only party who can act on it, and only while still writing the plan.
     expect(hit!.detail).toContain("12");
     expect(hit!.detail).toContain("split");
   });
@@ -1406,20 +1400,14 @@ describe("task-size advisory", () => {
     expect(violations.some((v) => v.rule === "task-size")).toBe(false);
   });
 
-  // The two run-time callers both lint single files and must never see this:
-  // autopilot's external-dev driver lints after the engine writes (and is told
-  // to repair until clean — size is not repairable by it), and the scout lints
-  // the whole tree before flying, where a violation would ground a correct plan
-  // authored before this rule existed.
-  test("is silent by default, so autopilot's driver and scout are unaffected", async () => {
+  test("is silent by default, since autopilot's driver cannot repair size and the scout would ground a plan authored before the rule", async () => {
     const violations = await lintDeclaring(20);
 
     expect(violations.some((v) => v.rule === "task-size")).toBe(false);
   });
 });
 
-// The edit hooks lint every task-shaped path, so authoring mode alone must pass a file that is not a flightplan task.
-describe("authoring header gate", () => {
+describe("authoring header gate: the edit hooks lint every task-shaped path, so authoring mode must pass a non-task file", () => {
   const lintBody = async (
     body: string,
     opts?: Parameters<typeof lintFile>[1],
@@ -1471,8 +1459,6 @@ describe("plan concurrency", () => {
   test("serial prose with no Max parallel header prints an advisory", async () => {
     const root = await treeWithPlan(`# Plan\n\n${SERIAL}\n`);
     const result = await runCli(join(root, "tasks"));
-    // Advisory, not a gate: plans whose serial wording is already carried by
-    // Depends on edges must still fly.
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("[serial-undeclared]");
     expect(result.stdout).toContain(SERIAL);
@@ -1480,7 +1466,6 @@ describe("plan concurrency", () => {
     await rm(root, { recursive: true });
   });
 
-  // The motivating plan kept its lock rule in _context/shared.md, not PLAN.md.
   test("serial prose in a context file prints the advisory too", async () => {
     const root = await treeWithPlan(
       "# Plan\n",
@@ -1584,9 +1569,7 @@ describe("human-gate", () => {
     expect(violations[0].detail).toContain("## Verification");
   });
 
-  test("the tag counts only at the head of the item", async () => {
-    // A tag accepted mid-text would let the linter and the verifier agent
-    // disagree about which items a person owes.
+  test("the tag counts only at the head of the item, so the linter and the verifier agent agree on which items a person owes", async () => {
     const violations = await lint(
       withGates(
         "- [ ] Sweep the pointer across the notch — (human) check",
@@ -1596,9 +1579,7 @@ describe("human-gate", () => {
     expect(violations.filter((v) => v.rule === "human-gate")).toEqual([]);
   });
 
-  test("a ticked human box still counts as human", async () => {
-    // Otherwise a task passes lint only after mark-done.ts ticks its boxes,
-    // which is exactly when nobody is reading the lint any more.
+  test("a ticked human box still counts as human, since mark-done.ts ticks every box after nobody reads the lint", async () => {
     const violations = await lint(
       withGates("- [x] (human) Sweep the notch", "- [ ] Run `bun test`"),
     );

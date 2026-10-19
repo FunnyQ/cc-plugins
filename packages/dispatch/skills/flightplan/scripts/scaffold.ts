@@ -25,10 +25,6 @@ import { join, resolve } from "node:path";
 
 export type CollisionResult = {
   exists: boolean;
-  /**
-   * The dir holds INTENT.md and nothing else — a captured intent waiting to be
-   * specced. Scaffolding into it is the intended flow, so `exists` stays false.
-   */
   intentOnly: boolean;
   suggestedAlt: string | null;
 };
@@ -47,12 +43,8 @@ export type ScaffoldResult = {
 };
 
 const SLUG_REGEX = /^[a-z][a-z0-9-]*$/;
-// BUCKETs must be a single kebab token (no internal dashes). The H1 parser
-// in lib/parse-task.ts treats BUCKET as one uppercase token, so dashed bucket
-// names would scaffold but never lint or appear in build-readme output.
 const BUCKET_REGEX = /^[a-z][a-z0-9]*$/;
 
-/** Check whether docs/<slug>/ exists. Returns a suggested alt slug if it does. */
 export async function checkCollision(
   slug: string,
   docsRoot = "docs",
@@ -64,8 +56,6 @@ export async function checkCollision(
   } catch {
     return { exists: false, intentOnly: false, suggestedAlt: null };
   }
-  // Dotfiles are ignored so a docs dir a Finder visit left a .DS_Store in still
-  // reads as intent-only.
   const meaningful = entries.filter((e) => !e.startsWith("."));
   if (meaningful.length === 1 && meaningful[0] === INTENT_FILE) {
     return { exists: false, intentOnly: true, suggestedAlt: null };
@@ -117,9 +107,6 @@ export async function scaffold(input: ScaffoldInput): Promise<ScaffoldResult> {
 
   const rootDir = join(input.docsRoot, input.slug);
 
-  // Ensure docsRoot exists, but create rootDir non-recursively so a TOCTOU
-  // race throws EEXIST instead of silently merging into an existing dir. An
-  // intent-only dir is the one root we are allowed to merge into.
   await mkdir(input.docsRoot, { recursive: true });
   if (!collision.intentOnly) {
     await mkdir(rootDir); // throws if rootDir already exists
@@ -207,10 +194,6 @@ async function main() {
       buckets: args.buckets,
       docsRoot: args.docsRoot,
     });
-    // Absolute, always. `docsRoot` defaults to the bare relative "docs", so
-    // echoing it back proves nothing about where the tree actually landed — a
-    // caller whose cwd drifted gets an identical success line for a tree built
-    // in the wrong repo subdirectory, and finds out several steps later.
     console.log(`Scaffolded ${resolve(result.rootDir)}`);
     for (const d of result.bucketDirs) console.log(`  + ${d}/`);
   } catch (err) {

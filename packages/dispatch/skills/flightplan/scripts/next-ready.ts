@@ -36,7 +36,6 @@ import { parseMaxParallel, readPlan } from "./lib/max-parallel";
 
 export type LoadError = { file: string; reason: string };
 
-/** A task that parsed but whose execution state is malformed. */
 export type InvalidTask = {
   ref: string;
   file: string;
@@ -47,19 +46,8 @@ export type InvalidTask = {
 export type LoadResult = {
   byRef: Record<string, ParsedTask>;
   pathByRef: Record<string, string>;
-  /**
-   * Every bucket directory under `tasks/`, in listing order. Carried here so
-   * the "a bucket is a directory that is not `_context`" rule lives once — a
-   * consumer that needs empty buckets never re-lists the tree itself.
-   */
   buckets: string[];
   errors: LoadError[];
-  /**
-   * Tasks that parsed but hold an invalid execution state (see `taskValidity`).
-   * They stay in `byRef` on purpose — the dashboard must render them as invalid
-   * rather than drop them — so every consumer decides for itself whether an
-   * invalid task is fatal. The CLI treats it as fatal.
-   */
   invalid: InvalidTask[];
 };
 
@@ -113,7 +101,6 @@ export async function loadAllTasks(tasksDir: string): Promise<LoadResult> {
   return { byRef, pathByRef, buckets: bucketNames, errors, invalid };
 }
 
-/** A ready task ref plus whether it is the closing final-review task. */
 export type ReadyRef = {
   ref: string;
   finalReview: boolean;
@@ -121,14 +108,6 @@ export type ReadyRef = {
   modelsRaw: string | null;
 };
 
-/**
- * Same ready set as `findReady`, but each entry carries its `finalReview`
- * flag and is pre-stringified. This is what the `--json` mode emits so an
- * executor (e.g. autopilot's scout) can consume the ready set verbatim —
- * without re-deriving `finalReview` by opening files (and without an LLM
- * having to interpret line-oriented output, where empty = "no ready tasks"
- * is easy to get wrong).
- */
 export function findReadyDetailed(
   byRef: Record<string, ParsedTask>,
   pathByRef: Record<string, string>,
@@ -144,10 +123,6 @@ export function findReadyDetailed(
   });
 }
 
-/**
- * Whole-tree status counts. `total` always equals the sum of the five buckets,
- * so a consumer can assert that identity instead of trusting the caller.
- */
 export type TreeCounts = {
   total: number;
   todo: number;
@@ -157,25 +132,12 @@ export type TreeCounts = {
   invalid: number;
 };
 
-/**
- * One authoritative snapshot of the tree: what is ready now, and how the whole
- * tree is distributed across statuses.
- *
- * autopilot's wave loop needs this because its own `completed` array only
- * covers the *current* run. A resumed run inherits `done` tasks from earlier
- * runs, so `completed.length === total` is never a completion test. `done ===
- * total` here is, because it counts the tree rather than the run.
- */
 export function summarizeTree(
   byRef: Record<string, ParsedTask>,
   pathByRef: Record<string, string>,
 ): {
   ready: ReadyRef[];
   counts: TreeCounts;
-  /**
-   * Every task that is not validly complete, so a stalled executor can name the
-   * remaining work instead of reporting a bare count.
-   */
   unfinished: { ref: string; state: keyof Omit<TreeCounts, "total"> }[];
 } {
   const counts: TreeCounts = {
@@ -192,8 +154,6 @@ export function summarizeTree(
   for (const [ref, task] of Object.entries(byRef)) {
     counts.total += 1;
     const validity = taskValidity(task);
-    // Invalid wins over the raw Status: a task claiming `done` over an unticked
-    // gate box must never be counted toward completion.
     let state: keyof Omit<TreeCounts, "total">;
     if (validity.kind === "invalid") state = "invalid";
     else if (task.status === "done") state = "done";
@@ -210,8 +170,6 @@ export function summarizeTree(
 
 export function findReady(byRef: Record<string, ParsedTask>): TaskRef[] {
   const ready: TaskRef[] = [];
-  // Built once, not per task: readiness is the same rule the dashboard reads, and
-  // it is expressed over nodes. See `unmetNodeDependencies`.
   const nodes = nodesFromParsedTasks(byRef);
   for (const [ref, task] of Object.entries(byRef)) {
     if (task.status !== "todo") continue;
@@ -236,13 +194,10 @@ async function main() {
   }
   const { byRef, pathByRef, errors, invalid } = await loadAllTasks(tasksDir);
 
-  // --summary reports before it exits: the caller needs the invalid refs to
-  // escalate, and a bare non-zero exit would hide them.
   if (summaryMode) {
     const { ready, counts, unfinished } = summarizeTree(byRef, pathByRef);
     const planPath = join(tasksDir, "..", "PLAN.md");
     let maxParallel: number | null = null;
-    // A tree without a PLAN.md beside it declares nothing, so nothing caps it.
     let plan: string | null = null;
     try {
       plan = await readPlan(planPath);
@@ -281,9 +236,6 @@ async function main() {
     process.exit(1);
   }
 
-  // An invalid task is not "not ready" — it is a tree whose completion state
-  // cannot be trusted. Returning a ready set here would either unlock work
-  // behind a fake `done`, or print an empty set that reads as "all finished".
   if (invalid.length > 0) {
     console.error(
       `Cannot compute ready tasks — ${invalid.length} task(s) have an invalid execution state:`,
@@ -295,8 +247,6 @@ async function main() {
   }
 
   if (jsonMode) {
-    // Always valid JSON — an empty ready set prints `[]`, never blank, so a
-    // consumer can't mistake "done" for "everything is ready".
     console.log(JSON.stringify(findReadyDetailed(byRef, pathByRef)));
   } else {
     for (const ref of findReady(byRef)) {

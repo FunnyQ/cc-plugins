@@ -45,24 +45,13 @@ export type Violation = {
   detail: string;
 };
 
-// Case-insensitive — catches "PLAN.md", "plan.md", "Plan.md".
 const PLAN_REF_REGEX = /\bplan\.md\b/i;
-// Sibling-task references: bucket/NN, bucket/NN-slug, bucket/NN-slug.md.
-// The lookbehind keeps us off the middle of deeper paths (`src/images/02`,
-// `foo-bar/01`) — only a bucket-like token NOT preceded by a path char counts.
 const SIBLING_TASK_REGEX =
   /(?<![\w/.-])([a-z][a-z0-9]*)\/(\d{2})(?:-([a-z0-9-]+))?(?:\.md)?\b/g;
-// Required reading must be exactly ../_context/<name>.md (sibling _context).
 const REQUIRED_READING_REGEX = /^\.\.\/_context\/[a-z0-9_-]+\.md$/;
-// Test-runner commands, matched at the head of a backticked span. The trailing
-// boundary keeps `bun testify` and `make tested` from counting as a suite.
-// It does NOT reject `pytest-cov`: `\b` matches between `t` and `-`, so a
-// hyphen-suffixed runner still counts. Left as-is — the false positives are
-// all plausible test invocations, and tightening it would reject `go test ./...`.
 const TEST_RUNNER_REGEX =
   /^(bun test|(?:npm|pnpm|yarn) (?:run )?test|cargo test|pytest|go test|rspec|make test)\b/;
 
-/** Checklist items of one section, each including its indented continuation lines. */
 function checklistItems(section: string): string[] {
   const lines = section.split("\n");
   const items: string[] = [];
@@ -84,10 +73,6 @@ function checklistItems(section: string): string[] {
   return items;
 }
 
-/**
- * Backticked commands in a task's `## Verification` section that invoke a known
- * test runner. Returns the command strings as written, in document order.
- */
 export function testCommandsIn(task: ParsedTask): string[] {
   const section = extractSection(task.body, "Verification");
   if (section === "") return [];
@@ -105,45 +90,22 @@ export function testCommandsIn(task: ParsedTask): string[] {
   return commands;
 }
 
-// An exclusivity claim next to a `git status` check. Autopilot edits the task
-// file itself — `Status: todo → in-progress`, then mark-done ticks every gate
-// box — so "only <file> is modified" is false from the first attempt onwards.
 const EXCLUSIVITY_REGEX = /\b(only|sole|nothing else|no other)\b/i;
-// A `git status` invocation anywhere in the item, backticked or bare.
 const GIT_STATUS_REGEX = /git status\b/;
-// Backticked spans that invoke it. Only a backticked span is read for a
-// pathspec: in bare prose ("run git status and quote it") every following word
-// would parse as an operand, so an unquoted gate is always treated as unscoped.
 const GIT_STATUS_SPAN_REGEX = /`([^`\n]*\bgit status\b[^`\n]*)`/g;
 
-/** True when a backticked `git status` command names at least one path operand. */
 function hasPathspec(span: string): boolean {
   const after = span.slice(span.indexOf("git status") + "git status".length);
-  // An operand is any token that is not an option flag. `--` itself is the
-  // separator, never the path — so `--short` and a lone `--` both fail here.
   return after
     .split(/\s+/)
     .some((token) => token !== "" && token !== "--" && !token.startsWith("-"));
 }
 
 export type ScopeGitStatusHit = {
-  /** First line of the offending checklist item. */
   item: string;
-  /** `unscoped` — no `--` pathspec; `exclusivity` — pathspec plus an exclusivity claim. */
   kind: "unscoped" | "exclusivity";
 };
 
-/**
- * Checklist items whose scope gate reads `git status` unsafely.
- *
- * A bare `git status` reports the WHOLE working tree, and under autopilot that
- * tree is never attributable to one task: siblings in the same wave leave their
- * legitimate edits uncommitted next to yours. So any gate without a `--`
- * pathspec is rejected outright — no wording survives that. A pathspec-limited
- * gate is fine, unless it also claims exclusivity over what it prints.
- *
- * Returns the offending items, first line only, in document order.
- */
 export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
   const hits: ScopeGitStatusHit[] = [];
   for (const heading of GATE_SECTIONS) {
@@ -153,7 +115,6 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
       if (!GIT_STATUS_REGEX.test(item)) continue;
       const first = item.split("\n")[0].trim();
       const spans = [...item.matchAll(GIT_STATUS_SPAN_REGEX)].map((m) => m[1]);
-      // Every invocation in the item must be narrowed, not just one of them.
       if (spans.length === 0 || !spans.every(hasPathspec)) {
         hits.push({ item: first, kind: "unscoped" });
       } else if (EXCLUSIVITY_REGEX.test(item)) {
@@ -167,7 +128,6 @@ export function scopeGitStatusChecks(task: ParsedTask): ScopeGitStatusHit[] {
 // `pgrep -f` reads every process on the machine, including other sessions'.
 const PGREP_REGEX = /\bpgrep\b([^`;|&\n]*)/g;
 
-// A `/` or a flag token (`--port`) anchors the pattern: only the task's own process carries it.
 export function scopePgrepChecks(task: ParsedTask): string[] {
   const hits: string[] = [];
   for (const heading of GATE_SECTIONS) {
@@ -189,7 +149,6 @@ export function scopePgrepChecks(task: ParsedTask): string[] {
   return hits;
 }
 
-/** Final review gate items that read `git status`, first line only, in document order. */
 export function finalReviewGitStatusItems(task: ParsedTask): string[] {
   if (!task.finalReview) return [];
   const hits: string[] = [];
@@ -201,11 +160,9 @@ export function finalReviewGitStatusItems(task: ParsedTask): string[] {
   return hits;
 }
 
-// "The report" with no backticked path: the verifier looks on disk and finds nothing to check.
 const REPORT_REGEX = /\bthe report\b/i;
 const PATH_SPAN_REGEX = /`[^`\n]*(?:\/|\.[a-z0-9]+\b)[^`\n]*`/i;
 
-/** Final review gate items that cite "the report" without naming its file, first line only. */
 export function unlocatedReportItems(task: ParsedTask): string[] {
   if (!task.finalReview) return [];
   const hits: string[] = [];
@@ -219,26 +176,8 @@ export function unlocatedReportItems(task: ParsedTask): string[] {
   return hits;
 }
 
-/**
- * The tag marking a gate item only a person can perform. It sits at the head of
- * the item, immediately after the checkbox: `- [ ] (human) sweep the pointer …`.
- * One fixed position, because the verifier agent and this linter have to read
- * the same items — a tag accepted anywhere in the text would let the two
- * disagree about which gate a person owes.
- */
 const HUMAN_GATE_REGEX = /^\s*[-*]\s+\[[ x]\]\s*\(human\)/i;
 
-/**
- * Gate sections in which every item is tagged `(human)`.
- *
- * The binary gate is the only thing between a task and a `done` it never
- * earned. A section where nothing is machine-checkable leaves that gate with no
- * work to do, so the task advances on an attestation alone — and `mark-done.ts`
- * then ticks every box, leaving a file that reads fully verified. So each gate
- * section that has items needs at least one a verifier can actually run.
- *
- * Returns the offending headings in `GATE_SECTIONS` order.
- */
 export function humanOnlyGateSections(task: ParsedTask): string[] {
   const hits: string[] = [];
   for (const heading of GATE_SECTIONS) {
@@ -251,11 +190,6 @@ export function humanOnlyGateSections(task: ParsedTask): string[] {
   return hits;
 }
 
-/**
- * Bullets under `## Files to create / modify`. Counts the PLANNER's declared
- * scope, not what an executor ends up touching — the number is only useful while
- * the plan is still being written, which is the only moment splitting is cheap.
- */
 export function countDeclaredFiles(body: string): number {
   const section = extractSection(body, "Files to create / modify");
   return (section.match(/^- /gm) ?? []).length;
@@ -272,20 +206,9 @@ export function countDeclaredFiles(body: string): number {
 export const MAX_DECLARED_FILES = 11;
 
 export type LintOptions = {
-  /**
-   * Authoring mode — adds judgment checks a plan's AUTHOR can act on. Off by
-   * default because both run-time callers lint single files and neither can act:
-   * autopilot's external-dev driver lints after the engine writes and is told to
-   * repair the file until clean (size is not repairable by it), and the scout
-   * lints the whole tree before flying, where a size violation would ground a
-   * correct plan authored before this rule existed. It also passes a file
-   * without the Required-reading header, since the edit hooks call it on every
-   * task-shaped path and only the header tells a flightplan task apart.
-   */
   authoring?: boolean;
 };
 
-// Both scaffolded forms: `**Required reading**:` and `**Required reading** (…):`. The `**` right after the label keeps `**Required reading later**:` out.
 const TASK_HEADER = /^> \*\*Required reading\*\*(\s*\([^)]*\))?\s*:/m;
 
 export async function lintFile(
@@ -312,7 +235,6 @@ export async function lintFile(
   }
   const task = parsed.task;
 
-  // Authoring-only size judgment — see LintOptions for why it is gated.
   if (options.authoring) {
     const declared = countDeclaredFiles(content);
     if (declared > MAX_DECLARED_FILES) {
@@ -324,7 +246,6 @@ export async function lintFile(
     }
   }
 
-  // Path vs H1 — the H1 claim must match where the file lives.
   const pathInfo = inferRefFromPath(filePath);
   if (pathInfo) {
     if (pathInfo.bucket !== task.bucket || pathInfo.nn !== task.nn) {
@@ -335,7 +256,6 @@ export async function lintFile(
     }
   }
 
-  // Status + completion state — one shared rule, see taskValidity().
   const validity = taskValidity(task);
   if (validity.kind === "invalid") {
     push(validity.rule, validity.reason);
@@ -346,7 +266,6 @@ export async function lintFile(
     push("models", "`fix` is legal only on the Final review task");
   }
 
-  // Required reading — exact shape ../_context/<name>.md and resolvable.
   if (task.requiredReading.length === 0) {
     push("required-reading", "no Required reading paths listed");
   } else {
@@ -376,7 +295,6 @@ export async function lintFile(
     }
   }
 
-  // Self-containment: body must not reference PLAN.md or sibling task files.
   if (PLAN_REF_REGEX.test(task.body)) {
     push(
       "self-containment",
@@ -391,7 +309,6 @@ export async function lintFile(
   SIBLING_TASK_REGEX.lastIndex = 0;
   while ((m = SIBLING_TASK_REGEX.exec(task.body)) !== null) {
     const fullMatch = m[0].replace(/\.md$/, "");
-    // Skip if it's referring to itself in any form.
     if (fullMatch === ownRef || fullMatch === ownRefSlug) continue;
     siblings.add(m[0]);
   }
@@ -402,7 +319,6 @@ export async function lintFile(
     );
   }
 
-  // Required sections
   const sectionSet = new Set(task.sections);
   if (!sectionSet.has("Acceptance criteria")) {
     push("sections", "missing `## Acceptance criteria` section");
@@ -456,8 +372,6 @@ export async function lintFile(
     );
   }
 
-  // Eval rubric — mandatory and machine-parseable (strict). Acceptance criteria
-  // is the binary gate; the rubric is the graded quality score on top of it.
   if (!sectionSet.has("Eval rubric")) {
     push(
       "rubric",
@@ -481,27 +395,6 @@ export async function lintFile(
   return violations;
 }
 
-/**
- * Tree-level check (whole-tree lint only): the plan must have a declared final
- * review that gates the whole deliverable. Two conditions, together:
- *
- *   1. **marker** — at least one task carries `> **Final review**: true`.
- *   2. **coverage** — one such marked task's transitive `Depends on` closure
- *      reaches every other task, so the review can't start until all the work
- *      is done and it sees the whole deliverable.
- *
- *   3. **location** — that task sits at `review/01`, its own reserved bucket.
- *
- * The marker says "this is the review" (not just a task that happens to be
- * terminal); coverage proves it actually reviews all results. Plans with one
- * task are exempt (nothing to gate).
- *
- * Rules 1 and 2 stay naming-agnostic: they resolve the closing task from the
- * marker and the graph, never from a bucket name. Rule 3 is the deliberate
- * exception, and it runs LAST for that reason — a plan that put its review in
- * the wrong bucket still gets told about a real coverage hole first, because
- * coverage breaks the gate while location only obscures it.
- */
 export function checkFinalReview(
   tasks: ParsedTask[],
   label: string,
@@ -541,18 +434,8 @@ export function checkFinalReview(
   return [];
 }
 
-/** The one ref the closing gate is allowed to occupy. */
 const FINAL_REVIEW_HOME = "review/01";
 
-/**
- * The one task both final-review rules judge: the marked task whose transitive
- * `Depends on` closure covers the most of the tree, and a covering one whenever
- * the tree has any. Returns null when no task carries the marker.
- *
- * Both rules resolve through this so a tree carrying more than one marker can
- * never have its coverage judged on one task and its test net on another —
- * which would let the actual closing review ship with no test at all.
- */
 export function resolveFinalReview(
   tasks: ParsedTask[],
 ): { task: ParsedTask; missing: string[] } | null {
@@ -561,7 +444,6 @@ export function resolveFinalReview(
 
   const byRef = new Map(tasks.map((t) => [refToString(t), t] as const));
 
-  // Transitive dependency closure of a task (cycle-safe).
   const closureOf = (t: ParsedTask): Set<string> => {
     const seen = new Set<string>();
     const stack = t.dependsOn.map(refToString);
@@ -581,26 +463,17 @@ export function resolveFinalReview(
     return tasks.map(refToString).filter((r) => r !== self && !closure.has(r));
   };
 
-  // Stable sort, so among equally-covering markers the first in document order
-  // wins — the same task the old `find` picked.
   return marked
     .map((task) => ({ task, missing: missingFor(task) }))
     .sort((a, b) => a.missing.length - b.missing.length)[0];
 }
 
-/**
- * Tree-level check (whole-tree lint only): when the plan has any test commands,
- * the closing final-review task must run one too. This is a presence guarantee
- * only: command strings cannot prove coverage breadth.
- */
 export function checkFinalReviewTestNet(
   tasks: ParsedTask[],
   label: string,
 ): Violation[] {
   if (tasks.length <= 1) return [];
 
-  // One `testCommandsIn` pass over the tree — it re-scans a whole section per
-  // call, so the commands are carried alongside their task from here on.
   const withTests = tasks
     .map((task) => ({ task, commands: testCommandsIn(task) }))
     .filter((row) => row.commands.length > 0);
@@ -609,8 +482,6 @@ export function checkFinalReviewTestNet(
   const resolved = resolveFinalReview(tasks);
   if (!resolved) return [];
   const marked = resolved.task;
-  // Membership is exactly "the closing review runs a test": it is in `withTests`
-  // iff it has at least one command.
   if (withTests.some((row) => row.task === marked)) return [];
 
   const missingFrom = withTests
@@ -633,10 +504,6 @@ export type TestNetReportRow = {
   paths: string[];
 };
 
-/**
- * Keep extraction crude because this report is advisory, not a shell parser or
- * a coverage gate.
- */
 export function extractTestPaths(command: string): string[] {
   const runner = TEST_RUNNER_REGEX.exec(command);
   if (!runner) return [];
@@ -648,14 +515,7 @@ export function extractTestPaths(command: string): string[] {
     .filter((token) => !token.startsWith("-"));
 }
 
-/**
- * Advisory view of which paths each task's test commands touch. One row per task
- * that runs at least one test; the final-review task sorts last so a reader
- * compares the closing gate against the tree above it. Returns [] when no task
- * in the tree runs a test at all.
- */
 export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[] {
-  // Describe the detected command strings only; advisory reach never becomes a gate.
   return tasks
     .map((task) => {
       const commands = testCommandsIn(task);
@@ -670,7 +530,6 @@ export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[] {
     .sort((a, b) => Number(a.finalReview) - Number(b.finalReview));
 }
 
-/** Render the rows as an indented, human-scannable block. Pure. */
 export function formatTestNetReport(rows: TestNetReportRow[]): string {
   const lines = ["Test net report:"];
   for (const row of rows) {
@@ -684,7 +543,6 @@ export function formatTestNetReport(rows: TestNetReportRow[]): string {
   return lines.join("\n");
 }
 
-/** Derive bucket + NN from a path like `.../tasks/ui/01-foo.md`. */
 export function inferRefFromPath(
   filePath: string,
 ): { bucket: string; nn: string } | null {
@@ -696,7 +554,6 @@ export function inferRefFromPath(
   return { bucket, nn: match[1] };
 }
 
-/** Return the lines of body that belong to a given `## Heading` section. */
 function extractSection(body: string, heading: string): string {
   const lines = body.split("\n");
   const start = lines.findIndex(
@@ -713,7 +570,6 @@ function extractSection(body: string, heading: string): string {
   return lines.slice(start + 1, end).join("\n");
 }
 
-/** Collect task-file paths under a tasks/ dir, skipping _context/ and README. */
 export async function collectTaskFiles(tasksDir: string): Promise<string[]> {
   const out: string[] = [];
   const entries = await readdir(tasksDir, { withFileTypes: true });
@@ -794,12 +650,6 @@ async function resolveInputs(
     try {
       info = await stat(arg);
     } catch {
-      // A path named on the command line that does not exist is a bad
-      // invocation, not a content defect. Feeding it through lintFile turned it
-      // into a `read` violation counted in the same tally as a broken rubric,
-      // so "you are in the wrong directory" printed as "1 violation(s) in 1
-      // file(s)" — which reads as a damaged tree and sends the caller looking
-      // at task files instead of at their cwd.
       missing.push(arg);
       continue;
     }
@@ -870,7 +720,6 @@ async function main() {
     reportAll(concurrency.violations);
     if (concurrency.advisory) console.log(concurrency.advisory);
     const rows = testNetReport(parsed);
-    // Keep this on stdout and before exit: it cannot affect total or disappear on failure.
     if (rows.length > 0) console.log(formatTestNetReport(rows));
   }
 
