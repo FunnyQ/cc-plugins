@@ -1,21 +1,14 @@
 #!/bin/bash
-# PreToolUse hook: ask before git commits on configured protected branches.
-# `.chronicle/pr.json` is authoritative; local git-flow config is a legacy fallback.
 
 set -euo pipefail
 
 input=$(cat)
-# This hook runs before every Bash call, so skip the jq spawn on the raw payload
-# first. A superset of line 13's test: no "commit" substring, no git commit.
 if [[ "$input" != *commit* ]]; then
   exit 0
 fi
 
-# Fail open if jq is missing or the payload isn't parseable — a branch guard must
-# never break every Bash command just because jq isn't installed.
 command=$(echo "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
 
-# Only care about git commit commands (commit-command.test.ts holds this equal to commit-command.ts)
 if [[ ! "$command" =~ git[[:space:]]+commit ]]; then
   exit 0
 fi
@@ -29,10 +22,6 @@ if [[ -n "$repo_root" && -f "$pr_config" ]] && command -v jq >/dev/null 2>&1; th
   if [[ "$workflow" == "github-flow" ]]; then
     protected_branch=$(jq -r '.base // empty' "$pr_config" 2>/dev/null || true)
     if [[ -n "$protected_branch" && "$branch" == "$protected_branch" ]]; then
-      # A GitHub Flow repo has one long-lived branch, so `/chronicle:release`
-      # commits the bump on the base by design. Exempt that one subject — every
-      # other commit on the base still asks. Git Flow gets no such exemption: its
-      # release commit belongs on develop, so one on production stays suspicious.
       if [[ "$command" == *"🔧 release:"* ]]; then
         exit 0
       fi
@@ -55,7 +44,6 @@ EOF
   fi
 fi
 
-# Backward compatibility for repos that still use local git-flow config.
 develop_branch=$(git config --get gitflow.branch.develop 2>/dev/null || true)
 if [ -z "$develop_branch" ]; then
   exit 0

@@ -13,7 +13,7 @@ function fakeFetch(answers: Record<string, unknown>, status = 200) {
 
 const questions = { q: { type: "noul" as const, instructions: "Is it?" } };
 
-describe("askJev", () => {
+describe("askJev returns every failure as a value, never a throw, since a flow must finish without Jev", () => {
   test("reports a missing key and never calls fetch", async () => {
     const { impl, calls } = fakeFetch({});
     for (const apiKey of [undefined, ""]) {

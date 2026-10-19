@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -82,7 +82,7 @@ describe("check-branch", () => {
     expect(runHook().stdout.toString()).toContain('"permissionDecision":"ask"');
   });
 
-  test("exempts a Chronicle release commit on the GitHub Flow base", () => {
+  test("exempts a Chronicle release commit on the GitHub Flow base, since that flow's one long-lived branch is where the release bump lands", () => {
     writePrConfig({ workflow: "github-flow", base: "main" });
 
     const result = runHook(
@@ -93,7 +93,7 @@ describe("check-branch", () => {
     expect(result.stdout.toString()).toBe("");
   });
 
-  test("still asks for a release commit on the Git Flow production branch", () => {
+  test("still asks for a release commit on the Git Flow production branch, since Git Flow releases belong on develop", () => {
     writePrConfig({
       workflow: "git-flow",
       production: "main",
@@ -103,6 +103,31 @@ describe("check-branch", () => {
     expect(
       runHook(`git commit -m "🔧 release: chronicle 0.9.3"`).stdout.toString(),
     ).toContain('"permissionDecision":"ask"');
+  });
+
+  test("fails open when jq is missing or the payload is unparseable, so the guard never breaks every Bash command", () => {
+    writePrConfig({ workflow: "github-flow", base: "main" });
+    const bin = mkdtempSync(join(tmpdir(), "chronicle-no-jq-"));
+    for (const tool of ["git", "cat"]) {
+      symlinkSync(Bun.which(tool)!, join(bin, tool));
+    }
+    const noJq = Bun.spawnSync([Bun.which("bash")!, hook], {
+      cwd: repo,
+      env: { PATH: bin },
+      stdin: new TextEncoder().encode(
+        JSON.stringify({ tool_input: { command: "git commit -m test" } }),
+      ),
+    });
+    const unparseable = Bun.spawnSync(["bash", hook], {
+      cwd: repo,
+      stdin: new TextEncoder().encode("{ git commit"),
+    });
+    Bun.spawnSync(["trash", bin]);
+
+    expect(noJq.exitCode).toBe(0);
+    expect(noJq.stdout.toString()).toBe("");
+    expect(unparseable.exitCode).toBe(0);
+    expect(unparseable.stdout.toString()).toBe("");
   });
 
   test("ignores commands that do not commit", () => {

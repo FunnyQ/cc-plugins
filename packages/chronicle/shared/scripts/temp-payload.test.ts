@@ -16,7 +16,7 @@ describe("writeTempPayload", () => {
     written.push(path);
 
     expect(dirname(path)).toBe(`${TEMP_ROOT}/adr-test`);
-    expect(basename(path)).toMatch(/^sample-\d+-\d+\.json$/);
+    expect(basename(path)).toMatch(/^sample-\d+-\d+-\d+\.json$/);
     expect(existsSync(path)).toBe(true);
     expect(await Bun.file(path).text()).toBe('{\n  "a": 1\n}\n');
   });
@@ -26,5 +26,15 @@ describe("writeTempPayload", () => {
     written.push(path);
 
     expect(await Bun.file(path).json()).toEqual([{ id: "x" }]);
+  });
+
+  test("gives two payloads written by one process in the same millisecond distinct paths", async () => {
+    const paths = await Promise.all([
+      writeTempPayload("adr-test", "twice", 1),
+      writeTempPayload("adr-test", "twice", 2),
+    ]);
+    written.push(...paths);
+
+    expect(new Set(paths).size).toBe(2);
   });
 });

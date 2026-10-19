@@ -17,7 +17,7 @@ const spy = {
   register: (on: On) => void;
 };
 
-// Stands for the repo: `git` answers from `branch` and `gitConfig`, and `.chronicle/pr.json` holds `pr` when given. A noun answering a primitive answers `{ value }`.
+// A noun answering a primitive answers `{ value }`.
 function repo(
   on: On,
   opts: {
@@ -137,7 +137,7 @@ test(
 );
 
 test(
-  "exempts a Chronicle release commit on the GitHub Flow base",
+  "exempts a Chronicle release commit on the GitHub Flow base, since that flow's one long-lived branch is where the release bump lands",
   { plugins: [spy] },
   async ($, on) => {
     repo(on, { pr: { workflow: "github-flow", base: "main" } });
@@ -149,7 +149,7 @@ test(
 );
 
 test(
-  "still asks for a release commit on the Git Flow production branch",
+  "still asks for a release commit on the Git Flow production branch, since Git Flow releases belong on develop",
   { plugins: [spy] },
   async ($, on) => {
     repo(on, {

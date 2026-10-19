@@ -1,9 +1,7 @@
 /**
- * check-branch as a Claude Code mod: the matcher rejects every Bash call that
- * is not a git commit before the hook runs, so an ordinary command spawns
- * nothing. It hooks `classic.PreToolUse` rather than `tool.call` because only
- * the classic result can ask; `tool.call` can pass or deny and nothing else.
- * OpenCode keeps check-branch.sh, since it has no function hooks.
+ * check-branch as a Claude Code mod. It hooks `classic.PreToolUse` rather than
+ * `tool.call` because only the classic result can ask; `tool.call` can pass
+ * or deny and nothing else. OpenCode keeps check-branch.sh, since it has no function hooks.
  */
 
 import type { Register } from "claude-code";
@@ -41,7 +39,6 @@ export const register: Register = (on) => {
         }
 
         if (config.workflow === "github-flow") {
-          // A GitHub Flow repo has one long-lived branch, so `/chronicle:release` commits the bump on the base by design.
           if (!config.base || branch !== config.base) return;
           if (e.command.includes("🔧 release:")) return;
           return `⚠️ You're on \`${branch}\`, the configured GitHub Flow PR base. Commit from a topic branch, or confirm explicitly before retrying.`;

@@ -1,9 +1,3 @@
-/**
- * One call to TypeSafe's Jev model. Every outcome — no key, an HTTP error, a
- * timeout, a partial answer — comes back as a value, never a throw, because Jev
- * only ever sharpens a step the flow can finish without it.
- */
-
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
 const TIMEOUT_MS = 5_000;
@@ -22,7 +16,6 @@ export type JevAnswer = {
   noul?: number;
 };
 
-/** `ms` is the round trip, so the user sees what the call cost this run. */
 export type JevResult =
   | { answers: Record<string, JevAnswer>; ms: number }
   | { skipped: string; ms?: number };

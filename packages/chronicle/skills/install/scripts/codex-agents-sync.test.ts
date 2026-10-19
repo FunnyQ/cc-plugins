@@ -10,7 +10,6 @@ const pluginRoot = resolve(import.meta.dir, "../../..");
 const claudeDir = join(pluginRoot, "agents");
 const codexDir = join(pluginRoot, "agents-codex");
 
-// sonnet → terra and haiku → luna is the tier mapping every role already follows.
 const CODEX_MODEL: Record<string, string> = {
   sonnet: "gpt-5.6-terra",
   haiku: "gpt-5.6-luna",

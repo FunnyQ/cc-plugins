@@ -91,8 +91,6 @@ describe("setup-codex-agents", () => {
     expect(config.match(/\[agents\.chronicle_lawspeaker\]/g)).toHaveLength(1);
   });
 
-  // Enumerating RETIRED_ROLES is the point: a hand-listed sample here would have
-  // gone on passing while an upgrade left the newest retired role installed.
   it("removes retired role files and preserves unrelated files", () => {
     const targetDir = join(codexHome, "agents", "chronicle");
     Bun.spawnSync(["mkdir", "-p", targetDir]);
