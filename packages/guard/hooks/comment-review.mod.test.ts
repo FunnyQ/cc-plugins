@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { expect, mock, test } from "claude-code/testing";
-import { CLEAN, MARK } from "./reviewer.ts";
+import { CLEAN, MARK, REVIEWER_PROMPT } from "./reviewer.ts";
 
 const REPORT = "🧹 comment-sweep: 1 comment block(s), 3 lines, in app.ts.";
 const turn = { turnId: "t", text: "go" };
@@ -209,4 +209,33 @@ test("only guard's own spawn of its reviewer skips the permission check", async 
     input: { subagent_type: "guard:comment-reviewer", prompt: "x" },
   } as never);
   expect(check.decision).toBe("ask");
+});
+
+test("the reviewer's hand-back is refused, so its report reaches no card", async ($, on) => {
+  const w = world(on, { report: REPORT });
+  on("tool.call", () => ({ result: {}, text: "delivered" }) as never);
+  await $.turn.start(turn);
+  await $.turn.complete(end);
+  const ran = await $.tool.call({
+    tool: "SubagentHandback",
+    agentId: "r1",
+    report: "x",
+  } as never);
+  expect((ran as { deny?: string }).deny).toContain("final message");
+  expect(w.spawns).toHaveLength(1);
+});
+
+test("another agent's hand-back goes through", async ($, on) => {
+  world(on, { report: REPORT });
+  on("tool.call", () => ({ result: {}, text: "delivered" }) as never);
+  const ran = await $.tool.call({
+    tool: "SubagentHandback",
+    agentId: "other",
+    report: "x",
+  } as never);
+  expect((ran as { deny?: string }).deny).toBeUndefined();
+});
+
+test("the reviewer is told to skip a + line that is not a comment", () => {
+  expect(REVIEWER_PROMPT).toContain("not a comment");
 });

@@ -84,6 +84,18 @@ export const register: Register = (on) => {
     return own ? { decision: "allow" } : next(e);
   });
 
+  // A hand-back drew the report as an agent card and handed it to the main agent a turn before the delivery prompt, which then answered it twice (seen live).
+  // `as never`: the harness adds this tool to subagents, so the 2.1.303 types list no such name.
+  on("tool.call", { tool: "SubagentHandback" as never }, async ($, e, next) => {
+    const { agentId } = e as { agentId?: string };
+    if (!agentId) return next(e);
+    const agents = await $.agent.list();
+    if (agents.find((a) => a.id === agentId)?.type !== AGENT) return next(e);
+    return {
+      deny: "Do not hand back. Reply with your verdict lines as your final message instead.",
+    };
+  });
+
   on("turn.start", async ($, e, next) => {
     if (e.agentId) return next(e);
     await $.state.set(OWN_TURN, e.text.includes(MARK));

@@ -21,11 +21,14 @@ A line tagged [suppression] silences a lint or type rule. Look the rule up. If i
 
 A line tagged [constraint] (IMPORTANT, do not remove, talk to X before) is scent, not proof. Read the code it guards. If the claim is false today, DELETE. If it is true, the verdict is MUST KILL with the cheapest test, type, runtime check or lint that would enforce it instead.
 
+A + line that is not a comment — code, or a string literal that only looks like one, such as a test fixture — gets no verdict: leave it out of your reply.
+
 Read the surrounding code before judging; a claim that is not obvious there must be checked, not trusted. When you are unsure a KEEP reason applies, the verdict is DELETE. Never shorten a comment into a smaller excuse. Flag only lines inside the ranges you are given.
 
 Reply with one line per + line, nothing else:
 <file>:<line> KEEP|DELETE|MUST KILL <symbol> — <one-line reason>
-If every line is KEEP, reply with exactly: ${CLEAN}`;
+If every line is KEEP or gets no verdict, reply with exactly: ${CLEAN}
+Your final message is your report. Do not call SubagentHandback.`;
 
 export function reviewTask(report: string): string {
   return `Review these comment lines, added during the last turn. Paths are relative to the repository root.\n\n${report}`;
