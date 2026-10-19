@@ -66,6 +66,34 @@ describe("scan with paths", () => {
     expect(counts).toEqual([SHARD_BLOCKS, 5]);
   });
 
+  test("a file and its test share a report, so parallel appliers never edit one test file", () => {
+    for (let i = 0; i < SHARD_BLOCKS - 1; i++)
+      put(`many/a${i}.ts`, "// c\nconst x = 1;\n");
+    put("many/b.test.ts", "// c\n");
+    put("many/b.ts", "// c\n");
+    const out = scan(repo, ["many"]);
+    const home = out.reports.find((r) => r.includes("many/b.ts:"));
+    expect(home).toContain("many/b.test.ts:");
+  });
+
+  test("the CLI pairs every report with the verdicts file its reviewer writes", () => {
+    for (let i = 0; i < SHARD_BLOCKS + 1; i++)
+      put(`many/f${i}.ts`, "// c\nconst x = 1;\n");
+    const cli = join(import.meta.dir, "scan.ts");
+    const out = Bun.spawnSync(["bun", cli, "many"], {
+      cwd: repo,
+      stdout: "pipe",
+    })
+      .stdout.toString()
+      .split("\n")
+      .filter((l) => l.startsWith("report "));
+    expect(out).toHaveLength(2);
+    for (const line of out)
+      expect(line).toMatch(
+        /^report (\S+)\/report-(\d)\.txt verdicts \1\/verdicts-\2\.txt$/,
+      );
+  });
+
   test("a file holding more blocks than SHARD_BLOCKS gets a report of its own", () => {
     put("big.ts", "// c\nconst x = 1;\n".repeat(SHARD_BLOCKS + 1));
     put("small.ts", "// c\n");

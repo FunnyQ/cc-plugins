@@ -23,12 +23,15 @@ Spawn reviewers that did not write the comments. Act on the verdicts they return
    Pass the user's paths through unchanged. With no paths, the scan covers the changes since HEAD.
    - On `no comments`, say so and stop.
    - On `refused`, relay the line and stop. Never split the scope yourself; `scan.ts` alone splits it.
-   - Otherwise, the scan prints a summary and one `report <path>` line per shard.
-2. Spawn one agent per report, all in one message, with `subagent_type: "guard:comments-reaper"`. Give each its report path, never the report text: `Read the report at <path> and judge every line marked +. Paths in it are relative to the repository root, <root>.`
+   - Otherwise, the scan prints a summary and one `report <path> verdicts <path>` line per shard. A file and its test always share a shard.
+2. Spawn one agent per report, all in one message, with `subagent_type: "guard:comments-reaper"`. Give each its two paths, never the report text: `Read the report at <report> and judge every line marked +. Write your verdicts to <verdicts>. Paths in the report are relative to the repository root, <root>.`
    - If that agent type is missing, spawn generic agents instead. Tell each to read `{SKILL_DIR}/../../agents/comments-reaper.md` and obey everything below its frontmatter, then give it the same task.
-3. Audit each verdict before acting on it. Reject a verdict that misreads the code or names a line outside its report. Reject a `DELETE` whose comment says why rather than what.
-   - Delete the accepted `DELETE` lines.
-   - For a `MUST KILL`, write the named test, type, lint rule, assertion or rename when it stays inside the scanned files, then delete the comment. A new test must fail with the rule broken. Otherwise, list it for the user and leave the code.
+   - A reviewer that fails or writes no verdicts file gets one respawn with the same task. Never retype its verdicts yourself.
+3. Act on the verdicts. With one report, read its verdicts file and audit it yourself as below. With several, spawn one generic agent per verdicts file, all in one message, with `model: "opus"` and `effort: "low"`. Tell each to read `{SKILL_DIR}/SKILL.md` and follow steps 3 and 4 for one report, to edit only the files its report names and their tests, and never to stash or commit; give it the report and verdicts paths. Shards never share a file, so the agents never collide.
+
+   Audit each verdict against the code before acting on it. Reject a verdict that misreads the code or names a line outside its report. Reject a `DELETE` of history or a rejected alternative a reader would otherwise retry.
+   - Delete the accepted `DELETE` lines. A `DELETE` justified by a test must leave the comment's why in that test's title; rename the test first when it does not.
+   - For a `MUST KILL`, write the named test, type, lint rule, assertion or rename when it stays inside the scanned files, then delete the comment. Break the rule and watch a new test fail before you restore it. When a verdict shows the comment is false, make it true or delete it. Otherwise, list it for the user and leave the code.
    - Leave `KEEP` lines alone.
    - On `CLEAN`, change nothing.
 4. Run the tests and the typecheck for the files you changed.

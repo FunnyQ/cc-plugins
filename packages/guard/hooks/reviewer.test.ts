@@ -16,5 +16,5 @@ test("the reviewer is told to skip a + line that is not a comment", () => {
 });
 
 test("the agent file's all-clear reply is the one the mod matches", () => {
-  expect(promptBody(agentFile)).toContain(`reply with exactly: ${CLEAN}`);
+  expect(promptBody(agentFile)).toContain(`your verdicts are exactly: ${CLEAN}`);
 });

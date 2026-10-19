@@ -7,7 +7,8 @@
  *
  *   bun scan.ts [path ...]
  *
- * Prints a one-line summary and one `report <path>` line per shard, never a report.
+ * Prints a one-line summary and one `report <path> verdicts <path>` line per
+ * shard, never a report. A file and its test always share a shard.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -130,13 +131,21 @@ export function scan(cwd: string, paths: string[]): Scan {
       refused: `${blocks} comment blocks, over the ${MAX_BLOCKS}-block limit; name a narrower path`,
     };
   }
-  const shards: { report: string[]; blocks: number }[] = [];
+  const units = new Map<string, { report: string[]; blocks: number }>();
   for (const f of found) {
+    const stem = f.file.replace(/\.(mod\.)?(test|spec)(?=\.[^./]+$)/, "");
+    const unit = units.get(stem) ?? { report: [], blocks: 0 };
+    unit.report.push(f.report);
+    unit.blocks += f.blocks;
+    units.set(stem, unit);
+  }
+  const shards: { report: string[]; blocks: number }[] = [];
+  for (const u of units.values()) {
     const last = shards.at(-1);
-    if (last && last.blocks + f.blocks <= SHARD_BLOCKS) {
-      last.report.push(f.report);
-      last.blocks += f.blocks;
-    } else shards.push({ report: [f.report], blocks: f.blocks });
+    if (last && last.blocks + u.blocks <= SHARD_BLOCKS) {
+      last.report.push(...u.report);
+      last.blocks += u.blocks;
+    } else shards.push({ report: [...u.report], blocks: u.blocks });
   }
   return {
     files: found.length,
@@ -166,6 +175,6 @@ if (import.meta.main) {
   out.reports.forEach((report, i) => {
     const reportPath = join(dir, `report-${i + 1}.txt`);
     writeFileSync(reportPath, report);
-    console.log(`report ${reportPath}`);
+    console.log(`report ${reportPath} verdicts ${join(dir, `verdicts-${i + 1}.txt`)}`);
   });
 }
