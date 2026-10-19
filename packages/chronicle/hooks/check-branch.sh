@@ -3,9 +3,6 @@
 set -euo pipefail
 
 input=$(cat)
-if [[ "$input" != *commit* ]]; then
-  exit 0
-fi
 
 command=$(echo "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
 
