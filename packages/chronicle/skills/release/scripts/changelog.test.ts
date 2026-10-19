@@ -81,7 +81,7 @@ describe("validateEntries", () => {
     expect(validateEntries(good, facts)).toEqual([]);
   });
 
-  test("names a commit the draft never accounted for", () => {
+  test("names a commit the draft never accounted for, since a changelog is immutable once its tag is pushed", () => {
     const draft: EntryDraft[] = [
       { ...good[0]!, sections: { Added: good[0]!.sections.Added! } },
     ];
@@ -257,7 +257,7 @@ describe("classifyJudged", () => {
 });
 
 describe("gatherFacts", () => {
-  test("fails loudly on a bad range instead of reporting no commits", async () => {
+  test("fails loudly on a bad range instead of reporting no commits that an empty entry would pass", async () => {
     await expect(
       gatherFacts([
         {

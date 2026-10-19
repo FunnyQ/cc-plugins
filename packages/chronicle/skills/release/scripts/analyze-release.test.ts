@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   agreedVersion,
   applyVersionToContent,
@@ -13,8 +16,10 @@ import {
   detectWorkflow,
   detectWorkflowDrift,
   effectiveWorkflow,
+  filesFor,
   hasChangelogEntry,
   lastTagFor,
+  loadConfig,
   normalizeVersion,
   parseBranchNames,
   parseConfig,
@@ -22,6 +27,7 @@ import {
   releaseBranchFor,
   scopedTagComponents,
   serializeConfig,
+  verify,
   versionInOutput,
   type ReleaseConfig,
 } from "./analyze-release";
@@ -59,9 +65,7 @@ describe("briefFacts", () => {
     });
   });
 
-  // Without a config there is nothing on disk to interview from, so the detected
-  // shape is the one field a first run cannot lose.
-  test("returns suggested on a first run", () => {
+  test("returns suggested on a first run, the only shape there is to interview from", () => {
     const brief = briefFacts({ ...payload, hasConfig: false, config: null });
 
     expect(brief.suggested).toEqual({ mode: "whole-repo" });
@@ -111,8 +115,7 @@ describe("formatFactsDigest", () => {
     );
   });
 
-  // Both drifts must stop the gate, so neither may read as an ordinary line.
-  test("shouts about either drift", () => {
+  test("shouts about either drift, since both must stop the gate", () => {
     expect(
       formatFactsDigest({
         ...facts,
@@ -127,8 +130,7 @@ describe("formatFactsDigest", () => {
     ).toContain("VERSION FILE DRIFT");
   });
 
-  // A version the files already carry means the target is chosen, not open.
-  test("flags a file version ahead of the tag", () => {
+  test("flags a file version ahead of the tag, so the gate confirms that target rather than bumping past it", () => {
     const ahead = {
       ...facts,
       components: [{ ...facts.components[0], fileVersion: "0.16.0" }],
@@ -161,9 +163,7 @@ describe("formatFactsDigest", () => {
     expect(digest).toContain("repo       1.2.3 → patch 1.2.4");
   });
 
-  // The failure this catches is silent: the tag lands on the release branch with
-  // the bump and none of the work, and every digest line above it reads fine.
-  test("shouts when the run stands off the release branch", () => {
+  test("shouts when the run stands off the release branch, whose tag would hold the bump and none of the work", () => {
     const digest = formatFactsDigest({
       ...facts,
       branch: "feat/thing",
@@ -195,9 +195,7 @@ describe("releaseBranchFor", () => {
     ).toBe("main");
   });
 
-  // git-flow commits the bump on develop and only merges it into main, so main
-  // is the wrong branch to stand on there.
-  test("git-flow releases on develop", () => {
+  test("git-flow releases on develop, since main only receives the merge", () => {
     expect(
       releaseBranchFor({
         workflow: "git-flow",
@@ -497,8 +495,6 @@ describe("detectShape", () => {
       ],
       tags: [],
     });
-    // The lock rides with its manifest rather than counting as one: a second
-    // manifest would have collapsed this to the ambiguous, empty case.
     expect(shape.versionFiles).toEqual([
       { path: "Cargo.toml", kind: "toml" },
       lock,
@@ -807,7 +803,7 @@ describe("agreedVersion", () => {
     expect(agreedVersion([{ current: "3.5.0" }, { current: null }])).toBe(null);
   });
 
-  test("returns null for a repo with no version files", () => {
+  test("returns null for a repo with no version files, so the tag-only shape never reads as prepared", () => {
     expect(agreedVersion([])).toBe(null);
   });
 });
@@ -906,8 +902,6 @@ describe("versionInOutput", () => {
     expect(versionInOutput("", "0.8.0")).toBe(false);
   });
 
-  // A substring match would call a 0.8.01 build current for 0.8.0, which is the
-  // exact failure this stage exists to catch.
   test("does not match inside a longer version", () => {
     expect(versionInOutput("workbench 0.8.01", "0.8.0")).toBe(false);
     expect(versionInOutput("workbench 10.8.0", "0.8.0")).toBe(false);
@@ -969,9 +963,6 @@ describe("detectVersionFileDrift", () => {
     expect(detectVersionFileDrift(config, manifests)).toEqual([]);
   });
 
-  // Only a manifest the config already bumps can be missing a companion. A repo
-  // that deliberately releases something else must not be nagged about a crate
-  // it never listed.
   test("ignores a manifest the config does not bump at all", () => {
     const config: ReleaseConfig = {
       mode: "whole-repo",
@@ -1044,5 +1035,39 @@ describe("parseConfig artifacts", () => {
     expect(() =>
       parseConfig(JSON.stringify({ ...base, artifacts: [{ build: "make" }] })),
     ).toThrow(/artifacts/);
+  });
+});
+
+describe("loadConfig", () => {
+  test("throws on a corrupt config rather than reading as a first run that would re-interview and overwrite it", async () => {
+    const root = mkdtempSync(join(tmpdir(), "release-config-"));
+    try {
+      mkdirSync(join(root, ".chronicle"));
+      writeFileSync(join(root, ".chronicle/release.json"), "{");
+      await expect(loadConfig(root)).rejects.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("verify", () => {
+  test("an empty file list verifies vacuously — the changelog-and-tag-only release — not as a mismatch", async () => {
+    const result = await verify(tmpdir(), "1.0.0", []);
+    expect(result.allMatch).toBe(true);
+    expect(result.noVersionFiles).toBe(true);
+  });
+
+  test("filesFor throws on an unknown component, so verify never reads its empty list as vacuous", () => {
+    const config: ReleaseConfig = {
+      mode: "per-component",
+      workflow: "github-flow",
+      tag: "{component}-v{version}",
+      changelog: "CHANGELOG.md",
+      branches: { main: "main" },
+      versionFiles: [],
+      components: [{ name: "chronicle", path: "packages/chronicle", versionFiles: [] }],
+    };
+    expect(() => filesFor(config, "ghost")).toThrow(/unknown component "ghost"/);
   });
 });

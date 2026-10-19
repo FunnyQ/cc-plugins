@@ -48,7 +48,6 @@ const wholeRepo: ReleaseConfig = {
   versionFiles: [{ path: "package.json", kind: "json" }],
 };
 
-/** The changelog-and-tag-only shape: a real config with nothing to bump. */
 const tagOnlyShape: ReleaseConfig = { ...wholeRepo, versionFiles: [] };
 
 const json = (v: string) => `{\n  "version": "${v}"\n}\n`;
@@ -95,7 +94,7 @@ describe("deriveUnits", () => {
     ]);
   });
 
-  test("an unknown component is an error, not a silent skip", () => {
+  test("an unknown component is an error, not a silent skip that tags an empty bump", () => {
     expect(() =>
       deriveUnits(perComponent, [
         { component: "ghost", targetVersion: "1.0.0", lastTag: null },
@@ -143,9 +142,7 @@ describe("bumpDone", () => {
     expect(bumpDone(u, { "package.json": json("2.0.0") })).toBe(true);
   });
 
-  // The changelog-and-tag-only shape has nothing to bump, so the stage is
-  // vacuously satisfied rather than permanently pending.
-  test("true when the unit has no version file at all", () => {
+  test("true when the unit has no version file at all, so the tag-only shape never stalls", () => {
     const [u] = deriveUnits(tagOnlyShape, [
       { component: null, targetVersion: "2.0.0", lastTag: null },
     ]);
@@ -191,9 +188,6 @@ describe("commitDone — the check the old prepared-state bug turned on", () => 
     expect(commitDone(unit, bumped, entry)).toBe(true);
   });
 
-  // Exactly the state a stopped `prepare` run leaves: the working tree has both
-  // halves, HEAD has neither. Reporting this as done is what tagged a commit
-  // that did not contain the version it claimed.
   test("false when HEAD still has the old version — prepare stopped here", () => {
     expect(commitDone(unit, stale, "# Changelog\n")).toBe(false);
   });
@@ -202,8 +196,6 @@ describe("commitDone — the check the old prepared-state bug turned on", () => 
     expect(commitDone(unit, bumped, "# Changelog\n")).toBe(false);
   });
 
-  // No version file to read, so the entry alone decides. This is the one place
-  // the check has to fall back, and it falls out of the composition.
   test("the tag-only shape rests entirely on the entry", () => {
     const [u] = deriveUnits(tagOnlyShape, [
       { component: null, targetVersion: "2.0.0", lastTag: null },
@@ -228,7 +220,6 @@ describe("tagState", () => {
     );
   });
 
-  // The hammerbearer's "refuse to re-cut an existing tag" guard, as data.
   test("conflict when it points somewhere else", () => {
     expect(tagState(unit, { "chronicle-v0.11.0": "deadbee" }, "abc123")).toBe(
       "conflict",
@@ -252,9 +243,6 @@ describe("touchedFiles", () => {
     );
   });
 
-  // The old design had to work out which unit's files nobody else had named —
-  // and getting that wrong produced an empty commit. Here the list is the same
-  // whether this run wrote the files or a previous prepare run did.
   test("does not depend on who wrote the files", () => {
     const units = deriveUnits(perComponent, [
       { component: "chronicle", targetVersion: "0.11.0", lastTag: null },
@@ -337,9 +325,7 @@ describe("artifacts", () => {
     ]);
   });
 
-  // After bump, before entry: the earliest point the check can pass, and far
-  // enough ahead of tag that nothing has to be force-pushed to undo.
-  test("it sits between bump and entry", () => {
+  test("it sits right after bump, the earliest it can pass, and before tag, so undoing it needs no force-push", () => {
     const order = stagesFor(withArtifact, { persistConfig: false });
     expect(order.indexOf("artifacts")).toBe(order.indexOf("bump") + 1);
     expect(order.indexOf("artifacts")).toBeLessThan(order.indexOf("tag"));
@@ -385,9 +371,7 @@ describe("artifacts", () => {
     expect(artifactsDone(unitOf(wholeRepo), {})).toBe(true);
   });
 
-  // The rebuilt binary is part of the release commit. Leaving it out would commit
-  // a manifest at 0.8.0 next to a checked-in binary still reporting 0.7.0.
-  test("the artifact is staged with the release commit", () => {
+  test("the artifact is staged with the release commit, so the manifest never ships beside a stale binary", () => {
     const units = deriveUnits(withArtifact, [
       { component: null, targetVersion: "0.8.0", lastTag: null },
     ]);
@@ -408,5 +392,15 @@ describe("hasArtifacts", () => {
         ],
       }),
     ).toBe(true);
+  });
+});
+
+describe("stages.ts", () => {
+  test("imports no fs, shell, or git, so every release decision stays unit-testable", async () => {
+    const source = await Bun.file(new URL("./stages.ts", import.meta.url)).text();
+    const imports = new Bun.Transpiler({ loader: "ts" })
+      .scanImports(source)
+      .map((i) => i.path);
+    expect(imports).toEqual(["./analyze-release"]);
   });
 });

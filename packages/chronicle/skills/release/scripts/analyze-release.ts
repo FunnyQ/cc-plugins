@@ -1,11 +1,5 @@
 #!/usr/bin/env bun
 /**
- * Chronicle release analyzer.
- *
- * Pure core (unit-tested): version math, pattern-aware version read/write, repo
- * shape detection (interview defaults), and `.chronicle/release.json` config I/O.
- * Thin git/fs shell on top feeds the skill's version gate and applies bumps.
- *
  * Usage:
  *   bun analyze-release.ts                       # detect + emit JSON for the interview/gate
  *   bun analyze-release.ts --verify 0.5.0        # check version files sit at 0.5.0
@@ -20,16 +14,10 @@ import { parseArgs } from "node:util";
 
 import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type VersionFileKind = "json" | "toml" | "text";
 
-/** How the repo finishes a release: a develop→main merge, or a commit on main. */
 export type Workflow = "git-flow" | "github-flow";
 
-/** A version source: either a known `kind` or a custom capture-group `pattern`. */
 export type VersionFileSpec =
   | { path: string; kind: VersionFileKind }
   | { path: string; pattern: string };
@@ -42,11 +30,8 @@ export type VersionFileSpec =
  * tag ships the mismatch.
  */
 export type ArtifactSpec = {
-  /** Repo-relative path. Staged with the release commit. */
   path: string;
-  /** How to ask it for its version. Default: `./<path> --version`. */
   command?: string;
-  /** How to rebuild it. Absent means the release stops and asks for a build. */
   build?: string;
 };
 
@@ -64,16 +49,11 @@ export type ReleaseConfig = {
    * existed keep the exact meaning they had.
    */
   workflow?: Workflow;
-  /** Tag template. Supports `{version}` and (per-component) `{component}`. */
   tag: string;
   changelog: string;
-  /** `develop` is required for git-flow and unused for github-flow. */
   branches: { main: string; develop?: string };
-  /** whole-repo bump targets. Empty = changelog + tag only. */
   versionFiles: VersionFileSpec[];
-  /** whole-repo committed build outputs. Per-component ones live on the component. */
   artifacts?: ArtifactSpec[];
-  /** per-component bump targets, one entry per releasable unit. */
   components?: ComponentSpec[];
 };
 
@@ -93,15 +73,12 @@ export function versionInOutput(output: string, version: string): boolean {
   return new RegExp(`(?<![\\d.])${want}(?![\\d.])`).test(output);
 }
 
-/** A missing `workflow` is git-flow — never silently a new default. */
 export function effectiveWorkflow(
   config: Pick<ReleaseConfig, "workflow">,
 ): Workflow {
   return config.workflow ?? "git-flow";
 }
 
-/** The branch the release commit lands on — `release.ts` checks it out itself,
- *  so a run standing anywhere else leaves the work behind. */
 export function releaseBranchFor(
   config: Pick<ReleaseConfig, "workflow" | "branches">,
 ): string {
@@ -126,15 +103,9 @@ export type ManifestFact = {
 export type ShapeFacts = {
   manifests: ManifestFact[];
   tags: string[];
-  /** Local + remote branch names. Absent = unknown, which stays git-flow. */
   branches?: string[];
-  /** Fallback long-lived branch when neither main nor master exists. */
   currentBranch?: string;
 };
-
-// ---------------------------------------------------------------------------
-// Version math
-// ---------------------------------------------------------------------------
 
 export function normalizeVersion(v: string): string {
   return v.replace(/^v/, "");
@@ -163,15 +134,10 @@ export function computeBumps(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Version file read / write (kind- or pattern-based)
-// ---------------------------------------------------------------------------
-
 function tomlRe() {
   return /^(version\s*=\s*["'])[^"']+(["'])/m;
 }
 
-/** Replace only `match[1]` (the version substring) in place. */
 function spliceGroup(
   content: string,
   m: RegExpMatchArray,
@@ -181,7 +147,6 @@ function spliceGroup(
   return content.slice(0, gStart) + value + content.slice(gStart + m[1].length);
 }
 
-/** Find the top-level JSON `"version"` key without reformatting the file. */
 function topLevelJsonVersion(content: string): RegExpMatchArray | null {
   const depthAt = new Array<number>(content.length);
   let depth = 0;
@@ -235,9 +200,7 @@ export function readVersionFromContent(
         const json = JSON.parse(content);
         const v = json.version ?? json.plugins?.[0]?.version;
         if (typeof v === "string") return v;
-      } catch {
-        /* fall through to regex */
-      }
+      } catch {}
       return /"version"\s*:\s*"([^"]+)"/.exec(content)?.[1] ?? null;
     }
     case "toml": {
@@ -281,11 +244,6 @@ export function applyVersionToContent(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Cargo.lock (a version file no `kind` can describe)
-// ---------------------------------------------------------------------------
-
-/** The `[package]` name of a Cargo.toml — never a `[workspace]` or dependency key. */
 export function cargoPackageName(toml: string): string | null {
   const header = /^\[package\]\s*$/m.exec(toml);
   if (!header) return null; // a virtual workspace manifest carries no version either
@@ -316,10 +274,6 @@ export function cargoLockSpec(
   const pattern = `name = "${escapeRegex(crate)}"\\nversion = "([^"]+)"`;
   return new RegExp(pattern).test(lock) ? { path, pattern } : null;
 }
-
-// ---------------------------------------------------------------------------
-// Shape detection (produces interview defaults, not gospel)
-// ---------------------------------------------------------------------------
 
 export function scopedTagComponents(tags: string[]): Set<string> {
   const set = new Set<string>();
@@ -403,9 +357,7 @@ export function detectWorkflowDrift(
 }
 
 export type VersionFileDrift = {
-  /** null for a whole-repo config. */
   component: string | null;
-  /** The manifest already in the config whose companion is missing. */
   manifest: string;
   missing: VersionFileSpec;
 };
@@ -485,8 +437,6 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
     }
   }
 
-  // whole-repo: only auto-fill a version file when exactly one manifest exists;
-  // anything ambiguous is left for the interview to resolve.
   const versionFiles =
     facts.manifests.length === 1 ? specsOf(facts.manifests[0]) : [];
   return {
@@ -498,10 +448,6 @@ export function detectShape(facts: ShapeFacts): ReleaseConfig {
     versionFiles,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Config I/O
-// ---------------------------------------------------------------------------
 
 export function parseConfig(text: string): ReleaseConfig {
   const raw = JSON.parse(text);
@@ -523,7 +469,6 @@ export function parseConfig(text: string): ReleaseConfig {
     bad(`unknown workflow ${raw.workflow}`);
   }
   if (typeof raw.branches?.main !== "string") bad(`branches must name main`);
-  // A config predating `workflow` is git-flow, so it still has to name develop.
   if (
     effectiveWorkflow(raw as ReleaseConfig) === "git-flow" &&
     typeof raw.branches?.develop !== "string"
@@ -575,8 +520,6 @@ export async function loadConfig(
   } catch {
     return null; // absent → genuine first run
   }
-  // A file that exists but is corrupt must fail loudly, not masquerade as a first
-  // run (which would re-interview and overwrite it).
   return parseConfig(text);
 }
 
@@ -589,10 +532,6 @@ export async function saveConfig(
   await writeFile(path, serializeConfig(config), "utf-8");
   return path;
 }
-
-// ---------------------------------------------------------------------------
-// Git / fs shell (not unit-tested; drives the agents)
-// ---------------------------------------------------------------------------
 
 const SKIP_DIR = /(^|\/)(node_modules|\.git|dist|build|vendor|\.cache)(\/|$)/;
 
@@ -693,7 +632,6 @@ export function parseBranchNames(out: string): string[] {
     .map((line) => line.replace(/^remotes\//, ""));
 }
 
-/** Local + remote branch names, or undefined when git can't tell us. */
 async function allBranches(): Promise<string[] | undefined> {
   const out = await git`git branch --all --no-color`;
   if (!out) return undefined;
@@ -740,7 +678,7 @@ function cmpSemver(a: string, b: string): number {
   return pa.major - pb.major || pa.minor - pb.minor || pa.patch - pb.patch;
 }
 
-function filesFor(
+export function filesFor(
   config: ReleaseConfig,
   component?: string,
 ): VersionFileSpec[] {
@@ -757,7 +695,7 @@ function filesFor(
   return config.versionFiles;
 }
 
-async function verify(
+export async function verify(
   root: string,
   expected: string,
   files: VersionFileSpec[],
@@ -783,9 +721,6 @@ async function verify(
   );
   return {
     expected: want,
-    // An empty file list is a legitimate changelog-+-tag-only release (a repo with
-    // no bump target), so it verifies vacuously — NOT a mismatch. A per-component
-    // config with a missing component can't reach here: filesFor() throws first.
     allMatch: results.every((f) => f.matches),
     noVersionFiles: results.length === 0,
     files: results,
@@ -827,15 +762,6 @@ async function commitCountSince(
   }
 }
 
-/**
- * The one version every version file agrees on, or null when they disagree, when
- * one is unreadable, or when the unit has no version file at all.
- *
- * Null collapses all three cases into "no prepared state detected", and the unit
- * then goes through the ordinary bump gate. Disagreeing files are not reported as
- * their own condition. A unit configured with no version file at all — the
- * changelog-and-tag-only shape — can therefore never read as prepared.
- */
 export function agreedVersion(
   files: Array<{ current: string | null }>,
 ): string | null {
@@ -847,11 +773,6 @@ export function agreedVersion(
   return versions.every((v) => v === versions[0]) ? versions[0] : null;
 }
 
-/**
- * Whether CHANGELOG.md already heads an entry for this version. Matches the
- * heading shape the annalist writes: `## [<component> <version>]` per-component,
- * `## [<version>]` whole-repo.
- */
 export function hasChangelogEntry(
   changelog: string,
   version: string,
@@ -875,7 +796,6 @@ export type ComponentFact = {
   changelogEntry: boolean;
 };
 
-/** Reads one repo-root-relative path, returning "" when it cannot be read. */
 type ContentReader = (path: string) => Promise<string>;
 
 const workingTreeReader =
@@ -883,7 +803,6 @@ const workingTreeReader =
   (path) =>
     readFile(resolve(root, path), "utf-8").catch(() => "");
 
-/** The version the unit's own files currently carry, independent of any tag. */
 async function fileVersionFor(
   files: VersionFileSpec[],
   read: ContentReader,
@@ -931,13 +850,6 @@ async function perComponentFacts(
   );
 }
 
-/** What the version gate actually reads, which is a third of what the analysis
- *  holds. `tags` is every tag in the repo — the largest field and one no caller has
- *  ever used. `config` and `suggested` are the two halves of one question: with a
- *  committed config the caller reads `.chronicle/release.json` itself; without one it
- *  interviews from `suggested`. Dropping them is a pure function of the payload, so
- *  the script owes the caller the short form — a sub-agent retyping this JSON to the
- *  same end could mistype a version instead. */
 export function briefFacts(
   full: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -966,8 +878,6 @@ function componentLine(unit: FactsComponent): string {
     unit.commitCount === null
       ? "commit count unknown"
       : `${unit.commitCount} commit${unit.commitCount === 1 ? "" : "s"} since ${unit.lastTag ?? "the beginning"}`;
-  // A file version ahead of the tag means someone already picked the target, so
-  // the gate confirms it rather than bumping on top of it.
   const ahead =
     unit.fileVersion && unit.fileVersion !== unit.current
       ? `  [files already at ${unit.fileVersion}]`
@@ -1009,8 +919,6 @@ export function formatFactsDigest(facts: Record<string, unknown>): string {
     drift.push("WORKFLOW DRIFT — resolve before the gate");
   if ((facts.versionFileDrift as unknown[])?.length)
     drift.push("VERSION FILE DRIFT — resolve before the gate");
-  // Standing off the branch the release commits on tags a commit holding the
-  // bump and nothing else — the work never reaches it.
   if (
     facts.releaseBranch &&
     facts.branch &&
@@ -1070,7 +978,6 @@ async function main() {
     process.exit(result.allMatch ? 0 : 1);
   }
 
-  // default: detection facts for the interview / version gate
   const [tags, manifests, branch, branches] = await Promise.all([
     allTags(),
     discoverManifests(root),
@@ -1098,8 +1005,6 @@ async function main() {
     "utf-8",
   ).catch(() => "");
 
-  // per-component mode: enumerate each unit with its own version + change count
-  // so the main agent's version gate can offer "which component + which bump".
   const components =
     effective.mode === "per-component"
       ? await perComponentFacts(root, effective, tags, changelog)

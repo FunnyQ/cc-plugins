@@ -1,10 +1,6 @@
 /**
  * The CHANGELOG entry as data. The engine gathers every in-scope commit and
  * splices the finished entry; the annalist only turns commits into sentences.
- *
- * Each bullet names the commits it covers and the rest go in `omitted`, so a
- * commit the annalist never mentioned is a validation error rather than a gap in
- * a changelog that becomes immutable once its tag is pushed.
  */
 
 import { askJev, type JevResult } from "../../../shared/scripts/typesafe";
@@ -29,7 +25,6 @@ export type Commit = {
   subject: string;
   body: string;
   section: Suggestion;
-  /** Set when Jev replaced a `judge` — a suggestion read from text, never the diff. */
   judgedBy?: "jev";
   confidence?: number;
 };
@@ -87,8 +82,6 @@ export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
     units.map(async (unit) => {
       const range = unit.lastTag ? [`${unit.lastTag}..HEAD`] : ["HEAD"];
       const scope = unit.pathScope ? ["--", unit.pathScope] : [];
-      // Throws on a bad range: the shared helper's "" would read as "no commits"
-      // and let an entry that covers nothing through the coverage check.
       const log =
         await $`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`
           .quiet()
@@ -203,7 +196,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 `;
 
-/** Newest-first: the blocks land above the first existing heading, which stays byte-identical. */
 export function spliceEntries(changelog: string, blocks: string[]): string {
   const block = blocks.join("\n\n");
   const first = changelog.search(/^## \[/m);
