@@ -112,6 +112,7 @@ export const register: Register = (on) => {
       const agents = await $.agent.list();
       if (agents.find((a) => a.id === e.agentId)?.type !== AGENT) return ran;
       await $.state.set(REVIEW, null);
+      $.ui.status(undefined);
       const verdicts = e.answer.trim();
       if (e.reason !== "answer" || !verdicts || verdicts === CLEAN) return ran;
       // Not awaited: it resolves only once the queued turn starts.
@@ -125,6 +126,7 @@ export const register: Register = (on) => {
       await $.state.set(CARRY, true);
       return ran;
     }
+    if (review) $.ui.status(undefined);
 
     const { value: carry } = await $.state.get(CARRY);
     const { value: own } = await $.state.get(OWN_TURN);
@@ -148,6 +150,7 @@ export const register: Register = (on) => {
     }
     await $.state.set(REVIEW, { since: await $.clock.now() });
     $.ui.toast(`${MARK}: reviewing ${found.blocks} comment block(s)`);
+    $.ui.status(`${MARK}: reviewing ${found.blocks} comment block(s)…`);
     return ran;
   });
 };

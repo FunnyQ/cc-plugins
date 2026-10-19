@@ -19,7 +19,8 @@ function world(on: On, opts: { report?: string; bun?: false } = {}) {
   const registered: Record<string, unknown>[] = [];
   const submitted: string[] = [];
   const toasts: string[] = [];
-  mock.clock(on);
+  const statuses: (string | undefined)[] = [];
+  const clock = mock.clock(on);
   on("session.id", () => ({ value: "s-1" }) as never);
   on("session.cwd", () => ({ value: "/repo" }) as never);
   on("process.run", (_$, e) => {
@@ -72,12 +73,26 @@ function world(on: On, opts: { report?: string; bun?: false } = {}) {
     toasts.push(e.text);
     return { value: undefined } as never;
   });
+  on("ui.status", (_$, e) => {
+    statuses.push(e.text);
+    return { value: undefined } as never;
+  });
   on("session.start", (_$, e) => e as never);
   on("turn.start", (_$, e) => ({ turnId: e.turnId }) as never);
   on("turn.complete", () => ({ text: "" }) as never);
   const sweeps = () => runs.filter((r) => r.argv[2] === "sweep").length;
   const snapshots = () => runs.filter((r) => r.argv[2] === "snapshot").length;
-  return { runs, spawns, registered, submitted, toasts, sweeps, snapshots };
+  return {
+    runs,
+    spawns,
+    registered,
+    submitted,
+    toasts,
+    statuses,
+    clock,
+    sweeps,
+    snapshots,
+  };
 }
 
 test("the session registers the reviewer on sonnet at medium effort, read-only", async ($, on) => {
@@ -139,6 +154,29 @@ test("the reviewer's verdicts come back as a prompt for the main agent", async (
   expect(w.submitted).toHaveLength(1);
   expect(w.submitted[0]).toStartWith(MARK);
   expect(w.submitted[0]).toContain("app.ts:2 DELETE — restates");
+});
+
+test("a running reviewer stays pinned under the prompt until it answers", async ($, on) => {
+  const w = world(on, { report: REPORT });
+  await $.turn.start(turn);
+  await $.turn.complete(end);
+  expect(w.statuses).toEqual([`${MARK}: reviewing 1 comment block(s)…`]);
+  await $.turn.complete({ ...end, agentId: "r1", answer: CLEAN });
+  expect(w.statuses.at(-1)).toBeUndefined();
+});
+
+test("a reviewer silent past the stale limit is unpinned", async ($, on) => {
+  const w = world(on, { report: REPORT });
+  await $.turn.start(turn);
+  await $.turn.complete(end);
+  await w.clock.advance(11 * 60_000);
+  await $.turn.start({ turnId: "t2", text: "more" });
+  await $.turn.complete({ ...end, turnId: "t2" });
+  expect(w.statuses).toEqual([
+    `${MARK}: reviewing 1 comment block(s)…`,
+    undefined,
+    `${MARK}: reviewing 1 comment block(s)…`,
+  ]);
 });
 
 test("a reviewer that keeps every line submits nothing", async ($, on) => {
