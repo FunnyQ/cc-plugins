@@ -21,7 +21,6 @@ export type TreePayload = {
   deckSource: DeckSourceKind;
   slug: string;
   planTitle: string;
-  /** Repo the plan lives in — empty when the plan sits outside one. */
   repo: string;
   buckets: string[];
   tasks: TaskView[];
@@ -31,37 +30,21 @@ export type TreePayload = {
     inProgress: number;
     ready: number;
     blocked: number;
-    /**
-     * Tasks whose completion state is malformed. Counted separately so the
-     * dashboard can never present the tree as complete while one exists.
-     */
     invalid: number;
   };
-  /** How the remaining work splits into wave-loop passes. */
   waves: WaveSummary;
   errors: PlanError[];
 };
 
-/**
- * Impure: walks up for the repo the plan belongs to, empty when there is none.
- * The walk itself lives in `repoRootOf` — the transcript reader needs the same
- * answer as an absolute path, and two copies could disagree about which repo a
- * plan belongs to while both panels claim to describe it.
- */
 export function repoName(planDir: string): string {
   const root = repoRootOf(planDir);
   return root === null ? "" : basename(root);
 }
 
-/** Impure: reads the tasks tree and the flightlog. */
 export async function loadPlan(planDir: string): Promise<{
   slug: string;
   planTitle: string;
   repo: string;
-  /**
-   * Every directory under `tasks/`, in listing order — NOT derived from parsed
-   * tasks. `buildTreePayload` owns the ordering rule.
-   */
   bucketDirs: string[];
   loaded: Loaded;
   entries: FlightlogEntry[];
@@ -86,7 +69,6 @@ export async function loadPlan(planDir: string): Promise<{
     slug,
     planTitle,
     repo: repoName(planDir),
-    // The loader already applied the bucket rule; re-listing here would state it twice.
     bucketDirs: taskResult.buckets,
     loaded: {
       byRef: nodesFromParsedTasks(taskResult.byRef),
@@ -99,7 +81,6 @@ export async function loadPlan(planDir: string): Promise<{
   };
 }
 
-/** Which counter each task state increments. Exhaustive over `TaskState`. */
 const COUNT_KEY = {
   done: "done",
   "in-progress": "inProgress",
@@ -108,7 +89,6 @@ const COUNT_KEY = {
   invalid: "invalid",
 } as const satisfies Record<TaskState, string>;
 
-/** Pure: shapes the response. */
 export function buildTreePayload(input: {
   deckSource?: DeckSourceKind;
   slug: string;
@@ -135,7 +115,6 @@ export function buildTreePayload(input: {
     slug: input.slug,
     planTitle: input.planTitle,
     repo: input.repo,
-    // Directory order is meaningless; declared graph lanes are the author's road order.
     buckets:
       input.deckSource === "graph"
         ? [...input.bucketDirs]

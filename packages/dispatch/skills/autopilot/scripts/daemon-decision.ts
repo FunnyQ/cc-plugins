@@ -14,7 +14,6 @@ export function decideStartup(
   me: { root: string; plan: string; port: number },
   isAlive: (pid: number) => boolean,
 ): StartupDecision {
-  // A killed pid must not make a stale record look reusable.
   if (typeof info?.pid !== "number" || !isAlive(info.pid)) {
     return { action: "start" };
   }
@@ -29,7 +28,6 @@ export function decideStartup(
     return { action: "supersede", info: daemon, reason: "different-plan" };
   }
 
-  // A port override is a request to replace the matching server at that port.
   if (daemon.port !== me.port) {
     return { action: "supersede", info: daemon, reason: "port-change" };
   }

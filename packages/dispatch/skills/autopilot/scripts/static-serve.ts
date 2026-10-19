@@ -17,11 +17,6 @@ const NO_CACHE_HEADERS = {
   "Cache-Control": "no-cache",
 };
 
-/**
- * Map a request pathname to an absolute path inside `root`.
- * Returns null when the path cannot be decoded or escapes the root.
- * Performs NO filesystem access — existence and file-type are the caller's job.
- */
 export function resolveStaticPath(
   root: string,
   pathname: string,
@@ -39,7 +34,6 @@ export function resolveStaticPath(
     ? decodedPathname.slice(1)
     : decodedPathname;
 
-  // Repeated separators are unnecessary in static asset paths and enable ambiguity tricks.
   if (relativePathname.includes("//")) {
     return null;
   }
@@ -61,7 +55,6 @@ function notFound(): Response {
   return new Response("Not found", { status: 404, headers: NO_CACHE_HEADERS });
 }
 
-/** Impure: stats the resolved path and returns the response. */
 export async function serveStatic(
   root: string,
   pathname: string,

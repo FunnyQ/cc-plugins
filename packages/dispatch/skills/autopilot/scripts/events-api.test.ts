@@ -134,7 +134,6 @@ describe("formatFleetFrame", () => {
     expect(second.rationales).toBeUndefined();
   });
 
-  // A rewritten flightlog can keep a score's identity and change its prose.
   test("resends a rationale whose text changed under the same key", () => {
     const memory = newFrameMemory();
     nextFleetFrame([entry, judged("Original")], true, [], memory);
@@ -460,7 +459,24 @@ describe("eventsHandler transcript membership", () => {
     }
   });
 
-  test("handler: run id read from correct location (graph source)", async () => {
+  test("keeps the Claude figures when the codex source throws", async () => {
+    const f = fixture();
+    const stream = connect(f, {
+      codexSource: {
+        read: () => {
+          throw new Error("unreadable codex tree");
+        },
+      },
+    });
+    try {
+      expectUsage(await stream.read(), 10, 2);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("handler: reads run.id beside graph.json, one level above the flightlog (graph source)", async () => {
     const f = fixture();
     const logPath = join(f.planDir, ".flightlog", "run.jsonl");
     mkdirSync(dirname(logPath), { recursive: true });
@@ -470,7 +486,6 @@ describe("eventsHandler transcript membership", () => {
         .map((item) => JSON.stringify(item))
         .join("\n") + "\n",
     );
-    // Production keeps run.id beside graph.json, one level above the flightlog.
     writeFileSync(join(f.planDir, "run.id"), "new-id\n");
     const stream = connect({ ...f, logPath }, { deckSource: "graph" });
     try {

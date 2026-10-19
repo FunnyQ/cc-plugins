@@ -2,15 +2,6 @@ import { closeSync, openSync, readSync } from "node:fs";
 
 const DEFAULT_CHUNK = 1 << 20;
 
-/**
- * Read a byte range in bounded chunks. Yields fewer bytes than asked when the
- * file shrank mid-read, nothing at all for an empty range.
- *
- * Chunked because `size - from` is bounded by nothing: `nextCursor` resets to 0
- * on a truncated or replaced file, and a cold pass starts there, so the range is
- * routinely the whole file. Chunks are freshly allocated, so a caller may hold
- * one past the next iteration.
- */
 export function* readRangeChunks(
   path: string,
   from: number,
@@ -36,7 +27,6 @@ export function* readRangeChunks(
   }
 }
 
-/** Split a chunk into complete lines and the trailing partial remainder. */
 export function splitCompleteLines(text: string): {
   complete: string[];
   partial: string;
@@ -46,10 +36,6 @@ export function splitCompleteLines(text: string): {
   return { complete: parts, partial };
 }
 
-/**
- * Decide how to advance after a stat. A file smaller than the cursor means it was
- * truncated or replaced, so the cursor resets to zero and the whole file is re-read.
- */
 export function nextCursor(
   prev: number,
   size: number,
@@ -58,22 +44,12 @@ export function nextCursor(
   return { from: prev, reset: false };
 }
 
-/** The bookkeeping `tailFileChunks` owns; a caller adds its own domain fields. */
 export type TailState = {
   cursor: number;
   partial: string;
   decoder: TextDecoder;
 };
 
-/**
- * Tail `file` from `state.cursor` to `size`, calling `onReset` first when the
- * file was truncated or replaced.
- *
- * Shared for two orderings invisible at the call site that both fail silently:
- * the generator opens lazily, so the first chunk is pulled before `onReset` (an
- * unopenable file must not clear state it will never refill); and `cursor`
- * advances per chunk, since `onLine` already has those lines.
- */
 export function tailFileChunks<S extends TailState>(
   file: string,
   state: S,

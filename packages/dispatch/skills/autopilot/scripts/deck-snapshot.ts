@@ -14,7 +14,6 @@ import { createTranscriptSource, repoRootOf } from "./usage-source";
 import { detectSource, loadGraphPlan } from "./graph-source";
 import { buildTreePayload, loadPlan, type TreePayload } from "./tree-api";
 
-/** Pure: depth counts done tasks too, so rows never move as work lands. */
 export function layerByDepth(tasks: { ref: string; dependsOn: string[] }[]): {
   waves: string[][];
   unschedulable: string[];
@@ -44,8 +43,6 @@ export function layerByDepth(tasks: { ref: string; dependsOn: string[] }[]): {
   return { waves, unschedulable: unschedulable.sort() };
 }
 
-/** Pure: shapes the payload and fleet into the pane's contract. */
-// the web fleet's runElapsed: one clock per task, so concurrent lenses count once
 function timeOf(rows: FleetRow[]): DeckTask["time"] {
   const started = rows.filter((row) => row.startedAt);
   if (started.length === 0) return null;
@@ -104,7 +101,6 @@ export function buildDeckSnapshot(input: {
     refs.some((ref) => tasks[ref].state !== "done"),
   );
 
-  // Rows without a start sort last; ISO strings from different writers may differ in offset, so compare as instants.
   const startOf = (row: FleetRow) =>
     row.startedAt === undefined ? Infinity : Date.parse(row.startedAt);
   const agents: DeckAgent[] = input.fleet
@@ -117,7 +113,6 @@ export function buildDeckSnapshot(input: {
       label: row.label,
       startedAt: row.startedAt ?? null,
     }));
-  // three rows show the scout or commit just finished beside the one running, without growing the box every wave
   const crew: DeckCrew[] = input.fleet
     .filter((row) => !row.ref || !tasks[row.ref])
     .sort((a, b) => (Date.parse(b.startedAt ?? "") || 0) - (Date.parse(a.startedAt ?? "") || 0))
@@ -149,7 +144,6 @@ export function buildDeckSnapshot(input: {
   };
 }
 
-/** Impure: the plan under `<root>/docs/` whose run log was written last. */
 export async function latestPlan(root: string): Promise<string | null> {
   const docs = resolve(root, "docs");
   let dirs: string[];
@@ -174,8 +168,7 @@ export async function latestPlan(root: string): Promise<string | null> {
   return best?.dir ?? null;
 }
 
-// Claude tokens only: the codex side of a dev or review row is left to the web fleet
-function readUsage(
+function readClaudeUsage(
   plan: string,
   deckSource: "tasks" | "graph",
   fleet: FleetRow[],
@@ -227,7 +220,7 @@ async function main(): Promise<void> {
   const payload = buildTreePayload({ ...loaded, deckSource });
   const fleet = aggregateFleet(loaded.entries);
   // a cold transcript read costs ~500 ms, so the pane asks for it only when a task newly lands
-  const read = withUsage ? readUsage(plan, deckSource, fleet) : {};
+  const read = withUsage ? readClaudeUsage(plan, deckSource, fleet) : {};
   console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, ...read })));
 }
 

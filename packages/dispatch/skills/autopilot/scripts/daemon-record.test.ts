@@ -82,7 +82,7 @@ describe("daemon record", () => {
       { pid: 1, port: 5757, root: "scripts", plan: "/tmp/plan" },
     ],
     ["missing plan", { pid: 1, port: 5757, root: "/tmp" }],
-  ])("returns null for a record with a %s", (_name, record) => {
+  ])("returns null for a record with a %s, since its pid reaches process.kill", (_name, record) => {
     writeRecord({ pid: 1, port: 1, root: "/tmp", plan: "/tmp/plan" });
     writeFileSync(recordPath(), JSON.stringify(record));
 

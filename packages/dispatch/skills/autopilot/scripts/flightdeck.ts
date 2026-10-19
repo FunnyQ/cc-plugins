@@ -17,7 +17,6 @@ export type FlightdeckOptions =
   | { ok: true; plan: string; port: number; projectsRoot?: string }
   | { ok: false; message: string };
 
-/** The serving entry point shares the launcher's flag shapes and plan rules. */
 export function parseArgs(argv: string[]): FlightdeckOptions {
   const parsed = parsePlanArgs(argv);
 
@@ -74,9 +73,6 @@ export async function createServer(
       async fetch(request) {
         const url = new URL(request.url);
 
-        // The launcher's identity check: a port answering HTTP is not proof of a
-        // flightdeck, and a pid can be recycled. This names the process it is safe
-        // to reuse or to signal.
         if (url.pathname === "/api/health") {
           return Response.json({
             flightdeck: true,
@@ -96,11 +92,6 @@ export async function createServer(
         }
 
         if (url.pathname === "/api/events") {
-          // Re-read per connection, never once at startup: a graph.json that was
-          // unreadable or malformed when the server booted yields an empty
-          // repoRoot, and a stream holding that stale value would attribute zero
-          // tokens forever — indistinguishable from a run that spent nothing.
-          // Reconnecting (a browser refresh) is what picks the repaired file up.
           const repoRoot =
             deckSource === "graph"
               ? (await loadGraph(plan)).repoRoot || undefined

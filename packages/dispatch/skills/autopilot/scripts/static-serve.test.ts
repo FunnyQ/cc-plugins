@@ -39,6 +39,18 @@ describe("resolveStaticPath", () => {
     expect(resolveStaticPath(root, pathname)).toBeNull();
   });
 
+  test("maps a path under a root that does not exist, touching no filesystem", () => {
+    const missingRoot = join(root, "no-such-dir");
+
+    expect(resolveStaticPath(missingRoot, "/app.js")).toBe(
+      join(missingRoot, "app.js"),
+    );
+  });
+
+  test("rejects a repeated separator even when the path stays inside the root", () => {
+    expect(resolveStaticPath(root, "/modules//lanes.js")).toBeNull();
+  });
+
   test("rejects a root-prefix sibling", () => {
     const siblingPath = `../${basename(root)}-evil/file.txt`;
 

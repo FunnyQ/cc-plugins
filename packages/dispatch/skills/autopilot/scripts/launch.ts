@@ -19,7 +19,6 @@ export function parseArgs(
 ): { ok: true; args: Args } | { ok: false; message: string } {
   let plan: string | undefined;
   let port = DEFAULT_PORT;
-  // under Claude Code the dispatch mod opens its pane instead, and the pane's button passes --open
   let open = env.CLAUDECODE !== "1";
 
   for (let index = 0; index < argv.length; index += 1) {

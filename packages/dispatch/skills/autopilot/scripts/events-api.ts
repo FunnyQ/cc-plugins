@@ -32,9 +32,7 @@ export type FleetSnapshot = {
   rows: ReturnType<typeof aggregateFleet>;
   entryCount: number;
   logPresent: boolean;
-  /** Plan-wide token rollup. Always present; all-zero when no transcript was found. */
   usage: UsageRollup;
-  /** Judge prose not yet sent on this stream, keyed by `rationaleKey`. Absent when none is new. */
   rationales?: Record<string, string>;
 };
 
@@ -48,11 +46,8 @@ function rationaleKey(score: { task: string; attempt: number; ts: string }) {
   return `${score.task}|${score.attempt}|${score.ts}`;
 }
 
-/** What one stream has already told its browser. Both fields are updated in place. */
 export type FrameMemory = {
-  /** Rationale text by `rationaleKey`, as last sent. */
   rationales: Map<string, string>;
-  /** The last snapshot sent, rationales excluded. */
   snapshot: string;
 };
 
@@ -90,8 +85,6 @@ export function nextFleetFrame(
     logPresent,
     usage: attributed.rollup,
   };
-  // Compared without the rationales, or the frame after one that carried them
-  // always differs and an unchanged snapshot goes out twice.
   const snapshot = JSON.stringify(payload);
   const fresh = Object.keys(rationales).length > 0;
   if (snapshot === memory.snapshot && !fresh) return undefined;
@@ -99,7 +92,6 @@ export function nextFleetFrame(
   return `event: fleet\ndata: ${JSON.stringify(fresh ? { ...payload, rationales } : payload)}\n\n`;
 }
 
-/** Always a frame: a fresh memory has sent nothing, and a shared one only drops rationales. */
 export function formatFleetFrame(
   entries: FlightlogEntry[],
   logPresent: boolean,
@@ -184,8 +176,6 @@ export function eventsHandler(
       options?.projectsRoot,
       repoRoot ?? undefined,
     );
-  // The codex side is optional in the same way: a plan with no external engine gets
-  // an empty list, and the join then attaches nothing.
   const codexSource =
     options?.codexSource ?? createCodexSource(options?.codexRoot);
 
@@ -203,14 +193,11 @@ export function eventsHandler(
 
   function readAgents(): AgentUsage[] {
     try {
-      // run.id lives beside graph.json; the log lives one level below in .flightlog/.
       const graph = options?.deckSource === "graph";
       const runId = graph ? readRunId(planDir) : undefined;
       if (graph && runId === undefined) return [];
       const agents = usageSource.read(runId);
       if (repoRoot === null) return agents;
-      // Wrapped separately: a codex tree that cannot be read must cost the Claude
-      // figures nothing, so its failure falls back to the un-attached agents.
       try {
         return attachCodexUsage(agents, codexSource.read(), repoRoot, {
           openIdentities: openIdentities(),
@@ -219,7 +206,6 @@ export function eventsHandler(
         return agents;
       }
     } catch {
-      // A broken token panel must not take the fleet panel down with it.
       return [];
     }
   }
@@ -320,8 +306,6 @@ export function eventsHandler(
           const from = reset ? 0 : next.from;
           const grew = stat.size > from;
           if (grew) {
-            // A flightlog is small, but `from` is 0 on every reset and cold pass.
-            //
             // The cursor moves per chunk, like the two usage readers: entries are
             // appended as each chunk decodes, so leaving it until the loop ends
             // means a read that dies partway re-ingests what already landed.
@@ -349,9 +333,6 @@ export function eventsHandler(
       checkFile();
       emitSnapshot();
       initializing = false;
-      // One timer doing both jobs. A transcript grows while its agent runs but the
-      // flightlog does not move until that agent ends, so scheduling snapshots off
-      // flightlog activity alone freezes every in-flight token cell for minutes.
       poll = setInterval(() => {
         checkFile();
         debounce.schedule();

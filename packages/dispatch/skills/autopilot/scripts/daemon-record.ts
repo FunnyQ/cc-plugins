@@ -5,9 +5,7 @@ import { dirname, isAbsolute, join } from "node:path";
 export type DaemonInfo = {
   pid: number;
   port: number;
-  /** Absolute path of the scripts dir this daemon was launched from. */
   root: string;
-  /** Absolute path of the plan dir it is serving. */
   plan: string;
 };
 
@@ -31,13 +29,6 @@ function isAbsolutePath(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && isAbsolute(value);
 }
 
-/**
- * Read the record, or null when any field is missing or malformed.
- *
- * The pid in this file reaches `process.kill`, so a half-written or hand-edited
- * record must never pass through: an unchecked field decides which process is
- * signalled and which URL the launcher prints.
- */
 export function readRecord(): DaemonInfo | null {
   try {
     const parsed: unknown = JSON.parse(readFileSync(recordPath(), "utf8"));

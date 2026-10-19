@@ -138,7 +138,7 @@ describe("layerByDepth", () => {
 });
 
 describe("buildDeckSnapshot", () => {
-  test("done tasks keep their wave", () => {
+  test("done tasks keep their wave, so rows never move as work lands", () => {
     const deck = snapshot([
       view("api/01", "done"),
       view("api/02", "done", ["api/01"]),
@@ -332,7 +332,23 @@ describe("buildDeckSnapshot", () => {
     ]);
   });
 
-  test("crew keeps the latest 3 taskless rows of any status, newest first", () => {
+  test("agents sort by instant when start times carry different UTC offsets", () => {
+    const deck = snapshot(
+      [],
+      [
+        row({ label: "utc", startedAt: "2026-10-04T09:00:00Z" }),
+        row({ label: "unstarted" }),
+        row({ label: "offset", startedAt: "2026-10-04T10:30:00+02:00" }),
+      ],
+    );
+    expect(deck.agents.map((agent) => agent.label)).toEqual([
+      "offset",
+      "utc",
+      "unstarted",
+    ]);
+  });
+
+  test("crew keeps the latest 3 taskless rows of any status, newest first, so the box never grows per wave", () => {
     const deck = snapshot(
       [view("a/01", "in-progress")],
       [

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -108,9 +108,7 @@ describe("readRangeChunks", () => {
     });
   });
 
-  // The point of the rewrite: no allocation scales with the range. Asserting
-  // only on reassembled content would pass on the old whole-file read too.
-  test("每個 chunk 都不超過上限，且會切成多塊", () => {
+  test("每個 chunk 都不超過上限，且會切成多塊：reset 後範圍就是整個檔案", () => {
     withTempFile("0123456789abcdefghij", (path) => {
       const { text, lengths } = readAll(path, 0, 20, 6);
       expect(text).toBe("0123456789abcdefghij");
@@ -118,14 +116,23 @@ describe("readRangeChunks", () => {
     });
   });
 
-  // All three callers decode immediately and would not notice a reused buffer;
-  // a fourth that batched chunks would, only on multi-chunk files.
   test("chunk 之間不共用 buffer", () => {
     withTempFile("aaaabbbbcccc", (path) => {
       const held = [...readRangeChunks(path, 0, 12, 4)].map((c) =>
         Buffer.from(c.buffer, c.byteOffset, c.length),
       );
       expect(held.map((b) => b.toString())).toEqual(["aaaa", "bbbb", "cccc"]);
+    });
+  });
+
+  test("yields fewer bytes when the file shrinks mid-read", () => {
+    withTempFile("aaaabbbbcccc", (path) => {
+      const lengths: number[] = [];
+      for (const chunk of readRangeChunks(path, 0, 12, 4)) {
+        lengths.push(chunk.length);
+        if (lengths.length === 1) truncateSync(path, 6);
+      }
+      expect(lengths).toEqual([4, 2]);
     });
   });
 });
@@ -168,14 +175,10 @@ describe("tailFileChunks", () => {
     });
   });
 
-  // Invariant 1. Both call sites used to hand-roll the pull-before-reset order,
-  // and getting it wrong is invisible: the state is cleared and then never
-  // refilled, so the agent silently reports zero.
-  test("一個開不起來的檔案不會觸發 reset", () => {
+  test("一個開不起來的檔案不會觸發 reset，否則 state 被清掉卻永遠補不回來", () => {
     const state = freshState();
-    // size < cursor is what makes nextCursor report a reset; with it the other
-    // way round this test passes no matter where onReset sits.
-    state.cursor = 999;
+    const cursorPastEnd = 999;
+    state.cursor = cursorPastEnd;
     state.partial = "kept";
     let resetCalls = 0;
 
@@ -193,12 +196,10 @@ describe("tailFileChunks", () => {
 
     expect(resetCalls).toBe(0);
     expect(state.partial).toBe("kept"); // nothing cleared
-    expect(state.cursor).toBe(999);
+    expect(state.cursor).toBe(cursorPastEnd);
   });
 
-  // Invariant 2. Lines are handed over per chunk, so the cursor has to move per
-  // chunk too — leaving it until the loop ends re-ingests them after a failure.
-  test("cursor 逐塊推進，不是最後才跳到 size", () => {
+  test("cursor 逐塊推進，不是最後才跳到 size，失敗後才不會重讀已交出的行", () => {
     withTempFile("aa\nbb\ncc\ndd\n", (path) => {
       const state = freshState();
       const cursorAtLine: number[] = [];
@@ -214,7 +215,6 @@ describe("tailFileChunks", () => {
         3,
       );
       expect(state.seen).toEqual(["aa", "bb", "cc", "dd"]);
-      // Strictly increasing and never the final size until the last line.
       expect(cursorAtLine).toEqual([3, 6, 9, 12]);
     });
   });

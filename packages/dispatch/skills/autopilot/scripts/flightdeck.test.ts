@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
@@ -94,9 +94,7 @@ describe("parseArgs", () => {
     ).toEqual({ ok: true, plan, port: 5757, projectsRoot: projects });
   });
 
-  // Silently falling back to the real `~/.claude/projects` here would hand a gate a
-  // dashboard full of unrelated transcripts and call it the fixture's numbers.
-  test("rejects --projects-root with nothing after it", () => {
+  test("rejects --projects-root with nothing after it rather than falling back to ~/.claude/projects", () => {
     expect(messageOf(["--serve", "--plan", plan, "--projects-root"])).toContain(
       "--projects-root",
     );
@@ -275,10 +273,28 @@ describe("source routing", () => {
     ]);
   });
 
+  test("re-reads graph.json repoRoot on every events connection", async () => {
+    const dir = graphPlan();
+    writeTrail(dir, [started]);
+    const handler = spyOn(eventsApi, "eventsHandler");
+    const controller = new AbortController();
+    try {
+      const server = await createServer(dir, 0);
+      servers.push(server);
+      const graphFile = join(dir, "graph.json");
+      const graph = JSON.parse(readFileSync(graphFile, "utf8"));
+      writeFileSync(graphFile, JSON.stringify({ ...graph, repoRoot: "/repaired/repository" }));
+      await fetch(`http://127.0.0.1:${server.port}/api/events`, { signal: controller.signal });
+      expect(handler.mock.lastCall![3]).toMatchObject({ repoRoot: "/repaired/repository" });
+    } finally {
+      controller.abort();
+      handler.mockRestore();
+    }
+  });
+
   for (const deckSource of ["tasks", "graph"] as const) {
     test(`serves and tails the shared trail for ${deckSource}, forwarding source options`, async () => {
       const dir = deckSource === "graph" ? graphPlan() : plan;
-      // A stray graph file must not opt an existing task plan into graph behaviour.
       if (deckSource === "tasks") writeFileSync(join(dir, "graph.json"), "{}");
       writeTrail(dir, [started]);
       const handler = spyOn(eventsApi, "eventsHandler");

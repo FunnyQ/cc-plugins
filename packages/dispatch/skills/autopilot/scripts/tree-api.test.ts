@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import type { GraphNode, NodeValidity } from "../../flightplan/scripts/lib/graph-node";
-import { buildTreePayload, type Loaded, repoName } from "./tree-api";
+import { buildTreePayload, type Loaded, loadPlan, repoName } from "./tree-api";
+import { buildFixture } from "./usage-fixture";
 
 const INVALID_COMPLETION: NodeValidity = {
   kind: "invalid",
@@ -213,7 +214,7 @@ describe("buildTreePayload", () => {
     });
   });
 
-  test("counts a malformed completion as invalid, not as done", () => {
+  test("counts a malformed completion as invalid, not as done, so the tree never reads complete", () => {
     const payload = buildTreePayload(
       input(
         {
@@ -307,7 +308,7 @@ describe("repoName", () => {
 
 describe("source bucket ordering", () => {
   for (const deckSource of ["tasks", "graph"] as const) {
-    test(`${deckSource} carries its source and applies its ordering rule`, () => {
+    test(`${deckSource} carries its source: graph keeps the declared lane order, tasks sorts directory order`, () => {
       const bucketDirs = ["z-build", "a-review", "m-empty"];
       const payload = buildTreePayload({ ...input({}, bucketDirs), deckSource });
       expect(payload.deckSource).toBe(deckSource);
@@ -317,4 +318,32 @@ describe("source bucket ordering", () => {
       expect(bucketDirs).toEqual(["z-build", "a-review", "m-empty"]);
     });
   }
+});
+
+describe("loadPlan", () => {
+  test("lists an empty or unparsed bucket directory, not only buckets with parsed tasks", async () => {
+    const planDir = mkdtempSync(join(tmpdir(), "tree-api-load-"));
+    try {
+      mkdirSync(join(planDir, "tasks", "empty"), { recursive: true });
+      mkdirSync(join(planDir, "tasks", "broken"), { recursive: true });
+      writeFileSync(join(planDir, "tasks", "broken", "01-bad.md"), "no heading\n");
+
+      const { bucketDirs } = await loadPlan(planDir);
+
+      expect([...bucketDirs].sort()).toEqual(["broken", "empty"]);
+    } finally {
+      rmSync(planDir, { recursive: true, force: true });
+    }
+  });
+
+  test("the usage fixture's plan renders its work/01 task", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "tree-api-fixture-"));
+    try {
+      const payload = buildTreePayload(await loadPlan(buildFixture(dir).planDir));
+
+      expect(payload.tasks.map((view) => view.ref)).toContain("work/01");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
