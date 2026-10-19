@@ -1,9 +1,7 @@
 #!/usr/bin/env bun
 
-// One entry point: parse the argv, find or start the one Safari session, run one
-// command over safaridriver's W3C WebDriver REST API, print one line. Safari allows
-// a single automation session per machine, so there is no instance to pick: every
-// caller shares the session recorded here until someone runs `close`.
+// Safari allows a single automation session per machine, so there is no instance
+// to pick: every caller shares the session recorded here until someone runs `close`.
 
 import {
   existsSync,
@@ -94,7 +92,6 @@ async function call(
   return settle(response.status, await response.json().catch(() => null));
 }
 
-/** The recorded session, if its driver still answers for it; a dead one is cleared. */
 async function liveSession(): Promise<Session | null> {
   if (!existsSync(RECORD)) return null;
   const session = JSON.parse(readFileSync(RECORD, "utf8")) as Session;

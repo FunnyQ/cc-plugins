@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BINARIES } from "./chrome";
 
-// Launches a real headless browser, so it skips on a machine without one.
 const installed = BINARIES.some((path) => existsSync(path));
 const cli = join(import.meta.dir, "chrome.ts");
 

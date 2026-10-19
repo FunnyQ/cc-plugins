@@ -1,10 +1,6 @@
 #!/usr/bin/env bun
 
-// One entry point: parse the argv, find or launch an instance, run one command
-// over the Chrome DevTools Protocol, print one line. Every instance is its own
-// process with a throwaway profile, so two agents never share a browser — and
-// none touches the Chrome you have open, which refuses remote debugging on its
-// default profile anyway.
+// Chrome refuses remote debugging on its default profile.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -156,7 +152,6 @@ async function evaluate(page: Page, expression: string): Promise<unknown> {
   return result.value;
 }
 
-/** Runs a navigation and waits for it to land: a new document loads, a same-document one only moves. */
 async function navigated(page: Page, start: () => Promise<any>): Promise<void> {
   const landed = page.nextEvent(
     ["Page.loadEventFired", "Page.navigatedWithinDocument"],
@@ -187,7 +182,6 @@ async function title(page: Page): Promise<string> {
   return String(await evaluate(page, "document.title"));
 }
 
-/** Scrolls the element into view and returns its centre in viewport pixels. */
 async function centre(
   page: Page,
   selector: string,

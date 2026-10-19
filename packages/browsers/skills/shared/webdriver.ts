@@ -3,7 +3,6 @@
 
 export const ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf";
 
-// One table for every protocol, so a key added for one browser exists in all of them.
 // Code points, not string escapes: a formatter rewrites the escapes into invisible characters.
 const KEYS: Record<string, { webdriver: number; vk: number; text?: string }> = {
   Backspace: { webdriver: 0xe003, vk: 8 },
@@ -28,7 +27,6 @@ function unknownKey(key: string): Error {
   );
 }
 
-/** The text WebDriver's element send-keys takes for one key. */
 export function keyText(key: string): string {
   if (KEYS[key]) return String.fromCharCode(KEYS[key].webdriver);
   if ([...key].length === 1) return key;
@@ -72,7 +70,6 @@ export function printable(value: unknown): string {
   return typeof value === "string" ? value : JSON.stringify(value);
 }
 
-/** Wraps an expression so `ExecuteScript` returns its value. */
 export function script(expression: string): string {
   return `return (${expression});`;
 }

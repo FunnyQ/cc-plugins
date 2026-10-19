@@ -1,9 +1,5 @@
 #!/usr/bin/env bun
 
-// One entry point: parse the argv, find or launch an instance, run one command
-// over Marionette, print one line. Every instance is its own process with a
-// throwaway profile and its own port, so two agents never share a browser.
-
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { connect, type Client } from "./marionette";

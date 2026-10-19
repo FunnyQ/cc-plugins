@@ -1,7 +1,3 @@
-// Every headless instance is its own process, throwaway profile, and port, recorded
-// as one JSON file under `<stateDir>/instances/`. Shared by the firefox and chrome
-// skills; Safari has a single machine-wide session and keeps its own record.
-
 import {
   existsSync,
   mkdirSync,
@@ -61,7 +57,6 @@ export function resolveBinary(
   return found;
 }
 
-/** Live instances; a record whose process died is pruned with its profile. */
 export function liveInstances(stateDir: string): Instance[] {
   const dir = join(stateDir, "instances");
   if (!existsSync(dir)) return [];
@@ -78,7 +73,6 @@ export function liveInstances(stateDir: string): Instance[] {
   return live;
 }
 
-/** A fresh profile directory; its random suffix doubles as the instance id. */
 export function newProfile(stateDir: string): { id: string; profile: string } {
   mkdirSync(join(stateDir, "instances"), { recursive: true });
   const profile = mkdtempSync(join(stateDir, "profile-"));

@@ -1,6 +1,5 @@
-// A minimal Chrome DevTools Protocol client: one WebSocket to one page target,
-// request ids matched to responses, protocol errors thrown. Events matter only
-// for navigation, because Page.navigate returns before the page has loaded.
+// Events matter only for navigation, because Page.navigate returns before the
+// page has loaded.
 
 type Reply = {
   id?: number;
@@ -9,7 +8,6 @@ type Reply = {
   error?: { code: number; message: string };
 };
 
-/** Resolves a reply to its result, or throws the protocol error it carries. */
 export function settle(method: string, reply: Reply): any {
   if (reply.error)
     throw new Error(`${method}: ${reply.error.message}`);
@@ -23,7 +21,6 @@ export type Page = {
   close: () => void;
 };
 
-/** The first page target's WebSocket URL, from the browser's HTTP discovery endpoint. */
 async function pageSocket(port: number): Promise<string> {
   const response = await fetch(`http://127.0.0.1:${port}/json/list`);
   const targets = (await response.json()) as {

@@ -37,7 +37,6 @@ describe("FrameReader", () => {
     ]);
   });
 
-  // Byte length, not string length: a multibyte character must not shift the cut.
   test("cuts on bytes when a body carries multibyte text split mid-character", () => {
     const reader = new FrameReader();
     const bytes = Buffer.from(encodeFrame([1, 2, null, { value: "開始" }]));
