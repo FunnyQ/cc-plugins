@@ -80,8 +80,8 @@ test("Clawd's frames redraw the band alone, never the transcript", async ($, on)
   await $.prompt.submit({ text: 'go' } as never)
   const before = rows
   const alts = new Set<string>()
-  for (let i = 0; i < 20; i++) {
-    await clock.advance(500)
+  for (let i = 0; i < 200; i++) {
+    await clock.advance(50)
     alts.add(JSON.stringify((await desk.find({ type: 'Svg' }))?.props.source))
   }
   await row.unmount()
@@ -101,8 +101,8 @@ test('Clawd animates once the desktop attaches, and never ticks in a headless ru
   const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND })
   const frames = async () => {
     const seen = new Set<string>()
-    for (let i = 0; i < 20; i++) {
-      await clock.advance(500)
+    for (let i = 0; i < 200; i++) {
+      await clock.advance(50)
       seen.add(JSON.stringify((await desk.find({ type: 'Svg' }))?.props.source))
     }
     return seen.size
@@ -162,7 +162,6 @@ test('with Clawd off, the minimap still draws in the band on the terminal, and t
   expect(await term.find({ key: 'clawd' })).toBeUndefined()
   expect(await term.find({ key: 'line:0' })).toBeDefined()
   await term.unmount()
-  // runes draws nothing there: the mount is refused, or it shows the engine's stub and no row of ours
   const desk = await $.ui.mount({ plugin: 'runes', surface: 'desktop', ...BAND }).catch(() => undefined)
   expect(await desk?.find({ key: 'clawd-row' })).toBeUndefined()
   await desk?.unmount()

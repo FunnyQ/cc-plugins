@@ -7,12 +7,9 @@ import { config } from '../config'
 import type { Ui } from '../ui'
 
 const TICK_MS = 50
-// a finished turn keeps Clawd celebrating this long, unless a new prompt comes first
 const DONE_MS = 5_000
-// 20x16 grid at 2 CSS px per pixel
 const SVG_WIDTH = 40
 const SVG_HEIGHT = 32
-// the columns Clawd takes in each drawing, so the map keeps minimap.gap columns clear of it: the octant text is 10 cells wide
 const TEXT_COLUMNS = 10
 
 // read while drawing, so a frame redraws the band alone; an invalidate redrew every transcript row runes hooks.
@@ -31,7 +28,6 @@ const INITIAL = {
 }
 export const clawd = { ...INITIAL }
 
-// the band reports each draw here, the only writer of what the frame ticker reads from it
 export const seen = (requestId: string, isDesktop: boolean) => {
   clawd.requestId = requestId
   if (isDesktop) clawd.isDesktop = true
@@ -39,7 +35,6 @@ export const seen = (requestId: string, isDesktop: boolean) => {
 
 export const spriteColumns = () => (clawd.useText ? TEXT_COLUMNS : IMAGE_COLUMNS)
 
-// Clawd's picture in the drawing this surface and terminal take
 export const sprite = ({ Image, Svg, Text, Box }: Ui, isDesktop: boolean, frame: { clip: string; index: number }) => {
   if (isDesktop) return <Svg key="clawd" source={svg(frame.clip, frame.index)} alt={`Clawd ${frame.clip}`} width={SVG_WIDTH} height={SVG_HEIGHT} />
   // Raster refuses non-BMP characters, so octants go out as plain coloured Text
@@ -56,7 +51,6 @@ export const sprite = ({ Image, Svg, Text, Box }: Ui, isDesktop: boolean, frame:
   return <Image key="clawd" columns={IMAGE_COLUMNS} rows={IMAGE_ROWS} alt=" " source={pixels(clawd.clip, clawd.index)} />
 }
 
-// moves Clawd one frame per clip step, once per session
 function animate($: Parameters<Hook<'session.start'>>[0], nextClip: () => string, isDue: () => boolean) {
   clawd.clip = nextClip()
   $.clock.every(TICK_MS, () => {
