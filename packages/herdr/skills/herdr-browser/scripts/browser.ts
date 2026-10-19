@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 
-
 import {
   INSTALL_HINT,
   newcomer,
@@ -411,13 +410,19 @@ async function pageSocket(base: string, targetId: string): Promise<string> {
   return socket;
 }
 
-// The tab strip is a snapshot taken before the command ran, so anything that
-// navigates, opens, or closes a tab has to re-read it — printing the stale one
-// describes the page as it was, which reads exactly like success. null means
-// the browser itself is gone: closing the last tab closes the pane.
-async function refreshStrip(id: string): Promise<Tab[] | null> {
-  return (await terminalTargets()).find((live) => live.id === id)?.tabs ?? null;
+async function refreshStrip(
+  id: string,
+  targets: () => Promise<Target[]>,
+): Promise<Tab[] | null> {
+  return (await targets()).find((live) => live.id === id)?.tabs ?? null;
 }
+
+export type Deps = {
+  run: typeof run;
+  terminalTargets: () => Promise<Target[]>;
+};
+
+const LIVE: Deps = { run, terminalTargets };
 
 const HERDR_BIN = process.env.HERDR_BIN_PATH || "herdr";
 
@@ -426,50 +431,61 @@ const HERDR_BIN = process.env.HERDR_BIN_PATH || "herdr";
 // "open in a new tab" is: make the tab, then point that one variable at its
 // root pane. Returns null outside herdr, where terminal-browser does its own
 // placement.
-async function herdrTab(): Promise<HerdrTab | null> {
+async function herdrTab(exec: typeof run): Promise<HerdrTab | null> {
   const workspace = process.env.HERDR_WORKSPACE_ID;
   if (!process.env.HERDR_PANE_ID || !workspace) {
     return null;
   }
   return parseHerdrTab(
-    await run([HERDR_BIN, ...herdrTabCreateArgs(workspace, process.cwd())]),
+    await exec([HERDR_BIN, ...herdrTabCreateArgs(workspace, process.cwd())]),
   );
 }
 
 // terminal-browser hands the pane back to a shell rather than closing it, so
 // the tab `open` made outlives its browser as an idle shell in the strip.
-async function closeHostTab(tab: string | null): Promise<void> {
+async function closeHostTab(
+  tab: string | null,
+  exec: typeof run,
+): Promise<void> {
   if (!tab) {
     return;
   }
   const label = herdrTabLabel(
-    await run([HERDR_BIN, "tab", "get", tab]).catch(() => ""),
+    await exec([HERDR_BIN, "tab", "get", tab]).catch(() => ""),
   );
   if (label !== "browser") {
     return;
   }
-  await run([HERDR_BIN, "tab", "close", tab]).catch(() => {});
+  await exec([HERDR_BIN, "tab", "close", tab]).catch(() => {});
 }
 
-async function openTerminal(
+export async function openTerminal(
   url: string,
   split: string | null,
   ratio: string | null,
   before: Target[],
+  deps: Deps = LIVE,
 ): Promise<Target> {
-  const tab = split === null ? await herdrTab() : null;
+  const tab = split === null ? await herdrTab(deps.run) : null;
   try {
-    await run(["terminal-browser", ...terminalOpenArgs(url, split, ratio)], {
-      env: tab ? { HERDR_PANE_ID: tab.pane, HERDR_TAB_ID: tab.tab } : undefined,
-    });
+    await deps.run(
+      ["terminal-browser", ...terminalOpenArgs(url, split, ratio)],
+      {
+        env: tab
+          ? { HERDR_PANE_ID: tab.pane, HERDR_TAB_ID: tab.tab }
+          : undefined,
+      },
+    );
     for (let attempt = 0; attempt < 40; attempt += 1) {
-      const found = newcomer(before, await terminalTargets());
+      const found = newcomer(before, await deps.terminalTargets());
       if (found) {
         // terminal-browser splits rather than takes over, so the tab we made
         // still holds the shell pane it was born with. Left alone it sits
         // beside the browser as dead space for the rest of the session.
         if (tab && found.pane && found.pane !== tab.pane) {
-          await run([HERDR_BIN, "pane", "close", tab.pane]).catch(() => {});
+          await deps
+            .run([HERDR_BIN, "pane", "close", tab.pane])
+            .catch(() => {});
         }
         return found;
       }
@@ -477,15 +493,14 @@ async function openTerminal(
     }
     throw new Error("opened the browser but it never reported the page");
   } catch (error) {
-    // An empty labelled tab left in the strip reads as a browser that opened.
     if (tab) {
-      await run([HERDR_BIN, "tab", "close", tab.tab]).catch(() => {});
+      await deps.run([HERDR_BIN, "tab", "close", tab.tab]).catch(() => {});
     }
     throw error;
   }
 }
 
-async function main(argv: string[]): Promise<void> {
+export async function main(argv: string[], deps: Deps = LIVE): Promise<void> {
   const {
     command,
     args,
@@ -512,7 +527,7 @@ async function main(argv: string[]): Promise<void> {
     return;
   }
 
-  const terminal = await terminalTargets();
+  const terminal = await deps.terminalTargets();
 
   let target: Target;
 
@@ -528,11 +543,11 @@ async function main(argv: string[]): Promise<void> {
       } finally {
         socket.close();
       }
-      const refreshed = await refreshStrip(target.id);
+      const refreshed = await refreshStrip(target.id, deps.terminalTargets);
       console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
       return;
     }
-    target = await openTerminal(url, split, ratio, terminal);
+    target = await openTerminal(url, split, ratio, terminal, deps);
     console.log(`view ${target.id} pane ${target.pane ?? "-"}`);
     console.log(formatTabs(target.tabs));
     return;
@@ -549,7 +564,7 @@ async function main(argv: string[]): Promise<void> {
     if (!passthrough || passthrough.length === 0) {
       throw new Error("raw needs a command after --, e.g. raw -- get title");
     }
-    const out = await run(
+    const out = await deps.run(
       [
         "terminal-browser",
         "action",
@@ -592,8 +607,14 @@ async function main(argv: string[]): Promise<void> {
     const url = requireArg(args[0], "missing URL");
     // Electron answers /json/new with a 500; terminal-browser's own command is
     // what keeps the new tab in its tab strip anyway.
-    await run(["terminal-browser", "new-tab", "--browser", target.id, url]);
-    const refreshed = await refreshStrip(target.id);
+    await deps.run([
+      "terminal-browser",
+      "new-tab",
+      "--browser",
+      target.id,
+      url,
+    ]);
+    const refreshed = await refreshStrip(target.id, deps.terminalTargets);
     console.log(refreshed ? formatTabs(refreshed) : `closed ${target.id}`);
     return;
   }
@@ -611,7 +632,7 @@ async function main(argv: string[]): Promise<void> {
           `tab ${row} carries no terminal-browser id to activate`,
         );
       }
-      await run([
+      await deps.run([
         "terminal-browser",
         "action",
         "--browser",
@@ -626,9 +647,9 @@ async function main(argv: string[]): Promise<void> {
     } else {
       await closeTab(base, targetId);
     }
-    const refreshed = await refreshStrip(target.id);
+    const refreshed = await refreshStrip(target.id, deps.terminalTargets);
     if (!refreshed) {
-      await closeHostTab(target.hostTab);
+      await closeHostTab(target.hostTab, deps.run);
       console.log(`closed ${target.id}`);
       return;
     }

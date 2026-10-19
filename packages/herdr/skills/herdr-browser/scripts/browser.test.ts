@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, spyOn, test } from "bun:test";
 
 import {
   cdp,
@@ -9,11 +9,15 @@ import {
   formatSnapshot,
   formatWatch,
   formatTabs,
+  main,
+  openTerminal,
   parseArgv,
   resolveMetrics,
   resolveTargetId,
   run,
+  type Deps,
   type Tab,
+  type Target,
 } from "./browser";
 import {
   applyWatchMessage,
@@ -634,5 +638,144 @@ describe("run timeout", () => {
 
   test("waits indefinitely when no timeout is given", async () => {
     expect((await run(["echo", "hi"])).trim()).toBe("hi");
+  });
+});
+
+describe("commands that change the tab strip", () => {
+  const server = Bun.serve({
+    port: 0,
+    fetch(request, server) {
+      const url = new URL(request.url);
+      if (url.pathname === "/json/list") {
+        return Response.json([
+          { id: "T1", webSocketDebuggerUrl: `ws://127.0.0.1:${server.port}` },
+        ]);
+      }
+      if (url.pathname.startsWith("/json/close/")) {
+        return new Response("Target is closing");
+      }
+      return server.upgrade(request)
+        ? undefined
+        : new Response("not found", { status: 404 });
+    },
+    websocket: {
+      message(socket, raw) {
+        const { id, method, params } = JSON.parse(String(raw));
+        const value =
+          method === "Runtime.evaluate" &&
+          params.expression === "document.readyState"
+            ? "complete"
+            : ["https://example.com/", "Example"];
+        socket.send(JSON.stringify({ id, result: { result: { value } } }));
+      },
+    },
+  });
+  afterAll(() => server.stop(true));
+
+  const browser = (tabs: Tab[]): Target => ({
+    id: "B1",
+    cdpHttp: `http://127.0.0.1:${server.port}`,
+    activeTargetId: "T1",
+    pane: null,
+    hostTab: null,
+    url: "https://example.com/",
+    title: "Example",
+    tabs,
+  });
+  const stale: Tab[] = [
+    {
+      id: 1,
+      targetId: "T1",
+      url: "https://old.test/",
+      title: "Old",
+      active: true,
+    },
+    {
+      id: 2,
+      targetId: "T2",
+      url: "https://two.test/",
+      title: "Two",
+      active: false,
+    },
+  ];
+  const fresh: Tab[] = [
+    {
+      id: 1,
+      targetId: "T1",
+      url: "https://new.test/",
+      title: "New",
+      active: true,
+    },
+  ];
+
+  async function printed(argv: string[], after: Target[]): Promise<string> {
+    const reads = [[browser(stale)], after];
+    const deps: Deps = {
+      run: async () => "",
+      terminalTargets: async () => reads.shift() ?? [],
+    };
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await main(argv, deps);
+      return log.mock.calls.map((call) => call.join(" ")).join("\n");
+    } finally {
+      log.mockRestore();
+    }
+  }
+
+  for (const argv of [
+    ["open", "https://new.test/"],
+    ["new-tab", "https://new.test/"],
+    ["activate", "1"],
+    ["close", "2"],
+  ]) {
+    test(`${argv[0]} prints the strip re-read after it ran, not the stale snapshot that reads like success`, async () => {
+      const out = await printed(argv, [browser(fresh)]);
+      expect(out).toContain(formatTabs(fresh));
+      expect(out).not.toContain(formatTabs(stale));
+    });
+
+    test(`${argv[0]} prints closed <id> when the re-read finds the browser gone`, async () => {
+      const out = await printed(argv, []);
+      expect(out.split("\n").at(-1)).toBe("closed B1");
+    });
+  }
+});
+
+describe("openTerminal", () => {
+  test("a failed open closes the herdr tab it made, so no empty tab reads as an opened browser", async () => {
+    const saved = {
+      pane: process.env.HERDR_PANE_ID,
+      workspace: process.env.HERDR_WORKSPACE_ID,
+    };
+    process.env.HERDR_PANE_ID = "P0";
+    process.env.HERDR_WORKSPACE_ID = "W0";
+    const calls: string[][] = [];
+    const deps: Deps = {
+      run: async (command) => {
+        calls.push(command);
+        if (command[0] === "terminal-browser") {
+          throw new Error("terminal-browser open failed: boom");
+        }
+        return JSON.stringify({
+          result: { root_pane: { pane_id: "P9", tab_id: "T9" } },
+        });
+      },
+      terminalTargets: async () => [],
+    };
+    try {
+      await expect(
+        openTerminal("https://example.com/", null, null, [], deps),
+      ).rejects.toThrow(/boom/);
+    } finally {
+      for (const [key, value] of [
+        ["HERDR_PANE_ID", saved.pane],
+        ["HERDR_WORKSPACE_ID", saved.workspace],
+      ] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+    expect(calls.at(-1)?.slice(1)).toEqual(["tab", "close", "T9"]);
   });
 });
