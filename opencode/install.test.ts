@@ -30,6 +30,7 @@ const EXPECTED_SKILL_NAMES = [
   "chrome",
   "chronicle-install",
   "cockpit",
+  "comments-reaper",
   "commit",
   "deckplan",
   "firefox",
