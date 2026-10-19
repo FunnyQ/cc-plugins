@@ -25,7 +25,6 @@ export type Probs = Record<string, number>;
 type Answers = { kind: Probs; language: Probs; risk: number };
 export type Next = { done: true; lang: string | undefined } | { done: false };
 
-// the fence language for the likeliest kind that is not plain; code in a language the list lacks stays plain
 const fenceOf = (kind: Probs, language: Probs): string | undefined => {
   const kinds = ["markdown", "json", "diff", "code"] as const;
   const best = kinds.reduce((a, b) => ((kind[b] ?? 0) > (kind[a] ?? 0) ? b : a));
@@ -57,7 +56,6 @@ const SECRETS: [RegExp, string][] = [
 ];
 export const scrub = (text: string): string => SECRETS.reduce((t, [re, to]) => t.replace(re, to), text);
 
-// commands whose output is the secret itself: never asked about, never sent, whatever Jev would say
 const DENIED: RegExp[] = [
   /^(env|printenv)\b(?!\s*\|\s*wc\b)/,
   /^history\b/,
@@ -137,17 +135,15 @@ const byOutput = (command: string, output: string) => ({
 
 type Transport = { post: Post; apiKey: string; redraw: () => void };
 let transport: Transport | undefined;
-// a verdict is a fence language, or undefined for plain; a key absent from both maps is unasked
-const verdicts = new Map<string, string | undefined>();
+const fenceByKey = new Map<string, string | undefined>();
 const asked = new Set<string>();
 
 const remember = (key: string, lang: string | undefined) => {
-  verdicts.delete(key);
-  verdicts.set(key, lang);
-  if (verdicts.size > CACHE_SIZE) verdicts.delete(verdicts.keys().next().value!);
+  fenceByKey.delete(key);
+  fenceByKey.set(key, lang);
+  if (fenceByKey.size > CACHE_SIZE) fenceByKey.delete(fenceByKey.keys().next().value!);
 };
 
-// one Jev call, its answers by question name; the teacher asks through it too
 export const systemOne = async (t: { post: Post; apiKey: string }, body: object) => {
   const r = await t.post(ENDPOINT, {
     method: "POST",
@@ -174,16 +170,14 @@ const decide = async (t: Transport, command: string, head: string) => {
 };
 
 export const jev = {
-  // the fence language for output the sniffer could not place, or undefined while unasked, pending, plain, or switched off
   view(command: string, stdout: string): string | undefined {
     if (!transport || !config.bash.jev || isDenied(command)) return undefined;
     const head = stdout.slice(0, OUTPUT_CHARS);
     const key = `${command}\0${head}`;
-    if (verdicts.has(key)) return verdicts.get(key);
+    if (fenceByKey.has(key)) return fenceByKey.get(key);
     if (asked.has(key)) return undefined;
     asked.add(key);
     const t = transport;
-    // any failure leaves the output plain, as it was before Jev
     void decide(t, command, head)
       .catch(() => undefined)
       .then((lang) => {
@@ -193,7 +187,6 @@ export const jev = {
       });
     return undefined;
   },
-  // run from session.start, which holds `$`; no key leaves every draw as it was
   work(next: { apiKey: string | undefined; post: Post; redraw: () => void }) {
     transport = next.apiKey ? { post: next.post, apiKey: next.apiKey, redraw: next.redraw } : undefined;
   },

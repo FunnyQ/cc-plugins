@@ -37,7 +37,6 @@ const answered = (...ids: string[]): SessionMessage =>
     toolResults: ids.map((tool_use_id) => ({ tool_use_id, text: "ok" })),
   }) as never;
 
-// a run of five calls closed by Claude's reply: an Edit stays out, and so does the Bash that failed
 const RUN: SessionMessage[] = [
   said("user", "tidy it"),
   called(use("b1", "Bash", { command: "ls", description: "List the files" })),
@@ -97,7 +96,6 @@ const start = async (
   files?: Map<string, string>,
 ) => {
   await startSession($, on, { messages, ...(files ? { files } : {}) });
-  // the runs are read after session.start, off the render path
   expect(
     await eventually(
       async () =>
@@ -131,7 +129,6 @@ test("runsOf folds the finished, unkept calls between two replies, and the last 
 });
 
 test("runsOf folds the live run from its first call, and holds a closed run to min", () => {
-  // no reply has closed b1, b2 and g1 yet, and they fold all the same
   expect(runsOf(RUN.slice(0, 5), { keep: [], min: 2 }).get("b1")?.label).toBe(
     "3 calls · Bash 2 · Grep 1",
   );
@@ -139,7 +136,6 @@ test("runsOf folds the live run from its first call, and holds a closed run to m
   expect(runsOf(live, { keep: [], min: 2 }).get("b1")?.label).toBe(
     "1 call · Bash 1",
   );
-  // once a reply closes it, a run below min is drawn as its cards
   expect(
     runsOf([...live, said("assistant", "ok")], { keep: [], min: 2 }).size,
   ).toBe(0);
@@ -166,7 +162,6 @@ test("runsOf folds a call still running, from tool.call before the transcript ho
     text: "Bash sleep 9",
     isRunning: true,
   });
-  // a pending call the transcript already holds is counted once
   const stored = [
     said("user", "go"),
     called({
@@ -201,7 +196,6 @@ const E1 = ROW("e1", "Edit", {
 
 test("each folded row draws its own title in place of its card, and the run's last row draws the summary under it", async ($, on) => {
   await start($, on, RUN);
-  // each title leads with its tool's rune icon, a search its own
   expect((await find($, B1, { key: "fold:title" }))?.text.trim()).toBe(
     `· ${DEFAULTS.bash.icon}  List the files`,
   );
@@ -215,7 +209,6 @@ test("each folded row draws its own title in place of its card, and the run's la
   expect((await find($, E1, { key: "fold" }))?.text.trim()).toBe(
     "▸ 4 calls · Bash 2 · Grep 1 · Edit 1",
   );
-  // a tool no rune draws keeps its own result row, which folds with it
   expect(
     await find($, RESULT("g1", "Grep"), { key: "fold:result" }),
   ).toBeDefined();
@@ -229,7 +222,6 @@ test("pressing a title unfolds that call alone, under its title, and pressing it
     `▾ ${DEFAULTS.bash.icon}  Bash pwd`,
   );
   expect(await row.find({ key: "bash" })).toBeDefined();
-  // the card sits on a tinted surface, the pressable title off it
   const rail = (await row.find({ key: "fold:rail" })) as
     | { props?: { backgroundColor?: string } }
     | undefined;
@@ -342,7 +334,6 @@ test("a running call's spinner sits left of its icon and turns on its own frame 
   expect(await frame()).toBe("⠋ ");
   await row.advance(80);
   expect(await frame()).toBe("⠙ ");
-  // ten frames come round to the first
   await row.advance(720);
   expect(await frame()).toBe("⠋ ");
   await row.unmount();
@@ -379,7 +370,6 @@ test("an AskUserQuestion is titled by its question, with each answer under it", 
     text: "Which DB?",
     answers: ["Postgres"],
   });
-  // several questions are titled by their headers, and each answer names its own
   const two = [
     said("user", "go"),
     called(
@@ -419,8 +409,125 @@ test("a folded run draws an AskUserQuestion's answer under its title, two cells 
   const title = (await find($, row, { key: "fold:title" }))!.text;
   const answer = (await find($, row, { key: "fold:answer:0" }))!.text;
   expect(answer.trim()).toBe("Postgres");
-  // the answer starts two cells right of where the title's text does
   expect(answer.length - answer.trimStart().length).toBe(
     title.indexOf("Which DB?") + 2,
   );
+});
+
+test("a title takes its tool's icon from config.yaml as read at draw time", async ($, on) => {
+  await startSession($, on, {
+    messages: RUN,
+    files: new Map([[CONFIG, 'transcript:\n  bash:\n    icon: "Z"\n']]),
+  });
+  expect(
+    await eventually(
+      async () =>
+        (await find($, B1, { key: "fold:title" }))?.text.trim() ===
+        "· Z  List the files",
+    ),
+  ).toBe(true);
+});
+
+const RUNNING = ROW("p1", "Bash", { command: "sleep 9" }, { isRunning: true });
+const TURN_END = {
+  answer: "",
+  durationMs: 0,
+  isAborted: false,
+  turnId: "t",
+} as const;
+
+const callPending = async ($: Engine, on: On) => {
+  on("tool.call", () => ({ result: "ok" }) as never);
+  on("turn.complete", () => ({ text: "" }) as never);
+  await startSession($, on);
+  await $.tool.call({
+    tool: "Bash",
+    tool_use_id: "p1",
+    command: "sleep 9",
+  } as never);
+  expect(
+    await eventually(
+      async () => (await find($, RUNNING, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+};
+
+for (const reason of ["answer", "aborted", "refusal", "error"] as const)
+  test(`a turn ending with ${reason} clears the calls tool.call held as pending`, async ($, on) => {
+    await callPending($, on);
+    await $.turn.complete({ ...TURN_END, reason } as never);
+    expect(
+      await eventually(
+        async () =>
+          (await find($, RUNNING, { key: "fold:title" })) === undefined,
+      ),
+    ).toBe(true);
+  });
+
+test("a subagent's turn ending leaves the main loop's pending calls held", async ($, on) => {
+  await callPending($, on);
+  await $.turn.complete({ ...TURN_END, reason: "answer", agentId: "a" } as never);
+  await new Promise((r) => setTimeout(r, 30));
+  expect(await find($, RUNNING, { key: "fold:title" })).toBeDefined();
+});
+
+test("a running title's spinner and a folded title's dot hold the same two cells, so the icons share a column", async ($, on) => {
+  const messages = [
+    said("user", "go"),
+    called(use("b0", "Bash", { command: "ls" })),
+    answered("b0"),
+    called({
+      tool_use_id: "b1",
+      tool: "Bash",
+      input: { command: "sleep 9" },
+    } as never),
+  ];
+  await startSession($, on, { messages });
+  const done = ROW("b0", "Bash", { command: "ls" });
+  expect(
+    await eventually(
+      async () => (await find($, done, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  const row = await $.ui.mount(
+    ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true }),
+  );
+  const spinner = (await row.find({ key: "fold:spinner" })) as
+    | { props?: { width?: number } }
+    | undefined;
+  const running = (await row.find({ key: "fold:title" }))!.text;
+  await row.unmount();
+  const folded = (await find($, done, { key: "fold:title" }))!.text;
+  expect(spinner?.props?.width).toBe(2);
+  expect(folded.indexOf(DEFAULTS.bash.icon)).toBe(2);
+  expect(running.indexOf(DEFAULTS.bash.icon)).toBe(0);
+});
+
+test("a folded row is answered before any card rune builds its card", async ($, on) => {
+  const messages = [
+    said("user", "go"),
+    called(
+      use("b1", "Bash", { command: "ls" }),
+      use("r1", "Read", { file_path: "/a.ts" }),
+      use("e1", "Edit", { file_path: "/a.ts" }),
+    ),
+    answered("b1", "r1", "e1"),
+    said("assistant", "ok"),
+  ];
+  await startSession($, on, { messages });
+  const rows = [
+    [ROW("b1", "Bash", { command: "ls" }), "bash"],
+    [ROW("r1", "Read", { file_path: "/a.ts" }), "read"],
+    [ROW("e1", "Edit", { file_path: "/a.ts" }), "edit"],
+  ] as const;
+  expect(
+    await eventually(
+      async () =>
+        (await find($, rows[0][0], { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  for (const [row, card] of rows) {
+    expect(await find($, row, { key: "fold:title" })).toBeDefined();
+    expect(await find($, row, { key: card })).toBeUndefined();
+  }
 });

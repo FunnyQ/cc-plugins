@@ -145,7 +145,6 @@ test("a skill that failed says so", async ($, on) => {
   ).toBeDefined();
 });
 
-// records every path read, so a test can tell a SKILL.md stays unread until its fold opens
 class Reads extends Map<string, string> {
   read: string[] = [];
   override get(key: string) {
@@ -188,6 +187,29 @@ test("SKILL.md is read only once its fold is pressed, from the installed plugin'
   expect((await row.find({ key: "skill.md:toggle" }))?.text.trim()).toBe(
     "▸ SKILL.md · 2 lines",
   );
+  await row.unmount();
+});
+
+test("a plugin installed for another project is not this project's skill", async ($, on) => {
+  await startSession($, on, {
+    files: new Map([
+      [
+        PLUGINS,
+        JSON.stringify({
+          version: 2,
+          plugins: { "chronicle@q-lab": [{ scope: "project", projectPath: "/elsewhere", installPath: ROOT }] },
+        }),
+      ],
+      [`${ROOT}/skills/commit/SKILL.md`, "# Chronicle Commit\nOne agent."],
+    ]),
+  });
+  const row = await $.ui.mount(CALL({ output: INLINE }));
+  await row.press({ key: "skill.md:toggle" });
+  expect(
+    await eventually(async () =>
+      Boolean(await row.find({ type: "Text", text: "(no SKILL.md found)" })),
+    ),
+  ).toBe(true);
   await row.unmount();
 });
 

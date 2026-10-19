@@ -26,14 +26,12 @@ export type Member = {
 type $ = Parameters<Hook<"tool.call">>[0];
 type Render = Parameters<Hook<"ui.render">>;
 
-// an MCP tool's full name repeats its server on every call
 const nameOf = (tool: string) => tool.replace(/^mcp__.+?__/, "");
 
 type Question = { question?: unknown; header?: unknown };
 const questionsOf = (input: Record<string, unknown>) =>
   (Array.isArray(input.questions) ? input.questions : []) as Question[];
 
-// what the person picked for each question; several questions name their headers, so each answer says which it is
 const answersOf = (input: Record<string, unknown>, result: unknown) => {
   const given =
     (result as
@@ -50,7 +48,6 @@ const answersOf = (input: Record<string, unknown>, result: unknown) => {
     : [given.response];
 };
 
-// a call's own description when it has one, else its tool and the input that tells it apart
 const titleOf = (tool: string, input: Record<string, unknown>) => {
   if (tool === "AskUserQuestion") {
     const qs = questionsOf(input);
@@ -70,8 +67,6 @@ const titleOf = (tool: string, input: Record<string, unknown>) => {
   return detail ? `${nameOf(tool)} ${detail}` : nameOf(tool);
 };
 
-// a run is the calls between two pieces of text; the live one folds from its first call, so a turn never shows its
-// cards before folding them, and a closed one folds only from min calls, so a lone call ends drawn as its card
 export const runsOf = (
   messages: readonly SessionMessage[],
   {
@@ -125,11 +120,9 @@ export const runsOf = (
   for (const m of messages) {
     // tool results ride on user messages with no text; anything the person typed ends the run
     if (m.text.trim()) close();
-    // a failed call stays out of the run, so its card is drawn
     for (const u of m.toolUses)
       if (!u.isError) add(u, u.result === undefined && u.text === undefined);
   }
-  // a call tool.call has seen that the transcript does not hold yet runs at the end of the live run
   for (const u of pending) if (!seen.has(u.tool_use_id)) add(u, true);
   close(1);
   return members;
@@ -139,7 +132,6 @@ export const runsOf = (
 export const SEARCH_ICON = "\u{F422}";
 const TOOL_ICON = "\u{F0AD}";
 
-// a tool with a card rune takes that card's icon and colour, read at draw time so config.yaml's apply
 const iconOf = (tool: string) => {
   const rune = (
     {
@@ -158,14 +150,10 @@ const iconOf = (tool: string) => {
   };
 };
 
-// module state, so a hot reload folds every run again
 let members = new Map<string, Member>();
-// the main loop's calls this turn, from tool.call; a turn's end clears them, by when the transcript holds each
 let pending: Pending[] = [];
-// the calls drawn as their card under their title
 const open = new Set<string>();
-// the rail's drawn length; a card taller than this shows a gap at its top
-const RAIL = 200;
+const RAIL_MAX_CARD_LINES = 200;
 const isOn = () => config.enabled.transcript && config.enabled.fold;
 
 // reads the whole transcript per call, a cursor over new messages if long sessions make it slow
@@ -183,8 +171,6 @@ async function refresh($: $) {
   $.ui.invalidate("ui.render");
 }
 
-// a call's title line, pressed to draw its card under it, then any answers it got; a ToolGroup draws several, so
-// it suffixes each key with the call's place in the group
 function titleLines(
   $: Render[0],
   e: Render[1],
@@ -197,12 +183,10 @@ function titleLines(
   const width = innerWidth(e.viewport?.columns);
   const scope = `fold:${id}`;
   const { icon, color } = iconOf(tool);
-  // the spinner's two cells, or a dot holding them, so every title starts in one column
   const lead = `  ${icon}  `;
   const room = width - cells(lead);
   const line = wrap(title, room - 2)[0] ?? "";
   const shown = `${line}${cells(line) < cells(title) ? "…" : ""}`;
-  // an answer sits two cells further in than the title's text
   const indent = " ".repeat(cells(lead) + 2);
   return [
     // the blank line between rows belongs to the engine's own row, so the run's first line sets its own
@@ -246,7 +230,6 @@ function titleLines(
   ];
 }
 
-// the summary under the run's last call, pressed to unfold every call, or fold them all once each is unfolded
 function summary($: Render[0], e: Render[1], m: Member) {
   const { Box, Button } = $.ui.resolve(e);
   const isAllOpen = m.ids.every((id) => open.has(id));
@@ -267,7 +250,6 @@ function summary($: Render[0], e: Render[1], m: Member) {
 }
 
 export const fold = (on: On) => {
-  // a resumed session's runs fold from the start; register.tsx holds the unmatched session.start
   on("session.start", { surface: "terminal" }, async ($, e, next) => {
     const r = await next(e);
     void refresh($);
@@ -291,11 +273,9 @@ export const fold = (on: On) => {
     try {
       return await next(e);
     } finally {
-      // the call's end takes its running mark off, or drops it from the run when it failed
       void refresh($);
     }
   });
-  // every way a turn ends clears its pending calls, or one an abort cut before it was stored runs on forever;
   // clawd holds the unmatched turn.complete, so each reason is its own matcher
   for (const reason of ["answer", "aborted", "refusal", "error"] as const)
     on("turn.complete", { reason }, async ($, e, next) => {
@@ -307,7 +287,6 @@ export const fold = (on: On) => {
       return r;
     });
 
-  // registered ahead of every card rune, so a folded row never builds the card it hides
   on(
     "ui.render",
     { component: "ToolUse", surface: "terminal" },
@@ -338,13 +317,12 @@ export const fold = (on: On) => {
                 flexDirection="column-reverse"
               >
                 <Text {...paint(palette().dim, `fold:${id}`)}>
-                  {`${"│\n".repeat(RAIL)}╰`}
+                  {`${"│\n".repeat(RAIL_MAX_CARD_LINES)}╰`}
                 </Text>
               </Box>
               {
                 await next({
                   ...e,
-                  // the card sizes itself to the viewport, so it is handed the column the rail takes off
                   viewport: e.viewport && {
                     ...e.viewport,
                     columns: e.viewport.columns - 1,
@@ -359,7 +337,6 @@ export const fold = (on: On) => {
     },
   );
 
-  // a tool no rune draws keeps its engine result row under the call, which has to fold with it
   on(
     "ui.render",
     { component: "ToolResult", surface: "terminal" },

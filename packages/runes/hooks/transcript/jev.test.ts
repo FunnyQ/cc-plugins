@@ -1,6 +1,6 @@
 import { expect, test } from "claude-code/testing";
 
-import { afterCommand, afterOutput, isDenied, scrub } from "./jev";
+import { afterCommand, afterOutput, isDenied, jev, type Post, scrub } from "./jev";
 
 const kind = (p: Partial<Record<"markdown" | "json" | "diff" | "code" | "plain", number>>) => ({
   markdown: 0, json: 0, diff: 0, code: 0, plain: 0, ...p,
@@ -31,14 +31,12 @@ test("isDenied stops the commands that print secrets before anything is sent", (
 });
 
 test("afterCommand decides alone when the command settles it, and asks for the output otherwise", () => {
-  // the rule is on the probability of plain, so the boundary is exact
   const at = (plain: number, risk = 0.1) => afterCommand({ kind: kind({ code: 1 - plain, plain }), language: lang("typescript"), risk });
   expect(at(0.05)).toEqual({ done: true, lang: "typescript" });
   expect(at(0.06)).toEqual({ done: false });
   expect(at(0.5)).toEqual({ done: false });
   expect(at(0.94)).toEqual({ done: false });
   expect(at(0.95)).toEqual({ done: true, lang: undefined });
-  // a risky command never gets its output sent, however sure the kind is, and is never asked for its output
   expect(at(0.01, 0.6)).toEqual({ done: true, lang: undefined });
   expect(at(0.01, 0.59)).toEqual({ done: true, lang: "typescript" });
   expect(at(0.5, 0.9)).toEqual({ done: true, lang: undefined });
@@ -49,8 +47,44 @@ test("afterOutput names the fence for the likeliest non-plain kind, or none", ()
   expect(afterOutput({ kind: kind({ json: 0.9, plain: 0.1 }), language: lang("other") })).toBe("json");
   expect(afterOutput({ kind: kind({ diff: 0.9, plain: 0.1 }), language: lang("other") })).toBe("diff");
   expect(afterOutput({ kind: kind({ code: 0.9, plain: 0.1 }), language: lang("typescript") })).toBe("typescript");
-  // code in a language the list lacks stays plain: a fence with no language is no help
   expect(afterOutput({ kind: kind({ code: 0.9, plain: 0.1 }), language: lang("other") })).toBeUndefined();
   expect(afterOutput({ kind: kind({ code: 0.69, plain: 0.31 }), language: lang("typescript") })).toBeUndefined();
   expect(afterOutput({ kind: kind({ code: 0.7, plain: 0.3 }), language: lang("typescript") })).toBe("typescript");
+});
+
+test("view answers undefined while switched off, unasked, pending or plain, and the fence once Jev names one", async () => {
+  const answer = (plain: number) => ({
+    ok: true,
+    text: JSON.stringify({
+      answers: {
+        kind: { probabilities: kind({ code: 1 - plain, plain }) },
+        language: { probabilities: lang("typescript") },
+        risk: { noul: 0 },
+      },
+    }),
+  });
+  const replies: Array<(r: { ok: boolean; text: string }) => void> = [];
+  const post = (() => new Promise((resolve) => replies.push(resolve))) as unknown as Post;
+  let redraws = 0;
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+
+  expect(jev.view("cat x", "a")).toBeUndefined();
+  jev.work({ apiKey: "k", post, redraw: () => redraws++ });
+
+  expect(jev.view("gh pr view 1", "a")).toBeUndefined();
+  expect(jev.view("gh pr view 1", "a")).toBeUndefined();
+  expect(replies.length).toBe(1);
+  replies[0]!(answer(0.01));
+  await settle();
+  expect(jev.view("gh pr view 1", "a")).toBe("typescript");
+  expect(redraws).toBe(1);
+
+  expect(jev.view("gh pr view 2", "a")).toBeUndefined();
+  replies[1]!(answer(0.99));
+  await settle();
+  expect(jev.view("gh pr view 2", "a")).toBeUndefined();
+  expect(replies.length).toBe(2);
+
+  jev.work({ apiKey: undefined, post, redraw: () => {} });
+  expect(jev.view("gh pr view 1", "a")).toBeUndefined();
 });

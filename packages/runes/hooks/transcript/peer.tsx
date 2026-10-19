@@ -6,6 +6,7 @@ import { glow, INSTALL_HINT } from "./glow";
 import { innerWidth, wrap } from "./text";
 
 const FRAME_END = "The report follows:\n";
+const PEER_INDENT = 2;
 
 // the harness wraps a subagent's report in a frame for the model and indents every report line by two
 export const split = (text: string): { frame?: string; report: string } => {
@@ -39,8 +40,7 @@ export const peer = (on: On) => {
         $.ui.invalidate("ui.render");
       };
 
-      // two columns in, and two narrower, so its right edge stays with the other bubbles
-      const inner = innerWidth(e.viewport?.columns) - 2;
+      const inner = innerWidth(e.viewport?.columns) - PEER_INDENT;
       const { frame, report } = split(e.props.text);
       const lines = report.split("\n");
       const isLong = lines.length > foldLines;
@@ -72,7 +72,6 @@ export const peer = (on: On) => {
               : []),
           ]
         : [];
-      // glow failed or is missing, so the report falls back to plain cell-width wrapping
       const body: [string, unknown][] = runs?.length
         ? runs.map((line, j) => [
             `body:${j}`,
@@ -87,9 +86,8 @@ export const peer = (on: On) => {
         { Box, Text },
         {
           key: "peer",
-          // another agent's words rest a step behind the conversation's own
           color: mute(color),
-          indent: 2,
+          indent: PEER_INDENT,
           icon,
           title: e.props.from?.name ?? "peer",
           side,

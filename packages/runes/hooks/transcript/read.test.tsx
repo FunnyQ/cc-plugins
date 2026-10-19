@@ -113,12 +113,10 @@ test("a text read folds its content away, and the detail row unfolds it, numbere
   expect((await row.find({ key: "read:toggle" }))?.text.trim()).toBe("▾ lines 9–10 of 40");
   expect(await row.find({ type: "Text", text: " 9  " })).toBeDefined();
   expect(await row.find({ type: "Text", text: "alpha" })).toBeDefined();
-  // a tab draws as four spaces, so the row's cells stay countable
   expect(await row.find({ type: "Text", text: "    beta" })).toBeDefined();
   await row.press({ key: "read:toggle" });
   expect(await row.find({ type: "Text", text: "alpha" })).toBeUndefined();
   await row.unmount();
-  // a .txt has no language, and a folded card asks glow for nothing
   expect(stdins).toEqual([]);
 });
 

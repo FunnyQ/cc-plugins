@@ -17,7 +17,6 @@ export const reply = (on: On) => {
     const inner = innerWidth(e.viewport?.columns);
     const rendered = glow.view(inner, e.props.text, e.requestId);
     if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
-    // without glow the raw markdown still gets the bubble, wrapped by cell width
     const lines: Run[][] = rendered?.length
       ? rendered
       : wrap(e.props.text, inner).map((l) => (l ? [{ text: l }] : []));

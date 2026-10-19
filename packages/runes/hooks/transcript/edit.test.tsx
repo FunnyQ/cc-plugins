@@ -51,14 +51,13 @@ const EDIT = (more: Record<string, unknown> = {}) =>
     { output: { filePath: "/src/a.txt", structuredPatch: [PATCH], ...more } },
   );
 
-test("an Edit draws its path, its counts and each patch line numbered with its sign", async ($, on) => {
+test("an Edit draws its path, its counts and each patch line with its sign, a removed line under its old number and every other under its new one", async ($, on) => {
   await startSession($, on);
   const edit = EDIT();
   expect(await find($, edit, { key: "edit" })).toBeDefined();
   expect(
     await find($, edit, { type: "Text", text: /src\/a\.txt {2}\+1 −1/ }),
   ).toBeDefined();
-  // a removed line takes its old number, every other line its new one
   expect(await within($, edit, "edit", /^ 9 {3}$/)).toBeDefined();
   expect(await within($, edit, "edit", /^10 - $/)).toBeDefined();
   expect(await within($, edit, "edit", /^10 \+ $/)).toBeDefined();
@@ -115,7 +114,7 @@ const CREATE = (content: string) =>
     },
   );
 
-test("a Write that creates a short file draws all of it, numbered from line 1", async ($, on) => {
+test("a Write that creates a short file draws all of it, numbered from line 1, with no sign since it has nothing to compare", async ($, on) => {
   await startSession($, on);
   const row = await $.ui.mount(CREATE("one\ntwo\n"));
   expect(await row.find({ key: "write" })).toBeDefined();
@@ -125,7 +124,6 @@ test("a Write that creates a short file draws all of it, numbered from line 1", 
   expect(await row.find({ type: "Text", text: "1  " })).toBeDefined();
   expect(await row.find({ type: "Text", text: "two" })).toBeDefined();
   expect(await row.find({ key: "diff:more:row" })).toBeUndefined();
-  // a new file has nothing to compare, so no line carries a sign or a tint
   expect(await row.find({ type: "Text", text: /\+/ })).toBeUndefined();
   await row.unmount();
 });
@@ -146,7 +144,7 @@ test("a Write that creates a file taller than fold_lines shows its head and fold
   await row.unmount();
 });
 
-test("a Write over an existing file draws its diff in the write rune's colour", async ($, on) => {
+test("a Write over an existing file draws its diff in the write rune's colour, under replace_icon since a plus would read as a new file", async ($, on) => {
   await startSession($, on);
   const write = CALL(
     "Write",
@@ -155,7 +153,6 @@ test("a Write over an existing file draws its diff in the write rune's colour", 
   );
   expect(await find($, write, { key: "write" })).toBeDefined();
   expect(await within($, write, "write", /^10 \+ $/)).toBeDefined();
-  // a plus would read as a new file, so a replacement takes replace_icon
   expect(
     await find($, write, { type: "Text", text: /^\u{F11E7} {2}a\.txt/u }),
   ).toBeDefined();
@@ -204,7 +201,7 @@ test("an errored Edit draws the text the model read", async ($, on) => {
   ).toBeDefined();
 });
 
-test("a known language goes through glow and its colours land on the matching lines", async ($, on) => {
+test("a known language goes through glow, its colours land on the matching lines, the code keeps its own indent, and the plain card drawn before glow lands is drawn again", async ($, on) => {
   const stdins: string[] = [];
   await startSession($, on, {
     run: (e) => {
@@ -241,7 +238,6 @@ test("a known language goes through glow and its colours land on the matching li
   expect(await within($, edit, "edit", /^if$/)).toMatchObject({
     props: { color: xterm256(81) },
   });
-  // the code keeps its own indent once the block's goes
   expect(await within($, edit, "edit", /^ {4}$/)).toBeDefined();
 });
 

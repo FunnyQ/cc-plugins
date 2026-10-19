@@ -1,4 +1,3 @@
-// the pasted images of a prompt row, found again in the session transcript
 
 type Block = {
   type: string;

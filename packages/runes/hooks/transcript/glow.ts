@@ -3,7 +3,6 @@ import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
 
 // glow's dark style indents every line by this much
 const GLOW_MARGIN = 2;
-// renders kept across redraws; the least recently drawn goes past this
 const CACHE_SIZE = 200;
 
 const glowArgv = (width: number, style: string) => [
@@ -26,18 +25,13 @@ type RunCommand = (
 
 type Job = { key: string; width: number; text: string; style: string };
 
-// module state shared by both bubbles, so a hot reload renders everything again
 const rendered = new Map<string, Run[][] | null>();
-// a streamed reply's last formatted text, drawn while its next chunk is still in glow
 const lastGood = new Map<string, Run[][]>();
-// keyed by owner, so a reply streaming faster than glow queues only its newest text
 const queue = new Map<string, Job>();
 let transport: { run: RunCommand; redraw: () => void } | undefined;
 let working = false;
 let wake: (() => void) | undefined;
-// glow could not start, so stop queueing work for it
 let missing = false;
-// each owner's last landed render; a streamed reply's older chunks are never drawn again, so they leave the cache
 const landed = new Map<string, string>();
 
 const keep = <V>(map: Map<string, V>, key: string, value: V) => {
@@ -50,16 +44,13 @@ export const INSTALL_HINT = "runes: install glow for markdown bubbles — brew i
 let hinted = false;
 
 export const glow = {
-  // true once, on the first draw after glow is found missing, so the install hint shows a single time
   hintDue() {
     if (!missing || hinted) return false;
     hinted = true;
     return true;
   },
-  // a draw never waits on glow: it takes what is rendered, or the owner's last, or null for raw text
   view(width: number, text: string, owner?: string): Run[][] | null {
     const { style } = config.glow;
-    // the style is in the key, so a /runes reload that changes it renders everything again
     const key = `${style}\0${width}\0${text}`;
     if (rendered.has(key)) {
       const lines = rendered.get(key)!;
@@ -112,7 +103,6 @@ export const glow = {
 
 const isBlank = (runs: Run[]) => runs.every((r) => !r.text.trim());
 
-// glow pads every line to its width and indents it; both go, so each row is the text alone
 const tidy = (runs: Run[]): Run[] => {
   const out = dropLead(runs, Math.min(GLOW_MARGIN, leadingSpaces(runs)));
   while (out.length && !out.at(-1)!.backgroundColor && !out.at(-1)!.text.trim())
@@ -122,7 +112,6 @@ const tidy = (runs: Run[]): Run[] => {
   return out;
 };
 
-// glow's blank first and last lines go, and each line is tidied to its text
 const toLines = (stdout: string): Run[][] => {
   const lines = stdout.split("\n").map(parseAnsi);
   while (lines.length && isBlank(lines[0])) lines.shift();

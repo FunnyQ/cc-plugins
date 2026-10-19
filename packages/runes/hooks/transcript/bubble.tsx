@@ -7,32 +7,22 @@ import { cells, wrap } from "./text";
 type BubbleProps = {
   color: string;
   icon: string;
-  // cut to the header's room
   title?: string;
-  // where the bar and the icon sit
   side: Side;
   inner: number;
   rows: [key: string, child: unknown][];
   key: string;
-  // down: a tee on the bottom edge hands a line to the card drawn next; up: this card takes that line in.
-  // `at` is the link's column from an unindented card's left edge, so both cards of a pair share one number
   link?: { to: "down" | "up"; at: number };
-  // false draws the bar's column blank, so the frame still lines up with the other bubbles
   bar?: boolean;
-  // columns the card sits in
   indent?: number;
-  // a hover group: every edge rests muted and lights to `color` while the pointer is on any of it
   scope?: string;
-  // a press target set into the top edge, at the end away from the icon
   action?: { key: string; label: string; onPress: () => void };
 };
 
 const SATURATION = 0.5;
 const BRIGHTNESS = 0.75;
-// one entry per colour drawn: the configured ones, the shell palette and glow's
 const muted = new Map<string, string>();
 
-// glow's light style is the one sign of a light terminal the config carries
 export const isLight = () => config.glow.style === "light";
 
 // text stands in for the terminal's foreground, which has no hex to mute
@@ -59,7 +49,6 @@ export const PALETTES = {
 
 export const palette = () => PALETTES[isLight() ? "light" : "dark"];
 
-// a finished card's content never changes, yet every redraw re-derived it; each card keeps its own, so one kind never evicts another's
 export const memo = (size = 200) => {
   const cache = new Map<string, unknown>();
   return <V,>(key: string, make: () => V): V => {
@@ -71,11 +60,9 @@ export const memo = (size = 200) => {
   };
 };
 
-// the title's tail for a call still running or cut short
 export const stateOf = (p: { isRunning: boolean; isInterrupted: boolean }) =>
   p.isInterrupted ? " · interrupted" : p.isRunning ? " · running" : "";
 
-// the text the model read for a call that errored, wrapped to the card
 export const errorRows = (
   Text: Elements["terminal"]["Text"],
   text: string,
@@ -87,7 +74,6 @@ export const errorRows = (
     <Text color={color}>{line}</Text>,
   ]);
 
-// a card that draws its call's result makes the engine's own block under it a repeat, so that block draws empty
 export const hideResult = (on: On, tool: string, rune: Rune) =>
   on(
     "ui.render",
@@ -99,8 +85,6 @@ export const hideResult = (on: On, tool: string, rune: Rune) =>
     },
   );
 
-// pulls each channel halfway to the colour's grey, then moves it a quarter toward the background,
-// so the hue stays at lower saturation and contrast
 export const mute = (color: string, light = isLight()) => {
   const key = `${light}${color}`;
   const known = muted.get(key);
@@ -120,10 +104,8 @@ export const mute = (color: string, light = isLight()) => {
   return out;
 };
 
-// a row that draws a rule across the card, joined to its side borders
 export const DIVIDER = Symbol("divider");
 
-// the Text props for a colour that rests muted and lights up while its hover group is under the pointer
 export const paint = (color: string, scope?: string) =>
   scope ? { color: mute(color), hover: { color, scope } } : { color };
 
@@ -155,7 +137,6 @@ export const pressRow = (
   );
 };
 
-// a divider, then the fold label centred on a full-row Button
 export const foldRows = (
   Button: Elements["terminal"]["Button"],
   {
@@ -191,8 +172,6 @@ export const foldRows = (
   ];
 };
 
-// a toggle row that folds a whole section away; open, the body follows and a fold row closes it from its end.
-// body is a function, so a folded section derives nothing
 export const foldSection = (
   Button: Elements["terminal"]["Button"],
   {
@@ -234,7 +213,6 @@ export const foldSection = (
   ];
 };
 
-// one row of styled runs; an empty one draws a space so the row keeps its height
 export const runLine = <R extends { text: string }>(
   Text: Elements["terminal"]["Text"],
   runs: R[],
@@ -287,9 +265,7 @@ export const bubble = (
         {action.label}
       </Button>
     ) : null;
-  // what the header's rule fills: the frame less its corners, the label, its padding and the action
   const fill = inner - cells(label) - (act ? cells(action!.label) : 0);
-  // a rule starting at column `from` takes the link's ┴ when the middle falls inside it
   const rule = (from: number) => {
     const line = [..."─".repeat(Math.max(0, fill))];
     if (link?.to === "up" && mid >= from && mid < from + line.length)
@@ -362,9 +338,8 @@ export const bubble = (
       flexDirection="row"
       marginTop={link?.to === "up" ? 0 : 1}
       marginLeft={indent}
-      // the column CHROME leaves spare goes before a right-side frame, not between it and its bar
+      // the column BUBBLE_CHROME_COLUMNS leaves spare goes before a right-side frame, not between it and its bar
       {...(side === "right" ? { justifyContent: "flex-end" as const } : {})}
-      // a hover group lights over the Box's whole area, so a hovering card must not stretch past its frame
       {...(scope ? { alignSelf: "flex-start" as const } : {})}
     >
       {side === "left" ? strip : null}

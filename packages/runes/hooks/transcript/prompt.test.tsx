@@ -59,7 +59,6 @@ test("a long prompt folds past the line cap", async ($, on) => {
     surface: "terminal",
     ...ROW(long),
   });
-  // the same fold block as the Bash cards: a divider, then a centred label padded to the row
   expect(await row.find({ type: "Text", text: /^├─+┤$/ })).toBeDefined();
   const more = await row.find({ key: "body:0:more" });
   expect(more?.text.trim()).toBe("▸ 14 more lines");

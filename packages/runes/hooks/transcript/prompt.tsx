@@ -52,7 +52,6 @@ export const prompt = (on: On) => {
       }
       // run the chain anyway so plugins beneath still see the row; its tree is discarded
       await next(e);
-      // a prompt body taller than fold_lines folds to its head
       const { color, icon, side, fold_lines: foldLines } = config.prompt;
       const { Box, Text, Button } = $.ui.resolve(e);
       const toggle = (id: string) => () => {
@@ -66,7 +65,6 @@ export const prompt = (on: On) => {
         child,
       ];
       const parts = segments(e.props.text);
-      // a prompt is markdown too, so its shown body goes through glow; reminders stay plain
       const shown = parts.map((s, i) => {
         const lines = s.text.split("\n");
         return lines.length > foldLines && !open.has(`${e.requestId}:${i}`)
@@ -108,7 +106,6 @@ export const prompt = (on: On) => {
         const lines = s.text.split("\n");
         const isLong = lines.length > foldLines;
         const runs = glowed[i];
-        // glow failed or is missing, so the body falls back to plain cell-width wrapping
         const body = runs?.length
           ? runs.map((line, j) => row(`body:${i}:${j}`, runLine(Text, line)))
           : wrap(shown[i], inner).map((line, j) =>

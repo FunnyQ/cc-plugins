@@ -45,7 +45,6 @@ export const xterm256 = (n: number): string => {
   );
 };
 
-// an extended colour (38/48) consumes its own parameters, so it returns how many it ate
 const extended = (
   codes: number[],
   at: number,
@@ -89,7 +88,6 @@ const apply = (style: Style, params: string): Style => {
   return s;
 };
 
-// one terminal line of SGR-styled text to runs; other escapes (OSC 8 links) are dropped
 export const parseAnsi = (line: string): Run[] => {
   const runs: Run[] = [];
   let style: Style = {};
@@ -111,13 +109,11 @@ export const parseAnsi = (line: string): Run[] => {
   return runs;
 };
 
-// how many spaces open a line, counted across its runs
 export const leadingSpaces = (runs: Run[]) => {
   const t = runs.map((r) => r.text).join("");
   return t.length - t.trimStart().length;
 };
 
-// drops the first n characters of a line, across as many runs as they span
 export const dropLead = (runs: Run[], n: number): Run[] => {
   const out = runs.map((r) => ({ ...r }));
   while (n > 0 && out.length) {

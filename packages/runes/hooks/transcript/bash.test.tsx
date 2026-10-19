@@ -2,6 +2,7 @@ import { expect, test, type Engine } from "claude-code/testing";
 
 import { mute } from "./bubble";
 import { xterm256 } from "./ansi";
+import { cells, innerWidth } from "./text";
 import {
   CONFIG,
   eventually,
@@ -63,7 +64,6 @@ test("a Bash call draws its description in the header and the command after a $"
   expect(
     await find($, call, { type: "Text", text: "$ bun test hooks/" }),
   ).toBeDefined();
-  // the call's card hands the link down to its output
   expect(await find($, call, { type: "Text", text: /┬/ })).toBeDefined();
 });
 
@@ -139,7 +139,6 @@ test("unfolding the command lights only the command card", async ($, on) => {
   const row = await $.ui.mount(event);
   await row.press({ key: "cmd:more" });
   await row.unmount();
-  // `d` reads as a command name, so its full colour is the bash green
   expect(await within($, event, "bash", /^d$/)).toEqual({
     type: "Text",
     props: { bold: true, color: "#5f8f6a" },
@@ -148,13 +147,12 @@ test("unfolding the command lights only the command card", async ($, on) => {
   expect(await within($, event, "bash", /^╰─+┬─+╯$/)).toMatchObject({
     props: { color: "#5f8f6a" },
   });
-  // the output is folded still, so it stays dim
   expect(await within($, event, "bash:output", /^1$/)).toMatchObject({
     props: { color: mute("#d4d4d4") },
   });
 });
 
-test("an errored Bash result taller than fold_lines folds to its head and its tail around the fold row", async ($, on) => {
+test("an errored Bash result taller than fold_lines folds to its head and its tail around the fold row, where a failing run prints its failures", async ($, on) => {
   await startSession($, on, fold(3));
   const result = RESULT(SEVEN, true);
   const toggle = async () => {
@@ -213,6 +211,14 @@ test("a successful Bash result at fold_lines 1 still folds to its head alone", a
   expect(await outLines($, RESULT(SEVEN))).toEqual(["1", "—", "▸ 6 more lines"]);
 });
 
+test("a card drawn before its result lands redraws with the output", async ($, on) => {
+  await startSession($, on);
+  expect(await find($, RESULT(OUT("")), { type: "Text", text: "42 pass" })).toBeUndefined();
+  expect(
+    await find($, RESULT(OUT("42 pass\n")), { type: "Text", text: "42 pass" }),
+  ).toBeDefined();
+});
+
 test("a Bash result draws its own card, linked to the call above it", async ($, on) => {
   await startSession($, on);
   const result = RESULT(OUT("42 pass\n0 fail\n"));
@@ -221,7 +227,6 @@ test("a Bash result draws its own card, linked to the call above it", async ($, 
     await find($, result, { type: "Text", text: "42 pass" }),
   ).toBeDefined();
   expect(await find($, result, { type: "Text", text: /┴/ })).toBeDefined();
-  // the trailing newline is not a blank line of output
   expect(await find($, result, { key: "out:2" })).toBeUndefined();
 });
 
@@ -250,22 +255,23 @@ test("Bash cards draw no bar, and the link runs down the middle column", async (
   const result = RESULT({ stdout: "ok", stderr: "" });
   const card = await find($, result, { key: "bash:output" });
   expect(card?.children?.[0]?.props?.backgroundColor).toBeUndefined();
-  // 60 columns leave a 53-cell inner; the call keeps 2 columns free on its right, so its 55-cell frame's middle is column 27
+  const inner = innerWidth(60);
+  const callFrame = inner - 2 + 4;
+  const callMiddle = Math.floor(callFrame / 2);
+  const outputIndent = 2;
+  const outputRuleStart = cells("╭─ \u{EF11}  output ");
   const tee = await find($, result, { type: "Text", text: /┬/ });
   const stem = await find($, result, { type: "Text", text: /^\s{2,}│$/ });
-  expect(String(tee?.text).indexOf("┬")).toBe(27);
-  // the ┬ meets the ┴ directly, so the link takes no row of its own
+  expect(String(tee?.text).indexOf("┬")).toBe(callMiddle);
   expect(stem).toBeUndefined();
   expect(
     await find($, result, { type: "Text", text: "\u{EF11}  output " }),
   ).toBeDefined();
-  // the output card sits two columns in, so its frame's column 25 is the call's 27;
-  // its ┴ sits in the rule after "╭─ <icon>  output ", which starts at column 13
   expect(await find($, result, { key: "bash:output" })).toMatchObject({
-    props: { marginLeft: 2 },
+    props: { marginLeft: outputIndent },
   });
   const elbow = await find($, result, { type: "Text", text: /┴/ });
-  expect(String(elbow?.text).indexOf("┴")).toBe(25 - 13);
+  expect(String(elbow?.text).indexOf("┴")).toBe(callMiddle - outputIndent - outputRuleStart);
 });
 
 test("an empty Bash result says so", async ($, on) => {
@@ -323,7 +329,6 @@ test("mute halves the saturation and dims to three quarters, keeping the hue", (
     return Math.max(...c) - Math.min(...c);
   };
   expect(spread(mute("#c94f4f"))).toBeLessThan(spread("#c94f4f"));
-  // a grey has no saturation to lose, so only the dimming shows: 0x80 * 0.75 = 0x60
   expect(mute("#808080")).toBe("#606060");
 });
 
@@ -344,7 +349,6 @@ test("a foldable card folds and unfolds from a full-width row under a divider", 
   expect(await row.find({ key: "cmd:2" })).toBeUndefined();
   expect(await row.find({ key: "cmd:toggle" })).toBeUndefined();
   expect(await row.find({ type: "Text", text: /^├─+┤$/ })).toBeDefined();
-  // the label pads to the call's 51-cell inner width, so the whole row takes the press
   const more = await row.find({ key: "cmd:more" });
   expect(more?.text.trim()).toBe("▸ 2 more lines");
   expect(more?.text.length).toBe(51);
@@ -409,7 +413,6 @@ test("a JSON result goes through glow as a json fence and draws its colours, mut
     props: { color: mute(xterm256(140)) },
     hover: { color: xterm256(140), scope: "t1:out" },
   });
-  // the block's indent goes, so the text starts at the card's edge
   expect(await within($, result, "bash:output", /^\{$/)).toBeDefined();
 });
 
@@ -457,7 +460,6 @@ test("glow's light style switches the cards to the light palette", async ($, on)
   });
 });
 
-// what Jev's command-only request answers: code in typescript, no risk
 const JEV = (over: { code?: number; risk?: number } = {}) => {
   const code = over.code ?? 0.99;
   return {
@@ -533,7 +535,6 @@ test("with a key, a command Jev is sure prints code goes through glow, and the o
     ),
   ).toBe(true);
   expect(stdins.some((s) => s.startsWith("```typescript\n"))).toBe(true);
-  // one request, for the command, with its token masked and none of the output in it
   expect(bodies).toHaveLength(1);
   expect(bodies[0]).toContain("make report");
   expect(bodies[0]).not.toContain("abcdef1234567890abcdef");
@@ -557,4 +558,16 @@ test("a command the local list denies is never sent to Jev", async ($, on) => {
   ).toBeDefined();
   await new Promise((r) => setTimeout(r, 30));
   expect(sent).toEqual([]);
+});
+
+test("a finished card drawn again reuses the command and output it laid out", async ($, on) => {
+  await startSession($, on);
+  const drawn = CALL({ command: "echo aaaa" }, { output: OUT("xxxx\n") });
+  expect(await find($, drawn, { type: "Text", text: /aaaa/ })).toBeDefined();
+  expect(await within($, drawn, "bash:output", /^xxxx$/)).toBeDefined();
+  const same = CALL({ command: "echo bbbb" }, { output: OUT("yyyy\n") });
+  expect(await find($, same, { type: "Text", text: /aaaa/ })).toBeDefined();
+  expect(await find($, same, { type: "Text", text: /bbbb/ })).toBeUndefined();
+  expect(await within($, same, "bash:output", /^xxxx$/)).toBeDefined();
+  expect(await within($, same, "bash:output", /^yyyy$/)).toBeUndefined();
 });

@@ -8,7 +8,6 @@ export const CONFIG = `${HOME}/.config/q-lab/cc-plugins/runes/config.yaml`;
 // and a line it cannot read fails the way bun's parser does
 const fakeYaml = (text: string) => {
   const root: Record<string, unknown> = {};
-  // each open mapping with the indent its keys sit at; a header's mapping exists once a child arrives
   const stack: { indent: number; map: Record<string, unknown>; parent?: Record<string, unknown>; key?: string }[] = [
     { indent: -1, map: root },
   ];
@@ -59,7 +58,6 @@ export const fakeHost = (
     store.delete(e.key);
     return { value: undefined } as never;
   });
-  // HOME unless a test names the variable; any other is unset, as on a machine without it
   on("env.get", (_$, e) => ({ value: env[e.name] ?? (e.name === "HOME" ? HOME : undefined) }) as never);
   on("fs.exists", (_$, e) => ({ value: files.has(e.path) }) as never);
   on("fs.read", (_$, e) => ({ value: files.get(e.path) }) as never);
@@ -84,16 +82,13 @@ export const fakeHost = (
     } as never;
   });
   on("command.register", () => ({ value: undefined }) as never);
-  // the transcript the fold rune reads its runs from; a test that folds hands its own
   on("session.messages", () => ({ value: messages }) as never);
   return { files, store, toasts };
 };
 
-// session.start loads the config and launches the glow worker
 export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof fakeHost>[1]) => {
   const host = fakeHost(on, opts);
   on("session.start", (_$, e) => e as never);
-  // the engine beneath the message rows, which the bubbles still run so other plugins see each row
   const beneath: string[] = [];
   for (const component of ["UserMessage", "AssistantMessage"] as const)
     on("ui.render", { component }, (_$, e) => {
@@ -108,7 +103,6 @@ export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof f
   return Object.assign(host, { beneath });
 };
 
-// the worker runs glow off the render path, so a test polls until its result lands
 export const eventually = async (check: () => Promise<boolean>) => {
   for (let i = 0; i < 100; i++) {
     if (await check()) return true;
@@ -119,7 +113,6 @@ export const eventually = async (check: () => Promise<boolean>) => {
 
 type Mounted = Awaited<ReturnType<Engine["ui"]["mount"]>>;
 
-// mounts one row, runs one query and unmounts it again
 export const find = async (
   $: Engine,
   event: never,
@@ -148,7 +141,6 @@ export const within = async ($: Engine, event: never, key: string, text: RegExp)
   return card ? walk(card) : undefined;
 };
 
-// what a process.run hook answers for a command that printed `stdout`
 export const ran = (stdout: string) => ({
   value: { exitCode: 0, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
 });

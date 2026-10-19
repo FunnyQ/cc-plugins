@@ -6,7 +6,6 @@ test("output that parses as a JSON object or array is json", () => {
   expect(language("gh api repos/x", '{"a": 1}\n')).toBe("json");
   expect(language("jq .", "[1, 2]")).toBe("json");
   expect(language("echo", "{oops")).toBeUndefined();
-  // a bare number parses as JSON but reads as plain text
   expect(language("wc -l < a", "42")).toBeUndefined();
 });
 
@@ -22,6 +21,7 @@ test("output that opens like a unified diff is diff", () => {
 test("one file read by cat, head, tail or sed -n takes the file's language", () => {
   expect(language("cat hooks/bash.tsx", "x")).toBe("tsx");
   expect(language("head -20 src/app.rb", "x")).toBe("ruby");
+  expect(language("head -n 5 a.ts", "x")).toBe("typescript");
   expect(language("sed -n '1,40p' lib/a.py", "x")).toBe("python");
   expect(language("tail -n 5 config.yaml", "x")).toBe("yaml");
   expect(language("cat README.md", "# hi")).toBe("markdown");

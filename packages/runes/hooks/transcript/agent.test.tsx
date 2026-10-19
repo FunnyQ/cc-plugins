@@ -199,7 +199,6 @@ test("a full model id shows as its family", async ($, on) => {
 });
 
 test("the effort a subagent's requests carry joins its model as model/effort", async ($, on) => {
-  // stands in for the engine sending the request
   on("turn.step", async function* (_$, e) {
     return { turnId: e.turnId, index: e.index, answer: "", toolUses: [] } as never;
   });

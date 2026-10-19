@@ -28,7 +28,6 @@ const DIFF = {
   light: { add: "#718c00", del: "#c82829", addBg: "#e6f2d8", delBg: "#f8e1e1" },
 };
 
-// a removed line takes its old number, every other line its new one; null splits two hunks
 const linesOf = (hunks: Hunk[]): (Line | null)[] =>
   hunks.flatMap((h, i) => {
     let old = h.oldStart;
@@ -51,7 +50,6 @@ const linesOf = (hunks: Hunk[]): (Line | null)[] =>
 
 const remember = memo();
 
-// a hunk's lines read once per call, with what the header and the gutter need from them
 const diffOf = (hunks: Hunk[]) => {
   const lines = linesOf(hunks);
   let adds = 0;
@@ -138,14 +136,14 @@ export const edit = (on: On) => {
           return card(`${path} · new`, icon, [
             ["empty", <Text color={palette().dim}>(empty file)</Text>],
           ]);
-        // codeRows opens with a divider a card's first row does not need
         const rows = codeRows(Text, {
           id,
           content,
           start: 1,
           path: file_path,
           inner,
-        }).slice(1);
+          divider: false,
+        });
         const key = `${id}:diff`;
         const isLong = rows.length > foldLines;
         return card(`${path} · new`, icon, [
@@ -177,7 +175,6 @@ export const edit = (on: On) => {
       const { text: TEXT, dim: DIM } = palette();
       const diff = DIFF[theme];
 
-      // the line count rides in the key, so a card drawn plain before glow lands is drawn again
       const rows = remember(
         `rows\0${id}\0${inner}\0${theme}\0${size}\0${colored ? "glow" : "plain"}`,
         () => {
@@ -221,11 +218,9 @@ export const edit = (on: On) => {
       const counts = [adds && `+${adds}`, dels && `−${dels}`]
         .filter(Boolean)
         .join(" ");
-      // a plus would read as a new file, so a Write over an existing one takes its own glyph
       const glyph = rune === "write" ? config.write.replace_icon : icon;
       const key = `${id}:diff`;
       const isLong = rows.length > foldLines;
-      // sliced before drawing, so a folded diff builds only the rows it shows
       const shown = isLong && !open.has(key) ? rows.slice(0, foldLines) : rows;
       return card(`${path}${counts ? `  ${counts}` : ""}${state}`, glyph, [
         ...shown.map((runs, i): [string, unknown] =>

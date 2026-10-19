@@ -26,7 +26,6 @@ const ran = (exitCode: number, stdout: string) => ({
   },
 });
 
-// mounts the reply once and reports whether the query matches what it drew
 const draws = async (
   $: Engine,
   reply: never,
@@ -51,7 +50,6 @@ test("a reply draws glow's lines inside the orange bubble once the worker has ru
   ).toBe(true);
   const row = await $.ui.mount(REPLY("**hi** there\n\nsecond"));
   expect(await row.find({ key: "line:1" })).toBeDefined();
-  // glow's blank first and last lines are trimmed
   expect(await row.find({ key: "line:2" })).toBeUndefined();
   await row.unmount();
   // a mod's child gets no HOME, and glow then writes its config under a literal ~ in the cwd

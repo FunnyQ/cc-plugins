@@ -13,11 +13,9 @@ const GLOW_INDENT = 4;
 const GLOW_MAX_WIDTH = 400;
 
 const remember = memo();
-// keyed by glow's own output, so an aligned render lives exactly as long as glow keeps the one it came from
 const aligned = new WeakMap<Run[][], Run[][] | null>();
 
 // glow drops a fence's blank first and last lines, so they are counted back; any other mismatch draws plain.
-// `key` names the lines, so the fence is built once and not on every draw
 export const highlight = (
   key: string,
   codes: string[],
@@ -54,7 +52,6 @@ export const highlight = (
   return aligned.get(glowed)!;
 };
 
-// a file's text as numbered rows from `start` under a divider, coloured by glow when its language is known
 export const codeRows = (
   Text: Elements["terminal"]["Text"],
   {
@@ -63,12 +60,14 @@ export const codeRows = (
     start,
     path,
     inner,
+    divider = true,
   }: {
     id: string;
     content: string;
     start: number;
     path: string;
     inner: number;
+    divider?: boolean;
   },
 ): [string, unknown][] => {
   const { text: TEXT, dim: DIM } = palette();
@@ -98,7 +97,7 @@ export const codeRows = (
       ),
   );
   return [
-    ["code:divider", DIVIDER],
+    ...(divider ? [["code:divider", DIVIDER] as [string, unknown]] : []),
     ...rows.map((runs, i): [string, unknown] => [
       `line:${i}`,
       runLine(Text, runs, ({ text: _, color: c, ...style }) => ({

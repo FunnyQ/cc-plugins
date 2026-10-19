@@ -30,7 +30,6 @@ const shell = (p: (typeof PALETTES)["dark"]): Partial<Record<Kind, Style>> => ({
 });
 const SHELL = { dark: shell(PALETTES.dark), light: shell(PALETTES.light) };
 
-// a finished card's command and output never change, yet every redraw re-tokenized, re-parsed and re-wrapped them
 const remember = memo();
 
 // a progress bar redraws its line with \r, so only the text after the last one is what the terminal showed
@@ -84,7 +83,6 @@ export const bash = (on: On) => {
       };
       const id = e.requestId;
       const inner = innerWidth(e.viewport?.columns);
-      // the call keeps two columns free on its right, so the output card under it reaches past its edge
       const callInner = inner - 2;
       const isBad = isErrored || isInterrupted;
       const tint = isBad ? error_color : color;
@@ -111,8 +109,6 @@ export const bash = (on: On) => {
       };
       const visible = <T,>(part: string, all: T[]) =>
         open.has(`${id}:${part}`) ? all : all.slice(0, foldLines);
-      // each card is one hover group, so the pointer anywhere on it lights all of it
-      // an unfolded card is being read, so it stays at full colour until it folds again
       const callScope = open.has(`${id}:cmd`) ? undefined : `${id}:call`;
       const outScope = open.has(`${id}:out`) ? undefined : `${id}:out`;
       const theme = isLight() ? "light" : "dark";
@@ -122,7 +118,6 @@ export const bash = (on: On) => {
         if (!s) return paint(TEXT, callScope);
         return s.color ? { ...s, ...paint(s.color, callScope) } : s;
       };
-      // the link runs through the middle column of the call card, and the output card meets it there
       const linkAt = Math.floor((callInner + 4) / 2);
 
       const state = isInterrupted
@@ -163,7 +158,6 @@ export const bash = (on: On) => {
         backgroundTaskId?: string;
       };
       const stdout = typeof o.stdout === "string" ? o.stdout : "";
-      // the output's lengths are in every key: a card can draw once without output before its result lands
       const size = `${stdout.length}\0${String(o.stderr ?? "").length}\0${typeof output === "string" ? output.length : -1}`;
       const { lang, fence } = remember(`lang\0${id}\0${isBad}\0${size}`, () => {
         const lang = isBad || !stdout ? undefined : language(command, stdout);
@@ -173,7 +167,6 @@ export const bash = (on: On) => {
             : `\`\`\`${lang}\n${stdout.replace(/\n+$/, "")}\n\`\`\``;
         return { lang, fence };
       });
-      // output the sniffer could not place may still be code or Markdown, which Jev says once it has been asked
       const guess =
         lang || isBad || !stdout ? undefined : jev.view(command, stdout);
       const shown = lang ?? guess;
@@ -185,7 +178,6 @@ export const bash = (on: On) => {
           )
         : fence;
       const glowed = shown ? glow.view(inner - 2, fenced) : null;
-      // until glow has rendered, or with no language to give it, the output draws as plain text
       const out = remember(
         `out\0${id}\0${inner}\0${isBad}\0${size}\0${glowed?.length ? "glow" : "plain"}`,
         () => {
@@ -214,9 +206,7 @@ export const bash = (on: On) => {
           outScope ? { hover: { scope: outScope } } : {},
         ),
       ];
-      // a folded error keeps its tail too, where a failing run prints its failures and its summary
       const isFolded = out.length > foldLines && !open.has(`${id}:out`);
-      // at fold_lines 1 the one line kept is the last
       const tail = isFolded && isBad ? Math.max(1, Math.floor(foldLines / 2)) : 0;
       const tailRows: [string, unknown][] = tail
         ? [
@@ -240,7 +230,6 @@ export const bash = (on: On) => {
                 </Text>,
               ] as [string, unknown],
             ]),
-        // with no head above it, the fold row needs no divider over it
         ...fold("out", out.length, outScope, inner - 2).filter(
           ([key]) => foldLines > tail || key !== "out:divider",
         ),
@@ -257,7 +246,6 @@ export const bash = (on: On) => {
               icon: outputIcon,
               title: isBad ? "error" : "output",
               side,
-              // two columns in, and two narrower, so its right edge stays with the other bubbles
               inner: inner - 2,
               indent: 2,
               rows: outRows,

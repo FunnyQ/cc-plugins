@@ -46,7 +46,6 @@ const duration = (ms: number) => {
 const tokens = (n: number) =>
   n < 1000 ? String(n) : `${(n / 1000).toFixed(1)}k`;
 
-// the zero counts go, so a read-only agent's line is not a row of zeros
 const statsLine = (t: NonNullable<Output["toolStats"]>) =>
   [
     t.readCount && plural(t.readCount, "read"),
@@ -61,11 +60,9 @@ const statsLine = (t: NonNullable<Output["toolStats"]>) =>
 
 const remember = memo();
 
-// a full id shows as its family, so claude-sonnet-5-5 reads sonnet; an alias stays as given
 const family = (model: string) => model.match(/^claude-([a-z]+)-/)?.[1] ?? model;
 
 export const agent = (on: On) => {
-  // module state, so a hot reload folds every card again
   const open = new Set<string>();
 
   // no Agent output carries the effort, so it is read off the subagent's own model requests, by agentId
@@ -127,7 +124,6 @@ export const agent = (on: On) => {
       const stats = o.toolStats ? statsLine(o.toolStats) : "";
       const info = [meta, stats, o.sessionUrl ?? ""].filter(Boolean);
 
-      // the texts and their line counts, read once per call rather than on every draw
       const { prompt, report } = remember(
         `texts\0${id}\0${o.status ?? ""}`,
         () => {
@@ -141,7 +137,6 @@ export const agent = (on: On) => {
         },
       );
 
-      // glow runs only once a section is open, so the agents nobody unfolds cost nothing
       const section = (name: string, text: { text: string; count: number }) => {
         const key = `${id}:${name}`;
         return foldSection(Button, {

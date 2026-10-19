@@ -32,7 +32,6 @@ const size = (bytes: number) =>
     ? `${Math.round(bytes / 1024)} KB`
     : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-// what the read came to, in one line; a kind this does not know shows its name
 const detail = (o: Output): string => {
   switch (o.type) {
     case "text": {

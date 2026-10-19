@@ -12,9 +12,7 @@ export type Kind =
   | "space";
 type Token = { text: string; kind: Kind };
 
-// longest first, so `&&` is never read as two `&`
 const OPS = ["2>&1", "&&", "||", ">>", "$(", "|", ";", "(", ")", ">", "<", "&"];
-// after these the next word is a file or an argument, not a command
 const TAKES_ARG = new Set([")", ">", "<", ">>", "2>&1"]);
 
 // a highlighter's reading, not a parser's: heredocs and nested quoting fall back to plain words
@@ -68,7 +66,6 @@ export const tokenize = (line: string): Token[] => {
 
 const CONTINUE: Token = { text: "  ", kind: "prompt" };
 
-// a line too wide for the row breaks before each top-level &&, || and |, then hard-wraps what is still too wide
 export const layout = (command: string, width: number): Token[][] =>
   command.split("\n").flatMap((src, n) => {
     const lead = n === 0 ? "$ " : "  ";

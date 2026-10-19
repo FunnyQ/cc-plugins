@@ -44,7 +44,6 @@ const skillFile = async (fs: Fs, name: string): Promise<string | undefined> => {
       for (const [key, installs] of Object.entries(plugins)) {
         if (!key.startsWith(`${plugin}@`)) continue;
         for (const i of installs) {
-          // a project-scoped install belongs to that project alone
           if (i.projectPath && i.projectPath !== where.cwd) continue;
           paths.push(`${i.installPath}/skills/${skill}/SKILL.md`, `${i.installPath}/commands/${skill}.md`);
         }
@@ -89,13 +88,11 @@ export const skill = (on: On) => {
       const meta = o.success === undefined ? "" : o.success ? "success" : "failed";
       const info = [input.args?.trim() ?? "", meta].filter(Boolean);
 
-      // a background fork's result only describes the launch, so it gets no fold
       const result =
         forked && !o.background && o.result
           ? remember(`result\0${id}`, () => docOf(o.result!))
           : undefined;
 
-      // glow runs only once a section is open, so the skills nobody unfolds cost nothing
       const textRows = (key: string, text: string): [string, unknown][] => {
         const runs = glow.view(inner, text);
         if (glow.hintDue()) $.ui.toast(INSTALL_HINT);
@@ -128,7 +125,6 @@ export const skill = (on: On) => {
 
       const docKey = `${id}:skill.md`;
       const doc = docs.get(name);
-      // drawn like a diff's "more lines" row: a divider, then a centred toggle under the body
       const skillMd = (): [string, unknown][] => {
         const isOpen = open.has(docKey);
         const toggle: [string, unknown] = [

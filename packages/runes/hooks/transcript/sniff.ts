@@ -53,7 +53,6 @@ export const language = (
   if (head?.kind !== "cmd" || !READERS.has(head.text)) return undefined;
   if (head.text === "sed" && !rest.some((t) => t.text === "-n"))
     return undefined;
-  // a count like `head -n 5` is a bare word too, so a file is a word with an extension
   const files = rest.filter((t) => t.kind === "text" && /\.\w+$/.test(t.text));
   if (files.length !== 1) return undefined;
   return languageOf(files[0]!.text);
