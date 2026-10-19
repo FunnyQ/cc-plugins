@@ -2,7 +2,6 @@ use super::Env;
 use serde_json::Value;
 use std::{fs, path::PathBuf};
 
-// Relay owns the writer of this shared path and JSON shape; preserve its fields and order.
 #[derive(Clone, Debug)]
 pub struct Marker {
     value: Value,
@@ -231,6 +230,29 @@ mod tests {
             )
             .is_some()
         );
+    }
+    #[test]
+    fn reads_relay_contract_fixture_from_home() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../relay/skills/relay/scripts/fixtures/delegation-marker.json"
+        ))
+        .unwrap();
+        let marker = &fixture["marker"];
+        let home = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
+        let dir = home.path().join(fixture["home"].as_str().unwrap());
+        fs::create_dir_all(&dir).unwrap();
+        let file = dir.join(fixture["file"].as_str().unwrap());
+        fs::write(&file, marker.to_string()).unwrap();
+        let env = Env::from([("HOME".into(), home.path().to_string_lossy().into_owned())]);
+        let cwd = marker["cwd"].as_str();
+        let armed = marker["armUntil"].as_i64().unwrap();
+        assert!(is_delegated_session(&env, cwd, Some("id"), armed));
+        let bound: Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        assert_eq!(bound["sessionIds"], json!(["id"]));
+        assert!(is_delegated_session(&env, None, Some("id"), armed + 1));
+        let expiry = marker["expiresAt"].as_i64().unwrap();
+        assert!(!is_delegated_session(&env, None, Some("id"), expiry));
+        assert!(!file.exists());
     }
     #[test]
     fn io_prunes_skips_corruption_and_preserves_binding_bytes() {

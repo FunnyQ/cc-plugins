@@ -8,6 +8,7 @@ const RELAY_SHARED = join(
   import.meta.dir,
   "../../../../../relay/skills/relay/scripts/shared.ts",
 );
+const RELAY_CLI = join(RELAY_SHARED, "../relay.ts");
 
 let home: string;
 
@@ -44,11 +45,18 @@ function run(config: string | null) {
 }
 
 describe("relayModel", () => {
-  test("reads the config relay writes at its own CONFIG_PATH", () => {
-    const config = JSON.stringify({
-      models: { codex: { delegate: "gpt-5", review: "cli-default" } },
-    });
-    expect(run(config)).toEqual(["gpt-5", null, "undefined"]);
+  test("reads the config relay's own `config set-model` writes", () => {
+    for (const [mode, model] of [
+      ["delegate", "gpt-5"],
+      ["review", "cli-default"],
+    ]) {
+      const proc = Bun.spawnSync(
+        ["bun", RELAY_CLI, "config", "set-model", "codex", mode, model],
+        { env: { ...process.env, HOME: home } },
+      );
+      expect(proc.exitCode).toBe(0);
+    }
+    expect(run(null)).toEqual(["gpt-5", null, "undefined"]);
   });
 
   test("returns undefined when no config exists", () => {

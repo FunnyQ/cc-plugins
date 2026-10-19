@@ -257,12 +257,7 @@ The module itself carries four constraints, each a trap if broken: it is a singl
 
 To test hook behavior for free, pass a bogus `-m` model — SessionStart and UserPromptSubmit fire and the rollout persists before the 400 lands, so no tokens are spent. Do **not** try to debug this by adding a probe hook to `~/.codex/hooks.json`: codex gates every hook on a `trusted_hash` under `[hooks.state."<file>:<event>:<i>:<j>"]` in `~/.codex/config.toml`, and an entry whose hash does not match is skipped with no warning.
 
-**The delegation marker crosses that daemon boundary.** relay's live codex path drops a file that monitor's decision-log hooks read, because no environment variable can reach them. The writer is `packages/relay/skills/relay/scripts/delegation-marker.ts`, the reader is `packages/monitor/cockpit-rs/src/hook/delegation_marker.rs`, and the two plugins version independently — **they share a path and a shape, never code**, so a change to one is a change to both:
-
-```
-~/.local/share/q-lab/delegation/<startedAt>-<rand>.json
-{ cwd, backend, startedAt, armUntil, expiresAt, sessionIds: [] }
-```
+**The delegation marker crosses that daemon boundary.** relay's live codex path drops a file that monitor's decision-log hooks read, because no environment variable can reach them. The writer is `packages/relay/skills/relay/scripts/delegation-marker.ts`, the reader is `packages/monitor/cockpit-rs/src/hook/delegation_marker.rs`, and the two plugins version independently — **they share a path and a shape, never code**. Both pin that contract against one fixture, `packages/relay/skills/relay/scripts/fixtures/delegation-marker.json`: the TS test checks the writer produces it, and the Rust test reads it through `include_str!` and runs the reader over it. Change the fixture, and both sides fail until both match. The reader rewrites the file byte for byte apart from `sessionIds`, so it keeps fields it does not know.
 
 Three rules make it safe. Matching is two-phase: a marker matches on `cwd` alone only until `armUntil` (90s, covering relay's spawn plus the 20s TUI settle), and the hook that matches writes its own `session_id` back so every later turn matches exactly — fuzzy once, precise forever, which is what keeps an interactive codex opened in the same repo from being silenced for its whole life. Only **codex live panes** get a marker (`needsDelegationMarker`): Claude and opencode run their hooks inside the process relay spawned, so `RELAY_DELEGATED` already reaches them, and a marker there could silence the parent session sharing the repo. And the reader ignores the marker store entirely unless `PLUGIN_ROOT` is set, which is codex's tell — Claude Code sets only the `CLAUDE_`-prefixed one.
 
