@@ -137,10 +137,7 @@ function openBrowser(url: string): void {
   }
 }
 
-export async function supersede(
-  info: DaemonInfo,
-  port: number,
-): Promise<boolean> {
+export async function supersede(info: DaemonInfo): Promise<boolean> {
   const running = await identifyDaemon(info.port);
 
   if (running?.pid === info.pid) {
@@ -150,7 +147,7 @@ export async function supersede(
       // The server may exit between the liveness check and the signal.
     }
 
-    if (!(await poll(async () => (await identifyDaemon(port)) === null))) {
+    if (!(await poll(async () => (await identifyDaemon(info.port)) === null))) {
       console.error(`flightdeck error: port ${info.port} did not close`);
       return false;
     }
@@ -197,7 +194,7 @@ export async function main(): Promise<void> {
 
   if (
     decision.action === "supersede" &&
-    !(await supersede(decision.info, port))
+    !(await supersede(decision.info))
   ) {
     process.exitCode = 1;
     return;
