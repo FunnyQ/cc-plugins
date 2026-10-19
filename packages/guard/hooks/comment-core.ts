@@ -58,16 +58,28 @@ const MIN_BLOCK_LINES = 3;
 
 // Anywhere after a marker, not leading only: `# noqa` and `# type: ignore` trail the code they silence.
 const SUPPRESSION =
-  /(?:\/\/|\/\*|#|--)\s*(?:eslint-disable|@ts-(?:ignore|expect-error|nocheck)|biome-ignore|oxlint-disable|deno-lint-ignore|stylelint-disable|noqa|type:\s*ignore|pyright:\s*ignore|pylint:\s*disable|rubocop:disable|standard:disable|nolint|NOLINT|shellcheck\s+disable|swiftlint:disable|istanbul\s+ignore|c8\s+ignore|pragma:\s*no\s+cover)/;
+  /(?:\/\/|\/\*|#|--)\s*(?:eslint-disable|@ts-(?:ignore|expect-error|nocheck)|biome-ignore|oxlint-disable|deno-lint-ignore|stylelint-disable|noqa|type:\s*ignore|pyright:\s*ignore|pylint:\s*disable|rubocop:disable|standard:disable|nolint|NOLINT|shellcheck\s+disable|swiftlint:disable|istanbul\s+ignore|c8\s+ignore|pragma:\s*no\s+cover)/g;
 
 // Split by case: lower-case "important" is ordinary prose, while "Do not remove" opens a sentence.
-const SHOUTED = /\b(?:IMPORTANT|DO NOT)\b/;
+const SHOUTED = /\b(?:IMPORTANT|DO NOT)\b/g;
 const CONSTRAINT =
-  /\b(?:do not|don't) (?:remove|delete|change|edit|modify|touch|move|rename|reorder)\b|\b(?:talk to|check with) \S+(?: \S+)? before\b/i;
+  /\b(?:do not|don't) (?:remove|delete|change|edit|modify|touch|move|rename|reorder)\b|\b(?:talk to|check with) \S+(?: \S+)? before\b/gi;
+
+// Odd quotes before a match put it inside a string or a quotation: a test fixture, or prose naming the directive. An apostrophe inside a word opens nothing.
+function unquoted(line: string, pattern: RegExp): boolean {
+  for (const m of line.matchAll(pattern)) {
+    const before = line.slice(0, m.index).replace(/\w'\w/g, "");
+    const open = ['"', "'", "`"].some((q) => before.split(q).length % 2 === 0);
+    if (!open) return true;
+  }
+  return false;
+}
+
+const isSuppression = (line: string) => unquoted(line, SUPPRESSION);
 
 function tagFor(line: string, comment: boolean): Tag | null {
-  if (SUPPRESSION.test(line)) return "suppression";
-  return comment && (SHOUTED.test(line) || CONSTRAINT.test(line))
+  if (isSuppression(line)) return "suppression";
+  return comment && (unquoted(line, SHOUTED) || unquoted(line, CONSTRAINT))
     ? "constraint"
     : null;
 }
@@ -255,7 +267,7 @@ export function commentFlags(lines: string[], syntax: Syntax): boolean[] {
 function commentLines(text: string, syntax: Syntax): string[] {
   const lines = text.split("\n").map((l) => l.trim());
   const flags = commentFlags(lines, syntax);
-  return lines.filter((l, i) => flags[i] || SUPPRESSION.test(l));
+  return lines.filter((l, i) => flags[i] || isSuppression(l));
 }
 
 /**
@@ -384,7 +396,7 @@ export function flaggedBlocks(
     const line = lines[i]!;
     if (!flags[i]) {
       if (line !== "" && !line.startsWith("#!")) sawCode = true;
-      if (SUPPRESSION.test(line) && claim(i)) {
+      if (isSuppression(line) && claim(i)) {
         blocks.push({
           start: i + 1,
           lines: [line],

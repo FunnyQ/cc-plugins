@@ -869,3 +869,39 @@ describe("suppressions and constraints", () => {
     expect(askFor(tagged)).not.toContain("[constraint]");
   });
 });
+
+describe("tags ignore quoted text", () => {
+  test("a suppression inside a string literal is not one", () => {
+    const file = [
+      "a();",
+      'const s = "// @ts-ignore";',
+      "expect(out).toContain('x  # noqa');",
+      "b();",
+    ].join("\n");
+    expect(flaggedBlocks(file, ts, new Set([2, 3]))).toEqual([]);
+  });
+
+  test("a comment that quotes a suppression or a constraint is neither", () => {
+    const file = [
+      "a();",
+      "// Trailing, since `# noqa` follows the code it silences.",
+      '// A "Do not remove" heading opens a sentence.',
+      "b();",
+    ].join("\n");
+    expect(flaggedBlocks(file, ts, new Set([2, 3]))).toEqual([]);
+  });
+
+  test("an apostrophe in a word does not open a quote", () => {
+    const file = "a();\n// it's IMPORTANT to keep this first\nb();";
+    expect(flaggedBlocks(file, ts, new Set([2]))[0]!.tags).toEqual([
+      "constraint",
+    ]);
+  });
+
+  test("a trailing suppression after a closed string still counts", () => {
+    const file = "import os\nx = f('a')  # type: ignore\n";
+    expect(flaggedBlocks(file, rb, new Set([2]))[0]!.tags).toEqual([
+      "suppression",
+    ]);
+  });
+});
