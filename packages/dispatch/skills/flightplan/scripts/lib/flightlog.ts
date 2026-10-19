@@ -28,19 +28,13 @@ import { dirname, basename, join } from "node:path";
 
 export type ScoreEntry = {
   kind: "score";
-  /** ISO timestamp. */
   ts: string;
-  /** Task ref, e.g. "ui/03". */
   task: string;
-  /** Which retry attempt produced this verdict (1-based). */
   attempt: number;
-  /** Label of the judge agent — links to the raw `agent-<id>.jsonl`. */
   agentLabel?: string;
-  /** Weighted average on the rubric's scale. */
   weighted: number;
   passed: boolean;
   hardFailed: boolean;
-  /** Dimensions the rubric declared but the scores omitted. */
   missing: string[];
   threshold: number;
   passOp: ">" | ">=";
@@ -57,15 +51,9 @@ export type NoteEntry = {
   kind: "note";
   ts: string;
   task: string;
-  /** Pipeline role: dev / verify / judge / final-review (free-form). */
   role: string;
   attempt?: number;
   agentLabel?: string;
-  /**
-   * "start" marks the agent beginning its work. "end" (or an absent value) marks
-   * completion. Absent is the completion case because every entry written before
-   * this field existed has no `phase` — that keeps old trails valid without migration.
-   */
   phase?: "start" | "end";
   message: string;
 };
@@ -85,33 +73,18 @@ export type FlightlogEntry = ScoreEntry | NoteEntry | StateEntry;
 
 export const FLIGHTLOG_DIRNAME = ".flightlog";
 
-/**
- * The JSONL trail for a plan dir. Exported so consumers never re-spell the
- * layout — this module owns the schema, so it owns where the schema lives.
- */
 export function runLogPath(planDir: string): string {
   return join(planDir, FLIGHTLOG_DIRNAME, "run.jsonl");
 }
 
-/** Serialize one entry to a single newline-free JSONL line. */
 export function formatEntry(entry: FlightlogEntry): string {
   return JSON.stringify(entry);
 }
 
-/**
- * Parse a JSONL log into entries. Tolerant: blank lines are skipped and a
- * malformed line is dropped rather than aborting the whole trail (a partial
- * log is more useful than none when an agent died mid-write).
- */
 export function parseLog(content: string): FlightlogEntry[] {
   return parseLines(content.split("\n"));
 }
 
-/**
- * Same tolerant parse as `parseLog`, for a caller that already holds the lines.
- * A tailer reads complete lines and would otherwise join them only for
- * `parseLog` to split the joined string apart again.
- */
 export function parseLines(lines: string[]): FlightlogEntry[] {
   const entries: FlightlogEntry[] = [];
   for (const raw of lines) {
@@ -119,7 +92,6 @@ export function parseLines(lines: string[]): FlightlogEntry[] {
     if (!line) continue;
     try {
       const parsed = JSON.parse(line);
-      // Older readers drop state and retain notes; this reader likewise drops future kinds.
       if (
         parsed &&
         (parsed.kind === "score" || parsed.kind === "note" || parsed.kind === "state")
@@ -127,13 +99,11 @@ export function parseLines(lines: string[]): FlightlogEntry[] {
         entries.push(parsed);
       }
     } catch {
-      // Drop the malformed line, keep the rest.
     }
   }
   return entries;
 }
 
-/** Render the trail to a human-readable RUNLOG.md, grouped by task. */
 export function renderRunlog(
   entries: FlightlogEntry[],
   opts: { slug: string },
@@ -142,7 +112,6 @@ export function renderRunlog(
     .filter((e) => !(e.kind === "note" && e.phase === "start"))
     .sort((a, b) => a.ts.localeCompare(b.ts));
 
-  // Preserve first-seen order of tasks for stable headings.
   const order: string[] = [];
   const byTask = new Map<string, FlightlogEntry[]>();
   for (const e of sorted) {
@@ -166,7 +135,6 @@ export function renderRunlog(
 
 function renderLine(e: FlightlogEntry): string {
   const agent = e.agentLabel ? ` _(agent: ${e.agentLabel})_` : "";
-  // Declarations share task headings but render without an agent role or attempt.
   if (e.kind === "state") {
     const message = e.message ? `: ${e.message}` : "";
     return `- state — ${e.state}${message}${agent}`;
@@ -187,11 +155,6 @@ function renderLine(e: FlightlogEntry): string {
   return `${line}\n\n<details><summary>judge rationale</summary>\n\n${rationale}\n\n</details>\n`;
 }
 
-/**
- * Append one entry to a JSONL log file, creating the parent dir on first
- * write. When the parent dir is `.flightlog`, also drop the self-ignore so the
- * trail never gets committed by accident.
- */
 export async function appendEntry(
   logFile: string,
   entry: FlightlogEntry,
@@ -216,7 +179,6 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-/** Read + parse a log file; returns [] if the file is absent. */
 export async function readLog(logFile: string): Promise<FlightlogEntry[]> {
   try {
     return parseLog(await readFile(logFile, "utf-8"));

@@ -18,45 +18,30 @@
  */
 import type { FlightlogEntry, NoteEntry, ScoreEntry } from "./flightlog";
 
-/** Roles whose completion proves the attempt's write step finished. */
 const WRITE_ROLES = new Set(["dev", "fix"]);
 
-/** Roles that are the binary gate. `requalify` is a verify re-run after quiet. */
 const GATE_ROLES = new Set(["verify", "requalify"]);
 
-/**
- * Roles that are bookkeeping, not pipeline steps. `resume` is the note a
- * resumed attempt writes about itself, and counting it as progress would let a
- * resume derive its next step from its own announcement.
- */
 const BOOKKEEPING_ROLES = new Set(["resume", "scout", "commit"]);
 
 export type StepOutcome = {
   role: string;
-  /** True when a `phase: "end"` note exists — or a phase-less one, the legacy shape. */
   completed: boolean;
-  /** The completing note's message, or null when the role only ever started. */
   message: string | null;
 };
 
 export type AttemptProgress = {
   attempt: number;
-  /** Every non-bookkeeping role seen in this attempt, in first-seen order. */
   steps: StepOutcome[];
-  /** The `score-task.ts --log` verdict for this attempt, when one was written. */
   verdict: { passed: boolean; weighted: number } | null;
 };
 
 export type ResumePoint = {
   task: string;
-  /** Every attempt number the trail holds for this ref, ascending. */
   attempts: number[];
   last: AttemptProgress;
-  /** The step a resume should start at. Never `judge` — see the module comment. */
   from: "dev" | "verify";
-  /** The attempt a resume should start counting at: always one past the last. */
   attempt: number;
-  /** One line naming the evidence that chose `from`. */
   reason: string;
   /**
    * True when a gate or judge RAN and rejected the work, rather than the run
@@ -70,15 +55,8 @@ export type ResumePoint = {
 const isNote = (e: FlightlogEntry): e is NoteEntry => e.kind === "note";
 const isScore = (e: FlightlogEntry): e is ScoreEntry => e.kind === "score";
 
-/** A note with no `phase` predates the field and means completion. */
 const completes = (note: NoteEntry): boolean => note.phase !== "start";
 
-/**
- * Collapse one attempt's notes into one outcome per role. A role that both
- * started and ended is completed; the LAST completing note wins, because a
- * `resilient()` retry writes a second pair of rows for the same role and the
- * retry's verdict is the one that counts.
- */
 function stepsOf(notes: NoteEntry[]): StepOutcome[] {
   const order: string[] = [];
   const byRole = new Map<string, StepOutcome>();
@@ -101,12 +79,6 @@ function stepsOf(notes: NoteEntry[]): StepOutcome[] {
   return order.map((role) => byRole.get(role)!);
 }
 
-/**
- * Derive where `task` stopped, or null when the trail holds nothing for it.
- *
- * Entries without an `attempt` are ignored: a resume has to name a number, and
- * a row that carries none cannot tell it which one.
- */
 export function resumePoint(
   entries: FlightlogEntry[],
   task: string,
@@ -125,7 +97,6 @@ export function resumePoint(
   const inLast = numbered.filter((e) => e.attempt === lastAttempt);
   const steps = stepsOf(inLast.filter(isNote));
   const scored = inLast.filter(isScore);
-  // The last score row wins for the same reason the last note does.
   const scoreRow = scored.length > 0 ? scored[scored.length - 1] : null;
   const verdict = scoreRow
     ? { passed: scoreRow.passed, weighted: scoreRow.weighted }
@@ -139,8 +110,6 @@ export function resumePoint(
   const reverify = at((step) => step.role === "reverify");
   const land = at((step) => step.role === "land");
 
-  // Ordered latest-evidence-first: a failed re-verify supersedes the verdict,
-  // the verdict supersedes the gate, and the gate supersedes the write step.
   const decide = (): Pick<ResumePoint, "from" | "reason" | "gateRejected"> => {
     if (reverify && /^FAIL\b/.test(reverify.message ?? "")) {
       return {
@@ -201,7 +170,6 @@ export function resumePoint(
   return { task, attempts, last, attempt: lastAttempt + 1, ...decide() };
 }
 
-/** Every task ref the trail mentions, in first-seen order. */
 export function tasksIn(entries: FlightlogEntry[]): string[] {
   const seen: string[] = [];
   for (const entry of entries) {

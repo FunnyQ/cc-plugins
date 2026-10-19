@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  matchStatusLine,
   parseTask,
   parseRubric,
   refToString,
@@ -8,8 +9,6 @@ import {
   type TaskModels,
 } from "./parse-task";
 
-// Mirrors a real-world engine task rubric — the format flightplan rubrics
-// must stay compatible with.
 const REAL_RUBRIC = `## Eval rubric
 
 > Scale and shared dimensions: see \`../_context/rubric.md\`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
@@ -460,8 +459,27 @@ describe("uncheckedGateItems", () => {
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(uncheckedGateItems(result.task.body)).not.toContain(
-      "Implementation notes: prose bullet",
-    );
+    expect(uncheckedGateItems(result.task.body)).toEqual([
+      "Acceptance criteria: One",
+      "Acceptance criteria: Two",
+      "Verification: Run `bun test`",
+    ]);
+  });
+});
+
+describe("matchStatusLine", () => {
+  test.each([
+    "> **Status**: todo",
+    ">**Status**:done",
+    "  >  **status**  :   in-progress (attempt 3)",
+    "**Status**: blocked",
+  ])("prefix + raw reproduces %p byte-for-byte", (line) => {
+    const match = matchStatusLine(line);
+    expect(match).not.toBeNull();
+    expect(match!.prefix + match!.raw).toBe(line);
+  });
+
+  test("rejects a line that is not a Status header", () => {
+    expect(matchStatusLine("> **Depends on**: ui/01")).toBeNull();
   });
 });

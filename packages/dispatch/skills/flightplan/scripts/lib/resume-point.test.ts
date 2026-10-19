@@ -1,14 +1,8 @@
-/**
- * The two ways to derive a resume point wrong are not symmetric: too EARLY
- * re-pays for work that landed, too LATE takes unfinished work as satisfied.
- * Every case below pins which side of that line a given trail falls on.
- */
 import { describe, expect, test } from "bun:test";
 import { resumePoint, tasksIn } from "./resume-point";
 import type { FlightlogEntry } from "./flightlog";
 
 let clock = 0;
-/** Monotonic timestamps, so ordering in a fixture is the order it is written. */
 const ts = () => new Date(1_700_000_000_000 + clock++ * 1000).toISOString();
 
 const note = (
@@ -27,7 +21,6 @@ const note = (
   message,
 });
 
-/** A role that ran start-to-finish. */
 const ran = (
   task: string,
   role: string,
@@ -65,8 +58,6 @@ describe("resumePoint", () => {
   });
 
   test("a write step that finished with nothing after it owes only the gate", () => {
-    // The case the whole feature exists for: the four lenses and the Opus fixer
-    // landed, and the run died before anything verified them.
     const point = resumePoint(
       [...ran(REF, "review", 2), ...ran(REF, "fix", 2, "applied 9 findings")],
       REF,
@@ -87,8 +78,6 @@ describe("resumePoint", () => {
   });
 
   test("a gate that FAILED rejects the work, so the resume runs dev again", () => {
-    // Too-late protection: the gate saw the work and said no. Restarting above
-    // it would take rejected code as satisfied.
     const point = resumePoint(
       [
         ...ran(REF, "fix", 2),
@@ -103,8 +92,6 @@ describe("resumePoint", () => {
   });
 
   test("a gate that PASSED with no verdict restarts at verify, not judge", () => {
-    // The judge needs the verifier's RAW evidence and the trail keeps only its
-    // one-line message, so `judge` is not reconstructable from disk.
     const point = resumePoint(
       [
         ...ran(REF, "fix", 2),
@@ -135,8 +122,6 @@ describe("resumePoint", () => {
   });
 
   test("a passing verdict on a task that never finished restarts at verify", () => {
-    // The rubric passed and mark-done did not confirm, so the run died after the
-    // judge. Nothing below the gate needs redoing and the gate is the cheap step.
     const point = resumePoint(
       [
         ...ran(REF, "dev", 1),
@@ -216,9 +201,7 @@ describe("resumePoint", () => {
     expect(point.gateRejected).toBe(false);
   });
 
-  test("a retried role is judged by its LAST outcome", () => {
-    // `resilient()` re-runs a schema'd call, writing a second pair of rows for
-    // the same role. The retry's verdict is the one that counts.
+  test("a resilient() retry of a role is judged by its LAST outcome", () => {
     const point = resumePoint(
       [
         ...ran(REF, "dev", 1),
@@ -232,9 +215,17 @@ describe("resumePoint", () => {
     expect(point.gateRejected).toBe(false);
   });
 
+  test("a re-scored attempt is decided by its LAST score row", () => {
+    const point = resumePoint(
+      [...ran(REF, "verify", 1, "PASS — green"), score(REF, 1, false, 2.1), score(REF, 1, true, 4.6)],
+      REF,
+    )!;
+
+    expect(point.last.verdict).toEqual({ passed: true, weighted: 4.6 });
+    expect(point.from).toBe("verify");
+  });
+
   test("a resumed attempt's own announcement is not progress", () => {
-    // Counting the `resume` note as a step would let a resume derive its next
-    // move from the fact that it resumed.
     const point = resumePoint(
       [note(REF, "resume", 3, "end", "resumed at the verify step")],
       REF,
@@ -255,7 +246,6 @@ describe("resumePoint", () => {
       message: "no attempt recorded",
     };
     expect(resumePoint([orphan], REF)).toBeNull();
-    // A numbered row beside it still decides.
     const point = resumePoint([orphan, ...ran(REF, "fix", 1)], REF)!;
     expect(point.attempt).toBe(2);
   });

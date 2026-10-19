@@ -5,7 +5,6 @@ export type NodeValidity =
   | { kind: "unfinished"; status: string | null }
   | { kind: "invalid"; rule: string; reason: string };
 
-// Markdown-only rubric, sections, body, requiredReading, and h1 are omitted because derivation never reads them.
 export type GraphNode = {
   ref: string;
   bucket: string;
@@ -15,11 +14,9 @@ export type GraphNode = {
   dependsOn: string[];
   blocks: string[];
   finalReview: boolean;
-  /** Whether this node counts as complete for a dependent. */
   validity: NodeValidity;
 };
 
-/** Pure. Converts the parsed markdown tree into the narrow node shape. */
 export function nodesFromParsedTasks(
   byRef: Record<string, ParsedTask>,
 ): Record<string, GraphNode> {

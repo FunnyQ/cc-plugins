@@ -1,22 +1,3 @@
-/**
- * Parser for flightplan task files.
- *
- * Task file shape (excerpt):
- *
- *   # UI-01: Fixture state shell
- *
- *   > **Required reading**:
- *   > - `../_context/shared.md`
- *   > - `../_context/api-contract.md`
- *   >
- *   > **Depends on**: ui/02, backend/01
- *   > **Blocks**: ui/05
- *   > **Status**: todo
- *
- *   ## Goal
- *   ...
- */
-
 export type TaskRef = {
   bucket: string;
   nn: string; // zero-padded, e.g. "01"
@@ -32,62 +13,39 @@ export type ModelChoice = { model: ModelName; effort: Effort | null };
 export type TaskModels = Partial<Record<ModelRole, ModelChoice>>;
 
 export type ParsedTask = {
-  /** Bucket directory name as found in the path (e.g. "ui"). */
   bucket: string;
-  /** Two-digit zero-padded sequence (e.g. "01"). */
   nn: string;
-  /** Title from the H1, e.g. "Fixture state shell". */
   title: string;
-  /** Raw H1 line for diagnostics. */
   h1: string;
-  /** Required reading paths as written in the file (kept relative). */
   requiredReading: string[];
-  /** Tasks this depends on. */
   dependsOn: TaskRef[];
-  /** Tasks this blocks (optional). */
   blocks: TaskRef[];
-  /** Status value, lowercased. */
   status: TaskStatus | null;
-  /** True if the header carries `> **Final review**: true` — the closing gate. */
   finalReview: boolean;
-  /** Parsed Models header; lint consumes this, absent headers give `{}`. */
   models: TaskModels;
-  /** Edge-trimmed header value for next-ready; null when absent. */
   modelsRaw: string | null;
-  /** One diagnostic per malformed Models entry for lint. */
   modelErrors: string[];
-  /** Section headings present in the body (e.g. ["Goal", "Acceptance criteria"]). */
   sections: string[];
-  /** Body text after the header blockquote, used by self-containment checks. */
   body: string;
-  /** Parsed `## Eval rubric`, or null if absent / unparseable. */
   rubric: Rubric | null;
 };
 
 export type RubricDimension = {
-  /** Dimension name as written, e.g. "Correctness". */
   name: string;
-  /** Weight multiplier (the `×N` value). Always > 0. */
   weight: number;
 };
 
 export type RubricHardFail = {
-  /** Dimension that vetoes the whole task when below `value`. */
   dimension: string;
   op: "<" | "<=";
   value: number;
 };
 
 export type Rubric = {
-  /** Weighted-average pass line, e.g. 4.0. */
   passThreshold: number;
-  /** Comparison operator on the pass line. */
   passOp: ">" | ">=";
-  /** Top of the scoring scale (e.g. 5 for "0–5"). Defaults to 5. */
   scaleMax: number;
-  /** Optional veto: a dimension below `value` fails regardless of the average. */
   hardFail: RubricHardFail | null;
-  /** Weighted dimensions from the rubric table (weight > 0 only). */
   dimensions: RubricDimension[];
 };
 
@@ -103,11 +61,6 @@ const H1_REGEX = /^#\s+([A-Z][A-Z0-9]*)-(\d{2})\s*:\s*(.+?)\s*$/;
 const TASK_REF_REGEX = /([a-z][a-z0-9-]*)\/(\d{2})/g;
 const STATUS_LINE_REGEX = /^(\s*>?\s*\*\*Status\*\*\s*:\s*)(.*)$/i;
 
-/**
- * Split a `> **Status**:` header line into its prefix and its raw value, or
- * return null when the line is not a Status header. A caller that rewrites the
- * line keeps `prefix` verbatim, so formatting never drifts.
- */
 export function matchStatusLine(
   line: string,
 ): { prefix: string; raw: string } | null {
@@ -115,11 +68,6 @@ export function matchStatusLine(
   return match ? { prefix: match[1], raw: match[2] } : null;
 }
 
-/**
- * The one Status rule, shared by every consumer: the value must be a bare word
- * from `TASK_STATUSES`. A decorated value such as `in-progress (attempt 3)` is
- * not a status — it returns null, and callers treat that as malformed.
- */
 export function parseStatusValue(raw: string): TaskStatus | null {
   const value = raw.trim().toLowerCase();
   return (TASK_STATUSES as readonly string[]).includes(value)
@@ -127,7 +75,6 @@ export function parseStatusValue(raw: string): TaskStatus | null {
     : null;
 }
 
-/** Pure parser; invalid entries are dropped so lint can report every error. */
 export function parseModels(value: string): { models: TaskModels; errors: string[] } {
   const models: TaskModels = {};
   const errors: string[] = [];
@@ -168,16 +115,11 @@ export function parseModels(value: string): { models: TaskModels; errors: string
   return { models, errors };
 }
 
-/**
- * Parse a task-file string into structured fields.
- * Returns null + a reason if the file is too malformed to parse.
- */
 export function parseTask(
   content: string,
 ): { ok: true; task: ParsedTask } | { ok: false; reason: string } {
   const lines = content.split("\n");
 
-  // H1
   const h1Line = lines.find((l) => l.startsWith("# "));
   if (!h1Line) {
     return { ok: false, reason: "missing H1" };
@@ -192,7 +134,6 @@ export function parseTask(
   const [, bucketUpper, nn, title] = h1Match;
   const bucket = bucketUpper.toLowerCase();
 
-  // Find header blockquote — contiguous lines that start with ">"
   const quoteStart = lines.findIndex((l) => l.trim().startsWith(">"));
   if (quoteStart === -1) {
     return { ok: false, reason: "missing header blockquote" };
@@ -232,21 +173,10 @@ export function parseTask(
 
 const RUBRIC_HEADING = "Eval rubric";
 
-/**
- * Parse a `## Eval rubric` section into structured form. Pure string parsing —
- * no YAML/markdown dependency. Returns null when the section is missing, has no
- * `>`-quoted pass-threshold line, or has no weighted dimension table.
- *
- * The contract is operator-anchored (language-neutral): the pass line carries a
- * `>` / `>=` / `≥` comparison; an optional veto carries `<dim> < N` (`<` / `≤`).
- */
 export function parseRubric(body: string): Rubric | null {
   const section = extractHeadingSection(body, RUBRIC_HEADING);
   if (section === null) return null;
 
-  // Threshold/scale/veto all live on the `>`-quoted line(s) — parse them there
-  // so the dimension table's "0–1 / 2–3 / 4–5" header cells can't contaminate
-  // the scale or threshold reads.
   const quote = section
     .split("\n")
     .filter((l) => l.trim().startsWith(">"))
@@ -278,7 +208,6 @@ export function parseRubric(body: string): Rubric | null {
   return { passThreshold, passOp, scaleMax, hardFail, dimensions };
 }
 
-/** Pull the weighted dimensions out of the rubric's markdown table. */
 function parseRubricTable(section: string): RubricDimension[] {
   const rows = section.split("\n").filter((l) => l.trim().startsWith("|"));
   if (rows.length < 2) return [];
@@ -300,7 +229,6 @@ function parseRubricTable(section: string): RubricDimension[] {
   const dims: RubricDimension[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = cells(rows[r]);
-    // Skip the markdown separator row (|---|:--:|...).
     if (row.every((c) => c === "" || /^:?-+:?$/.test(c))) continue;
     const name = (row[nameCol] ?? "").trim();
     if (!name) continue;
@@ -313,7 +241,6 @@ function parseRubricTable(section: string): RubricDimension[] {
   return dims;
 }
 
-/** Return the text under a `## Heading`, or null if the heading is absent. */
 function extractHeadingSection(body: string, heading: string): string | null {
   const lines = body.split("\n");
   const start = lines.findIndex((l) => l.trim() === `## ${heading}`);
@@ -345,7 +272,6 @@ function extractRequiredReading(quote: string): string[] {
         required.push(bullet[1]);
         continue;
       }
-      // End of bulleted block once we hit a non-bullet, non-empty line
       if (line.trim() && !line.trim().startsWith("-")) {
         inBlock = false;
       }
@@ -376,8 +302,6 @@ function extractRefs(quote: string, label: string): TaskRef[] {
 function extractStatus(quote: string): TaskStatus | null {
   const lines = quote.split("\n").map((l) => l.replace(/^>\s?/, ""));
   for (const line of lines) {
-    // Trailing junk like "todo maybe" or "todo | in-progress | done" is
-    // rejected by parseStatusValue, not silently treated as todo.
     const match = matchStatusLine(line);
     if (match) return parseStatusValue(match.raw);
   }
@@ -409,18 +333,12 @@ function extractSections(bodyLines: string[]): string[] {
     .map((l) => l.replace(/^##\s+/, "").trim());
 }
 
-/** Format a task ref as "bucket/NN". */
 export function refToString(ref: TaskRef): string {
   return `${ref.bucket}/${ref.nn}`;
 }
 
-/**
- * The two sections whose checkboxes are the pass/fail gate. Boxes anywhere else
- * (Implementation notes, Out of scope, …) carry no completion meaning.
- */
 export const GATE_SECTIONS = ["Acceptance criteria", "Verification"] as const;
 
-/** Unticked gate checkboxes, each labelled with the section it came from. */
 export function uncheckedGateItems(body: string): string[] {
   const unchecked: string[] = [];
   for (const heading of GATE_SECTIONS) {
@@ -434,21 +352,9 @@ export function uncheckedGateItems(body: string): string[] {
   return unchecked;
 }
 
-/**
- * How the executor repairs a malformed completion state. Single-sourced so the
- * linter, readiness, and the dashboard all give the same instruction — and so
- * none of them can accidentally suggest hand-ticking the boxes.
- */
 export const COMPLETION_STATE_FIX =
   "Do NOT tick the boxes by hand — that fakes a gate that never ran. Reset `> **Status**:` to `in-progress` or `todo`, then rerun the task's gates. Only mark-done.ts may write `done`, and it ticks the boxes in the same step.";
 
-/**
- * Execution validity of a parsed task — the one rule every consumer reads.
- *
- * A dependency is satisfied only by a *valid* completed task, so the three
- * outcomes must stay distinguishable: unfinished work, real completion, and a
- * completion claim the file itself contradicts.
- */
 export type TaskValidity =
   | { kind: "unfinished"; status: Exclude<TaskStatus, "done"> }
   | { kind: "complete" }

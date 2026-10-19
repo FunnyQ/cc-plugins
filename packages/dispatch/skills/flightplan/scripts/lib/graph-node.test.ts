@@ -147,7 +147,6 @@ describe("unmetNodeDependencies", () => {
       "unfinished/01",
       "invalid/01",
     ]);
-    // findReady reads this same function, so the scout parks api/01 on the same refs.
     expect(findReady(byRef)).toEqual([{ bucket: "unfinished", nn: "01" }]);
   });
 });

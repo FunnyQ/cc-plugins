@@ -60,7 +60,7 @@ describe("formatEntry / parseLog", () => {
     expect(entries[1].kind).toBe("score");
   });
 
-  test("parseLog skips malformed lines rather than throwing", () => {
+  test("parseLog skips malformed lines rather than throwing, so a trail cut mid-write still reads", () => {
     const content = [formatEntry(NOTE), "{not json", formatEntry(SCORE)].join(
       "\n",
     );
@@ -83,7 +83,6 @@ describe("renderRunlog", () => {
     const md = renderRunlog([NOTE, SCORE], { slug: "demo" });
     expect(md).toContain("# Run log — demo");
     expect(md).toContain("## ui/03");
-    // note (09:59) appears before score (10:00)
     expect(md.indexOf("Fixed the boundary")).toBeLessThan(md.indexOf("4.4"));
   });
 
@@ -111,10 +110,8 @@ describe("renderRunlog", () => {
       { slug: "demo" },
     );
     expect(md).toContain("<details><summary>judge rationale</summary>");
-    // The judge's own markdown survives verbatim — no re-indentation.
     expect(md).toContain("Correctness 5/5.\n\n`kind.rs:68` is wrong.");
     expect(md).toContain("</details>");
-    // The verdict line still leads, so a scan of the file reads as before.
     expect(md.indexOf("4.40")).toBeLessThan(md.indexOf("<details>"));
   });
 
