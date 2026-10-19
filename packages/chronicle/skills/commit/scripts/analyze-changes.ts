@@ -65,7 +65,6 @@ function statusFromCode(code: string): FileStatus | undefined {
   }
 }
 
-/** One `--porcelain -z` record, before the staged/unstaged split. */
 export type StatusRecord = {
   index: string;
   worktree: string;
@@ -95,8 +94,6 @@ export function parseStatusRecords(output: string): StatusRecord[] {
     const worktree = field[1] ?? " ";
     const record: StatusRecord = { index, worktree, path: field.slice(3) };
 
-    // A rename or copy on either side is followed by its source path. Consume
-    // that field here, or the next iteration reads it as a bogus entry.
     if ("RC".includes(index) || "RC".includes(worktree)) {
       i += 1;
       const source = fields[i];
@@ -109,7 +106,6 @@ export function parseStatusRecords(output: string): StatusRecord[] {
   return records;
 }
 
-/** Every changed path, one entry per staged/unstaged side. */
 export function parseStatus(output: string): ParsedStatus[] {
   return parseStatusRecords(output).flatMap(toParsedStatus);
 }
@@ -134,8 +130,6 @@ function toParsedStatus({
   // A worktree-side "added" with an empty index side is `git add -N`
   // (intent-to-add): a brand-new file, staged only as a placeholder with no
   // content. It has to be reported or the analysis silently loses the file.
-  // Guarded on `!stagedStatus` so an unmerged "AA" conflict keeps its single
-  // staged entry instead of being reported twice.
   if (unstagedStatus === "added" && !stagedStatus) {
     return [{ path, oldPath, staged: false, status: "added" }];
   }
@@ -226,9 +220,9 @@ function expandHome(path: string): string {
   return path;
 }
 
-// `any` because the argument is a JSON.parse result and the caller already
-// catches — only the string check below is load-bearing.
-function readChronicleTemplateOverride(settings: any): string | undefined {
+function readChronicleTemplateOverride(settings: {
+  skills?: { chronicle?: { commit?: { templatePath?: unknown } } };
+} | null): string | undefined {
   const path = settings?.skills?.chronicle?.commit?.templatePath;
   return typeof path === "string" ? path : undefined;
 }
@@ -292,11 +286,6 @@ function omittedDiff(
   return `[diff omitted: changeset exceeds the ${maxLines}-line aggregate budget; +${file.insertions}/-${file.deletions} in this file — ${totalFiles} files changed]`;
 }
 
-/**
- * Per-file capping still lets a wide changeset blow past a usable context, so
- * trim whole diffs — largest first — until the changeset fits. Stats survive,
- * so the reader always keeps the shape of what was dropped.
- */
 export function applyTotalDiffBudget<T extends AnalyzedFile>(
   files: T[],
   maxLines = MAX_TOTAL_DIFF_LINES,
@@ -326,12 +315,6 @@ export function applyTotalDiffBudget<T extends AnalyzedFile>(
   );
 }
 
-/**
- * Lock files never contribute a readable diff, but their stats still tell the
- * story ("deps churned"). An untracked one is wholly new, so its line count IS
- * the insertion count; a tracked one has to come from numstat or we'd report
- * the entire file as added.
- */
 async function lockfileStats(entry: ParsedStatus): Promise<Numstat> {
   if (entry.status === "added" && !entry.staged) {
     const content = await Bun.file(entry.path)
@@ -470,13 +453,6 @@ function diffSection(file: AnalyzedFile): string {
   return `### ${file.path} — ${file.status}, ${where}, +${file.insertions}/-${file.deletions}\n${file.diff}\n`;
 }
 
-/**
- * Handing the analysis back on stdout is what removes two round trips — one to
- * read the payload the script had just written, one to read the template it had
- * only named. Diffs go last and drop largest-first, so a budgeted digest loses
- * diff detail rather than the parts every run needs; `payloadPath` is where the
- * dropped detail stays reachable.
- */
 export function renderDigest(
   analysis: AnalysisResult,
   template: string,
@@ -540,7 +516,6 @@ const LOCK_MANIFESTS: Record<string, string> = {
   "composer.lock": "composer.json",
 };
 
-/** Where the implementation of a test file would live, most likely first. */
 function implementationsOf(path: string): string[] {
   const slash = path.lastIndexOf("/");
   const dir = path.slice(0, slash + 1);
@@ -558,7 +533,6 @@ function implementationsOf(path: string): string[] {
   return [];
 }
 
-// Found from paths alone, so the agent spends no judgement here and it holds without a TypeSafe key.
 export function mustPairs(paths: string[]): MustPair[] {
   const changed = new Set(paths);
   const pairs: MustPair[] = [];
@@ -584,7 +558,6 @@ export function mustPairs(paths: string[]): MustPair[] {
   return pairs;
 }
 
-/** What the plan must follow, decided here so the agent only writes prose around it. */
 export function renderRules(paths: string[]): string {
   const unique = [...new Set(paths)];
   const lines: string[] = [];
@@ -612,13 +585,6 @@ function normalizePath(path: string): string {
   return unquoted.startsWith("./") ? unquoted.slice(2) : unquoted;
 }
 
-/**
- * A commit run is only trustworthy when the plan and the repository agree, so
- * check both directions. `missing` catches a planned file the commit never
- * picked up; `leftover` catches a changed file the plan never knew about — the
- * failure the reporting agent cannot see, because a file that is absent from
- * the plan is absent from its success report too.
- */
 export function verifyPlanLanded(
   planned: string[],
   committed: string[],

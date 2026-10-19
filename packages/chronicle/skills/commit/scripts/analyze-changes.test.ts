@@ -238,7 +238,7 @@ describe("renderDigest", () => {
     expect(digest).toContain("abc1234 🔧 chore: init");
   });
 
-  test("holds back the largest diffs, naming them, to stay under budget", () => {
+  test("holds back the largest diffs, naming them, so a budget costs diff detail and never the template", () => {
     const digest = renderDigest(
       analysisOf(
         analyzed("small.ts", "+s"),
@@ -252,7 +252,6 @@ describe("renderDigest", () => {
     expect(digest).not.toContain("x".repeat(5000));
     expect(digest).toContain("1 diff(s) held back");
     expect(digest).toContain("huge.ts");
-    // The parts every run needs survive the budget; only diff detail goes.
     expect(digest).toContain("+s");
     expect(digest).toContain("- keep it terse");
   });
@@ -295,7 +294,7 @@ describe("applyTotalDiffBudget", () => {
     expect(result[2].diff).not.toContain("[diff omitted:");
   });
 
-  test("preserves original file order and stats when trimming", () => {
+  test("preserves original file order and stats when trimming, so a dropped diff keeps its shape", () => {
     const result = applyTotalDiffBudget(
       [file("a.ts", 500, { i: 400, d: 100 }), file("b.ts", 5)],
       50,
@@ -328,7 +327,6 @@ describe("analyzeFile", () => {
     await $`git config user.email t@t`.quiet();
     await $`git config user.name t`.quiet();
 
-    // 100-line lock file, of which only 4 lines change
     await writeFile(
       join(dir, "bun.lock"),
       `${Array.from({ length: 100 }, (_, n) => `"pkg-${n}": "1.0.0",`).join("\n")}\n`,
@@ -469,7 +467,7 @@ describe("verifyPlanLanded", () => {
     expect(result.missing).toEqual(["feature.ts", "newmod.ts"]);
   });
 
-  test("fails on a leftover change the plan never mentioned", () => {
+  test("fails on a leftover change the plan never mentioned, which no success report would name", () => {
     const result = verifyPlanLanded(["a.ts"], ["a.ts"], ["untouched.ts"]);
 
     expect(result.ok).toBe(false);

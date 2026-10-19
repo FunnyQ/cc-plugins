@@ -118,7 +118,7 @@ describe("validatePlan", () => {
     expect(result.ok).toBe(true);
   });
 
-  test("reports a changed file the plan dropped", () => {
+  test("reports a changed file the plan dropped, before it becomes a commit that cannot build", () => {
     const result = validatePlan(
       planOf(group("feat", ["a.ts"])),
       changed("a.ts", "b.ts"),
@@ -161,13 +161,21 @@ describe("validatePlan", () => {
     expect(result.splitRenames).toEqual(["old.ts -> new.ts"]);
   });
 
-  test("rejects a rename split across two commits", () => {
+  test("rejects a rename split across two commits, which would stage the old path's deletion behind and leave both files in the tree", () => {
     const result = validatePlan(
       planOf(group("refactor", ["new.ts"]), group("chore", ["old.ts"])),
       [{ path: "new.ts", oldPath: "old.ts", staged: true, status: "renamed" }],
     );
     expect(result.ok).toBe(false);
     expect(result.splitRenames).toEqual(["old.ts -> new.ts"]);
+  });
+
+  test("reports an unassigned rename once, as missing, not also as split", () => {
+    const result = validatePlan(planOf(group("refactor", ["old.ts"])), [
+      { path: "new.ts", oldPath: "old.ts", staged: true, status: "renamed" },
+    ]);
+    expect(result.missing).toEqual(["new.ts"]);
+    expect(result.splitRenames).toEqual([]);
   });
 
   test("a path staged and unstaged at once needs only one assignment", () => {
@@ -305,7 +313,7 @@ describe("validatePlanFile", () => {
     expect(validatePlanFile(split)).toEqual([]);
   });
 
-  test("requires `simple` once there is more than one group", () => {
+  test("requires `simple` up front once there is more than one group, sparing a round trip after the shape is known", () => {
     const { simple, ...without } = split;
     expect(validatePlanFile(without)).toEqual([
       "`simple` is missing — write the one-commit message these groups collapse into",
@@ -321,7 +329,6 @@ describe("validatePlanFile", () => {
 
   test("does not demand `simple` when the split cannot collapse", () => {
     expect(validatePlanFile(wide)).toEqual([]);
-    // The invariant the relaxation rests on: those groups always commit atomic.
     expect(
       decideShape(["feat", "feat"], {
         mode: "auto",
@@ -345,7 +352,7 @@ describe("validatePlanFile", () => {
     expect(validatePlanFile({ commits: draft.commits })).toEqual([]);
   });
 
-  test("rejects files on `simple` — they are every path in the plan", () => {
+  test("rejects files on `simple` — they are every path in the plan, so any written would repeat or contradict them", () => {
     const errors = validatePlanFile({
       ...split,
       simple: { ...split.simple, files: ["a.ts"] },
@@ -359,8 +366,7 @@ describe("validatePlanFile", () => {
     expect(errors[0]).toContain("simple.subject");
   });
 
-  test("rejects a moduleSpread that is not a list of strings", () => {
-    // A bare string passes `.length` and then throws inside decideShape's join.
+  test("rejects a moduleSpread that is not a list of strings, which would throw inside decideShape's join", () => {
     expect(validatePlanFile({ ...draft, moduleSpread: "pkg" })).toHaveLength(1);
     expect(validatePlanFile({ ...draft, notes: "one note" })).toHaveLength(1);
     expect(validatePlanFile({ ...draft, moduleSpread: [1] })).toHaveLength(1);
@@ -457,7 +463,7 @@ describe("resolveShapedCommits", () => {
     ]);
   });
 
-  test("one group keeps its own prose, `simple` or not", () => {
+  test("one group keeps its own prose, written for exactly its files, `simple` or not", () => {
     const one: PlanDraft = {
       commits: [{ type: "fix", subject: "patch it", files: ["a.ts"] }],
       simple: { type: "feat", subject: "never used" },
@@ -551,7 +557,7 @@ describe("resolveResumption", () => {
     });
   });
 
-  test("a half-finished run resumes after its last commit and keeps the original base", () => {
+  test("a half-finished run resumes after its last commit instead of duplicating it, and keeps the pre-plan base for the coverage check", () => {
     const result = resolveResumption(
       [
         { sha: "sha2", subject: "🐛 fix: second", paths: ["b.ts"] },
@@ -611,7 +617,7 @@ describe("resolveResumption", () => {
     expect(result.landed).toBe(0);
   });
 
-  test("a matching subject over a different file set is not this plan's commit", () => {
+  test("a matching subject over a different file set is not this plan's commit, so a repeated subject cannot skip real work", () => {
     const result = resolveResumption(
       [
         {

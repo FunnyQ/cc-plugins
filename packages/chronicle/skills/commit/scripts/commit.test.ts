@@ -30,7 +30,6 @@ async function baseCommit(): Promise<void> {
 }
 
 type PlanShape = {
-  /** Refused by the script — only the "it decided the shape itself" case sets it. */
   shape?: "simple" | "atomic";
   mode?: "auto" | "simple";
   commits: PlannedCommit[];
@@ -40,7 +39,6 @@ type PlanShape = {
   exclude?: string[];
 };
 
-// Outside the repo on purpose — a plan file inside it is part of the changeset.
 async function writePlan(plan: PlanShape): Promise<string> {
   const path = join(
     await mkdtemp(join(tmpdir(), "chronicle-plan-")),
@@ -178,7 +176,7 @@ describe("shape", () => {
     expect(json.errors[0]).toContain("remove `shape`");
   });
 
-  test("refuses a plan file inside the repo", async () => {
+  test("refuses a plan file inside the repo, where it would be an unplanned change itself", async () => {
     await baseCommit();
     await seed("a.ts", "a\n");
     await seed(
@@ -422,8 +420,6 @@ describe("apply", () => {
       ],
     });
 
-    // Committing new.ts alone leaves old.ts's deletion staged: the tree would
-    // hold both files, and the post-commit check would catch it too late.
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(2);
     expect(json.splitRenames).toEqual(["old.ts -> new.ts"]);
@@ -436,7 +432,6 @@ describe("apply", () => {
     await $`git add -A`.cwd(repo).quiet();
     await $`git commit -q -m ${"🔧 chore: bump the version"}`.cwd(repo).quiet();
 
-    // A fresh changeset whose subject happens to repeat the previous run's.
     await seed("b.ts", "two\n");
     const planPath = await writePlan({
       commits: [
@@ -504,7 +499,6 @@ describe("apply", () => {
       simple: { type: "feat", subject: "add a and document it" },
     };
 
-    // Simulate a run that died after the first commit.
     await $`git add -- a.ts`.cwd(repo).quiet();
     await $`git commit -q --only -m ${"✨ feat: add a"} -- a.ts`
       .cwd(repo)
@@ -548,10 +542,25 @@ describe("apply", () => {
         { emoji: "✨", type: "feat", subject: "add a", files: ["a.ts"] },
       ],
     });
-    // Appears only after the coverage check has read the changeset.
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(0);
     expect(json.verify.leftover).toEqual([]);
+  });
+
+  test("a failed commit keeps its message file and reports the path, so the user can commit it by hand", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed(".git/hooks/pre-commit", "#!/bin/sh\nexit 1\n");
+    await $`chmod +x .git/hooks/pre-commit`.cwd(repo).quiet();
+    const planPath = await writePlan({
+      commits: [
+        { emoji: "✨", type: "feat", subject: "add a", files: ["a.ts"] },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(2);
+    expect(await Bun.file(json.messagePath).text()).toBe("✨ feat: add a\n");
   });
 
   test("refuses an atomic split while a merge is in progress", async () => {
@@ -622,7 +631,6 @@ describe("apply", () => {
       ],
       exclude: ["drafts/"],
     });
-    // Written after the plan: a per-file exclude list would miss it.
     await seed("drafts/two.md", "two\n");
 
     const { exitCode, json } = await run("apply", planPath);

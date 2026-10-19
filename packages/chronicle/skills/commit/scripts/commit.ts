@@ -95,10 +95,6 @@ function insideRepo(absolute: string): boolean {
   return holder === root || holder.startsWith(`${root}${sep}`);
 }
 
-/**
- * A plan file living in the tree is itself an unassigned change, and the
- * coverage check would then reject the plan for not planning its own plan.
- */
 async function readPlanFile(path: string): Promise<PlanDraft> {
   const absolute = resolve(path);
   if (insideRepo(absolute)) {
@@ -128,11 +124,6 @@ async function readChangeset(): Promise<ParsedStatus[]> {
   return parseStatus(await git("status", "--porcelain", "-uall", "-z"));
 }
 
-/**
- * Newest-first, capped just past the plan so a resume can see the commit before
- * it. Each entry carries the paths it changed, because the resume check needs
- * them as identity — a subject on its own is not unique across runs.
- */
 async function readLog(limit: number): Promise<LogEntry[]> {
   const output = (
     await gitOrEmpty("log", "--format=%H%x1f%s", "-n", String(limit))
@@ -202,17 +193,17 @@ async function cachedPaths(): Promise<Set<string>> {
   );
 }
 
+function messagePathFor(index: number): string {
+  return join(TEMP_ROOT, "commit", `message-${process.pid}-${index}.txt`);
+}
+
 async function writeCommit(
   commit: PlannedCommit,
-  index: number,
+  messagePath: string,
   duringMerge: boolean,
   cached: Set<string>,
 ): Promise<void> {
-  // Kept on failure on purpose: the message is the part of a broken run that is
-  // expensive to reproduce, and the reported path is how the user recovers it.
-  const messageDir = join(TEMP_ROOT, "commit");
-  await mkdir(messageDir, { recursive: true });
-  const messagePath = join(messageDir, `message-${process.pid}-${index}.txt`);
+  await mkdir(dirname(messagePath), { recursive: true });
   await Bun.write(messagePath, composeMessage(commit));
 
   const toStage = stageable(commit.files, cached);
@@ -277,11 +268,13 @@ async function applyMain(planPath: string): Promise<void> {
 
     const cached = await cachedPaths();
     for (const [offset, commit] of pending.entries()) {
+      const messagePath = messagePathFor(landed + offset);
       try {
-        await writeCommit(commit, landed + offset, duringMerge, cached);
+        await writeCommit(commit, messagePath, duringMerge, cached);
       } catch (error) {
         refuse((error as Error).message, {
           executed: offset,
+          messagePath,
           note: "earlier commits stand; re-run to finish the rest",
         });
       }

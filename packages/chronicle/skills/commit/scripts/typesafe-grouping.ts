@@ -5,7 +5,11 @@
  * the Lawspeaker still owns it. Every failure degrades to "no suggestion".
  */
 
-import { askJev, type JevAnswer, type JevQuestion } from "../../../shared/scripts/typesafe";
+import {
+  askJev,
+  type JevAnswer,
+  type JevQuestion,
+} from "../../../shared/scripts/typesafe";
 
 /** Pairs grow as N²/2 — 20 files is 190 questions. */
 const MAX_FILES = 20;
@@ -33,9 +37,7 @@ export type GroupInput = {
   diff: string;
 };
 
-
 export type Group = { files: string[]; types: string[] };
-/** `ms` is the round trip, so the user sees what the call cost this commit. */
 export type Suggestion =
   | { groups: Group[]; ms: number }
   | { skipped: string; ms?: number };
@@ -131,7 +133,8 @@ export async function suggestGroups(
 
 export function renderSuggestion(suggestion: Suggestion): string {
   if ("skipped" in suggestion) {
-    const after = suggestion.ms === undefined ? "" : ` after ${suggestion.ms} ms`;
+    const after =
+      suggestion.ms === undefined ? "" : ` after ${suggestion.ms} ms`;
     return `\n[TypeSafe grouping skipped${after}: ${suggestion.skipped}]\n`;
   }
   const lines = suggestion.groups.map(
