@@ -1,8 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  utimes,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
 import { applyCommit, buildNewAdrs, setLifecycle } from "./adr-commit";
 
 const tempDirs: string[] = [];
@@ -79,9 +88,7 @@ describe("buildNewAdrs", () => {
     expect(result.drops).toBeNull();
   });
 
-  // A dropped group was `promote` at gate 1, so its sessions are already planned for
-  // `done`; without the watch override the decision archives unrecorded.
-  test("turns every dropped group's entries into a watch override", () => {
+  test("turns every dropped group's entries into a watch override, so a gate-1 promote never archives to done unrecorded", () => {
     const result = buildNewAdrs(drafts, [
       { proposedPath: "docs/adr/0027-first.md", verdict: "drop" },
       { proposedPath: "docs/adr/0028-second.md", verdict: "approve" },
@@ -178,7 +185,7 @@ describe("applyCommit", () => {
     );
   });
 
-  test("refuses the whole batch on a collision and writes nothing", async () => {
+  test("refuses the whole batch on a collision and writes nothing, so a numbering race never half-lands a batch", async () => {
     const root = await repo();
     await writeFile(join(root, "docs/adr/0002-taken.md"), record("0002"));
     const result = await applyCommit({
@@ -197,12 +204,21 @@ describe("applyCommit", () => {
     expect(existsSync(join(root, "docs/adr/0001-example.md"))).toBe(false);
   });
 
-  test("keeps the writes but skips archiving when validation fails", async () => {
+  test("keeps the writes but skips the irreversible archive when validation fails", async () => {
     const root = await repo();
+    const from = join(root, ".cockpit", "logs", "s1.jsonl");
+    const to = join(root, ".cockpit", "archive", "done", "s1.jsonl");
+    await writeFile(from, "{}\n");
+    const old = new Date(Date.now() - STALE_MS - 1_000);
+    await utimes(from, old, old);
     const result = await applyCommit({
       root,
       newAdrs: [{ path: "docs/adr/0001-example.md", content: record("0002") }],
-      plan: emptyPlan(root),
+      plan: {
+        trailRoot: root,
+        moves: [{ from, to, target: "done", fromBucket: "inbox" }],
+        refused: [],
+      },
     });
     expect(result).toMatchObject({
       success: false,
@@ -213,6 +229,8 @@ describe("applyCommit", () => {
     expect(
       (result as { violations: unknown[] }).violations.length,
     ).toBeGreaterThan(0);
+    expect(existsSync(from)).toBe(true);
+    expect(existsSync(to)).toBe(false);
   });
 
   test("reports a failed metadata update without rolling back or archiving", async () => {

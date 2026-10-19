@@ -189,7 +189,7 @@ describe("collectContext", () => {
 });
 
 describe("fetchBodies", () => {
-  test("ignores unknown ids and finds records in every archive bucket", async () => {
+  test("ignores unknown ids and finds records in every archive bucket, done included, since the ids are already shortlisted", async () => {
     const root = temporaryRoot();
     writeSession(root, "logs", "active", [JSON.stringify(record("inbox-id"))]);
     writeSession(root, "archive/watch", "watching", [
@@ -211,9 +211,6 @@ describe("fetchBodies", () => {
   });
 });
 
-// Every agent file that reaches this script names its flags in prose. A drifted flag
-// used to be ignored, so `--ids` silently produced a skeleton run and the caller only
-// noticed three steps later, by the evidence that never arrived.
 describe("parseCliArgs", () => {
   test("accepts the two supported flags", () => {
     expect(parseCliArgs([])).toEqual({ includeDone: false, bodyIds: null });
@@ -227,7 +224,7 @@ describe("parseCliArgs", () => {
     });
   });
 
-  test("rejects an unknown flag instead of ignoring it", () => {
+  test("rejects an unknown flag instead of ignoring it, so a drifted --ids never runs as a silent skeleton pass", () => {
     expect(() => parseCliArgs(["--ids", "a"])).toThrow(/Usage/);
     expect(() => parseCliArgs(["--include-archived"])).toThrow(/Usage/);
   });
@@ -302,7 +299,7 @@ describe("CLI", () => {
       adrDir: join(realpathSync(root), "docs", "adr"),
     });
     expect(basename(skeletonSummary.outputPath)).toMatch(
-      /^context-\d+-\d+\.json$/,
+      /^context-\d+-\d+-\d+\.json$/,
     );
     const skeletonPayload = await Bun.file(skeletonSummary.outputPath).json();
     expect(skeletonPayload.skeletons[0].id).toBe("cli-id");

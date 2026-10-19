@@ -6,7 +6,6 @@ import { writeTempPayload } from "../../../shared/scripts/temp-payload";
 
 export type ArchiveTarget = "done" | "watch";
 
-/** Where the session sits now. Watched sessions are legal sources for the wake path. */
 export type SourceBucket = "inbox" | "watch";
 
 export type Assignment = {
@@ -40,7 +39,6 @@ export type PlanDeps = {
   exists: (path: string) => boolean;
 };
 
-/** Every bucket a session log can sit in. `inbox` is Cockpit's live log directory. */
 export type TrailBucket = SourceBucket | ArchiveTarget;
 
 // The one place the on-disk trail layout is written down. The collector, the planner
@@ -62,7 +60,6 @@ export function sessionPath(
   return join(bucketDirectory(trailRoot, bucket), `${sessionId}.jsonl`);
 }
 
-/** Pure. No filesystem access — everything comes through deps. */
 export function planArchive(
   trailRoot: string,
   assignments: Assignment[],
@@ -77,8 +74,6 @@ export function planArchive(
     const to = sessionPath(trailRoot, assignment.sessionId, assignment.target);
     const mtimeMs = deps.mtimeOf(from);
 
-    // The shared reader owns STALE_MS so the planner cannot drift from Cockpit's
-    // definition of a live session while protecting a log that may still be written.
     if (mtimeMs !== null && deps.nowMs - mtimeMs < STALE_MS) {
       const ageSeconds = (deps.nowMs - mtimeMs) / 1_000;
       refused.push({
@@ -137,7 +132,6 @@ export function planArchive(
   return { trailRoot, moves, refused };
 }
 
-/** Nothing moves and every refusal is `missing`: the signature of a plan built from the wrong cwd. */
 export function everySessionMissing(plan: ArchivePlan): boolean {
   return (
     plan.moves.length === 0 &&
@@ -146,7 +140,6 @@ export function everySessionMissing(plan: ArchivePlan): boolean {
   );
 }
 
-/** Writes the plan to a temp path and returns it. The only write this module performs. */
 export async function writePlan(plan: ArchivePlan): Promise<string> {
   return writeTempPayload("adr", "archive-plan", plan);
 }
@@ -174,7 +167,6 @@ async function main(): Promise<void> {
     throw new Error("Assignments JSON must contain an array");
   }
 
-  // A wrong cwd used to plan every session `missing` and still exit 0 with a plan path.
   const trailRoot = logRoot(process.cwd());
   if (!existsSync(join(trailRoot, ".cockpit"))) {
     throw new Error(

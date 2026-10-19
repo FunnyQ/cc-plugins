@@ -11,14 +11,8 @@ export type AdrMeta = {
   supersedes: string[];
   supersededBy: string[];
   path: string;
-  /** H2 headings present, in document order — e.g. ["Context", "Decision", "Evidence"]. */
   sections: string[];
-  /** Top-level list items under `## Evidence`. 0 when the section is absent or empty. */
   evidenceEntries: number;
-  /**
-   * Other records this one names in its body, excluding the H1, the lifecycle
-   * metadata lines, and its own id. Deduped, in first-appearance order.
-   */
   proseRefs: string[];
 };
 
@@ -34,15 +28,12 @@ export type AdrIndex = {
   adrs: AdrMeta[];
   nextNumber: number;
   brokenLinks: BrokenLink[];
-  /** Markdown files in the directory that `parseAdr` could not read, with why. Never dropped. */
   skipped: {
     path: string;
     reason: "no-h1" | "bad-h1" | "unreadable";
   }[];
 };
 
-// `unreadable` is deliberately absent: only buildIndex's readFile can produce it.
-// Parsing is pure string work that cannot fail, so it reports only shape problems.
 type ParseResult =
   | { adr: AdrMeta; reason: null }
   | { adr: null; reason: "no-h1" | "bad-h1" };
@@ -82,8 +73,6 @@ function adrIds(value: string | null): string[] {
     .filter(Boolean);
 }
 
-// Lifecycle links are excluded because brokenLinks already checks them both ways.
-// Reporting the same dead id twice would make one typo look like two problems.
 function proseRefIds(lines: string[], h1: string, selfId: string): string[] {
   const ids = new Set<string>();
   for (const line of lines) {
@@ -237,13 +226,11 @@ export async function buildIndex(dir: string): Promise<AdrIndex> {
     if (result.adr) {
       adrs.push(result.adr);
     } else {
-      // Silently dropping a file would be a file no validation rule could ever fire on. By recording it in skipped, we let the validator discover it and decide whether it is harmless (e.g., a README) or a violation (e.g., a malformed record).
       skipped.push({ path: entry.name, reason: result.reason });
     }
   }
 
   adrs.sort((a, b) => a.number - b.number);
-  // Gaps are never reused because reusing a number would make an id ambiguous across git history.
   const nextNumber = adrs.length === 0 ? 1 : adrs[adrs.length - 1].number + 1;
   return {
     dir,

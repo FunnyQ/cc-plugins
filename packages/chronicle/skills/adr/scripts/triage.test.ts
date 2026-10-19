@@ -182,7 +182,7 @@ describe("buildTriage", () => {
     ]);
   });
 
-  test("evidence mode clusters every session in every bucket and assigns none", () => {
+  test("evidence mode clusters every session in every bucket and assigns none, since promote must archive nothing", () => {
     const triage = buildTriage(
       context(
         [
@@ -250,7 +250,6 @@ describe("prescreen", () => {
     };
   }
 
-  /** Answers each request from `pSkip` by the cluster's decision text, so batching order does not matter. */
   function fetchScoring(pSkip: Record<string, number>, fail = false) {
     const calls: {
       questions: Record<string, unknown>;
@@ -294,7 +293,7 @@ describe("prescreen", () => {
     ]);
   });
 
-  test("never asks about a watched cluster", async () => {
+  test("never asks about a watched cluster, which an earlier triage already judged plausible", async () => {
     const { impl, calls } = fetchScoring({
       "decision 1": 0.99,
       "decision 2": 0.99,
@@ -345,7 +344,7 @@ describe("prescreen", () => {
     expect(String(entry.reason).length).toBe(2_500);
   });
 
-  test("keeps every cluster when Jev fails or no key is set", async () => {
+  test("keeps every cluster when Jev fails or no key is set, so a run without Jev judges what it judged before", async () => {
     const clusters = [cluster(1), cluster(2)];
     const bodies = [body(1), body(2)];
     const { impl } = fetchScoring({ "decision 1": 0.99 }, true);
@@ -605,6 +604,13 @@ describe("mergeTriage", () => {
     expect(merged.errors.join("\n")).toMatch(/maybe/);
   });
 
+  test("reports a result count that differs from the batch count", () => {
+    const fallback = fallbackResult(batch);
+    expect(
+      mergeTriage(run, [batch], [fallback, fallback], []).errors.join(),
+    ).toMatch(/Expected 1 batch results, got 2/);
+  });
+
   test("reports a batch with no result", () => {
     expect(mergeTriage(run, [batch], [null], []).errors.join()).toMatch(
       /batch 1/,
@@ -640,6 +646,23 @@ describe("CLI", () => {
     const directory = realpathSync(mkdtempSync(join(tmpdir(), "triage-")));
     directories.push(directory);
     return directory;
+  }
+
+  function prepWithJevSkippingEverything(cwd: string, args: string[]) {
+    const preload = join(cwd, "jev-skips-all.ts");
+    writeFileSync(
+      preload,
+      `globalThis.fetch = (async (_url, init) => {
+        const { questions } = JSON.parse(String(init.body));
+        const skip = { type: "choice", choice: "skip", confidence: 1, probabilities: { promote: 0, watch: 0, skip: 1 } };
+        return new Response(JSON.stringify({ answers: Object.fromEntries(Object.keys(questions).map((key) => [key, skip])) }));
+      }) as typeof fetch;\n`,
+    );
+    return spawnSync(
+      process.execPath,
+      ["--preload", preload, script, "prep", ...args],
+      { cwd, encoding: "utf8", env: { ...process.env, TYPESAFE_API_KEY: "k" } },
+    );
   }
 
   function cli(cwd: string, args: string[], input?: string) {
@@ -751,7 +774,7 @@ describe("CLI", () => {
     expect(cli(elsewhere, ["merge", "--run", summary.runDir]).status).toBe(1);
   });
 
-  test("merge --missing-as-watch persists the fallback for every later merge", () => {
+  test("merge --missing-as-watch persists the fallback for every later merge and refuses a late judge", () => {
     const root = scratch();
     mkdirSync(join(root, ".cockpit", "logs"), { recursive: true });
     writeLog(root, "s1", [["a", "A"]]);
@@ -805,5 +828,22 @@ describe("CLI", () => {
       readFileSync(join(summary.runDir, "run.json"), "utf8"),
     );
     expect(run.assignments).toEqual([]);
+  });
+
+  test("prep --evidence pre-screens nothing away, even when Jev scores every cluster skip", () => {
+    const root = scratch();
+    mkdirSync(join(root, ".cockpit", "logs"), { recursive: true });
+    writeLog(root, "s1", [["a", "A"]]);
+
+    const screened = JSON.parse(prepWithJevSkippingEverything(root, []).stdout);
+    directories.push(screened.runDir);
+    expect(screened.prescreened).toBe(1);
+
+    const evidence = JSON.parse(
+      prepWithJevSkippingEverything(root, ["--evidence"]).stdout,
+    );
+    directories.push(evidence.runDir);
+    expect(evidence).toMatchObject({ prescreened: 0, clusters: 1 });
+    expect(evidence.batches).toHaveLength(1);
   });
 });

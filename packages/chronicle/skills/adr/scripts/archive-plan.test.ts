@@ -97,7 +97,7 @@ describe("planArchive", () => {
       outcome: "move",
     },
     {
-      name: "watch to done",
+      name: "watch to done, the wake path",
       assignment: {
         sessionId: "watch-done",
         from: "watch",

@@ -70,8 +70,7 @@ export type Gate2Payload = {
 
 export type GatePayload = Gate1Payload | Gate2Payload;
 
-/** At most this many records may reach `draft` in one run. */
-export const GROUP_CAP = 12;
+export const MAX_DRAFTS_PER_RUN = 12;
 
 export type GateServer = {
   url: string;
@@ -170,11 +169,6 @@ export function serveGatePage(opts: {
   };
 }
 
-/**
- * Both locales share one shape. Without the annotation `as const` would give
- * each table its own literal types, and the zh-TW table would stop being
- * assignable wherever a renderer takes the en one.
- */
 type Strings = {
   eyebrow: string;
   gate1Title: string;
@@ -190,8 +184,7 @@ type Strings = {
   tallyGroups: string;
   cap: string;
   capWillWrite: string;
-  /** Carries a literal `{n}` — the client substitutes the live count. */
-  capOver: string;
+  capOver: `${string}{n}${string}`;
   capNone: string;
   ledgerSect: string;
   draftsSect: string;
@@ -210,8 +203,7 @@ type Strings = {
   completeNote: string;
   alertGroupTitle: string;
   alertGroupBody: string;
-  /** Carries a literal `{n}` — the client substitutes the live count. */
-  alertCapTitle: string;
+  alertCapTitle: `${string}{n}${string}`;
   alertCapBody: string;
   path: string;
   editToggle: string;
@@ -237,7 +229,7 @@ const STRINGS: Record<Lang, Strings> = {
     tallyGroups: "records after grouping",
     cap: "cap",
     capWillWrite: "will write",
-    capOver: `{n} / ${GROUP_CAP} — over cap, group further or set the excess to watch`,
+    capOver: `{n} / ${MAX_DRAFTS_PER_RUN} — over cap, group further or set the excess to watch`,
     capNone: "no promotions — this run records nothing",
     ledgerSect: "Candidate ledger",
     draftsSect: "Proposed records",
@@ -259,7 +251,7 @@ const STRINGS: Record<Lang, Strings> = {
     alertGroupTitle: "A group holds a non-promote row.",
     alertGroupBody:
       "Rows only fold into one record when every one of them is promote. Either drop the label from the outlier, or set it back to promote.",
-    alertCapTitle: `{n} records exceeds the ${GROUP_CAP}-record cap.`,
+    alertCapTitle: `{n} records exceeds the ${MAX_DRAFTS_PER_RUN}-record cap.`,
     alertCapBody:
       "Group further, or set the excess to watch — a watch candidate archives to the watched bucket and re-queues on the next triage run, so nothing is lost.",
     path: "path",
@@ -285,7 +277,7 @@ const STRINGS: Record<Lang, Strings> = {
     tallyGroups: "分群後記錄數",
     cap: "上限",
     capWillWrite: "將產生",
-    capOver: `{n} / ${GROUP_CAP} — 超過上限，請再分群或把多的改成 watch`,
+    capOver: `{n} / ${MAX_DRAFTS_PER_RUN} — 超過上限，請再分群或把多的改成 watch`,
     capNone: "沒有任何晉升 — 這一輪不會產生記錄",
     ledgerSect: "候選帳冊",
     draftsSect: "待寫入的記錄",
@@ -307,7 +299,7 @@ const STRINGS: Record<Lang, Strings> = {
     alertGroupTitle: "group 裡混進了非 promote 的列。",
     alertGroupBody:
       "只有全部都是 promote 的列才能折成同一筆記錄。要嘛把標籤從那個例外身上拿掉，要嘛把它改回 promote。",
-    alertCapTitle: `{n} 筆記錄超過 ${GROUP_CAP} 筆上限。`,
+    alertCapTitle: `{n} 筆記錄超過 ${MAX_DRAFTS_PER_RUN} 筆上限。`,
     alertCapBody:
       "請再分群，或把多出來的改成 watch——watch 候選會歸檔到 watched bucket，下一次分流會重新排隊，不會遺失。",
     path: "路徑",
@@ -374,8 +366,6 @@ ${opts?.submitUrl ? `      <button class="btn" id="send" type="button">${esc(t.s
 </div>
 <script>${clientScript(payload.gate, opts?.submitUrl)}</script>`;
 }
-
-/* ------------------------------ gate 1 ------------------------------ */
 
 function gate1Body(p: Gate1Payload, t: Strings): string {
   const s = p.scan ?? {};
@@ -484,8 +474,6 @@ function idMarkup(ids: string[], t: Strings): string {
   return `${shown}${rest}<button class="more-ids" type="button" data-more>${esc(t.moreIds(ids.length - 4))}</button>`;
 }
 
-/* ------------------------------ gate 2 ------------------------------ */
-
 function gate2Body(p: Gate2Payload, t: Strings): string {
   const cards = p.drafts
     .map((d, i) => {
@@ -534,8 +522,6 @@ ${cards}
   </section>
 `;
 }
-
-/* ------------------------------ client ------------------------------ */
 
 const SHARED_JS = `
   const P = JSON.parse(document.getElementById("payload").textContent);
@@ -628,7 +614,7 @@ function clientScript(gate: 1 | 2, submitUrl?: string): string {
 
 const GATE1_JS = `(() => {
 ${SHARED_JS}
-  const CAP = ${GROUP_CAP};
+  const CAP = ${MAX_DRAFTS_PER_RUN};
   const state = P.candidates.map(c => ({ d: c.disposition, group: "" }));
 
   document.getElementById("ledger").addEventListener("change", e => {
@@ -791,8 +777,6 @@ function pickClientStrings(lang: Lang, withSubmit = false) {
   };
 }
 
-/* -------------------------------- css -------------------------------- */
-
 const CSS = `
 :root {
   --paper: #eceef1; --card: #fff; --ink: #171a20; --ink-2: #4a5262; --ink-3: #7c8496;
@@ -903,8 +887,6 @@ pre#out { background: var(--card); border: 1px solid var(--line); border-radius:
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 `;
 
-/* -------------------------------- cli -------------------------------- */
-
 if (import.meta.main) {
   const argv = process.argv.slice(2);
   const flag = (name: string): string | undefined => {
@@ -959,8 +941,6 @@ if (import.meta.main) {
   console.log(outPath);
   if (gateServer) console.error(`gate-page: serving ${gateServer.url}`);
 
-  // The review surface stays local whether the browser reads the file or the
-  // one-shot loopback page.
   if (argv.includes("--open")) {
     const opener =
       process.platform === "darwin"

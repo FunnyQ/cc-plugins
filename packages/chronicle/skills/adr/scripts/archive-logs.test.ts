@@ -193,7 +193,7 @@ describe("applyArchive", () => {
     }
   });
 
-  test("reports a source deleted between plan and apply as missing", async () => {
+  test("reports a source deleted between plan and apply as missing, not as a structural failure", async () => {
     const item = fixture();
     try {
       const missingMove = move(item.root, "missing");
@@ -257,12 +257,15 @@ describe("applyArchive", () => {
     }
   });
 
-  test("rejects a plan for a different trail root", async () => {
+  test("rejects a plan for a different trail root, so a plan never chooses its own boundary", async () => {
     const item = fixture();
     try {
       const source = join(item.logs, "root.jsonl");
       stale(source);
       const archivePlan = plan("/test-trail", [move(item.root, "root")]);
+      expect(validatePlan(archivePlan, item.root)).toContain(
+        "Plan trail root does not match trusted root: /test-trail",
+      );
       await expectStructuralRejection(item, archivePlan, source);
     } finally {
       item.cleanup();

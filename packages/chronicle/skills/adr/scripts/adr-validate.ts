@@ -37,7 +37,6 @@ export type ValidateResult = {
   ok: boolean;
 };
 
-// adr-index.ts owns filename construction; this expression validates its kebab-case output shape.
 const ADR_FILENAME = /^\d{4}-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 const REQUIRED_SECTIONS = [
   "Context",
@@ -67,9 +66,6 @@ function filenameViolations(filename: string): Violation[] {
   ];
 }
 
-// A calendar round-trip, not just the YYYY-MM-DD shape: 2026-99-99 and 2025-02-30
-// match the pattern and do not exist, and a validator that passes them reports
-// success on already-corrupt metadata.
 function isCalendarDate(value: string): boolean {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return false;
@@ -83,7 +79,6 @@ function isCalendarDate(value: string): boolean {
   );
 }
 
-/** Pure. Every rule an already-parsed record can answer without reading its siblings. */
 export function validateMeta(adr: AdrMeta, filename: string): Violation[] {
   const violations = filenameViolations(filename);
   const filenameMatch = /^(\d{4})-/.exec(filename);
@@ -150,7 +145,6 @@ export function validateMeta(adr: AdrMeta, filename: string): Violation[] {
   }
 
   if (adr.evidenceEntries === 0) {
-    // Hand-written ADRs may have nothing to cite; failing them would encourage invented evidence.
     violations.push(
       violation(
         "empty-evidence",
@@ -164,7 +158,6 @@ export function validateMeta(adr: AdrMeta, filename: string): Violation[] {
   return violations;
 }
 
-/** Pure. Parses one record, then applies every rule that needs no directory context. */
 export function validateOne(content: string, path: string): Violation[] {
   const filename = basename(path);
   const adr = parseAdr(content, path);
@@ -186,7 +179,6 @@ function toResult(checked: number, violations: Violation[]): ValidateResult {
   };
 }
 
-/** Adds the cross-file link rules on top of validateMeta. */
 export async function validateDir(dir: string): Promise<ValidateResult> {
   const index = await buildIndex(dir);
   const violations: Violation[] = [];
@@ -211,9 +203,6 @@ export async function validateDir(dir: string): Promise<ValidateResult> {
 
   const pathById = new Map(index.adrs.map((adr) => [adr.id, adr.path]));
 
-  // A warning, not an error: a record that restates the fact it cites still reads
-  // correctly once the cited record is gone. What rots is the pointer, so this
-  // reports where to drop a dead citation without blocking an unrelated batch.
   for (const adr of index.adrs) {
     for (const ref of adr.proseRefs) {
       if (pathById.has(ref)) continue;
@@ -247,7 +236,6 @@ async function main(): Promise<void> {
   const fileIndex = Bun.argv.indexOf("--file");
   let result: ValidateResult;
 
-  // --file skips sibling-dependent link rules, while validateOne still catches self-links from the record alone.
   if (fileIndex !== -1) {
     const path = Bun.argv[fileIndex + 1];
     if (!path) throw new Error("Missing required --file <path>");

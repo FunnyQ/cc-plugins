@@ -199,7 +199,7 @@ describe("validateOne", () => {
     expect(violations).toHaveLength(1);
   });
 
-  test("reports empty-evidence as a warning", () => {
+  test("reports empty-evidence as a warning, so a hand-written ADR is never pushed to invent evidence", () => {
     expect(
       validateOne(adr({ evidence: "No entries." }), "0001-example.md"),
     ).toContainEqual(
@@ -263,7 +263,7 @@ describe("validateDir", () => {
     );
   });
 
-  test("reports stale-prose-ref as a warning naming the dead id", async () => {
+  test("reports stale-prose-ref as a warning naming the dead id, so a dead citation never blocks an unrelated batch", async () => {
     const dir = await tempDir();
     await writeAdr(
       dir,
@@ -300,7 +300,7 @@ describe("validateDir", () => {
     );
   });
 
-  test("leaves a dead lifecycle link to link-missing alone", async () => {
+  test("reports a dead lifecycle link once, as link-missing, never also as stale-prose-ref", async () => {
     const dir = await tempDir();
     await writeAdr(
       dir,

@@ -94,7 +94,6 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** `evidence` assigns no session because `promote` searches every bucket but must archive nothing. */
 export function buildTriage(
   context: AdrContext,
   nowMs: number,
@@ -196,7 +195,6 @@ export function buildTriage(
   };
 }
 
-/** At most MAX_JUDGES batches, each as close to BATCH_SIZE as that cap allows. */
 export function planBatches<T>(items: T[]): T[][] {
   if (items.length === 0) return [];
   const count = Math.min(MAX_JUDGES, Math.ceil(items.length / BATCH_SIZE));
@@ -223,7 +221,6 @@ const PRESCREEN_CRITERIA: Record<Disposition, string> = {
   skip: "An implementation detail, bug post-mortem, caveat for code, workaround, mechanical convention, a fact about an external system or tool, or a default any competent engineer would pick",
 };
 
-/** Any Jev failure keeps every cluster, so a run without Jev judges exactly what it judged before. */
 export async function prescreen(
   clusters: Cluster[],
   bodies: EntryBody[],
@@ -233,7 +230,6 @@ export async function prescreen(
   skipped: RecordedCandidate[];
   jev: JevResult | null;
 }> {
-  // Watched clusters are always plausible: an earlier triage already judged they might matter.
   const asked = clusters.filter(({ watched }) => !watched);
   if (asked.length === 0) return { kept: clusters, skipped: [], jev: null };
   if (!opts.apiKey) {
@@ -313,11 +309,10 @@ export async function prescreen(
   };
 }
 
-/** Pure. Checks one judge's result against its batch; `result` is null whenever `errors` is not empty. */
 export function validateJudgment(
   batch: Batch,
   input: unknown,
-): { result: BatchResult | null; errors: string[] } {
+): { result: BatchResult; errors: [] } | { result: null; errors: string[] } {
   if (!isObject(input) || !Array.isArray(input.candidates)) {
     return {
       result: null,
@@ -432,7 +427,6 @@ export function validateJudgment(
   };
 }
 
-/** The result a batch gets when its judge failed twice: every cluster at `watch`, never a silent `skip`. */
 export function fallbackResult(batch: Batch): BatchResult {
   return {
     batch: batch.batch,
@@ -449,7 +443,6 @@ export function fallbackResult(batch: Batch): BatchResult {
   };
 }
 
-/** Pure. `results[i]` is batch `batches[i]`'s recorded result, or null when its judge never recorded one. */
 export function mergeTriage(
   run: RunMeta,
   batches: Batch[],
@@ -465,6 +458,11 @@ export function mergeTriage(
   const rows: (RecordedCandidate & { batch: number })[] = [];
   const conflicts: Gate1Conflict[] = [];
 
+  if (results.length !== batches.length) {
+    errors.push(
+      `Expected ${batches.length} batch results, got ${results.length}.`,
+    );
+  }
   batches.forEach((batch, index) => {
     const result = results[index];
     if (result) {
@@ -551,7 +549,6 @@ function usage(): string {
   ].join("\n");
 }
 
-/** Reads `--name <value>` pairs and bare switches; anything outside `allowed` is a usage error. */
 function parseFlags(
   argv: string[],
   allowed: { values: string[]; switches: string[] },
@@ -597,6 +594,27 @@ function countDispositions(candidates: { disposition: Disposition }[]) {
   return counts;
 }
 
+function recordPrescreenedBatch(
+  runDir: string,
+  batch: number,
+  adrs: Batch["adrs"],
+  clusters: Cluster[],
+  skipped: RecordedCandidate[],
+): void {
+  const path = batchPath(runDir, batch);
+  const skippedIds = new Set(skipped.map(({ clusterId }) => clusterId));
+  writeJson(path, {
+    batch,
+    adrs,
+    clusters: clusters.filter(({ clusterId }) => skippedIds.has(clusterId)),
+  } satisfies Batch);
+  writeJson(resultPath(path), {
+    batch,
+    candidates: skipped,
+    conflicts: [],
+  } satisfies BatchResult);
+}
+
 async function prep(argv: string[]): Promise<void> {
   const { switches } = parseFlags(argv, {
     values: [],
@@ -625,7 +643,6 @@ async function prep(argv: string[]): Promise<void> {
     title,
     status,
   }));
-  // `promote` searches for evidence, so a pre-screen skip there would hide what the user asked for.
   const screened = evidence
     ? { kept: triage.clusters, skipped: [], jev: null }
     : await prescreen(
@@ -646,24 +663,14 @@ async function prep(argv: string[]): Promise<void> {
   });
   let batchCount = batches.length;
   if (screened.skipped.length > 0) {
-    // Recorded as one more batch with its result already on disk, so merge reads it like any judge's and no judge is spawned for it.
     batchCount += 1;
-    const path = batchPath(runDir, batchCount);
-    const skippedIds = new Set(
-      screened.skipped.map(({ clusterId }) => clusterId),
-    );
-    writeJson(path, {
-      batch: batchCount,
+    recordPrescreenedBatch(
+      runDir,
+      batchCount,
       adrs,
-      clusters: triage.clusters.filter(({ clusterId }) =>
-        skippedIds.has(clusterId),
-      ),
-    } satisfies Batch);
-    writeJson(resultPath(path), {
-      batch: batchCount,
-      candidates: screened.skipped,
-      conflicts: [],
-    } satisfies BatchResult);
+      triage.clusters,
+      screened.skipped,
+    );
   }
   const scan = {
     sessions: triage.sessions,
@@ -752,7 +759,6 @@ async function merge(argv: string[]): Promise<void> {
     batches.push(current);
     const output = resultPath(path);
     if (!existsSync(output) && switches.has("--missing-as-watch")) {
-      // Written as the batch's result, so a later merge without the flag keeps it and a late judge is refused.
       writeFileSync(
         output,
         `${JSON.stringify(fallbackResult(current), null, 2)}\n`,

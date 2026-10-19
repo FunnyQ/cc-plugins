@@ -18,10 +18,8 @@ export type ScanRoot = { dir: string; deep: boolean };
 
 export type TrailResult = {
   trailRoot: string;
-  /** Moved under `--apply`, planned otherwise. */
   moves: Move[];
   skipped: Refusal[];
-  /** `null` when nothing moves or the trail sits outside a git repository. */
   archiveIgnored: boolean | null;
 };
 
@@ -53,6 +51,10 @@ function isTrail(directory: string): boolean {
   }
 }
 
+function isForwardTestFixtures(parent: string, name: string): boolean {
+  return name === "fixtures" && basename(parent) === "references";
+}
+
 export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
   const found = new Set<string>();
 
@@ -70,10 +72,7 @@ export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
         found.add(realpathSync(directory));
       }
       if (PRUNED.has(entry.name)) continue;
-      // Chronicle's own forward-test trails, in the checkout and in every plugin cache copy.
-      if (entry.name === "fixtures" && basename(directory) === "references") {
-        continue;
-      }
+      if (isForwardTestFixtures(directory, entry.name)) continue;
       visit(join(directory, entry.name));
     }
   };
@@ -85,21 +84,20 @@ export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
   return [...found].sort();
 }
 
-/** `destinations` are relative to `trailRoot`. */
 export function archiveIgnored(
   trailRoot: string,
-  destinations: string[],
+  relativeDestinations: string[],
 ): boolean | null {
   // Every real destination, not one probe: a negation can re-include a single file name.
   const result = spawnSync(
     "git",
-    ["-C", trailRoot, "check-ignore", ...destinations],
+    ["-C", trailRoot, "check-ignore", ...relativeDestinations],
     { encoding: "utf8" },
   );
   if (result.status === 1) return false;
   if (result.status !== 0) return null;
   const ignored = result.stdout.split("\n").filter((line) => line.length > 0);
-  return ignored.length === destinations.length;
+  return ignored.length === relativeDestinations.length;
 }
 
 export async function archiveTrail(

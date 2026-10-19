@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { renderGatePage, serveGatePage } from "./gate-page";
+import { renderGatePage, serveGatePage, type GatePayload } from "./gate-page";
 
 const GATE1 = {
   gate: 1 as const,
@@ -60,9 +60,6 @@ describe("renderGatePage", () => {
     expect(html).not.toContain("</script><svg");
   });
 
-  // The client script is assembled by substituting placeholders. A string
-  // replacement would re-read "$&" as a substitution pattern and splice the
-  // placeholder's own name into the URL.
   test("a substitution pattern in the submit URL survives verbatim", () => {
     const submitUrl = "http://127.0.0.1/x$&$'y/submit";
     const html = renderGatePage(GATE1, { submitUrl });
@@ -94,8 +91,6 @@ describe("renderGatePage", () => {
     }
   });
 
-  // The payload rides inside a <script> block, so an unescaped "</script>" in
-  // any candidate title or draft body would close it early and blank the page.
   test("a closing script tag in the content cannot break out", () => {
     const html = renderGatePage({
       ...GATE2,
@@ -128,8 +123,9 @@ describe("renderGatePage", () => {
   });
 
   test("an unknown gate is rejected rather than rendered empty", () => {
-    // @ts-expect-error deliberately out of contract
-    expect(() => renderGatePage({ gate: 3, lang: "en" })).toThrow();
+    expect(() =>
+      renderGatePage({ gate: 3, lang: "en" } as unknown as GatePayload),
+    ).toThrow();
   });
 });
 

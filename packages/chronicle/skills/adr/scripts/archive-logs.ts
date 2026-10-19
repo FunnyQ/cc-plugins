@@ -54,7 +54,6 @@ function validateDestinationAncestors(
   }
 }
 
-/** Structural validation of an untrusted plan. Pure apart from lstat/realpath probes. */
 export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
   const errors: string[] = [];
   let realTrustedRoot: string;
@@ -65,8 +64,6 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
     return [`Trusted trail root does not exist: ${trustedRoot}`];
   }
 
-  // The caller derives trustedRoot from cwd so an untrusted plan cannot choose the
-  // filesystem boundary within which it is allowed to operate.
   if (resolve(plan.trailRoot) !== realTrustedRoot) {
     errors.push(
       `Plan trail root does not match trusted root: ${plan.trailRoot}`,
@@ -101,8 +98,6 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
       const sessionId = basename(move.from, ".jsonl");
       const expectedSource = sourceDirectories.get(move.fromBucket);
 
-      // Validate source strings lexically. Realpathing the file would turn a source
-      // removed after planning into a structural failure instead of a missing refusal.
       if (!expectedSource || dirname(move.from) !== expectedSource) {
         errors.push(
           `Source escapes its ${move.fromBucket} bucket: ${move.from}`,
@@ -176,8 +171,6 @@ export async function applyArchive(
     sourceCounts.set(move.from, (sourceCounts.get(move.from) ?? 0) + 1);
   }
 
-  // Re-stat immediately before mutation because files can change after planning.
-  // Apply-time races refuse only the affected move so independent moves can proceed.
   for (const move of plan.moves) {
     if (
       (destinationCounts.get(resolve(move.to)) ?? 0) > 1 ||
@@ -225,9 +218,6 @@ export async function applyArchive(
     eligible.push(move);
   }
 
-  // Structural violations abort above. Apply-time refusals are reported and skipped.
-  // This second phase creates directories only after every move has been inspected,
-  // then performs the eligible renames without deletion or overwrite behavior.
   for (const move of eligible) mkdirSync(dirname(move.to), { recursive: true });
   for (const move of eligible) renameSync(move.from, move.to);
 

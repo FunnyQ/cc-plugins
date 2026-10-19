@@ -157,7 +157,7 @@ describe("buildIndex", () => {
     });
   });
 
-  test("keeps stray Markdown files in skipped with a reason", async () => {
+  test("keeps stray Markdown files in skipped with a reason, so the validator can still fire on them", async () => {
     const dir = await tempDir();
     await writeAdr(dir, "README.md", "## ADRs\n");
     await writeAdr(dir, "malformed.md", "# ADR-4: Broken\n");
@@ -168,7 +168,7 @@ describe("buildIndex", () => {
     ]);
   });
 
-  test("sorts ADRs and advances past numbering gaps", async () => {
+  test("sorts ADRs and advances past numbering gaps, never reusing a number git history already holds", async () => {
     const dir = await tempDir();
     await writeAdr(dir, "0004-b.md", "# ADR-0004: B\n");
     await writeAdr(dir, "0001-a.md", "# ADR-0001: A\n");

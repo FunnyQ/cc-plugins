@@ -21,7 +21,6 @@ export type SessionFile = {
   entryCount: number;
 };
 
-/** Pass 1 output. Deliberately omits reason, tradeoff, facets, options, diagram. */
 export type EntrySkeleton = {
   id: string;
   sessionId: string;
@@ -40,7 +39,6 @@ export type AdrContext = {
   error?: string;
 };
 
-/** A full record plus the session it came from. `DecisionRecord` alone has no session field. */
 export type EntryBody = DecisionRecord & { sessionId: string };
 
 type SessionRecords = {
@@ -48,7 +46,6 @@ type SessionRecords = {
   records: DecisionRecord[];
 };
 
-/** Trail root and record directory, resolved from ONE `git rev-parse`. */
 type Roots = { trailRoot: string; adrDir: string };
 
 export function toSkeleton(
@@ -91,7 +88,6 @@ async function readSession(
   bucket: Bucket,
 ): Promise<SessionRecords | null> {
   try {
-    // readDecisionLog already drops every line that fails isDecisionRecord.
     const [metadata, records] = await Promise.all([
       stat(path),
       readDecisionLog(path),
@@ -174,7 +170,6 @@ export async function collectContext(
   };
 }
 
-/** Takes an already-resolved trail root, so a bodies run spawns git exactly once. */
 export async function fetchBodies(
   trailRoot: string,
   ids: string[],
@@ -184,8 +179,6 @@ export async function fetchBodies(
   if (!existsSync(join(trailRoot, ".cockpit"))) return [];
 
   const requested = new Set(ids);
-  // Bodies are fetched for an already-shortlisted set, so the done archive is in
-  // scope here even when the skeleton pass excluded it.
   const collected = await readBuckets(trailRoot, true);
 
   return collected.flatMap(({ session, records }) =>
@@ -207,9 +200,6 @@ export function parseCliArgs(argv: string[]): {
     if (argument === "--include-done") {
       includeDone = true;
     } else if (argument === "--bodies") {
-      // Reject rather than ignore. An agent file that drifted to `--ids` or
-      // `--include-archived` used to be silently downgraded to a skeleton run,
-      // and the caller only noticed by the missing evidence three steps later.
       const value = argv[index + 1];
       if (value === undefined) throw new Error(usage());
       bodyIds = value
@@ -246,7 +236,6 @@ async function main(): Promise<void> {
     ({ hasTrail, adrDir } = context);
     payload = context;
   } else {
-    // A bodies payload is a bare array, so the summary fields are resolved here — once.
     const roots = resolveRoots(cwd);
     adrDir = roots.adrDir;
     hasTrail = existsSync(join(roots.trailRoot, ".cockpit"));

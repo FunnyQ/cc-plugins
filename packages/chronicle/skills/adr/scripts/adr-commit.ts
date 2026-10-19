@@ -1,10 +1,4 @@
 #!/usr/bin/env bun
-/**
- * The ADR write side, as code. `verdicts` folds gate 2's reply into the records to
- * write and the watch overrides for dropped groups; `apply` checks for collisions,
- * writes, applies the lifecycle link, validates, and archives. Draft text travels
- * between them as files, so no model retypes a record it already wrote once.
- */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -146,8 +140,6 @@ export async function applyCommit(input: {
   const at = (path: string) => resolve(input.root, path);
   const newAdrs = input.newAdrs ?? [];
 
-  // Checked before any write: a batch that half-lands and then refuses leaves the caller
-  // unable to tell which records exist, and a collision is a numbering race, not repairable.
   const collisions = newAdrs
     .filter((adr) => existsSync(at(adr.path)))
     .map((adr) => adr.path);
@@ -180,7 +172,6 @@ export async function applyCommit(input: {
     }
   }
 
-  // Validation gates the archive because archiving is the one irreversible step.
   const validation = await validateDir(at(input.adrDir ?? "docs/adr"));
   const errors = validation.violations.filter(
     (violation) => violation.severity === "error",
