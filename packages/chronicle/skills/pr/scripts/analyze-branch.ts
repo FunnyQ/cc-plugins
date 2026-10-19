@@ -19,9 +19,6 @@ export type BranchMaterial = {
   remoteUrl: string | null;
   base: string;
   head: string;
-  // The repo the request must be opened against, when it cannot be inferred —
-  // i.e. `origin` is upstream and the branch was pushed to a separate fork remote.
-  // null in every other case; see resolveCrossFork.
   repo: string | null;
   mergeBase: string;
   commits: { sha: string; subject: string; body: string }[];
@@ -45,8 +42,6 @@ export function detectProvider(remoteUrl: string | null): Provider {
   return "unknown";
 }
 
-// "owner/name" from any of the shapes git hands back:
-//   https://host/owner/name(.git)  |  git@host:owner/name.git  |  ssh://git@host/owner/name
 export function parseRepoSlug(remoteUrl: string | null): string | null {
   if (!remoteUrl) return null;
   const match = remoteUrl.trim().match(/[:/]([^/:]+)\/([^/]+?)(?:\.git)?\/?$/);
@@ -78,14 +73,14 @@ export function qualifyHead(
 // plain branch name (a cross-project MR needs --source-project, which request-creator.ts
 // does not speak yet), so on any non-GitHub provider we keep today's bare head
 // rather than hand glab a head it cannot parse.
-export function resolveCrossFork(
+export async function resolveCrossFork(
   branch: string,
-  headRemoteUrl: string | null,
+  headRemoteUrl: () => Promise<string | null>,
   originRemoteUrl: string | null,
   provider: Provider,
-): { head: string; repo: string | null } {
+): Promise<{ head: string; repo: string | null }> {
   if (provider !== "github") return { head: branch, repo: null };
-  const headSlug = parseRepoSlug(headRemoteUrl);
+  const headSlug = parseRepoSlug(await headRemoteUrl());
   const baseSlug = parseRepoSlug(originRemoteUrl);
   const crossFork = !!headSlug && !!baseSlug && headSlug !== baseSlug;
 
@@ -247,10 +242,9 @@ async function gatherGit(baseOverride: string | null) {
   const commitTimes = lines(commitTimesText);
   const branch = head.trim();
   const provider = detectProvider(remoteUrl);
-  // resolveCrossFork ignores the head remote off GitHub, so don't go ask git for it.
-  const crossFork = resolveCrossFork(
+  const crossFork = await resolveCrossFork(
     branch,
-    provider === "github" ? await headRemoteUrl(branch) : null,
+    () => headRemoteUrl(branch),
     remoteUrl,
     provider,
   );
@@ -269,8 +263,6 @@ async function gatherGit(baseOverride: string | null) {
   };
 }
 
-// The remote this branch actually pushes to — which is NOT always `origin`, and not
-// always the tracking remote either (see pickPushRemote for the resolution chain).
 async function headRemoteUrl(branch: string): Promise<string | null> {
   const [pushRemote, pushDefault, trackingRemote] = await Promise.all([
     tryGitText(["config", "--get", `branch.${branch}.pushRemote`]),
@@ -327,7 +319,6 @@ async function harvestCockpit(
   }
 }
 
-// Unique because the material path is, so the drafter's Write never meets a stale file.
 export function textPathFor(outputPath: string): string {
   return outputPath.replace(/\.json$/, ".text.json");
 }

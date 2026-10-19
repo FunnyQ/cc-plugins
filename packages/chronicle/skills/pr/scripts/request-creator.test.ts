@@ -38,9 +38,6 @@ describe("buildArgs", () => {
     expect(buildArgs({ ...githubInput, draft: true })).toContain("--draft");
   });
 
-  // Cross-fork: the branch lives on the contributor's fork while the PR targets
-  // upstream. `gh` cannot infer that when `origin` IS upstream, so the target repo
-  // has to be explicit. `head` arrives already qualified as `owner:branch`.
   test("targets an explicit repo when one is given", () => {
     expect(
       buildArgs({
@@ -65,16 +62,11 @@ describe("buildArgs", () => {
     ]);
   });
 
-  // Omitting --repo is what lets `gh` do the right thing in its own fork workflow
-  // (origin = your fork): it defaults the base repo to the parent. Emitting --repo
-  // unconditionally would turn those into fork→fork PRs.
   test("omits --repo when none is given", () => {
     expect(buildArgs(githubInput)).not.toContain("--repo");
   });
 
-  // The marker is appended here, not by the drafting agent: a script cannot
-  // forget it, reword it, or bury it mid-title.
-  test("appends the skip-review marker to the github title", () => {
+  test("appends the skip-review marker to the github title itself, so the drafter cannot forget, reword or bury it", () => {
     expect(buildArgs({ ...githubInput, skipReview: true })).toContain(
       "Ship request creator [skip-review]",
     );
@@ -143,8 +135,6 @@ describe("createRequest", () => {
     });
   });
 
-  // Bun.spawn throws ENOENT for a binary that is not on PATH, which is the only
-  // signal createRequest gets — there is no `command -v` preflight.
   test("maps a spawn ENOENT to missing-cli", async () => {
     const run: Runner = async () => {
       throw Object.assign(new Error('Executable not found in $PATH: "gh"'), {
@@ -266,8 +256,6 @@ describe("checkPushed", () => {
     ).resolves.toBeNull();
   });
 
-  // A suffix match would pass `x` against `feature/x` and open a request for
-  // commits the remote does not have.
   test("reports not-pushed when only a longer name ends with the branch", async () => {
     await expect(checkPushed("x", refs("feature/x\n"))).resolves.toMatchObject({
       ok: false,

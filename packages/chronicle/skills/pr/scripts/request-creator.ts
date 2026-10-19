@@ -144,8 +144,6 @@ export async function createRequest(
   input: CreateInput,
   run: Runner,
 ): Promise<CreateResult> {
-  // analyze-branch emits "unknown" for any remote that is neither host; there is no
-  // CLI to reach for, so refuse here rather than let buildArgs guess a binary.
   if (input.provider === "unknown") {
     return {
       ok: false,

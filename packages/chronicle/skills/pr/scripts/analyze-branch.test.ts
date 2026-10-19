@@ -19,6 +19,12 @@ describe("textPathFor", () => {
       textPathFor("/tmp/q-lab/chronicle/pr/branch-material-1-2.json"),
     ).toBe("/tmp/q-lab/chronicle/pr/branch-material-1-2.text.json");
   });
+
+  test("gives each material file its own text path, so the drafter's Write never meets a stale file", () => {
+    expect(
+      textPathFor("/tmp/q-lab/chronicle/pr/branch-material-1-2.json"),
+    ).not.toBe(textPathFor("/tmp/q-lab/chronicle/pr/branch-material-3-4.json"));
+  });
 });
 
 function decision(
@@ -89,10 +95,6 @@ describe("branchDecisions", () => {
   });
 
   test("compares timestamps chronologically across timezone formats", () => {
-    // Cutoff in local +08:00, records in UTC Z. 16:48:34+08:00 == 08:48:34Z, so
-    // the 12:59Z record (later) must be kept and the 07:00Z record (earlier)
-    // dropped. A lexical string compare would invert this (12 < 16 < 07 is false
-    // etc.), which is the real-world bug this guards against.
     const records = [
       decision("after-utc", "2026-06-18T12:59:51.331Z", []),
       decision("before-utc", "2026-06-18T07:00:00.000Z", []),
@@ -190,54 +192,67 @@ describe("qualifyHead", () => {
 describe("resolveCrossFork", () => {
   const UPSTREAM = "https://github.com/FunnyQ/cc-plugins.git";
   const FORK = "git@github.com:Dylan0203/cc-plugins.git";
+  const remote = (url: string | null) => async () => url;
 
-  // origin = upstream, branch pushed to a separate fork remote. This is the case
-  // `gh` cannot infer, so the target repo must be made explicit.
-  test("qualifies head and names the target repo when origin is upstream", () => {
-    expect(resolveCrossFork("fix/foo", FORK, UPSTREAM, "github")).toEqual({
+  test("qualifies head and names the target repo when origin is upstream", async () => {
+    expect(
+      await resolveCrossFork("fix/foo", remote(FORK), UPSTREAM, "github"),
+    ).toEqual({
       head: "Dylan0203:fix/foo",
       repo: "FunnyQ/cc-plugins",
     });
   });
 
-  // gh's own fork workflow (origin = your fork). gh already defaults the base repo
-  // to the parent; emitting --repo here would open a fork→fork PR instead.
-  test("stays out of the way when the branch pushes to origin", () => {
-    expect(resolveCrossFork("fix/foo", UPSTREAM, UPSTREAM, "github")).toEqual({
+  test("stays out of the way when the branch pushes to origin", async () => {
+    expect(
+      await resolveCrossFork("fix/foo", remote(UPSTREAM), UPSTREAM, "github"),
+    ).toEqual({
       head: "fix/foo",
       repo: null,
     });
   });
 
-  test("falls back to today's behavior when a remote is unreadable", () => {
-    expect(resolveCrossFork("fix/foo", null, UPSTREAM, "github")).toEqual({
+  test("falls back to today's behavior when a remote is unreadable", async () => {
+    expect(
+      await resolveCrossFork("fix/foo", remote(null), UPSTREAM, "github"),
+    ).toEqual({
       head: "fix/foo",
       repo: null,
     });
-    expect(resolveCrossFork("fix/foo", FORK, null, "github")).toEqual({
+    expect(
+      await resolveCrossFork("fix/foo", remote(FORK), null, "github"),
+    ).toEqual({
       head: "fix/foo",
       repo: null,
     });
   });
 
-  // `owner:branch` is gh's syntax, and only gh's. glab reads --source-branch as a
-  // plain branch name, so a qualified head would hand it a branch that cannot exist.
-  test("keeps a bare head on non-GitHub providers, fork or not", () => {
+  test("keeps a bare head on non-GitHub providers, fork or not", async () => {
     const GL_UPSTREAM = "git@gitlab.com:group/project.git";
     const GL_FORK = "git@gitlab.com:me/project.git";
-    expect(resolveCrossFork("fix/foo", GL_FORK, GL_UPSTREAM, "gitlab")).toEqual(
-      { head: "fix/foo", repo: null },
-    );
-    expect(resolveCrossFork("fix/foo", FORK, UPSTREAM, "unknown")).toEqual({
+    expect(
+      await resolveCrossFork("fix/foo", remote(GL_FORK), GL_UPSTREAM, "gitlab"),
+    ).toEqual({ head: "fix/foo", repo: null });
+    expect(
+      await resolveCrossFork("fix/foo", remote(FORK), UPSTREAM, "unknown"),
+    ).toEqual({
       head: "fix/foo",
       repo: null,
     });
+  });
+
+  test("never asks git for the head remote off GitHub", async () => {
+    let asked = 0;
+    const lookup = async () => {
+      asked += 1;
+      return FORK;
+    };
+    await resolveCrossFork("fix/foo", lookup, UPSTREAM, "gitlab");
+    await resolveCrossFork("fix/foo", lookup, UPSTREAM, "unknown");
+    expect(asked).toBe(0);
   });
 });
 
-// Git resolves the push destination through a chain — branch.<name>.pushRemote →
-// remote.pushDefault → branch.<name>.remote — not the tracking remote alone. The
-// triangular workflow (fetch upstream, push fork) lives entirely in the first two.
 describe("pickPushRemote", () => {
   test("branch pushRemote outranks everything", () => {
     expect(
@@ -249,8 +264,6 @@ describe("pickPushRemote", () => {
     ).toBe("fork");
   });
 
-  // The canonical triangular setup: the branch tracks origin (upstream) for fetch,
-  // while remote.pushDefault sends every push to the fork.
   test("remote.pushDefault beats the tracking remote", () => {
     expect(
       pickPushRemote({
