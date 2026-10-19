@@ -10,7 +10,6 @@ import {
   upgrade,
 } from "./config";
 
-// what bun's parser makes of the current template
 const CURRENT = () => ({
   clawd: { enabled: true },
   transcript: {
@@ -76,7 +75,6 @@ test("normalize still reads both older layouts, the nested one winning", () => {
   expect(config.enabled.bash).toBe(true);
   expect(config.bash.side).toBe("right");
   expect(config.enabled.reply).toBe(true);
-  // a nested section, even a bare one, is the one read; the flat one beside it is ignored
   expect(config.reply.side).toBe(DEFAULTS.reply.side);
   expect(problems).toEqual([]);
 });
@@ -189,7 +187,6 @@ test("upgrade moves the oldest top-level enabled block into the nested sections"
   expect(out).toContain("clawd:\n  enabled: false\n");
   expect(out).toContain("  bash:\n    enabled: false    # Bash calls");
   expect(out).toContain("transcript:\n  enabled: true");
-  // the commented defaults come with each block the template supplies
   expect(out).toContain(
     '  bash:\n    enabled: false    # Bash calls and their output\n    # color: "#5f8f6a"\n',
   );
@@ -224,8 +221,8 @@ test("a section holding only comments reads as null, which is neither a problem 
   expect(RUNES.every((r) => normalize(CURRENT()).config.enabled[r])).toBe(true);
 });
 
-test("the minimap rune starts off and its section sits at the top level", () => {
-  expect(DEFAULTS.enabled.minimap).toBe(false);
+test("every rune starts on but the minimap, which re-reads the transcript every 3s, and its section sits at the top level", () => {
+  for (const r of RUNES) expect(DEFAULTS.enabled[r]).toBe(r !== "minimap");
   expect(TEMPLATE(DEFAULTS.enabled)).toContain("\nminimap:\n  enabled: false");
 });
 
@@ -254,4 +251,34 @@ test("bash.jev is on by default, is read as a switch, and an invalid value falls
   expect(config.bash.fold_lines).toBe(4);
   expect(problems.join("\n")).toContain("transcript.bash.jev");
   expect(TEMPLATE(DEFAULTS.enabled)).toContain("\n    # jev: true");
+});
+
+test("TEMPLATE writes a switch for every rune, so setSwitch edits a line rather than adding a section", () => {
+  const t = TEMPLATE(DEFAULTS.enabled);
+  for (const r of RUNES) {
+    const out = setSwitch(t, r, !DEFAULTS.enabled[r]);
+    expect(out).not.toBe(t);
+    expect(out.split("\n")).toHaveLength(t.split("\n").length);
+  }
+});
+
+test("setSwitch restores a removed top-level section to its place in the template", () => {
+  const t = TEMPLATE(DEFAULTS.enabled).split("\n");
+  const keys = (lines: string[]) => lines.filter((l) => /^\w+:/.test(l));
+  for (const top of keys(t)) {
+    const from = t.indexOf(top);
+    const next = t.findIndex((l, i) => i > from && /^\w+:/.test(l));
+    const without = [...t.slice(0, from), ...(next === -1 ? [""] : t.slice(next))];
+    const out = setSwitch(without.join("\n"), top.slice(0, -1) as never, true).split("\n");
+    expect(keys(out)).toEqual(keys(t));
+  }
+});
+
+test("a block ends before a trailing blank or a comment no deeper than its header, and keeps a deeper one", () => {
+  expect(
+    setSwitch("transcript:\n  prompt:\n    enabled: true\n\n# next\nminimap:\n", "peer", false),
+  ).toBe("transcript:\n  prompt:\n    enabled: true\n  peer:\n    enabled: false\n\n# next\nminimap:\n");
+  expect(
+    setSwitch("transcript:\n  prompt:\n    enabled: true\n  # note\n\nminimap:\n", "peer", false),
+  ).toBe("transcript:\n  prompt:\n    enabled: true\n  # note\n  peer:\n    enabled: false\n\nminimap:\n");
 });

@@ -61,7 +61,6 @@ test("/runes clawd off writes the line and hides Clawd, and /runes on brings it 
   expect(text).toContain("# the person's bubble");
   expect(await hasClawd($)).toBe(false);
 
-  // `/runes on` turns every rune on, the minimap that starts off included
   await run($, "on");
   expect(host.files.get(CONFIG)).toBe(
     TEMPLATE({ ...DEFAULTS.enabled, minimap: true }),
@@ -87,8 +86,14 @@ test("an edit that does not read back as intended is refused", async ($, on) => 
   const host = await start($, on, new Map([[CONFIG, text]]));
   await session($);
   expect(await run($, "clawd off")).toContain("nothing written");
-  // the sections added since still go in, but neither clawd block is touched
   expect(host.files.get(CONFIG)!.startsWith(text)).toBe(true);
+});
+
+test("an upgrade whose read-back is shadowed by a duplicate key is not written", async ($, on) => {
+  const text = "clawd:\n  enabled: true\ntranscript:\n  enabled: true\ntranscript:\n  enabled: true\n";
+  const host = await start($, on, new Map([[CONFIG, text]]));
+  await session($);
+  expect(host.files.get(CONFIG)).toBe(text);
 });
 
 test("an invalid field toasts its name and keeps its default", async ($, on) => {

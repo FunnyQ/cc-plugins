@@ -1,4 +1,3 @@
-// every rune; a new rune adds its name here and its section to TEMPLATE, any settings to DEFAULTS, and gates its hooks on `config.enabled[name]`
 export const RUNES = [
   "clawd",
   "transcript",
@@ -56,7 +55,6 @@ type Config = {
 };
 
 export const DEFAULTS: Config = {
-  // every rune starts on but the minimap, which re-reads the transcript every 3s and so waits to be asked for
   enabled: Object.fromEntries(RUNES.map((r) => [r, r !== "minimap"])) as Record<
     Rune,
     boolean
@@ -118,20 +116,16 @@ export const DEFAULTS: Config = {
   },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
-  // the tools a run leaves drawn, comma-separated; an Edit or Write is what a review reads
   fold: { keep: "", min_calls: 1 },
   glow: { style: "dark" },
-  // gap is the columns kept clear between the map and Clawd
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
 };
 
 export const configPath = (home: string) =>
   `${home}/.config/q-lab/cc-plugins/runes/config.yaml`;
 
-// what renders read; register.tsx replaces its sections at session.start and on every /runes
 export const config: Config = { ...DEFAULTS };
 
-// only the switches are set; every other field is its default, commented, so a changed default reaches every file
 export const TEMPLATE = (
   enabled: Config["enabled"],
 ) => `# runes — edits apply at the next session start, or right away after any /runes
@@ -214,7 +208,6 @@ teacher:
   enabled: ${enabled.teacher}    # the English teacher: a better phrasing under an English prompt that could read better; needs TYPESAFE_API_KEY, sends each (secret-masked) English-looking prompt to TypeSafe's Jev, and asks haiku for the rewrite
 `;
 
-// the keys at each level in the order the template writes them; the bubbles and glow live under transcript
 const TOP = ["clawd", "transcript", "minimap", "teacher"] as const;
 const UNDER = [
   "prompt",
@@ -340,7 +333,6 @@ const sectionOf = (
   return isMap(t) && s in t ? [path.join("."), t[s]] : [s, raw[s]];
 };
 
-// each invalid field falls back alone, so one typo never resets the rest of the file
 export const normalize = (
   raw: unknown,
 ): { config: Config; problems: string[] } => {
@@ -403,8 +395,6 @@ const blockAt = (lines: string[], head: number): Block => {
     (isNote(lines[end]!) || indentOf(lines[end]!) > indent)
   )
     end++;
-  // a trailing blank line, or a comment no deeper than the header, belongs to whatever comes next;
-  // a deeper one is a commented field of this block
   while (
     end > head + 1 &&
     isNote(lines[end - 1]!) &&
@@ -417,12 +407,10 @@ const blockAt = (lines: string[], head: number): Block => {
     end,
     indent,
     inner: child ? indentOf(child) : indent + 2,
-    // a flow mapping (`key: { … }`) or a scalar holds no block to edit
     isOpen: /^\s*[\w-]+:\s*(#.*)?$/.test(lines[head]!),
   };
 };
 
-// finds a section by its path, each key a direct child of the one before
 const locate = (lines: string[], path: string[]): Block | undefined => {
   let from = 0;
   let to = lines.length;
@@ -445,8 +433,6 @@ const locate = (lines: string[], path: string[]): Block | undefined => {
   return found;
 };
 
-// a block, written with its key at column 0, goes in under its parent before the first sibling the template writes
-// after it, so the file keeps the template's order
 const insertBlock = (
   lines: string[],
   parent: string[],
@@ -484,8 +470,6 @@ const switchAt = (lines: string[], b: Block) =>
       /^\s*enabled\s*:/.test(l),
   );
 
-// rewrites only the switch's own line in its section, so comments and layout survive;
-// a flow mapping is left as it is, and the caller's read-back refuses the result
 export const setSwitch = (text: string, name: Rune, value: boolean): string => {
   let lines = text.split("\n");
   const path = pathOf(name);
@@ -518,8 +502,6 @@ export const setSwitch = (text: string, name: Rune, value: boolean): string => {
   return lines.join("\n");
 };
 
-// true once a parsed file has the current layout: every section nested where the template puts it, each rune's
-// with its switch, and nothing left of an older layout; an addition a flow mapping or a duplicate key swallowed fails it
 export const isComplete = (raw: unknown): boolean => {
   if (!isMap(raw) || raw.enabled !== undefined) return false;
   if (UNDER.some((s) => raw[s] !== undefined)) return false;
@@ -531,7 +513,6 @@ export const isComplete = (raw: unknown): boolean => {
   });
 };
 
-// the template's own block for a section, its key at column 0
 const templateBlock = (enabled: Config["enabled"], s: Section): string[] => {
   const lines = TEMPLATE(enabled).split("\n");
   const b = locate(lines, pathOf(s))!;

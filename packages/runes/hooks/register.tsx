@@ -39,14 +39,12 @@ const status = () =>
 type Loaded = {
   path: string;
   text?: string;
-  // set when the file did not parse; every write then refuses, so a half-finished hand edit is never overwritten
   broken?: string;
   problems: string[];
   parse: (text: string) => Promise<unknown>;
 };
 
-// read on session.start and on every /runes, never while drawing
-const load = async ($: $): Promise<Loaded> => {
+const loadConfig = async ($: $): Promise<Loaded> => {
   const home = (await $.env.get("HOME")) ?? "";
   where.home = home;
   const path = configPath(home);
@@ -84,7 +82,6 @@ const load = async ($: $): Promise<Loaded> => {
     let raw = await parse(text);
     const filled = upgrade(text, raw);
     if (filled !== text) {
-      // checked by meaning: a text comparison passed a file whose duplicate key won over the edited one
       const back = await parse(filled).catch(() => undefined);
       if (isComplete(back)) {
         await $.fs.write(path, filled);
@@ -113,7 +110,7 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     where.cwd = e.cwd;
     const [loaded] = await Promise.all([
-      load($),
+      loadConfig($),
       $.command.register({
         name: "runes",
         description: "Turn runes (UI mods) on or off",
@@ -137,7 +134,6 @@ export const register: Register = (on) => {
           resolve({ ok: r.ok, text: r.text });
         }, reject);
       });
-    // Jev's verdicts on Bash output; no TYPESAFE_API_KEY leaves every draw as it was
     jev.work({ apiKey, post, redraw });
     teacher.work({
       apiKey,
@@ -159,7 +155,7 @@ export const register: Register = (on) => {
     if (!["on", "off", "status", "reload", undefined].includes(state))
       return { text: `Usage: /runes ${USAGE}` };
 
-    const loaded = await load($);
+    const loaded = await loadConfig($);
     $.ui.invalidate("ui.render");
     const said = notice(loaded);
     const answer = (text: string) => ({
@@ -170,12 +166,10 @@ export const register: Register = (on) => {
     if (loaded.text === undefined)
       return answer("Runes — config.yaml did not parse, so nothing written");
 
-    // no state toggles: on while any target is off, off once they are all on
     const value = state ? state === "on" : targets.some((r) => !config.enabled[r]);
     const text = targets.reduce((t, r) => setSwitch(t, r, value), loaded.text);
     const want = { ...config.enabled };
     for (const r of targets) want[r] = value;
-    // a flow mapping or a duplicate key further down would swallow the edit, so read it back first
     const parsed = await loaded.parse(text).catch((err: Error) => err);
     if (parsed instanceof Error)
       return answer(
@@ -197,7 +191,6 @@ export const register: Register = (on) => {
   band(on);
   prompt(on);
   reply(on);
-  // ahead of the card runes, so a folded row is answered before any of them builds its card
   fold(on);
   bash(on);
   read(on);
