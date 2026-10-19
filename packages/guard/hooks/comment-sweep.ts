@@ -156,7 +156,15 @@ type SweepOutput = {
   systemMessage?: string;
 };
 
-export async function sweep(payload: Payload): Promise<SweepOutput | null> {
+/** What the turn added, screened: `report` is empty when Jev withdrew every block, `note` says so. */
+export type Found = {
+  report: string;
+  blocks: number;
+  ask: string;
+  note: string | null;
+};
+
+export async function collect(payload: Payload): Promise<Found | null> {
   const sessionId = payload.session_id;
   if (!sessionId) return null;
   const baseline = readBaseline(sessionId);
@@ -255,15 +263,26 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
     withdrawn: screened.reduce((n, s) => n + s.withdrawn, 0),
     ms: Math.max(0, ...screened.map((s) => s.ms ?? 0)),
   });
+  const kept = screened.flatMap((s) => s.kept);
+  if (reasons.length === 0 && !note) return null;
+  return {
+    report: reasons.join("\n\n"),
+    blocks: kept.length,
+    ask: askFor(kept),
+    note,
+  };
+}
+
+export async function sweep(payload: Payload): Promise<SweepOutput | null> {
+  const found = await collect(payload);
+  if (!found) return null;
   const out: SweepOutput = {};
-  if (reasons.length > 0) {
+  if (found.report) {
     out.decision = "block";
-    out.reason = [...reasons, askFor(screened.flatMap((s) => s.kept))].join(
-      "\n\n",
-    );
+    out.reason = `${found.report}\n\n${found.ask}`;
   }
-  if (note) out.systemMessage = note;
-  return Object.keys(out).length > 0 ? out : null;
+  if (found.note) out.systemMessage = found.note;
+  return out;
 }
 
 async function main(): Promise<void> {
@@ -275,7 +294,11 @@ async function main(): Promise<void> {
   }
   if (process.argv[2] === "snapshot") return snapshot(payload);
   if (process.argv[2] !== "sweep") return;
-  const out = await sweep(payload);
+  // --json is the Claude Code mod's: it hands the report to a reviewer instead of blocking Stop.
+  const out =
+    process.argv[3] === "--json"
+      ? await collect(payload)
+      : await sweep(payload);
   if (out) console.log(JSON.stringify(out));
 }
 

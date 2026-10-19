@@ -1,74 +1,141 @@
 /**
- * comment-guard as a Claude Code mod: the same check as comment-guard.ts, run
- * in-process on `tool.call` instead of spawning bun per Edit or Write. The
- * question rides back as the result's `context`, which the model reads the way
- * it read the command hook's exit-2 stderr. Codex and OpenCode keep spawning
- * comment-guard.ts, since neither has function hooks.
+ * comment-guard on Claude Code: one review per turn, by a reviewer that did
+ * not write the comments. Each main turn's start snapshots the worktree
+ * through comment-sweep.ts; its end diffs against it, so Edit, Write and a
+ * Bash `sed -i` alike reach the same report. A non-empty report goes to the
+ * `guard:comment-reviewer` subagent in the background, and its verdicts come
+ * back as a prompt the main agent audits and acts on.
+ *
+ * The author is no longer asked mid-edit: it defends what it just wrote, and
+ * a reviewer asked after it would re-judge the same lines. Codex and OpenCode
+ * have no function hooks, so they keep the command hooks and that question.
  */
 
-import type { Register } from "claude-code";
+import type { EngineInterface, Register } from "claude-code";
 import {
-  askFor,
-  baseName,
-  blocksFor,
-  formatReason,
-  type ToolResponse,
-} from "./comment-core.ts";
-import {
-  screenBlocks,
-  screenNote,
-  TIMEOUT_MS,
-  type Post,
-} from "./jev-screen.ts";
-import { DEFAULT_STATE_DIR, reportedFile, reportedLine } from "./ledger.ts";
+  CLEAN,
+  deliverPrompt,
+  MARK,
+  REVIEWER_PROMPT,
+  reviewTask,
+} from "./reviewer.ts";
+
+const REVIEW = { plugin: "guard", key: "review" } as const;
+const CARRY = { plugin: "guard", key: "carry" } as const;
+const OWN_TURN = { plugin: "guard", key: "ownTurn" } as const;
+const NAME = "comment-reviewer";
+const AGENT = `guard:${NAME}`;
+// A reviewer that never reports back must not hold off every later review.
+const STALE_MS = 10 * 60_000;
+
+type Found = { report: string; blocks: number; note: string | null };
+
+let warned = false;
+
+async function runSweep(
+  $: EngineInterface,
+  args: string[],
+): Promise<string | null> {
+  const stdin = JSON.stringify({
+    session_id: await $.session.id(),
+    cwd: await $.session.cwd(),
+  });
+  try {
+    const ran = await $.process.run(
+      ["bun", `${$.plugin.root}/hooks/comment-sweep.ts`, ...args],
+      { stdin },
+    );
+    if (ran.exitCode === 0) return ran.stdout;
+    throw new Error(ran.stderr.trim() || `exit ${ran.exitCode}`);
+  } catch (err) {
+    // A mod has no Bun global, so the sweep needs `bun` on PATH; without it nothing is guarded.
+    if (!warned) {
+      warned = true;
+      $.ui.toast(`${MARK}: comment-sweep did not run (needs bun): ${err}`);
+    }
+    return null;
+  }
+}
 
 export const register: Register = (on) => {
-  on("tool.call", { tool: ["Edit", "Write"] }, async ($, e, next) => {
+  on("session.start", async ($, e, next) => {
     const ran = await next(e);
-    if (ran.deny !== undefined || ran.isError) return ran;
-    if (e.tool !== "Edit" && e.tool !== "Write") return ran;
-
-    const filePath = e.file_path;
-    const { blocks, asked } = await blocksFor(
-      e.tool,
-      e,
-      ran.result as ToolResponse,
-      (path) => $.fs.read(path),
-    );
-    if (blocks.length === 0) return ran;
-
-    // Read-then-write, not an append: two parallel writes can drop one entry, which costs one re-asked block at Stop.
-    const dir = (await $.env.get("GUARD_STATE_DIR")) ?? DEFAULT_STATE_DIR;
-    const ledger = reportedFile(dir, await $.session.id());
-    const prior = (await $.fs.exists(ledger)) ? await $.fs.read(ledger) : "";
-    await $.fs.write(ledger, prior + reportedLine(filePath, asked));
-
-    const post: Post = (url, init) =>
-      new Promise((resolve, reject) => {
-        // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it.
-        const timer = $.clock.after(TIMEOUT_MS, () =>
-          reject(new Error("jev timeout")),
-        );
-        $.http.fetch(url, init).then((r) => {
-          timer.cancel();
-          resolve({ ok: r.ok, json: async () => JSON.parse(r.text) });
-        }, reject);
-      });
-
-    const fileName = baseName(filePath);
-    const screen = await screenBlocks(fileName, blocks, {
-      apiKey: await $.env.get("TYPESAFE_API_KEY"),
-      fetch: post,
+    await $.agent.register({
+      name: NAME,
+      description:
+        "Reviews the comment lines a turn added, with no stake in them. Spawned by guard alone.",
+      prompt: REVIEWER_PROMPT,
+      tools: ["Read", "Grep", "Glob"],
+      model: "sonnet",
+      effort: "medium",
     });
-    const note = screenNote("💬 comment-guard", screen);
-    if (screen.kept.length === 0) {
-      if (note) $.ui.toast(note);
+    return ran;
+  });
+
+  on("agent.offer", { agent: AGENT }, () => ({ isOffered: false })).catch(
+    () => ({ isOffered: false }),
+  );
+
+  // Its own spawn only: auto mode's classifier otherwise judges a read-only reviewer the person never asked for, and denies it when unavailable.
+  on("tool.check", { tool: "Agent" }, async ($, e, next) => {
+    const own =
+      next.origin.plugin === $.plugin.name &&
+      (e.input as { subagent_type?: string }).subagent_type === AGENT;
+    return own ? { decision: "allow" } : next(e);
+  });
+
+  on("turn.start", async ($, e, next) => {
+    if (e.agentId) return next(e);
+    await $.state.set(OWN_TURN, e.text.includes(MARK));
+    const { value: carry } = await $.state.get(CARRY);
+    if (!carry) await runSweep($, ["snapshot"]);
+    return next(e);
+  });
+
+  on("turn.complete", async ($, e, next) => {
+    const ran = await next(e);
+
+    if (e.agentId) {
+      // By type, not by the id spawn answered: any reviewer's answer is guard's to deliver.
+      const agents = await $.agent.list();
+      if (agents.find((a) => a.id === e.agentId)?.type !== AGENT) return ran;
+      await $.state.set(REVIEW, null);
+      const verdicts = e.answer.trim();
+      if (e.reason !== "answer" || !verdicts || verdicts === CLEAN) return ran;
+      // Not awaited: it resolves only once the queued turn starts.
+      void $.prompt.submit({ text: deliverPrompt(verdicts) });
       return ran;
     }
-    const reason = `${formatReason(fileName, screen.kept)}\n${askFor(screen.kept)}`;
-    return {
-      ...ran,
-      context: [...(ran.context ?? []), note ? `${reason}\n${note}` : reason],
-    };
+
+    const { value: review } = await $.state.get(REVIEW);
+    const busy = review && (await $.clock.now()) - review.since < STALE_MS;
+    if (e.reason !== "answer" || busy) {
+      await $.state.set(CARRY, true);
+      return ran;
+    }
+
+    const { value: carry } = await $.state.get(CARRY);
+    const { value: own } = await $.state.get(OWN_TURN);
+    const out = await runSweep($, ["sweep", "--json"]);
+    await $.state.set(CARRY, false);
+    if (own && !carry) return ran;
+    if (!out) return ran;
+
+    const found = JSON.parse(out) as Found;
+    if (found.note) $.ui.toast(found.note);
+    if (!found.report) return ran;
+
+    const spawned = await $.agent.spawn({
+      subagentType: AGENT,
+      prompt: reviewTask(found.report),
+      description: "review added comments",
+    });
+    if (spawned.deny !== undefined) {
+      $.ui.toast(`${MARK}: could not start: ${spawned.deny}`);
+      return ran;
+    }
+    await $.state.set(REVIEW, { since: await $.clock.now() });
+    $.ui.toast(`${MARK}: reviewing ${found.blocks} comment block(s)`);
+    return ran;
   });
 };

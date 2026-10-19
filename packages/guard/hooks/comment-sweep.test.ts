@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ASK } from "./comment-core.ts";
-import { snapshot, sweep } from "./comment-sweep.ts";
+import { collect, snapshot, sweep } from "./comment-sweep.ts";
 import { recordReported } from "./sweep-state.ts";
 
 // A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
@@ -171,5 +171,23 @@ describe("comment-guard records what it reported", () => {
     );
     expect(await proc.exited).toBe(2);
     expect(await sweep(payload)).toBeNull();
+  });
+});
+
+describe("collect", () => {
+  test("hands back the report without the question, for a reviewer to judge", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    const found = await collect(payload);
+    expect(found?.report).toContain("+ 2  // one");
+    expect(found?.report).not.toContain(ASK);
+    expect(found?.blocks).toBe(1);
+  });
+
+  test("advances the baseline, so the next turn judges only its own writes", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    await collect(payload);
+    expect(await collect(payload)).toBeNull();
   });
 });

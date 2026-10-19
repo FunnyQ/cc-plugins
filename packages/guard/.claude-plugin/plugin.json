@@ -1,8 +1,11 @@
 {
   "name": "guard",
   "version": "0.7.3",
-  "description": "Turn coding rules into harness-enforced ones. comment-guard (each Edit/Write) and comment-sweep (at Stop, for writes that bypassed them) hand back the comment blocks of three or more lines the agent added or grew, with one question: is this why, or is this what?",
-  "author": { "name": "Q" },
+  "description": "Turn coding rules into harness-enforced ones. At the end of each turn, comment-guard diffs what the turn wrote (Edit, Write, or Bash) and hands the comment blocks it added, plus any suppression or constraint comment, to a reviewer subagent that judges each line why or what.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Q"
+  },
   "license": "MIT",
   "keywords": [
     "guard",
@@ -12,29 +15,5 @@
     "coding-discipline",
     "lint",
     "code-quality"
-  ],
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/comment-sweep.ts\" snapshot",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bun \"${CLAUDE_PLUGIN_ROOT}/hooks/comment-sweep.ts\" sweep",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }
