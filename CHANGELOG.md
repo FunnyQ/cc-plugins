@@ -1,5 +1,13 @@
 # Changelog
 
+## [guard 0.8.1] - 2026-10-19
+
+_tracks tag `guard-v0.8.1`_
+
+### Fixed
+- The comment reviewer no longer gives a verdict on added lines that are not comments, and can no longer hand its answer back twice, so the main agent stops receiving duplicate or false DELETE verdicts.
+- Suppression and constraint tags such as `# noqa` are ignored inside quoted text, which cuts needless reviewer runs on test fixtures and comments that merely mention them.
+
 ## [guard 0.8.0] - 2026-10-19
 
 _tracks tag `guard-v0.8.0`_
