@@ -1,5 +1,15 @@
 # Changelog
 
+## [guard 0.8.3] - 2026-10-19
+
+_tracks tag `guard-v0.8.3`_
+
+### Added
+- Run /guard:comments-reaper to review comments on demand over given paths, or over the changes since HEAD with untracked files read whole; it refuses past 50 files and writes its report to a file so only a path reaches the conversation.
+
+### Changed
+- The turn-end reviewer and the comments-reaper skill now share one reviewer prompt, so their verdicts no longer drift apart.
+
 ## [guard 0.8.2] - 2026-10-19
 
 _tracks tag `guard-v0.8.2`_
