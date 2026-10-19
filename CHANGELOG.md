@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.8.2] - 2026-10-19
+
+_tracks tag `guard-v0.8.2`_
+
+### Added
+- A one-line status now stays pinned under the prompt while the comment reviewer runs, so you no longer have to catch a brief toast, and it clears when the review finishes or after ten minutes of silence.
+
 ## [guard 0.8.1] - 2026-10-19
 
 _tracks tag `guard-v0.8.1`_
