@@ -58,16 +58,17 @@ export type NoteEntry = {
   message: string;
 };
 
-export type StateEntry = {
-  kind: "state";
+export type StateFields = {
   ts: string;
   /** Node ref, in the declared graph's `<lane>/<NN>` shape. */
   task: string;
-  state: "done" | "blocked" | "failed";
   agentLabel?: string;
-  /** One line of why. Required for `blocked` and `failed`. */
-  message?: string;
-};
+} & (
+  | { state: "done"; message?: string }
+  | { state: "blocked" | "failed"; message: string }
+);
+
+export type StateEntry = { kind: "state" } & StateFields;
 
 export type FlightlogEntry = ScoreEntry | NoteEntry | StateEntry;
 
@@ -94,12 +95,13 @@ export function parseLines(lines: string[]): FlightlogEntry[] {
       const parsed = JSON.parse(line);
       if (
         parsed &&
-        (parsed.kind === "score" || parsed.kind === "note" || parsed.kind === "state")
+        (parsed.kind === "score" ||
+          parsed.kind === "note" ||
+          parsed.kind === "state")
       ) {
         entries.push(parsed);
       }
-    } catch {
-    }
+    } catch {}
   }
   return entries;
 }

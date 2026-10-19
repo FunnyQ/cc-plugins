@@ -28,6 +28,7 @@ import {
   renderRunlog,
   type NoteEntry,
   type StateEntry,
+  type StateFields,
 } from "./lib/flightlog";
 import { resumePoint, tasksIn } from "./lib/resume-point";
 
@@ -52,21 +53,8 @@ export function buildNoteEntry(meta: {
   };
 }
 
-export function buildStateEntry(meta: {
-  task: string;
-  state: "done" | "blocked" | "failed";
-  ts: string;
-  agentLabel?: string;
-  message?: string;
-}): StateEntry {
-  return {
-    kind: "state",
-    ts: meta.ts,
-    task: meta.task,
-    state: meta.state,
-    agentLabel: meta.agentLabel,
-    message: meta.message,
-  };
+export function buildStateEntry(meta: StateFields): StateEntry {
+  return { kind: "state", ...meta };
 }
 
 export function slugFromLogPath(logFile: string): string {
@@ -120,19 +108,15 @@ async function main() {
     if (state !== "done" && state !== "blocked" && state !== "failed") {
       fail("flightlog --state must be done, blocked or failed");
     }
-    if (state !== "done" && !message) {
-      fail("flightlog state requires --message for blocked or failed");
-    }
-    await appendEntry(
-      logFile,
-      buildStateEntry({
-        task,
-        state,
-        ts: new Date().toISOString(),
-        agentLabel: flagValue(rest, "--agent"),
-        message,
-      }),
-    );
+    const ts = new Date().toISOString();
+    const agentLabel = flagValue(rest, "--agent");
+    const fields: StateFields =
+      state === "done"
+        ? { ts, task, state, agentLabel, message }
+        : message
+          ? { ts, task, state, agentLabel, message }
+          : fail("flightlog state requires --message for blocked or failed");
+    await appendEntry(logFile, buildStateEntry(fields));
     return;
   }
 

@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import {
   type FlightlogEntry,
   type StateEntry,
+  type StateFields,
   parseLog,
 } from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet, deriveTaskViews } from "./fleet";
@@ -387,7 +388,7 @@ function loadedNode(overrides: Partial<GraphNode> = {}): GraphNode {
 
 function declaration(
   state: StateEntry["state"],
-  overrides: Partial<StateEntry> = {},
+  overrides: Partial<StateFields> = {},
 ): StateEntry {
   return {
     kind: "state",
@@ -395,7 +396,7 @@ function declaration(
     ts: "2026-01-01T00:00:00Z",
     state,
     ...overrides,
-  };
+  } as StateEntry;
 }
 
 describe("applyStateEntries", () => {

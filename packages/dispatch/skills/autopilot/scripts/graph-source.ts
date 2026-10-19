@@ -283,7 +283,8 @@ export function applyStateEntries(
       const updated = { ...node, status: node.status ?? "todo" };
       const entry = latest.get(ref);
       if (entry !== undefined) {
-        switch (entry.state) {
+        const state: string = entry.state;
+        switch (state) {
           case "done":
             updated.status = "done";
             updated.validity = { kind: "complete" };
@@ -300,7 +301,7 @@ export function applyStateEntries(
             };
             break;
           default: {
-            const reason = `Node ${display(ref)} declares unknown state ${display(entry.state)}`;
+            const reason = `Node ${display(ref)} declares unknown state ${display(state)}`;
             updated.validity = {
               kind: "invalid",
               rule: "unknown-state",
