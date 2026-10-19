@@ -1,5 +1,31 @@
 # Changelog
 
+## [guard 0.8.4] - 2026-10-19
+
+_tracks tag `guard-v0.8.4`_
+
+### Added
+- comments-reaper writes its verdicts to files, one applier per file, so a large sweep no longer floods the main conversation with hundreds of verdict lines.
+- comments-reaper splits its report into shards of 60 comment blocks and reviews them in parallel, refusing only past 480 blocks instead of 50 files; reviewers must now name a concrete replacement for every MUST KILL and read the code before judging.
+
+## [chronicle 0.22.4] - 2026-10-19
+
+_tracks tag `chronicle-v0.22.4`_
+
+### Changed
+- PR creation no longer asks git for the head remote on non-GitHub providers.
+
+### Fixed
+- A failed commit now keeps its message file and reports its messagePath, so the message can be recovered instead of lost.
+- Temp payload files written within the same millisecond no longer collide.
+
+## [browsers 0.1.1] - 2026-10-19
+
+_tracks tag `browsers-v0.1.1`_
+
+### Changed
+- Trimmed comments that only narrated the code, keeping the notes on external browser constraints; behaviour is unchanged.
+
 ## [guard 0.8.3] - 2026-10-19
 
 _tracks tag `guard-v0.8.3`_
