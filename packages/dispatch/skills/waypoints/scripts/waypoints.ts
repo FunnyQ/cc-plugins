@@ -52,8 +52,6 @@ const GLYPH_BY_STATUS: Record<LegStatus, string> = {
 
 const LEG_SLUG_REGEX = /^\d{2}-[a-z][a-z0-9-]*$/;
 const BUCKET_REGEX = /^[a-z][a-z0-9]*$/;
-// <proj> is joined straight into docs/<proj>/... — constrain it to a kebab
-// slug so values like "../outside" can't escape the docs/ root.
 const PROJ_SLUG_REGEX = /^[a-z][a-z0-9-]*$/;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -189,6 +187,9 @@ export function formatActive(
   return lines.join("\n");
 }
 
+const readFileOrNull = (path: string): Promise<string | null> =>
+  readFile(path, "utf-8").catch(() => null);
+
 export function validateProjectSlug(proj: string): void {
   if (!PROJ_SLUG_REGEX.test(proj)) {
     throw new Error(
@@ -259,8 +260,6 @@ export function advanceRoadmap(
   if (activeIndex === -1) {
     throw new Error("No active leg to advance.");
   }
-  // Promote the first pending leg *after* the active one so a malformed
-  // roadmap with a stray earlier pending leg can't regress the order.
   const pendingIndex = roadmap.legs.findIndex(
     (leg, index) => index > activeIndex && leg.status === "pending",
   );
@@ -386,16 +385,11 @@ async function main() {
         for (const leg of roadmap.legs.filter(
           (candidate) => candidate.status === "done",
         )) {
-          try {
-            const plan = await readFile(
-              join("docs", proj, "legs", leg.slug, "PLAN.md"),
-              "utf-8",
-            );
-            const goal = overviewFirstLine(plan);
-            if (goal) priorGoals[leg.slug] = goal;
-          } catch {
-            // Best-effort only: missing prior plans should not hide the leg.
-          }
+          const plan = await readFileOrNull(
+            join("docs", proj, "legs", leg.slug, "PLAN.md"),
+          );
+          const goal = plan === null ? null : overviewFirstLine(plan);
+          if (goal) priorGoals[leg.slug] = goal;
         }
         console.log(formatActive(roadmap, priorGoals));
         return;
@@ -470,21 +464,9 @@ async function main() {
           "RUNLOG.md",
         );
         const planPath = join("docs", proj, "legs", activeLeg.slug, "PLAN.md");
-        let runlog = "";
-        let planOverview = "";
-
-        try {
-          runlog = await readFile(runlogPath, "utf-8");
-        } catch {
-          // Best-effort: RUNLOG may not exist yet.
-        }
-
-        try {
-          const plan = await readFile(planPath, "utf-8");
-          planOverview = overviewFirstLine(plan) || "";
-        } catch {
-          // Best-effort: PLAN.md may not exist yet.
-        }
+        const runlog = (await readFileOrNull(runlogPath)) ?? "";
+        const plan = await readFileOrNull(planPath);
+        const planOverview = (plan === null ? null : overviewFirstLine(plan)) || "";
 
         const draftedOutcome = draftOutcome(runlog, planOverview);
         if (dryRun || !outcome) {

@@ -12,6 +12,7 @@ import {
   serializeRoadmap,
   validateBucket,
   validateLegSlug,
+  validateProjectSlug,
 } from "./waypoints";
 
 const SCRIPT_PATH = new URL("./waypoints.ts", import.meta.url).pathname;
@@ -226,7 +227,33 @@ Started implementation.
   });
 });
 
+describe("validateProjectSlug", () => {
+  test.each(["../outside", "a/b"])(
+    "rejects %p, since the slug is joined straight into docs/<proj>/ and must not escape it",
+    (proj) => {
+      expect(() => validateProjectSlug(proj)).toThrow();
+    },
+  );
+
+  test("accepts a kebab slug", () => {
+    expect(() => validateProjectSlug("my-app")).not.toThrow();
+  });
+});
+
 describe("advanceRoadmap", () => {
+  test("promotes the first pending leg after the active one, so a stray earlier pending leg cannot regress the order", () => {
+    const roadmap = parseRoadmap(SAMPLE);
+    roadmap.legs[0].status = "pending";
+
+    const advanced = advanceRoadmap(roadmap, "Profile shipped.", "2026-07-04");
+
+    expect(advanced.legs.map((leg) => leg.status)).toEqual([
+      "pending",
+      "done",
+      "active",
+    ]);
+  });
+
   test("lands active leg and promotes next pending leg", () => {
     const roadmap = parseRoadmap(SAMPLE);
     const advanced = advanceRoadmap(
