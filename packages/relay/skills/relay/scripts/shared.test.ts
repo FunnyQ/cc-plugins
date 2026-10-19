@@ -65,9 +65,8 @@ describe("resolveModel", () => {
 });
 
 describe("addTimestampSuffix", () => {
-  it("appends timestamp before extension", () => {
+  it("appends timestamp before extension, returning a bare name when parse yields an empty dir", () => {
     const result = addTimestampSuffix("./a.png");
-    // parse("./a.png") yields dir="" (empty), not "." — join with dir falls back to bare name
     expect(result).toMatch(/^a_\d{8}-\d{4}\.png$/);
   });
 
@@ -81,9 +80,8 @@ describe("addTimestampSuffix", () => {
     expect(result).toMatch(/^dir\/subdir\/file_\d{8}-\d{4}\.txt$/);
   });
 
-  it("handles dot files", () => {
+  it("treats a dot file as all name, no extension", () => {
     const result = addTimestampSuffix(".hidden");
-    // parse(".hidden") treats entire string as name (no dir, no ext)
     expect(result).toMatch(/^\.hidden_\d{8}-\d{4}$/);
   });
 
@@ -107,13 +105,11 @@ describe("createTmpRunDir", () => {
     const dir = createTmpRunDir();
     const parts = dir.split("/");
     const last = parts[parts.length - 1];
-    // Format: YYYYMMDD-HHMMSS-milliseconds-<pid>-<8-char-uuid>
     expect(last).toMatch(/^\d{8}-\d{6}-\d{3}-\d+-[a-f0-9]{8}$/);
   });
 
   it("creates the directory", () => {
     const dir = createTmpRunDir();
-    // Verify the directory exists by trying to read it
     const entries = Bun.file(dir);
     expect(entries).toBeDefined();
   });
@@ -137,7 +133,6 @@ describe("the shipped suggested config", () => {
   const suggested = JSON.parse(readFileSync(SUGGESTED_CONFIG_PATH, "utf-8"));
 
   it("carries a version and provider/model ids for opencode delegate and review", () => {
-    // Unix seconds: a 10-digit integer until 2286.
     expect(Number.isInteger(suggested.version)).toBe(true);
     expect(String(suggested.version)).toMatch(/^\d{10}$/);
     for (const mode of ["delegate", "review"]) {

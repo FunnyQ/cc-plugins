@@ -192,7 +192,6 @@ describe("claudeBackend", () => {
           content: [],
         });
         const output = claudeBackend.parseOutput(json);
-        // When content array is empty, falls back to raw JSON string trimmed
         expect(output).toBe('{"type":"response","content":[]}');
       });
     });

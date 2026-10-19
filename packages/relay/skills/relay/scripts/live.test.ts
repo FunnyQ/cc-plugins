@@ -20,10 +20,6 @@ import {
 import { RESULT_END_MARKER } from "./relay-prompt";
 import { BACKENDS } from "./backends";
 
-// ---------------------------------------------------------------------------
-// resolveHerdScript
-// ---------------------------------------------------------------------------
-
 const SIBLING = "/repo/packages/herdr/skills/herdr/scripts/herd.ts";
 
 function locator(overrides: Partial<LocatorDeps> = {}): LocatorDeps {
@@ -80,7 +76,6 @@ describe("resolveHerdScript", () => {
         if (p === claudeRoot) return []; // herdr not installed for Claude here
         if (p === codexRoot) return ["q-lab-marketplace"];
         if (p === join(codexRoot, "q-lab-marketplace/herdr"))
-          // Directory order is arbitrary — numeric-aware sort must pick 0.10.0
           return ["0.9.1", "0.10.0"];
         return [];
       },
@@ -103,10 +98,6 @@ describe("compareVersionsDesc", () => {
     ]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// liveGate
-// ---------------------------------------------------------------------------
 
 describe("liveGate", () => {
   const base = {
@@ -149,10 +140,6 @@ describe("liveGate", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// extractFinalText
-// ---------------------------------------------------------------------------
-
 describe("extractFinalText", () => {
   it("strips the marker and trailing whitespace", () => {
     expect(extractFinalText(`# Answer\n\nbody\n${RESULT_END_MARKER}\n\n`)).toBe(
@@ -170,10 +157,6 @@ describe("extractFinalText", () => {
     ).toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// resolveCallerLocation
-// ---------------------------------------------------------------------------
 
 describe("resolveCallerLocation", () => {
   const agents = [
@@ -367,16 +350,13 @@ describe("resolveCallerLocation", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// runLive
-// ---------------------------------------------------------------------------
-
 type HerdCall = { verb: string; args: unknown[] };
 
 function fakeHerd(options: {
   statuses: string[]; // status returned per get() call (last repeats)
   spawnError?: Error;
   sendError?: Error;
+  waitError?: Error;
   closeError?: Error;
   getErrorAtGet?: number;
   preSpawnAgents?: string[]; // list() result before spawn (snapshot)
@@ -425,6 +405,7 @@ function fakeHerd(options: {
     },
     async wait(target, opts) {
       calls.push({ verb: "wait", args: [target, opts] });
+      if (options.waitError) throw options.waitError;
       return {};
     },
     async get(target) {
@@ -454,6 +435,7 @@ function runLiveHarness(options: {
   waitTimeoutMs?: number;
   spawnError?: Error;
   sendError?: Error;
+  waitError?: Error;
   closeError?: Error;
   getErrorAtGet?: number;
   loadError?: Error;
@@ -478,6 +460,7 @@ function runLiveHarness(options: {
   ];
   const { herd, calls } = fakeHerd({ ...options, callerAgents });
   const errors: string[] = [];
+  const timeline: string[] = [];
   let clock = 0;
   let gets = 0;
 
@@ -511,22 +494,24 @@ function runLiveHarness(options: {
       );
     },
     readFile: () => options.resultContent ?? "",
-    stderr: (text) => errors.push(text),
+    stderr: (text) => {
+      errors.push(text);
+      timeline.push(text);
+    },
     now: () => clock,
     sleep: async (ms) => {
+      timeline.push("sleep");
       clock += ms;
     },
   };
 
-  // Track get() count for fileExists gating (herd.get is already counted in
-  // calls; mirror it here without reaching into fakeHerd internals).
   const originalGet = herd.get.bind(herd);
   herd.get = async (target) => {
     gets++;
     return originalGet(target);
   };
 
-  return { run: () => runLive(opts, deps), calls, errors, opts };
+  return { run: () => runLive(opts, deps), calls, errors, timeline, opts };
 }
 
 describe("runLive", () => {
@@ -554,18 +539,15 @@ describe("runLive", () => {
     expect(spawn.agent).toBe("codex");
     expect(spawn.argv).toEqual(["-m", "gpt-6"]);
     expect(spawn.env).toEqual(["RELAY_DELEGATED=1"]);
-    // Opens its own tab; split stays as a fallback for an older herd.ts.
     expect(spawn.newTab).toBe(true);
     expect(spawn.split).toBe("down");
     expect(spawn.cwd).toBe("/repo");
     expect(spawn.workspace).toBe("wT");
 
-    // Exactly one send, carrying the one-line bootstrap — never the prompt body.
     const sends = calls.filter((c) => c.verb === "send");
     expect(sends).toHaveLength(1);
     expect(sends[0].args[1]).toContain("live-prompt.md");
 
-    // Progress lines surfaced each poll.
     expect(errors.some((e) => e.includes("working"))).toBe(true);
   });
 
@@ -694,7 +676,6 @@ describe("runLive", () => {
     expect(result.report).toContain("wait");
     expect(result.report).toContain("close");
     expect(result.report).toContain("NOT a failure");
-    // relay never kills or closes the pane.
     expect(calls.some((c) => c.verb === "close")).toBe(false);
   });
 
@@ -741,7 +722,6 @@ describe("runLive", () => {
     const result = await run();
 
     expect(result.ok).toBe(true);
-    // Completed on the third poll (first idle), not the first marker sighting.
     expect(calls.filter((c) => c.verb === "get")).toHaveLength(3);
   });
 
@@ -760,7 +740,6 @@ describe("runLive", () => {
       agentName: "relay-codex-delegate-ab12",
       text: "4",
     });
-    // 'done' is treated as activity → it must never trigger a bootstrap nudge.
     expect(calls.filter((c) => c.verb === "send")).toHaveLength(1);
   });
 
@@ -809,7 +788,6 @@ describe("runLive", () => {
     const result = await run();
 
     expect(result.ok).toBe(false);
-    // Only the initial bootstrap was sent — the nudge pressed Enter, no duplicate.
     const sends = calls.filter((c) => c.verb === "send");
     expect(sends).toHaveLength(1);
     const keys = calls.filter((c) => c.verb === "keys");
@@ -869,7 +847,6 @@ describe("runLive", () => {
   });
 
   it("surfaces the leaked pane name when spawn throws AFTER creating it (no headless fallback)", async () => {
-    // agent start created the pane, then returned malformed JSON → spawn threw.
     const { run } = runLiveHarness({
       statuses: [],
       spawnError: new Error("bad JSON envelope"),
@@ -884,14 +861,11 @@ describe("runLive", () => {
 
     expect(result.ok).toBe(false);
     if (result.ok || result.pending) throw new Error("expected error");
-    // agentName present → relay reports instead of double-running headless.
     expect(result.agentName).toBe("relay-codex-delegate-9x2f");
     expect(result.error).toContain("bad JSON envelope");
   });
 
-  it("does not mistake a pre-existing kept-open pane for a leaked spawn", async () => {
-    // A same-prefix pane from an earlier run (user chose keep) is in BOTH
-    // snapshots — a genuinely failed spawn must still allow headless fallback.
+  it("does not mistake a pre-existing kept-open pane for a leaked spawn, so a failed spawn still falls back headless", async () => {
     const { run } = runLiveHarness({
       statuses: [],
       spawnError: new Error("no herdr session"),
@@ -958,14 +932,38 @@ describe("runLive", () => {
 
     const result = await run();
 
-    // Confirming is a diagnostic, not a gate — it must never fail a run that
-    // would have proceeded before the confirmation existed.
     expect(String("error" in result ? result.error : "")).not.toContain(
       "failed to send bootstrap",
     );
     expect(errors.some((e) => e.includes("could not confirm activity"))).toBe(
       true,
     );
+  });
+
+  it("still sends the bootstrap when the pre-send idle wait rejects", async () => {
+    const { run, calls } = runLiveHarness({
+      statuses: ["working"],
+      waitError: new Error("never reported idle"),
+      waitTimeoutMs: 1,
+    });
+
+    await run();
+
+    expect(calls.filter((c) => c.verb === "send")).toHaveLength(1);
+  });
+
+  it("prints the recovery handles before the first poll sleep, so a killed run stays recoverable", async () => {
+    const { run, timeline } = runLiveHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 1,
+    });
+
+    await run();
+
+    const recovery = timeline.findIndex((e) => e.includes("recover if this call is interrupted"));
+    expect(recovery).toBeGreaterThanOrEqual(0);
+    expect(timeline[recovery]).toContain("/tmp/relay/run/result.md");
+    expect(recovery).toBeLessThan(timeline.indexOf("sleep"));
   });
 
   it("still fails the run when the send itself is rejected", async () => {
@@ -976,7 +974,6 @@ describe("runLive", () => {
 
     const result = await run();
 
-    // Nothing was sent and the pane needs a human — do not pretend otherwise.
     expect(result.ok).toBe(false);
     expect(String("error" in result ? result.error : "")).toContain("failed to send bootstrap");
   });
@@ -999,11 +996,6 @@ describe("runLive", () => {
     expect(errors.some((e) => e.includes("agent_prompt_stalled"))).toBe(true);
   });
 });
-
-// ---------------------------------------------------------------------------
-// collectLive — reattach to an ALREADY-RUNNING pane and poll for its result.
-// Same settled+marker contract as runLive, minus spawn/bootstrap/self-heal.
-// ---------------------------------------------------------------------------
 
 function collectHarness(options: {
   statuses: string[];
@@ -1072,7 +1064,6 @@ describe("collectLive", () => {
       agentName: "relay-codex-delegate-ab12",
       text: "# Late\n\nFinished after the first window.",
     });
-    // Reattach only — it must never spawn a second pane or re-send a prompt.
     expect(calls.some((c) => c.verb === "spawn")).toBe(false);
     expect(calls.some((c) => c.verb === "send")).toBe(false);
     expect(calls.some((c) => c.verb === "close")).toBe(true);
@@ -1114,7 +1105,6 @@ describe("collectLive", () => {
     expect(result.ok).toBe(false);
     if (result.ok || !result.pending) throw new Error("expected pending");
     expect(result.report).toContain("still running");
-    // The report must teach the caller how to keep waiting.
     expect(result.report).toContain("collect");
   });
 
@@ -1143,7 +1133,7 @@ describe("collectLive", () => {
     expect(calls.some((c) => c.verb === "keys")).toBe(false);
   });
 
-  it("fails fast when the agent name is unknown", async () => {
+  it("fails fast when the agent name is unknown, without burning the poll window", async () => {
     const { run, calls } = collectHarness({
       statuses: [],
       getErrorAtGet: 1,
@@ -1155,7 +1145,6 @@ describe("collectLive", () => {
     expect(result.ok).toBe(false);
     if (result.ok || result.pending) throw new Error("expected failure");
     expect(result.error).toContain("relay-codex-delegate-ab12");
-    // One probe, then out — never the full poll window.
     expect(calls.filter((c) => c.verb === "get")).toHaveLength(1);
   });
 
@@ -1203,14 +1192,13 @@ describe("pendingReport (via a timed-out collect)", () => {
     const result = await run();
 
     if (result.ok || !result.pending) throw new Error("expected pending");
-    // The path must be a real filesystem path, never a percent-encoded URL one.
     expect(result.report).not.toContain("%20");
     expect(result.report).toMatch(
       /collect --agent relay-codex-delegate-ab12 --result \/tmp\/relay\/run\/result\.md --wait-timeout 20000/,
     );
   });
 
-  it("carries --keep-pane into the follow-up command", async () => {
+  it("carries --keep-pane into the follow-up command so collect never closes a kept pane", async () => {
     const { run } = collectHarness({
       statuses: ["working"],
       waitTimeoutMs: 20_000,
@@ -1233,5 +1221,19 @@ describe("pendingReport (via a timed-out collect)", () => {
 
     if (result.ok || !result.pending) throw new Error("expected pending");
     expect(result.report).not.toContain("--keep-pane");
+  });
+});
+
+describe("relay's portability without herdr", () => {
+  it("never imports herd.ts statically, so relay loads on machines without the herdr plugin", async () => {
+    const offenders: string[] = [];
+    for await (const file of new Bun.Glob("*.ts").scan(import.meta.dir)) {
+      if (file.endsWith(".test.ts")) continue;
+      const source = await Bun.file(join(import.meta.dir, file)).text();
+      if (/^\s*(import|export)\b[^;]*?\bfrom\s*["'][^"']*herd(\.ts)?["']/m.test(source)) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
   });
 });

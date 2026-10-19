@@ -1,13 +1,4 @@
 /**
- * live.ts — relay's optional live-pane execution layer.
- *
- * When relay runs inside herdr (HERDR_ENV=1), delegates/reviews can run in a
- * VISIBLE, take-over-able sibling pane driving the backend's interactive TUI
- * instead of a blocking headless spawn. The herdr wrapper (herd.ts) is loaded
- * via DYNAMIC import only when the live path is actually taken — relay must
- * stay portable to machines with no herdr plugin installed at all, so there is
- * no static herdr import anywhere in relay.
- *
  * Result capture is a file contract (see relay-prompt.appendFileContract):
  * the delegate writes its final answer to <dir>/result.md ending with
  * RESULT_END_MARKER; relay polls for agent-idle + marker. Pane reads cannot
@@ -40,18 +31,11 @@ const RELAY_SCRIPT_PATH = join(
   "relay.ts",
 );
 
-// Quote a value for a command line we PRINT for someone to copy. Bare when it
-// is already shell-safe (the common case, so reports stay readable); single
-// quoted otherwise, since install paths really do contain spaces.
 export function shellArg(value: string): string {
   return /^[A-Za-z0-9_@%+=:,./-]+$/.test(value)
     ? value
     : `'${value.replaceAll("'", `'\\''`)}'`;
 }
-
-// ---------------------------------------------------------------------------
-// herd.ts locator
-// ---------------------------------------------------------------------------
 
 export type LocatorDeps = {
   env: Record<string, string | undefined>;
@@ -80,7 +64,6 @@ export function defaultLocatorDeps(): LocatorDeps {
   };
 }
 
-// Numeric-aware DESC version comparator: "3.10.0" sorts above "3.9.1".
 export function compareVersionsDesc(a: string, b: string): number {
   const pa = a.split(".").map((n) => Number.parseInt(n, 10));
   const pb = b.split(".").map((n) => Number.parseInt(n, 10));
@@ -92,14 +75,6 @@ export function compareVersionsDesc(a: string, b: string): number {
   return 0;
 }
 
-/**
- * Locate herd.ts without any hard dependency on the herdr plugin:
- * 1. HERD_SCRIPT_PATH env override
- * 2. Repo sibling (this marketplace checkout: packages/relay ↔ packages/herdr)
- * 3. Plugin caches of BOTH harnesses, newest version first — the cross-harness
- *    scan rescues Codex-side relay when herdr is only installed for Claude.
- * 4. null → caller falls back headless.
- */
 export function resolveHerdScript(
   deps: LocatorDeps = defaultLocatorDeps(),
 ): string | null {
@@ -137,10 +112,6 @@ export function resolveHerdScript(
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Gate
-// ---------------------------------------------------------------------------
-
 export type LiveGateInput = {
   env: Record<string, string | undefined>;
   headless: boolean; // --headless escape hatch
@@ -151,12 +122,6 @@ export type LiveGateInput = {
 
 export type LiveGateResult = { live: boolean; reason?: string };
 
-/**
- * Live iff inside herdr, not opted out, mode has a live path, the backend
- * exposes the live seam, and herd.ts resolved. `reason` is set only for
- * non-user denials (surfaced on stderr when HERDR_ENV=1) — env-off, --headless
- * and image mode are expected, silent outcomes.
- */
 export function liveGate(input: LiveGateInput): LiveGateResult {
   if (input.env.HERDR_ENV !== "1") return { live: false };
   if (input.headless) return { live: false };
@@ -175,11 +140,6 @@ export function liveGate(input: LiveGateInput): LiveGateResult {
   return { live: true };
 }
 
-// ---------------------------------------------------------------------------
-// Runner
-// ---------------------------------------------------------------------------
-
-// The slice of herd.ts's createHerd() surface runLive drives.
 export type HerdClient = {
   spawn(opts: {
     role: string;
@@ -258,8 +218,6 @@ function locationOf(
   };
 }
 
-/** True when `base` is `target` or one of its ancestor directories. Compared on
- * path segments, so /repo never matches a /repo-other sibling. */
 function isAncestorOrSame(base: string | undefined, target: string): boolean {
   if (!base) return false;
   if (base === target) return true;
@@ -267,8 +225,6 @@ function isAncestorOrSame(base: string | undefined, target: string): boolean {
   return target.startsWith(prefix);
 }
 
-/** How closely a pane's cwd covers the caller's: the length of the deepest of
- * its two cwds that contains `cwd`, or null when neither does. */
 function cwdMatchDepth(agent: HerdAgent, cwd: string): number | null {
   const covering = [agent.cwd, agent.foregroundCwd].filter(
     (base): base is string => isAncestorOrSame(base, cwd),
@@ -350,9 +306,6 @@ export type LiveRunResult =
   | { ok: false; pending: true; agentName: string; report: string }
   | { ok: false; pending: false; agentName?: string; error: string };
 
-// Everything the result poll needs, independent of HOW the pane got there.
-// `selfHeal` is present only on the spawn path: re-delivering a bootstrap makes
-// sense only for a pane we just created, never for one already mid-task.
 type PollContext = {
   agentName: string;
   herdScriptPath: string;
@@ -377,8 +330,6 @@ export type RunLiveOpts = {
   callerEnv: Record<string, string | undefined>;
 };
 
-// Reattach to a pane that is already running — no spawn, no bootstrap, so no
-// backend/spec/cwd is needed. Everything here comes off a pending report.
 export type CollectLiveOpts = {
   agentName: string;
   herdScriptPath: string;
@@ -410,8 +361,6 @@ export function defaultRunLiveDeps(): RunLiveDeps {
   };
 }
 
-// The result file is final only when its last non-empty line is the marker.
-// Marker absent = mid-write (or not started) — keep polling.
 export function extractFinalText(content: string): string | null {
   const trimmed = content.trimEnd();
   const lines = trimmed.split("\n");
@@ -423,8 +372,6 @@ function pendingReport(ctx: PollContext, elapsedMs: number): string {
   const herd = `bun ${shellArg(ctx.herdScriptPath)}`;
   const agent = shellArg(ctx.agentName);
   const result = shellArg(ctx.resultPath);
-  // Carry --keep-pane forward: without it a copied collect command would close
-  // a pane the original caller explicitly asked to keep.
   const keep = ctx.keepPane ? " --keep-pane" : "";
   return [
     `Live ${ctx.label} still running after ${Math.round(elapsedMs / 1000)}s — this is NOT a failure.`,
@@ -445,13 +392,6 @@ function pendingReport(ctx: PollContext, elapsedMs: number): string {
   ].join("\n");
 }
 
-/**
- * Spawn the backend TUI in a sibling pane, send the bootstrap line, and poll
- * for agent-idle + result-file marker. A verified success closes the pane
- * unless keepPane is set. Timeout exits are status-aware: still-working panes
- * return pending, already-settled panes without a verified result return
- * failure, and every non-success outcome leaves the pane open for postmortem.
- */
 export async function runLive(
   opts: RunLiveOpts,
   deps: RunLiveDeps = defaultRunLiveDeps(),
@@ -484,9 +424,7 @@ export async function runLive(
       env: opts.callerEnv,
       cwd: opts.cwd,
     });
-  } catch {
-    /* handled by the caller-location guard below */
-  }
+  } catch {}
   if (!callerLocation) {
     return {
       ok: false,
@@ -513,9 +451,6 @@ export async function runLive(
     });
     agentName = spawned.name;
   } catch (error) {
-    // If a NEW agent with our role prefix appeared despite the throw, the pane
-    // is real: surface its name so relay reports the error instead of falling
-    // back headless — a fallback here would run the task twice.
     let leaked: string | undefined;
     try {
       leaked = (await herd.list())
@@ -524,9 +459,7 @@ export async function runLive(
           (n): n is string =>
             n !== null && n.startsWith(`${role}-`) && !namesBefore.has(n),
         );
-    } catch {
-      /* herdr unreachable — assume nothing spawned */
-    }
+    } catch {}
     return {
       ok: false,
       pending: false,
@@ -536,16 +469,12 @@ export async function runLive(
   }
 
   try {
-    // Best-effort settle before the bootstrap send — a TUI that never reports
-    // idle (or a slow start) should not abort the run.
     try {
       await herd.wait(agentName, {
         status: "idle",
         timeoutMs: SPAWN_IDLE_WAIT_MS,
       });
-    } catch {
-      /* proceed to send regardless */
-    }
+    } catch {}
     // Ask herdr to confirm the bootstrap actually landed. When the agent takes
     // the text but never acts, herdr says so outright rather than leaving the
     // nudge loop below to infer it from the pane's visible text one poll window
@@ -588,11 +517,6 @@ export async function runLive(
     };
   }
 
-  // Announce the recovery handles BEFORE the long poll begins. If this
-  // foreground process is KILLED mid-run (e.g. a caller's exec cap) rather than
-  // timing out cleanly, relay never reaches the pending report below — so the
-  // result path + reattach commands would be lost. Emitting them up front keeps
-  // the run recoverable from stderr alone.
   deps.stderr(
     `[relay live] ${agentName} running — recover if this call is interrupted:\n` +
       `  cat ${opts.resultPath}   # the answer, once written\n` +
@@ -643,9 +567,6 @@ export async function collectLive(
     };
   }
 
-  // Probe once before committing to a long poll. Inside the loop a get()
-  // failure is treated as a transient herdr hiccup, so a typo'd or already-
-  // closed agent would otherwise burn the whole window before reporting.
   try {
     await herd.get(opts.agentName);
   } catch (error) {
@@ -659,8 +580,6 @@ export async function collectLive(
   return pollForResult(herd, { ...opts, label: "collect" }, deps);
 }
 
-// Poll a live pane until it settles with a verified result, or the budget runs
-// out. Shared by the spawn path (runLive) and the reattach path (collectLive).
 async function pollForResult(
   herd: HerdClient,
   ctx: PollContext,
@@ -668,8 +587,6 @@ async function pollForResult(
 ): Promise<LiveRunResult> {
   const agentName = ctx.agentName;
 
-  // Stable head/tail tokens of the bootstrap, used to detect whether the line
-  // is sitting in the pane's input box (fully, partially, or not at all).
   const bootstrapText = ctx.selfHeal?.bootstrapText ?? "";
   const bootWords = bootstrapText.trim().split(/\s+/);
   const bootHead = bootWords.slice(0, 3).join(" ");
@@ -693,9 +610,7 @@ async function pollForResult(
     let status = "unknown";
     try {
       status = (await herd.get(agentName)).status;
-    } catch {
-      /* transient herdr hiccup — keep polling */
-    }
+    } catch {}
     const elapsed = Math.round((deps.now() - start) / 1000);
     deps.stderr(`[relay live] ${agentName}: ${status} (${elapsed}s elapsed)\n`);
     if (status === "working" || status === "blocked") sawActivity = true;
@@ -708,8 +623,6 @@ async function pollForResult(
     const settled = status === "idle" || status === "done";
     if (status === "done") sawActivity = true;
 
-    // Complete only when the agent has settled AND the marker landed — a marker
-    // while still working means the file may be a partial/older write.
     if (!settled) continue;
     if (deps.fileExists(ctx.resultPath)) {
       const text = extractFinalText(deps.readFile(ctx.resultPath));
@@ -731,16 +644,10 @@ async function pollForResult(
     }
     if (!sawActivity && nudgesLeft > 0) {
       nudgesLeft--;
-      // Read the pane's visible input before nudging. Three cases seen live:
-      //   full text present, Enter swallowed (codex) → press Enter only
-      //   text lost entirely (opencode)              → re-send the bootstrap
-      //   partial paste                              → clear the line, re-send
       let visible = "";
       try {
         visible = await herd.read(agentName, { source: "visible" });
-      } catch {
-        /* read failed — fall through to a plain re-send */
-      }
+      } catch {}
       const hasHead = bootHead !== "" && visible.includes(bootHead);
       const hasTail = bootTail !== "" && visible.includes(bootTail);
       if (hasHead && hasTail) {
@@ -749,32 +656,24 @@ async function pollForResult(
         );
         try {
           await herd.keys(agentName, "enter");
-        } catch {
-          /* best-effort */
-        }
+        } catch {}
       } else if (hasHead) {
         deps.stderr(
           `[relay live] ${agentName}: partial bootstrap in the input — clearing then re-sending\n`,
         );
         try {
           await herd.keys(agentName, "ctrl+a", "ctrl+k");
-        } catch {
-          /* best-effort */
-        }
+        } catch {}
         try {
           await herd.send(agentName, bootstrapText);
-        } catch {
-          /* best-effort */
-        }
+        } catch {}
       } else {
         deps.stderr(
           `[relay live] ${agentName}: idle with no result yet — re-sending the bootstrap (it may not have been delivered)\n`,
         );
         try {
           await herd.send(agentName, bootstrapText);
-        } catch {
-          /* best-effort */
-        }
+        } catch {}
       }
     }
   }
@@ -782,9 +681,7 @@ async function pollForResult(
   let finalStatus = "unknown";
   try {
     finalStatus = (await herd.get(agentName)).status;
-  } catch {
-    /* unknowable means we must not assume the agent finished */
-  }
+  } catch {}
   if (finalStatus === "idle" || finalStatus === "done") {
     return {
       ok: false,

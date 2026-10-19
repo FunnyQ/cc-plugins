@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
+import { homedir, tmpdir } from "os";
+import { basename, join } from "path";
+import { SPAWN_IDLE_WAIT_MS } from "./live";
 import {
   ARM_WINDOW_MS,
   buildMarker,
@@ -41,6 +42,10 @@ describe("buildMarker", () => {
     expect(marker.armUntil).toBe(NOW + ARM_WINDOW_MS);
     expect(marker.sessionIds).toEqual([]);
     expect(marker.cwd).toBe("/repo");
+  });
+
+  it("arms long enough to cover the live spawn's idle wait plus a cold pane", () => {
+    expect(ARM_WINDOW_MS).toBeGreaterThan(SPAWN_IDLE_WAIT_MS * 2);
   });
 
   it("outlives the wait, because collect rounds reattach after it expires", () => {
@@ -129,7 +134,7 @@ describe("writeDelegationMarker", () => {
     expect(existsSync(path!)).toBe(true);
   });
 
-  it("returns null instead of throwing when the store is unwritable", () => {
+  it("returns null instead of failing the run when the store is unwritable", () => {
     const path = writeDelegationMarker(
       buildMarker({
         cwd: "/repo",
@@ -158,6 +163,37 @@ describe("writeDelegationMarker", () => {
   });
 });
 
+describe("contract with monitor's delegation_marker.rs", () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      join(import.meta.dir, "fixtures", "delegation-marker.json"),
+      "utf8",
+    ),
+  ) as { home: string; file: string; marker: DelegationMarker };
+
+  it("stores markers in the directory the reader scans", () => {
+    expect(delegationHome({})).toBe(join(homedir(), fixture.home));
+  });
+
+  it("writes exactly the fixture's file name shape and JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "relay-delegation-"));
+    const marker = buildMarker({
+      cwd: fixture.marker.cwd,
+      backend: fixture.marker.backend,
+      now: fixture.marker.startedAt,
+      waitTimeoutMs: 480_000,
+    });
+    const path = writeDelegationMarker(marker, { Q_DELEGATION_HOME: dir })!;
+    const name = new RegExp(`^${fixture.marker.startedAt}-[a-z0-9]+\\.json$`);
+    expect(basename(path)).toMatch(name);
+    expect(fixture.file).toMatch(name);
+    expect(JSON.parse(readFileSync(path, "utf8"))).toStrictEqual(
+      fixture.marker,
+    );
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
 describe("clearDelegationMarker", () => {
   it("removes the file", () => {
     const dir = mkdtempSync(join(tmpdir(), "relay-delegation-"));
@@ -175,7 +211,7 @@ describe("clearDelegationMarker", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("tolerates a null path and a missing file", () => {
+  it("tolerates a null path and a missing file, leaving leftovers to the TTL", () => {
     expect(() => clearDelegationMarker(null)).not.toThrow();
     expect(() =>
       clearDelegationMarker(join(tmpdir(), "not-a-real-marker.json")),

@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, statSync, utimesSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync, statSync, utimesSync } from "fs";
 import { join } from "path";
 import * as os from "os";
 import {
   buildImagePrompt,
   extractGeneratedPngPath,
   findNewestPng,
+  generatedImages,
   selectSourcePng,
   codexBackend,
 } from "./codex";
@@ -216,7 +217,6 @@ describe("codexBackend", () => {
     });
 
     afterEach(() => {
-      // Cleanup
       try {
         const fs = require("fs");
         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -232,13 +232,11 @@ describe("codexBackend", () => {
       expect(result).toBe(pngPath);
     });
 
-    it("should resolve tilde-relative paths", () => {
-      // This test depends on a real ~/something.png existing, so we skip in CI
-      // or use a fixture. For now, test the path resolution logic via direct test.
+    it("should resolve tilde-relative paths against the home dir", () => {
+      const pngPath = join(tempDir, "test-image.png");
+      writeFileSync(pngPath, "fake");
       const output = `Image saved to ~/test-image.png`;
-      const result = extractGeneratedPngPath(output);
-      // Will be null since ~/test-image.png likely doesn't exist
-      expect(result).toBeNull();
+      expect(extractGeneratedPngPath(output, tempDir)).toBe(pngPath);
     });
 
     it("should return null if no .png found in output", () => {
@@ -289,7 +287,6 @@ describe("codexBackend", () => {
       writeFileSync(oldPng, "old");
       writeFileSync(newPng, "new");
 
-      // Set mtimes using utimesSync
       utimesSync(oldPng, oldTime, oldTime);
       utimesSync(newPng, newTime, newTime);
 
@@ -311,7 +308,6 @@ describe("codexBackend", () => {
       const oldPng = join(tempDir, "old.png");
       writeFileSync(oldPng, "old");
 
-      // Set mtime to well before the cutoff (year 2020)
       const veryOldTime = new Date("2020-01-01");
       utimesSync(oldPng, veryOldTime, veryOldTime);
 
@@ -334,7 +330,6 @@ describe("codexBackend", () => {
       writeFileSync(png1, "1");
       writeFileSync(png2, "2");
 
-      // Give png2 a newer mtime
       const time1 = new Date(Date.now() - 3000);
       const time2 = new Date(Date.now() - 1000);
 
@@ -363,14 +358,11 @@ describe("codexBackend", () => {
     });
 
     it("prefers the PNG generated during this run over an older one named in the output", () => {
-      // An older image that still exists on disk, of the kind a model routinely
-      // refers to ("similar to ~/reference.png").
       const olderPng = join(tempDir, "reference.png");
       writeFileSync(olderPng, "old");
       const longAgo = new Date(Date.now() - 86_400_000);
       utimesSync(olderPng, longAgo, longAgo);
 
-      // The image this run actually produced.
       const freshPng = join(tempDir, "generated", "fresh.png");
       writeFileSync(freshPng, "new");
 
@@ -383,7 +375,6 @@ describe("codexBackend", () => {
     });
 
     it("falls back to the output path when this run generated nothing", () => {
-      // Covers a codex that saved outside ~/.codex/generated_images.
       const elsewhere = join(tempDir, "elsewhere.png");
       writeFileSync(elsewhere, "png");
 
@@ -404,13 +395,16 @@ describe("codexBackend", () => {
 
   describe("postRun", () => {
     let tempDir: string;
+    const realImagesDir = generatedImages.dir;
 
     beforeEach(() => {
       tempDir = join(os.tmpdir(), `test-postrun-${Date.now()}`);
       mkdirSync(tempDir, { recursive: true });
+      generatedImages.dir = join(tempDir, "generated");
     });
 
     afterEach(() => {
+      generatedImages.dir = realImagesDir;
       try {
         const fs = require("fs");
         fs.rmSync(tempDir, { recursive: true, force: true });
@@ -432,38 +426,47 @@ describe("codexBackend", () => {
     });
 
     it("should copy image PNG to output path for image mode", () => {
-      // Create a source PNG
       const sourceDir = join(tempDir, "source");
       mkdirSync(sourceDir);
       const sourcePng = join(sourceDir, "generated.png");
       writeFileSync(sourcePng, "fake png data");
 
-      // Set up output path
       const outDir = join(tempDir, "output");
       mkdirSync(outDir);
       const outPath = join(outDir, "result.png");
 
-      // Far-future cutoff so the mtime search finds nothing in the real
-      // ~/.codex/generated_images and the output-path fallback is what runs.
       const opts: InvokeOpts = {
         out: outPath,
-        runStartedAt: new Date(Date.now() + 60_000),
+        runStartedAt: new Date(Date.now() - 5_000),
       };
       const parsed = `Image at ${sourcePng}`;
 
       const result = codexBackend.postRun!("image", parsed, opts);
 
-      // Result should indicate success
       expect(result.ok).toBe(true);
       expect(result.text).toContain("Image saved:");
       expect(result.text).toContain(".png");
     });
 
+    it("copies a PNG codex wrote to its generated-images dir during the run", () => {
+      const generated = join(generatedImages.dir, "session");
+      mkdirSync(generated, { recursive: true });
+      writeFileSync(join(generated, "new.png"), "fresh png");
+
+      const result = codexBackend.postRun!("image", "no path here", {
+        out: join(tempDir, "out.png"),
+        runStartedAt: new Date(Date.now() - 5_000),
+      });
+
+      expect(result.ok).toBe(true);
+      const saved = result.text.replace("Image saved: ", "").trim();
+      expect(readFileSync(saved, "utf-8")).toBe("fresh png");
+    });
+
     it("should return error message if PNG not found", () => {
       const opts: InvokeOpts = {
-        out: "/tmp/nonexistent/result.png",
-        // Far-future cutoff so no real ~/.codex PNG matches the fallback search.
-        runStartedAt: new Date(Date.now() + 60_000),
+        out: join(tempDir, "result.png"),
+        runStartedAt: new Date(Date.now() - 5_000),
       };
       const parsed = "No PNG path in output";
       const result = codexBackend.postRun!("image", parsed, opts);

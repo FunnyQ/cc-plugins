@@ -7,8 +7,6 @@ export type RunResult = {
   code: number;
 };
 
-// What relay.ts hands a backend after parsing argv + (maybe) building a prompt.
-// This is the single shared seam — backends must not invent their own extensions.
 export type InvokeOpts = {
   promptText?: string; // the built prompt body — every CLI takes it inline (codex on stdin, opencode after --, claude via -p)
   task?: string; // raw delegate, review, or image task
@@ -20,35 +18,21 @@ export type InvokeOpts = {
   runStartedAt?: Date; // wall-clock just before the backend spawn (codex image: cutoff for newest-PNG search)
 };
 
-// Optional post-run side effect (e.g. codex image PNG copy). Returning {ok:false}
-// lets relay surface a non-zero exit instead of treating the error text as success.
 export type PostRunResult = { ok: boolean; text: string };
 
-// How to launch this backend's INTERACTIVE TUI in a live herdr pane.
-// argv carries only TUI-safe extras (model/permission flags) — never the
-// headless exec/-p/-o forms; the prompt arrives later via a herd send.
 export type LiveSpec = {
   agentBin: string; // interactive TUI binary
-  argv: string[]; // extra TUI args — NO exec/-p/-o
+  argv: string[];
 };
 
 export type Backend = {
   name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
   supports: Set<Mode>;
-  // Build the argv (and optional stdin) for this mode. Pure — no spawning here.
   invoke(mode: Mode, opts: InvokeOpts): { argv: string[]; stdin?: string };
-  // Extract clean final text from a completed run (file content or stdout).
   parseOutput(raw: string): string;
-  // Optional post-run step run by relay.ts AFTER the spawn + parseOutput. Receives the parsed
-  // text + opts, returns the final text relay prints. This is the generic seam for backend-only
-  // side effects (e.g. codex image: locate the PNG, copy it to opts.out, return "Image saved: <path>").
-  // relay.ts calls `b.postRun ? b.postRun(mode, parsed, opts) : ...` — no backend-name branching.
   postRun?(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult;
   // Optional: pull the real error out of a failed run's stdout, for CLIs that
   // exit non-zero with empty stderr (opencode reports it as a JSONL event).
   parseError?(stdout: string): string | undefined;
-  // Optional live seam: describe the interactive TUI launch for a herdr pane.
-  // Pure — no spawning. Returning null means this mode has no live path
-  // (e.g. codex image), so relay stays headless for it.
   invokeLive?(mode: Mode, opts: InvokeOpts): LiveSpec | null;
 };

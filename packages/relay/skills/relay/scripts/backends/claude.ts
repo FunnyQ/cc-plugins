@@ -5,8 +5,6 @@ export const claudeBackend: Backend = {
   supports: new Set(["delegate", "review"]),
 
   invoke(_mode: Mode, opts: InvokeOpts) {
-    // Both supported modes use the prompt text that relay.ts has already built.
-    // Always use --output-format json to get a structured envelope.
     const argv = ["claude", "-p", opts.promptText || "", "--output-format", "json"];
     if (opts.model) argv.push("--model", opts.model);
     if (opts.effort) argv.push("--effort", opts.effort);
@@ -22,13 +20,10 @@ export const claudeBackend: Backend = {
   },
 
   parseOutput(raw: string): string {
-    // Try to parse as JSON. If it fails (delegate mode outputs JSON, review outputs plain text),
-    // gracefully fall back to raw.
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Not JSON — return raw text.
       return raw.trim();
     }
 
@@ -51,13 +46,11 @@ export const claudeBackend: Backend = {
       return raw.trim();
     }
 
-    // Only plain objects carry an extractable envelope; anything else is raw.
     if (typeof parsed !== "object" || parsed === null) {
       return raw.trim();
     }
     const obj = parsed as Record<string, unknown>;
 
-    // Extraction order: .result → .text → .content[0].text → raw
     if (typeof obj.result === "string") {
       return obj.result;
     }
@@ -66,7 +59,6 @@ export const claudeBackend: Backend = {
       return obj.text;
     }
 
-    // Try .content[0].text, but only if content is a non-empty array of objects.
     if (
       Array.isArray(obj.content) &&
       obj.content.length > 0 &&
@@ -79,7 +71,6 @@ export const claudeBackend: Backend = {
       }
     }
 
-    // Fallback: return raw text trimmed.
     return raw.trim();
   },
 

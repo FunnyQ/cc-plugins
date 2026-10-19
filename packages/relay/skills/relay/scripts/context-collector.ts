@@ -134,7 +134,6 @@ export function collectFileContents(files: string[]): string {
     }
 
     try {
-      // Skip binary files (null byte heuristic)
       const buffer = readFileSync(resolved);
       if (buffer.includes(0)) {
         sections.push(`## ${filePath}\n> Binary file, skipped\n`);
@@ -155,7 +154,6 @@ export function collectProjectInfo(): string {
   const sections: string[] = [];
   sections.push("# Project Info\n");
 
-  // Detect tech stack and read key project files in one pass
   const stackIndicators: Record<string, { stack: string; read?: boolean }> = {
     "package.json": { stack: "Node.js", read: true },
     Gemfile: { stack: "Ruby", read: true },
@@ -186,7 +184,6 @@ export function collectProjectInfo(): string {
           `## ${file}\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\`\n`,
         );
       } catch {
-        // malformed package.json, skip
       }
     } else {
       sections.push(`## ${file}\n\`\`\`\n${content}\n\`\`\`\n`);
@@ -194,7 +191,6 @@ export function collectProjectInfo(): string {
   }
 
   if (detectedStacks.length > 0) {
-    // Insert tech stack summary after the "# Project Info" header
     sections.splice(1, 0, "## Tech Stack\n" + detectedStacks.join(", ") + "\n");
   }
 

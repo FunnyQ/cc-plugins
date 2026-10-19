@@ -15,10 +15,6 @@ export type FormatOptions = {
   files: string[]; // for the delegate file-scope line
 };
 
-/**
- * Pure formatter: takes a context string and formats it into a prompt.
- * No filesystem I/O, no backend-specific naming.
- */
 export function formatPrompt(options: FormatOptions): string {
   const { kind, context, task, files } = options;
 
@@ -54,8 +50,6 @@ export function formatPrompt(options: FormatOptions): string {
   throw new Error(`Unknown prompt kind: ${kind}`);
 }
 
-// Sentinel the live delegate writes as the LAST line of result.md — relay's
-// poll loop treats the file as final only once this line has landed.
 export const RESULT_END_MARKER = "==== RELAY RESULT END ====";
 
 const REVIEW_CONTRACT =
@@ -118,10 +112,6 @@ export function appendFileContract(prompt: string, resultPath: string): string {
   );
 }
 
-/**
- * Impure: collects context, formats, writes <kind>-prompt.md to a tmp dir, returns the path.
- * Imported and called by the relay entry point directly.
- */
 export function buildPromptFile(options: {
   kind: PromptKind;
   files: string[];
@@ -131,17 +121,14 @@ export function buildPromptFile(options: {
 }): string {
   const { kind, files, task, gitScope, noProject } = options;
 
-  // Validate delegate requires a task
   if (kind === "delegate" && !task) {
     const msg = "Error: delegate mode requires a task (--task or stdin)";
     console.error(msg);
     process.exit(1);
   }
 
-  // Collect context from filesystem
   const context = collect({ files, gitScope, noProject });
 
-  // Format the prompt
   const prompt = formatPrompt({
     kind,
     context,
@@ -149,7 +136,6 @@ export function buildPromptFile(options: {
     files,
   });
 
-  // Write to tmp directory
   const tmpDir = createTmpRunDir();
   const fileName = `${kind}-prompt.md`;
   const promptPath = join(tmpDir, fileName);
@@ -158,7 +144,6 @@ export function buildPromptFile(options: {
   return promptPath;
 }
 
-// Optional CLI entry for manual/debug use
 if (import.meta.main) {
   async function main() {
     const args = process.argv.slice(2);
@@ -190,7 +175,6 @@ if (import.meta.main) {
       noProject: false,
     };
 
-    // Parse arguments
     for (let i = 1; i < args.length; i++) {
       const arg = args[i];
       if (arg === "--files" && i + 1 < args.length) {
@@ -207,12 +191,10 @@ if (import.meta.main) {
       }
     }
 
-    // Read stdin as the task fallback for both modes.
     if (!opts.task) {
       opts.task = (await Bun.stdin.text()).trim();
     }
 
-    // Build the prompt file
     const promptPath = buildPromptFile(opts);
     console.log(promptPath);
   }

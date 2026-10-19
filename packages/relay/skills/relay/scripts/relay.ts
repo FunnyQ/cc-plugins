@@ -264,7 +264,6 @@ function readSuggestedConfig(deps: RelayDeps): Record<string, unknown> {
   return JSON.parse(deps.readFile(SUGGESTED_CONFIG_PATH));
 }
 
-// A distinct exit code for a malformed file, so SKILL.md never reads it as "nothing configured".
 function executeConfigCheck(deps: RelayDeps): RelayExecution {
   const suggested = readSuggestedConfig(deps);
   const report = (
@@ -289,15 +288,14 @@ function executeConfigCheck(deps: RelayDeps): RelayExecution {
   }
 
   const models = isObject(config.models) ? config.models : {};
-  if (typeof config.version !== "number") return report("no-version", { models });
+  if (typeof config.version !== "number")
+    return report("no-version", { models });
   if (config.version !== suggested.version) {
     return report("outdated", { version: config.version, models });
   }
   return report("current", { version: config.version, models });
 }
 
-// `applied` records what apply wrote, so merge can tell a stale suggestion (value
-// unchanged since apply → replace) from a user's own choice (keep).
 function executeConfigApply(
   flags: string[],
   deps: RelayDeps,
@@ -331,7 +329,9 @@ function executeConfigApply(
     const applied = isObject(config.applied) ? config.applied : {};
     const models: Record<string, unknown> = { ...userModels };
     for (const [backend, modes] of Object.entries(suggestedModels)) {
-      const userModes = isObject(userModels[backend]) ? userModels[backend] : {};
+      const userModes = isObject(userModels[backend])
+        ? userModels[backend]
+        : {};
       const appliedModes = isObject(applied[backend]) ? applied[backend] : {};
       const chosen = Object.fromEntries(
         Object.entries(userModes).filter(
@@ -493,7 +493,6 @@ async function executeCollectCommand(
   }
 
   if (result.pending) {
-    // Still running after another window — still not a failure.
     deps.stdout(result.report);
     return { code: 0, agentName: result.agentName, pending: true };
   }
@@ -504,6 +503,11 @@ async function executeCollectCommand(
   return { code: 1, agentName: result.agentName };
 }
 
+export function writeFileCreatingDir(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text, "utf-8");
+}
+
 export async function executeRelay(
   argv: string[],
   deps: RelayDeps = {
@@ -511,14 +515,7 @@ export async function executeRelay(
     createTmpRunDir,
     buildPromptFile,
     readFile: (path) => readFileSync(path, "utf-8"),
-    writeFile: (path, text) => {
-      // Defensive: ensure the parent scratch dir exists right before writing.
-      // The run dir is created up front, but an external CLI runs in between;
-      // re-creating the dir here keeps the output-contract write from crashing
-      // if anything disturbed it mid-run.
-      mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, text, "utf-8");
-    },
+    writeFile: writeFileCreatingDir,
     ensureDir: (path) => mkdirSync(path, { recursive: true }),
     fileExists: existsSync,
     run,
@@ -579,7 +576,6 @@ export async function executeRelay(
     return { code: 1 };
   }
 
-  // Only the claude CLI takes an effort flag; dropping it elsewhere would run at a default nobody asked for.
   if (parsed.flags.effort && backend.name !== "claude") {
     deps.stderr(`--effort is supported on claude only, not ${backend.name}\n`);
     return { code: 1 };
@@ -594,8 +590,6 @@ export async function executeRelay(
     return { code: 1 };
   }
 
-  // Generation costs money, so a missing destination has to fail here rather
-  // than land the PNG in the cwd under a name the caller never chose.
   if (parsed.mode === "image" && !parsed.flags.out) {
     deps.stderr(
       "image mode requires --out <path> (pass an explicit output path)\n",
@@ -629,10 +623,6 @@ export async function executeRelay(
     dangerous: parsed.flags.dangerous,
   };
 
-  // The delegate prompt is built at most once per run. A live pre-spawn failure
-  // falls through to the headless path below, and rebuilding there would re-run
-  // the whole context collection (every git subprocess, every --files read) for
-  // a provably identical result — no pane ran, so the tree did not change.
   let delegatePromptText: string | undefined;
   const delegatePromptOnce = () => {
     if (delegatePromptText === undefined) {
@@ -650,12 +640,6 @@ export async function executeRelay(
     return delegatePromptText;
   };
 
-  // Live-pane routing: inside herdr (HERDR_ENV=1), delegate/review runs in a
-  // visible sibling pane instead of a blocking headless spawn. Everything here
-  // is optional — any denial (or a pre-spawn runner error) falls through to
-  // the unchanged headless flow below.
-  // Gated on HERDR_ENV so a non-herdr run never pays for the locator's
-  // plugin-cache directory scan; liveGate re-checks it to stay pure.
   const herdScriptPath =
     deps.env.HERDR_ENV === "1" ? deps.resolveHerdScript() : null;
   const gate = liveGate({
@@ -671,10 +655,6 @@ export async function executeRelay(
     );
   }
 
-  // The gate only checks that a live seam EXISTS; invokeLive may still decline a
-  // specific mode by returning null (the type is `LiveSpec | null` — codex image
-  // already does this). Resolve it here so a null cleanly degrades to headless
-  // instead of force-unwrapping to a crash below.
   const liveSpec = gate.live ? backend.invokeLive!(parsed.mode, opts) : null;
   if (gate.live && !liveSpec) {
     deps.stderr(
@@ -686,8 +666,6 @@ export async function executeRelay(
     const promptText =
       parsed.mode === "review" ? opts.promptText! : delegatePromptOnce();
     const resultPath = join(dir, "result.md");
-    // no-ask first, so the result-file contract stays the prompt's last word —
-    // it is the one the delegate must act on to be collected at all.
     const livePrompt = appendFileContract(
       parsed.flags.noAsk ? appendNoAskContract(promptText) : promptText,
       resultPath,
@@ -732,25 +710,17 @@ export async function executeRelay(
       callerEnv: deps.env,
     });
 
-    // A pending pane is STILL RUNNING and still being nudged, so its marker has
-    // to outlive this process and retire on its TTL. Every other outcome means
-    // the delegate is done and the marker would only silence whatever opens in
-    // this repo next.
     if (liveResult.ok || !liveResult.pending) {
       clearDelegationMarker(markerPath);
     }
 
     if (liveResult.ok) {
-      // result.md is already the delegate's clean final markdown — no
-      // parseOutput/postRun (those exist for headless stream/image handling).
       if (!liveResult.text.trim()) {
         deps.stderr("Live run produced empty output\n");
         return { code: 1, dir, agentName: liveResult.agentName };
       }
       const lastMd = join(dir, "last.md");
       deps.writeFile(lastMd, liveResult.text);
-      // stdout carries ONLY the answer; live metadata rides stderr so piping
-      // the result stays clean.
       deps.stdout(liveResult.text);
       deps.stderr(
         `\n[relay live] agent ${liveResult.agentName} — ${
@@ -763,20 +733,15 @@ export async function executeRelay(
     }
 
     if (liveResult.pending) {
-      // Still running is NOT a failure: exit 0 with a follow-up report.
       deps.stdout(liveResult.report);
       return { code: 0, dir, agentName: liveResult.agentName, pending: true };
     }
 
     if (liveResult.agentName) {
-      // Post-spawn failure: a pane may be mid-flight — do NOT double-run the
-      // task headless; surface the error instead.
       deps.stderr(`Live run failed: ${liveResult.error}\n`);
       return { code: 1, dir, agentName: liveResult.agentName };
     }
 
-    // Pre-spawn failure (herd.ts failed to load/spawn): nothing is running —
-    // fall through to the headless flow in this same invocation.
     deps.stderr(
       `[relay] live spawn unavailable (${liveResult.error}); falling back to headless\n`,
     );
@@ -796,7 +761,6 @@ export async function executeRelay(
   });
 
   if (!result.ok) {
-    // Never echo argv: it carries the whole prompt.
     const detail =
       backend.parseError?.(result.stdout) ||
       result.stderr.trim() ||
@@ -818,9 +782,6 @@ export async function executeRelay(
     ? backend.postRun(parsed.mode, parsedOutput, opts)
     : { ok: true, text: parsedOutput };
 
-  // A failed post-run step (e.g. codex image: no PNG found / copy failed) must
-  // exit non-zero — its error text is non-empty, so it would otherwise sail
-  // past the empty-output check below and report success.
   if (!postRun.ok) {
     deps.stderr(
       postRun.text.endsWith("\n") ? postRun.text : `${postRun.text}\n`,

@@ -41,9 +41,6 @@ describe("opencodeBackend", () => {
   });
 
   describe("invoke", () => {
-    // relay.ts resolves the model (flag > config) and passes
-    // it as opts.model; invoke trusts that value. These pass the resolved model
-    // the way relay.ts would.
     it("builds delegate argv with the resolved model", () => {
       const opts: InvokeOpts = {
         promptText: "test prompt",
@@ -119,7 +116,6 @@ describe("opencodeBackend", () => {
       const opts: InvokeOpts = { promptText: "" };
       const result = opencodeBackend.invoke("delegate", opts);
 
-      // Should still build argv, just with empty prompt
       expect(result.argv).toContain("--format");
       expect(result.argv).toContain("json");
       expect(result.argv).toContain("");
@@ -129,7 +125,6 @@ describe("opencodeBackend", () => {
       const opts: InvokeOpts = { model: "opencode-go/deepseek-v4-light" };
       const result = opencodeBackend.invoke("delegate", opts);
 
-      // Should build argv without appending undefined
       expect(result.argv).toEqual([
         "opencode",
         "run",
@@ -174,8 +169,6 @@ describe("opencodeBackend", () => {
   });
 
   describe("parseOutput", () => {
-    // parseOutput delegates to parseJsonl — extract `text` parts from the JSONL
-    // stream. (parseJsonl itself is exhaustively tested in its own describe block.)
     it("extracts the answer from a real opencode JSONL stream", () => {
       const raw = [
         '{"type":"step_start","part":{"type":"step-start"}}',
@@ -231,7 +224,6 @@ describe("parseJsonl", () => {
   });
 
   it("handles missing step_finish event (bug #26855)", () => {
-    // No terminal step_finish; should still work
     const jsonl = [
       '{"type":"text","part":{"text":"Result"}}',
       '{"type":"status","status":"complete"}',

@@ -1,9 +1,6 @@
 import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 
 /**
- * opencode Backend: delegate + emulated (prompt-based) review.
- *
- * Both modes run off relay's built prompt (no native review).
  * No model is pinned: hosted ids churn, and a pinned default rotted once already.
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
@@ -23,16 +20,13 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
  * Output: `--format json` streams JSONL (one event per line) — `step_start`,
  * `text`, `step_finish`. The actual answer lives in the `text` events; relay
  * extracts it with parseJsonl rather than scraping `--format default`, whose
- * stream interleaves the answer with TUI/progress noise. parseJsonl concatenates
- * every `text` part and never blocks on a terminal event (#26855-safe).
+ * stream interleaves the answer with TUI/progress noise.
  */
 export const opencodeBackend: Backend = {
   name: "opencode",
   supports: new Set(["delegate", "review"]),
 
   invoke(mode: Mode, opts: InvokeOpts) {
-    // Model is already resolved in relay.ts (flag > config); opts.model is the
-    // final value — do not re-resolve here.
     const model = opts.model;
     const argv: string[] = ["opencode", "run"];
 
@@ -78,22 +72,13 @@ export const opencodeBackend: Backend = {
   },
 
   parseOutput(raw: string): string {
-    // Extract the concatenated `text` parts from the JSONL stream.
     return parseJsonl(raw);
   },
 
   parseError,
 };
 
-/**
- * Parse JSONL output from opencode when --format json is used.
- *
- * Extracts all `.part.text` from lines where `.type === "text"`.
- * Ignores malformed lines and does NOT require a terminal step_finish event (bug #26855).
- *
- * @param raw - Raw JSONL text (one JSON object per line)
- * @returns Concatenated text from all text parts
- */
+/** Ignores malformed lines and does NOT require a terminal step_finish event (bug #26855). */
 export function parseJsonl(raw: string): string {
   const lines = raw.split("\n");
   const textParts: string[] = [];
@@ -108,7 +93,6 @@ export function parseJsonl(raw: string): string {
         textParts.push(obj.part.text);
       }
     } catch {
-      // Ignore malformed lines silently
       continue;
     }
   }

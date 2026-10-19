@@ -1,8 +1,16 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { BACKENDS } from "./backends";
-import { executeRelay, parseFlags, type RelayDeps } from "./relay";
+import {
+  executeRelay,
+  parseFlags,
+  writeFileCreatingDir,
+  type RelayDeps,
+} from "./relay";
 import { CLI_DEFAULT, CONFIG_PATH, SUGGESTED_CONFIG_PATH } from "./shared";
-import type { RunResult } from "./types";
+import type { Mode, RunResult } from "./types";
 import {
   DEFAULT_WAIT_TIMEOUT_MS,
   type CollectLiveOpts,
@@ -51,7 +59,6 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
   };
 }
 
-// Shorthand for tests that take the live path: inside herdr, herd resolved.
 function liveDeps(overrides: Partial<RelayDeps> = {}): RelayDeps {
   return deps({
     env: { HERDR_ENV: "1" },
@@ -148,9 +155,9 @@ describe("parseFlags", () => {
   });
 
   it("rejects an unknown --effort level", () => {
-    expect(() =>
-      parseFlags(["claude", "review", "--effort", "ultra"]),
-    ).toThrow("--effort must be one of low, medium, high, xhigh, max");
+    expect(() => parseFlags(["claude", "review", "--effort", "ultra"])).toThrow(
+      "--effort must be one of low, medium, high, xhigh, max",
+    );
   });
 
   it("does not validate backend names in the parser", () => {
@@ -318,7 +325,7 @@ describe("executeRelay", () => {
     expect(errors.join("")).toContain("Unknown mode: inspect");
   });
 
-  it("refuses --effort on a backend other than claude", async () => {
+  it("refuses --effort on a backend other than claude, rather than run it at a default", async () => {
     let spawned = false;
     const errors: string[] = [];
 
@@ -398,7 +405,6 @@ describe("executeRelay", () => {
         },
         run: (argv) => {
           promptArg = argv.at(-1) ?? "";
-          // opencode --format json → JSONL; parseOutput extracts the text part.
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -427,7 +433,6 @@ describe("executeRelay", () => {
         },
         run: (argv) => {
           promptArg = argv.at(-1) ?? "";
-          // opencode --format json → JSONL; parseOutput extracts the text part.
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -504,7 +509,7 @@ describe("executeRelay", () => {
     expect(errors.join("")).toContain("image mode requires a prompt");
   });
 
-  it("rejects codex image with no --out before spawning", async () => {
+  it("rejects codex image with no --out before spawning a paid generation", async () => {
     let spawned = false;
     const errors: string[] = [];
 
@@ -592,7 +597,6 @@ describe("executeRelay", () => {
     const result = await executeRelay(
       ["codex", "image", "a quiet studio", "--out", "/tmp/relay/studio.png"],
       deps({
-        // No PNG will be found (future cutoff via real run), so postRun fails.
         run: () => ({ ok: true, stdout: "no png here", stderr: "", code: 0 }),
         fileExists: () => false,
         stderr: (text) => errors.push(text),
@@ -601,6 +605,33 @@ describe("executeRelay", () => {
 
     expect(result.code).toBe(1);
     expect(errors.join("")).toContain("No image found");
+  });
+
+  it("prints any backend's post-run text in place of the parsed output", async () => {
+    const printed: string[] = [];
+    const seen: string[] = [];
+    const fourth = {
+      name: "fourth",
+      supports: new Set<Mode>(["delegate"]),
+      invoke: () => ({ argv: ["fourth"] }),
+      parseOutput: (raw: string) => `parsed ${raw}`,
+      postRun: (_mode: Mode, parsed: string) => {
+        seen.push(parsed);
+        return { ok: true, text: "post-run text" };
+      },
+    };
+
+    const result = await executeRelay(
+      ["fourth", "delegate", "--task", "x"],
+      deps({
+        registry: { ...BACKENDS, fourth },
+        stdout: (text) => printed.push(text),
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(seen).toEqual(["parsed backend output"]);
+    expect(printed).toEqual(["post-run text"]);
   });
 
   it("exits with the CLI code on non-zero backend exit", async () => {
@@ -633,7 +664,10 @@ describe("executeRelay", () => {
           ok: false,
           stdout: JSON.stringify({
             type: "error",
-            error: { name: "UnknownError", data: { message: "Model not found" } },
+            error: {
+              name: "UnknownError",
+              data: { message: "Model not found" },
+            },
           }),
           stderr: "",
           code: 1,
@@ -724,18 +758,38 @@ describe("executeRelay", () => {
 
     expect(result.code).toBe(1);
     expect(spawned).toBe(false);
-    expect(errors.join("")).toContain(`Could not read relay config (${CONFIG_PATH})`);
+    expect(errors.join("")).toContain(
+      `Could not read relay config (${CONFIG_PATH})`,
+    );
+  });
+});
+
+describe("writeFileCreatingDir", () => {
+  it("creates a missing parent directory before writing", () => {
+    const root = mkdtempSync(join(tmpdir(), "relay-write-"));
+    try {
+      const path = join(root, "gone", "last.md");
+      writeFileCreatingDir(path, "text");
+      expect(readFileSync(path, "utf-8")).toBe("text");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
 describe("executeRelay live routing", () => {
-  it("stays headless when HERDR_ENV is unset", async () => {
+  it("stays headless when HERDR_ENV is unset, never scanning for herd.ts", async () => {
     let liveCalled = false;
     let ranHeadless = false;
+    let resolved = false;
 
     const result = await executeRelay(
       ["opencode", "delegate", "--task", "x"],
       deps({
+        resolveHerdScript: () => {
+          resolved = true;
+          return "/x/herd.ts";
+        },
         runLive: () => {
           liveCalled = true;
           return Promise.resolve(liveOk);
@@ -755,6 +809,42 @@ describe("executeRelay live routing", () => {
     expect(result.code).toBe(0);
     expect(liveCalled).toBe(false);
     expect(ranHeadless).toBe(true);
+    expect(resolved).toBe(false);
+  });
+
+  it("degrades to headless when the backend has no live path for the mode", async () => {
+    const errors: string[] = [];
+    let liveCalled = false;
+    let ranHeadless = false;
+
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x"],
+      liveDeps({
+        registry: {
+          ...BACKENDS,
+          opencode: { ...BACKENDS.opencode!, invokeLive: () => null },
+        },
+        stderr: (text) => errors.push(text),
+        runLive: () => {
+          liveCalled = true;
+          return Promise.resolve(liveOk);
+        },
+        run: () => {
+          ranHeadless = true;
+          return {
+            ok: true,
+            stdout: '{"type":"text","part":{"text":"done"}}',
+            stderr: "",
+            code: 0,
+          };
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(liveCalled).toBe(false);
+    expect(ranHeadless).toBe(true);
+    expect(errors.join("")).toContain("has no live path for delegate");
   });
 
   it("stays headless on --headless even inside herdr", async () => {
@@ -902,6 +992,9 @@ describe("executeRelay live routing", () => {
     ]);
     expect(guarded).toContain("Nobody is watching this run");
     expect(guarded).toContain("never wait on a reply");
+    expect(guarded.indexOf("Nobody is watching this run")).toBeLessThan(
+      guarded.indexOf("/tmp/relay/test-run/result.md"),
+    );
 
     const plain = await promptFor(["codex", "delegate", "Do", "the", "thing"]);
     expect(plain).not.toContain("Nobody is watching this run");
@@ -911,7 +1004,6 @@ describe("executeRelay live routing", () => {
     const printed: string[] = [];
     const metadata: string[] = [];
     const writes = new Map<string, string>();
-    // opencode's parseJsonl would reduce this to "" — live must NOT parse it.
     const markdown = "# Verdict\n\n**looks good**\n";
 
     const result = await executeRelay(
@@ -933,7 +1025,6 @@ describe("executeRelay live routing", () => {
     expect(result.agentName).toBe("relay-opencode-delegate-9f1c");
     expect(printed.join("")).toBe(markdown);
     expect(writes.get("/tmp/relay/test-run/last.md")).toBe(markdown);
-    // Live metadata (agent name, keep/close hint) rides stderr, not stdout.
     expect(metadata.join("")).toContain("relay-opencode-delegate-9f1c");
     expect(metadata.join("")).toContain("pane closed");
     expect(printed.join("")).not.toContain("pane left open");
@@ -994,13 +1085,18 @@ describe("executeRelay live routing", () => {
     expect(keepPane).toBe(true);
   });
 
-  it("falls back to headless in the same invocation on a pre-spawn live error", async () => {
+  it("falls back to headless on a pre-spawn live error, building the prompt once", async () => {
     const errors: string[] = [];
     let ranHeadless = false;
+    let builds = 0;
 
     const result = await executeRelay(
       ["opencode", "delegate", "--task", "x"],
       liveDeps({
+        buildPromptFile: () => {
+          builds++;
+          return "/tmp/prompt.md";
+        },
         stderr: (text) => errors.push(text),
         runLive: () =>
           Promise.resolve({
@@ -1023,6 +1119,7 @@ describe("executeRelay live routing", () => {
     expect(result.code).toBe(0);
     expect(ranHeadless).toBe(true);
     expect(errors.join("")).toContain("falling back to headless");
+    expect(builds).toBe(1);
   });
 
   it("does NOT double-run headless after a post-spawn live error", async () => {
@@ -1053,10 +1150,38 @@ describe("executeRelay live routing", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// `relay collect` — reattach to a pending pane (top-level subcommand, like
-// `relay config`: no backend, no mode, no prompt building)
-// ---------------------------------------------------------------------------
+describe("codex live delegation marker", () => {
+  const outcomes: [string, LiveRunResult, number][] = [
+    ["ok", liveOk, 0],
+    ["failed", { ok: false, pending: false, agentName: "a", error: "e" }, 0],
+    ["spawn-failed", { ok: false, pending: false, error: "e" }, 0],
+    ["pending", { ok: false, pending: true, agentName: "a", report: "r" }, 1],
+  ];
+
+  for (const [label, outcome, left] of outcomes) {
+    it(`leaves ${left} marker(s) after a ${label} run`, async () => {
+      const home = mkdtempSync(join(tmpdir(), "relay-marker-"));
+      try {
+        let during = 0;
+        await executeRelay(
+          ["codex", "delegate", "--task", "x"],
+          liveDeps({
+            env: { HERDR_ENV: "1", Q_DELEGATION_HOME: home },
+            runLive: () => {
+              during = readdirSync(home).length;
+              return Promise.resolve(outcome);
+            },
+          }),
+        );
+
+        expect(during).toBe(1);
+        expect(readdirSync(home)).toHaveLength(left);
+      } finally {
+        rmSync(home, { recursive: true, force: true });
+      }
+    });
+  }
+});
 
 describe("relay collect", () => {
   function collectDeps(
@@ -1187,7 +1312,6 @@ describe("relay config check / apply", () => {
     suggestions: { opencode: { delegate: ["s/alt"], review: ["s/alt"] } },
   };
 
-  // A config-only deps: the suggested file ships with relay, the user file may be absent.
   function configDeps(userConfig?: string) {
     const files = new Map<string, string>([
       [SUGGESTED_CONFIG_PATH, JSON.stringify(suggested)],
@@ -1217,7 +1341,10 @@ describe("relay config check / apply", () => {
 
   it("reports current with exit 0 when the version matches", async () => {
     const { code, report } = await check(
-      JSON.stringify({ version: 1790740000, models: { opencode: { review: "u/r" } } }),
+      JSON.stringify({
+        version: 1790740000,
+        models: { opencode: { review: "u/r" } },
+      }),
     );
 
     expect(code).toBe(0);
@@ -1231,7 +1358,9 @@ describe("relay config check / apply", () => {
     const outdated = await check(JSON.stringify({ version: 1780000000 }));
     const semver = await check(JSON.stringify({ version: "0.9.0" }));
 
-    expect([missing, noVersion, outdated].map((r) => [r.code, r.report.status])).toEqual([
+    expect(
+      [missing, noVersion, outdated].map((r) => [r.code, r.report.status]),
+    ).toEqual([
       [3, "missing"],
       [3, "no-version"],
       [3, "outdated"],
@@ -1277,7 +1406,9 @@ describe("relay config check / apply", () => {
       JSON.stringify({
         version: 1780000000,
         models: { opencode: { delegate: "old/delegate", review: "u/r" } },
-        applied: { opencode: { delegate: "old/delegate", review: "old/review" } },
+        applied: {
+          opencode: { delegate: "old/delegate", review: "old/review" },
+        },
       }),
     );
 
@@ -1294,10 +1425,16 @@ describe("relay config check / apply", () => {
   it("set-model leaves the applied record alone", async () => {
     const applied = { opencode: { delegate: "s/delegate" } };
     const c = configDeps(
-      JSON.stringify({ models: { opencode: { delegate: "s/delegate" } }, applied }),
+      JSON.stringify({
+        models: { opencode: { delegate: "s/delegate" } },
+        applied,
+      }),
     );
 
-    await executeRelay(["config", "set-model", "opencode", "delegate", "u/d"], c.deps);
+    await executeRelay(
+      ["config", "set-model", "opencode", "delegate", "u/d"],
+      c.deps,
+    );
 
     expect(JSON.parse(c.files.get(CONFIG_PATH)!).applied).toEqual(applied);
   });
@@ -1307,7 +1444,10 @@ describe("relay config check / apply", () => {
       JSON.stringify({ keep: true, models: { claude: { delegate: "opus" } } }),
     );
 
-    const result = await executeRelay(["config", "apply", "--overwrite"], c.deps);
+    const result = await executeRelay(
+      ["config", "apply", "--overwrite"],
+      c.deps,
+    );
 
     expect(result.code).toBe(0);
     expect(JSON.parse(c.files.get(CONFIG_PATH)!)).toEqual({
@@ -1319,7 +1459,10 @@ describe("relay config check / apply", () => {
 
   it("merge refuses a malformed config; overwrite replaces it", async () => {
     const merge = configDeps("{not json");
-    const mergeResult = await executeRelay(["config", "apply", "--merge"], merge.deps);
+    const mergeResult = await executeRelay(
+      ["config", "apply", "--merge"],
+      merge.deps,
+    );
 
     expect(mergeResult.code).toBe(1);
     expect(merge.errors.join("")).toContain("Could not read relay config");
@@ -1332,7 +1475,9 @@ describe("relay config check / apply", () => {
     );
 
     expect(overwriteResult.code).toBe(0);
-    expect(JSON.parse(overwrite.files.get(CONFIG_PATH)!).version).toBe(1790740000);
+    expect(JSON.parse(overwrite.files.get(CONFIG_PATH)!).version).toBe(
+      1790740000,
+    );
   });
 
   it("rejects apply without exactly one of --merge or --overwrite", async () => {
@@ -1340,14 +1485,34 @@ describe("relay config check / apply", () => {
 
     expect((await executeRelay(["config", "apply"], c.deps)).code).toBe(1);
     expect(
-      (await executeRelay(["config", "apply", "--merge", "--overwrite"], c.deps)).code,
+      (
+        await executeRelay(
+          ["config", "apply", "--merge", "--overwrite"],
+          c.deps,
+        )
+      ).code,
     ).toBe(1);
     expect(c.files.has(CONFIG_PATH)).toBe(false);
   });
 
+  it("check reports a cli-default choice, and leaves a never-asked mode absent", async () => {
+    const c = configDeps();
+    await executeRelay(
+      ["config", "set-model", "opencode", "delegate", CLI_DEFAULT],
+      c.deps,
+    );
+    await executeRelay(["config", "check"], c.deps);
+
+    expect(JSON.parse(c.out.at(-1)!).models).toEqual({
+      opencode: { delegate: CLI_DEFAULT },
+    });
+  });
+
   it("runs without -m when the config says cli-default", async () => {
     let invocation: string[] = [];
-    const config = JSON.stringify({ models: { opencode: { delegate: CLI_DEFAULT } } });
+    const config = JSON.stringify({
+      models: { opencode: { delegate: CLI_DEFAULT } },
+    });
     await executeRelay(
       ["opencode", "delegate", "--task", "x", "--headless"],
       deps({

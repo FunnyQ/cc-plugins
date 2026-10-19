@@ -4,11 +4,8 @@ import { join, parse } from "path";
 import { homedir } from "os";
 import type { Mode, RunResult } from "./types";
 
-// Temp directory root for relay runs
 export const TMP_ROOT = "/tmp/q-lab/relay/relay";
 
-// Config file path for relay models (XDG standard). dispatch's
-// flightplan/scripts/lib/relay-model.ts reads this path and `models` shape without importing it.
 export const CONFIG_PATH = join(
   homedir(),
   ".config",
@@ -18,7 +15,6 @@ export const CONFIG_PATH = join(
   "config.json",
 );
 
-// Ships with relay; `config check` compares the user's version against it.
 export const SUGGESTED_CONFIG_PATH = join(
   import.meta.dir,
   "..",
@@ -26,14 +22,12 @@ export const SUGGESTED_CONFIG_PATH = join(
   "config.suggested.json",
 );
 
-// A stored choice to omit the model flag, so an unset entry can still mean "never asked".
 export const CLI_DEFAULT = "cli-default";
 
 export function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-// Parse a comma-separated flag value into a trimmed, empty-free list.
 export function parseCsv(value: string): string[] {
   return value
     .split(",")
@@ -41,7 +35,6 @@ export function parseCsv(value: string): string[] {
     .filter(Boolean);
 }
 
-// Bun.spawnSync wrapper
 export function run(
   args: string[],
   opts?: {
@@ -65,7 +58,6 @@ export function run(
 
 const pad = (n: number, len = 2) => String(n).padStart(len, "0");
 
-// Timestamp in YYYYMMDD-HHMM format (minute resolution)
 function timestampToMinute(now: Date): string {
   return [
     `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`,
@@ -73,7 +65,6 @@ function timestampToMinute(now: Date): string {
   ].join("-");
 }
 
-// Timestamp in YYYYMMDD-HHMMSS-milliseconds format (for paths)
 export function timestampForPath(now = new Date()): string {
   return `${timestampToMinute(now)}${pad(now.getSeconds())}-${pad(
     now.getMilliseconds(),
@@ -81,7 +72,6 @@ export function timestampForPath(now = new Date()): string {
   )}`;
 }
 
-// Create a tmp run directory and return its path
 export function createTmpRunDir(): string {
   const dir = join(
     TMP_ROOT,
@@ -91,17 +81,13 @@ export function createTmpRunDir(): string {
   return dir;
 }
 
-// Add timestamp suffix to file path (foo.png → foo_YYYYMMDD-HHMM.png)
 export function addTimestampSuffix(filePath: string): string {
   const { dir, name, ext } = parse(filePath);
   const newName = `${name}_${timestampToMinute(new Date())}${ext}`;
-  // Preserve empty dir as "." (current directory)
   if (!dir) return newName;
   return join(dir, newName);
 }
 
-// Resolve model with precedence: flag > config > undefined (the CLI's own default).
-// A readConfig error propagates so a broken config never looks like "nothing configured".
 export function resolveModel(
   backend: string,
   mode: Mode,

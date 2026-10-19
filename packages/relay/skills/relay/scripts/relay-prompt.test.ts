@@ -203,12 +203,9 @@ describe("appendFileContract", () => {
     expect(result).toContain("base prompt");
     expect(result).toContain("/tmp/relay/run/result.md");
     expect(result).toContain(RESULT_END_MARKER);
-    // The marker instruction is the load-bearing line — the poll loop keys on it.
     expect(result).toContain(
       `The file's last line must be exactly: ${RESULT_END_MARKER}`,
     );
-    // The file is mandatory (relay does not read the pane), with a human-visible
-    // escape hatch for sandboxes that genuinely cannot write it.
     expect(result).toContain("relay does not read the pane");
     expect(result).toContain("print the full answer in the pane");
   });
@@ -236,24 +233,20 @@ describe("buildReviewPrompt", () => {
 
 describe("buildPromptFile", () => {
   beforeEach(() => {
-    // Clean up any test tmp files before each test
     try {
       if (existsSync(TMP_ROOT)) {
         rmSync(TMP_ROOT, { recursive: true, force: true });
       }
     } catch {
-      // ignore cleanup errors
     }
   });
 
   afterEach(() => {
-    // Clean up after each test
     try {
       if (existsSync(TMP_ROOT)) {
         rmSync(TMP_ROOT, { recursive: true, force: true });
       }
     } catch {
-      // ignore cleanup errors
     }
   });
 
@@ -315,7 +308,6 @@ describe("buildPromptFile", () => {
         noProject: true,
       });
     } catch {
-      // ignore
     }
 
     expect(exitCode).toBe(1);
@@ -326,7 +318,6 @@ describe("buildPromptFile", () => {
   });
 
   it("should use related git scope by default", () => {
-    // This test verifies the option signature accepts the default
     const promptPath = buildPromptFile({
       kind: "review",
       files: [],
