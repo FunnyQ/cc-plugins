@@ -9,8 +9,7 @@ import type { DeckSnapshot, DeckTask } from "./types.ts";
 const PANE = "flightdeck";
 const COLUMNS = 40;
 const INLINE_ROWS = 2;
-// the snapshot child re-reads the task tree and run log; 2 s keeps elapsed times live without a busy child
-const TICK_MS = 2000;
+const SNAPSHOT_POLL_MS = 2000;
 
 const EMPTY: FlightdeckDeck = {
   snapshot: null,
@@ -85,7 +84,6 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
       await publish($);
     }
   }
-  // a tick whose snapshot did not change still moves the agents' and tasks' elapsed times
   const live = view.snapshot as DeckSnapshot | null;
   if (live?.agents.length || (live?.time && live.time.endedAt === null))
     $.ui.invalidate("ui.render");
@@ -107,7 +105,6 @@ const openOn = async ($: EngineInterface, plan: string) => {
     isRunning = true;
     try {
       if (!isFirst && !(await isOpen($))) {
-        // closed by hand: stop here, unless an open or close already moved on and owns the ticker
         if (gen === generation) {
           generation++;
           followedPlan = null;
@@ -121,7 +118,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
       isRunning = false;
     }
   };
-  const own = $.clock.every(TICK_MS, () => void tick());
+  const own = $.clock.every(SNAPSHOT_POLL_MS, () => void tick());
   ticker = own;
   void tick();
   const title = `Flightdeck · ${plan.replace(/\/+$/, "").split("/").pop()}`;

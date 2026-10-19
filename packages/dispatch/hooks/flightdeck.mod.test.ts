@@ -37,7 +37,10 @@ const snap = (
       state: "done",
       attempts: 1,
       score: null,
-      time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:03:12Z" },
+      time: {
+        startedAt: "2026-01-01T00:00:00Z",
+        endedAt: "2026-01-01T00:03:12Z",
+      },
       tokens: null,
     },
     "api/02": {
@@ -65,6 +68,7 @@ function world(
   answer: (argv: readonly string[]) => Answer,
   tool: { isError?: boolean; stdout?: string } = {},
   fits: { next: boolean } = { next: true },
+  panesDelay: { ms: number } = { ms: 0 },
 ) {
   const clock = mock.clock(on);
   const runs: (readonly string[])[] = [];
@@ -72,6 +76,11 @@ function world(
   const placed = new Set<string>();
   const opens: Record<string, unknown>[] = [];
   const toasts: string[] = [];
+  const invalidates: string[] = [];
+  on("ui.invalidate", (_$, e) => {
+    invalidates.push((e as { event: string }).event);
+    return { value: undefined } as never;
+  });
   on("process.run", async (_$, e) => {
     runs.push(e.argv);
     const a = answer(e.argv);
@@ -86,24 +95,24 @@ function world(
       },
     } as never;
   });
-  on(
-    "ui.panes",
-    () =>
-      ({
-        value: [...panes].map(([id, title]) => ({
-          id,
-          title,
-          isShown: true,
-          isFocused: false,
-          isPlaced: placed.has(id),
-        })),
-      }) as never,
-  );
+  on("ui.panes", async () => {
+    const value = [...panes].map(([id, title]) => ({
+      id,
+      title,
+      isShown: true,
+      isFocused: false,
+      isPlaced: placed.has(id),
+    }));
+    if (panesDelay.ms) await clock.sleep(panesDelay.ms);
+    return { value } as never;
+  });
   on("ui.open", (_$, e) => {
     panes.set(e.id, e.title ?? e.id);
     opens.push({ ...e });
     if (!fits.next)
-      return { value: { isPlaced: false, reason: "144 columns, 100 now" } } as never;
+      return {
+        value: { isPlaced: false, reason: "144 columns, 100 now" },
+      } as never;
     placed.add(e.id);
     return { value: { isPlaced: true } } as never;
   });
@@ -133,7 +142,7 @@ function world(
         argv[2] !== "--latest" &&
         (!plan || argv[2] === plan),
     );
-  return { clock, runs, panes, opens, toasts, snapshots };
+  return { clock, runs, panes, opens, toasts, invalidates, snapshots };
 }
 
 const run = async ($: Engine, args: string) =>
@@ -157,7 +166,10 @@ const mountPane = ($: Engine, placement: "dock" | "inline" = "dock") =>
   } as never);
 const drawnText = async ($: Engine, placement: "dock" | "inline" = "dock") => {
   const ui = await mountPane($, placement);
-  const texts = [...(await ui.findAll({ type: "Text" })), ...(await ui.findAll({ type: "Button" }))].map((el) => el.text);
+  const texts = [
+    ...(await ui.findAll({ type: "Text" })),
+    ...(await ui.findAll({ type: "Button" })),
+  ].map((el) => el.text);
   await ui.unmount();
   return texts.join("\n");
 };
@@ -231,7 +243,8 @@ test("a launch whose --plan is a shell variable opens on the plan the launcher p
   });
   await $.tool.call({
     tool: "Bash",
-    command: 'D=/abs/docs/x; bun $B/autopilot/scripts/flightdeck.ts --plan "$D"; echo done',
+    command:
+      'D=/abs/docs/x; bun $B/autopilot/scripts/flightdeck.ts --plan "$D"; echo done',
   } as never);
   expect(w.panes.get("flightdeck")).toBe("Flightdeck · x");
   expect(w.snapshots("/abs/docs/x")).toHaveLength(1);
@@ -421,13 +434,27 @@ test("pressing a card toasts its details, and Open flightdeck toasts a failed la
 });
 
 test("agents with no task sit in a bordered box above the waves; none means no box", async ($, on) => {
-  const dev = { role: "dev", ref: "api/02", attempt: 2, label: "dev-a", startedAt: null };
+  const dev = {
+    role: "dev",
+    ref: "api/02",
+    attempt: 2,
+    label: "dev-a",
+    startedAt: null,
+  };
   world(on, (argv) => ({
     exitCode: 0,
     stdout: JSON.stringify(
       snap(argv[2]!, {
         agents: [dev],
-        crew: [{ role: "scout", label: "scout-wave-2", status: "in-flight", startedAt: null, elapsedMs: null }],
+        crew: [
+          {
+            role: "scout",
+            label: "scout-wave-2",
+            status: "in-flight",
+            startedAt: null,
+            elapsedMs: null,
+          },
+        ],
       }),
     ),
   }));
@@ -455,7 +482,12 @@ test("a pane with no taskless agents draws no agent box", async ($, on) => {
 
 test("a done task's tokens are read once, with --usage, and kept on later ticks", async ($, on) => {
   const w = world(on, (argv) => {
-    const s = snap(argv[2]!, { time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:04:12Z" } });
+    const s = snap(argv[2]!, {
+      time: {
+        startedAt: "2026-01-01T00:00:00Z",
+        endedAt: "2026-01-01T00:04:12Z",
+      },
+    });
     if (argv.includes("--usage")) {
       s.tasks["api/01"]!.tokens = 1_234_567;
       s.tokens = 2_000_000;
@@ -485,4 +517,34 @@ test("the inline seat draws two lines: the summary and the current wave's cards"
   const rows = ((await ui.drawn()) as { children: unknown[] }).children;
   await ui.unmount();
   expect(rows).toHaveLength(2);
+});
+
+test("a tick whose snapshot did not change still redraws while an agent is in flight, so elapsed times keep moving", async ($, on) => {
+  const dev = { role: "dev", ref: "api/02", attempt: 2, label: "dev-a", startedAt: "2026-01-01T00:00:00Z" };
+  const w = world(on, (argv) => ({ exitCode: 0, stdout: JSON.stringify(snap(argv[2]!, { agents: [dev] })) }));
+  await run($, "/abs/docs/x");
+  const first = w.invalidates.length;
+  await w.clock.advance(4000);
+  expect(w.snapshots()).toHaveLength(3);
+  expect(w.invalidates.slice(first)).toEqual(["ui.render", "ui.render"]);
+});
+
+test("a tick that finds the pane closed by hand leaves the ticker alone when a newer open already owns it", async ($, on) => {
+  const panesDelay = { ms: 0 };
+  const w = world(
+    on,
+    (argv) => (argv[2] === "/abs/b" ? { ...good("/abs/b"), delay: 1000 } : good(argv[2]!)),
+    {},
+    { next: true },
+    panesDelay,
+  );
+  await run($, "/abs/a");
+  w.panes.delete("flightdeck");
+  panesDelay.ms = 500;
+  await w.clock.advance(2000);
+  await run($, "/abs/b");
+  await w.clock.advance(1000);
+  expect(await drawnText($)).toContain("api/01");
+  await w.clock.advance(2000);
+  expect(w.snapshots("/abs/b")).toHaveLength(2);
 });

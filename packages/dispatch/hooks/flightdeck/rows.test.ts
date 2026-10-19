@@ -128,7 +128,8 @@ function big(): DeckSnapshot {
 }
 
 test("every glyph is one code unit, since a line's width is its text.length", () => {
-  for (const glyph of [...Object.values(GLYPH), BAR, "…", "—"]) expect(glyph).toHaveLength(1);
+  for (const glyph of [...Object.values(GLYPH), BAR, "…", "—"])
+    expect(glyph).toHaveLength(1);
 });
 
 test("formatTokens prints the web fleet's format, so both views show one number the same way", () => {
@@ -176,7 +177,10 @@ describe("waveCards", () => {
     const s = snap({
       waves: [["a", "b"]],
       tasks: tasksOf([
-        { ...task("a", "done"), score: { weighted: 4.56, threshold: 4, passed: true } },
+        {
+          ...task("a", "done"),
+          score: { weighted: 4.56, threshold: 4, passed: true },
+        },
         task("b", "in-progress", 2),
       ]),
     });
@@ -191,8 +195,13 @@ describe("waveCards", () => {
   });
 
   test("every card in a snapshot shares one inner width, 4 columns past its longest ref", () => {
-    const wide = snap({ waves: [["api/very-long-ref-01"]], tasks: tasksOf([task("api/very-long-ref-01", "ready")]) });
-    expect(waveCards(wide, 80, 0).inner).toBe("api/very-long-ref-01".length + 6);
+    const wide = snap({
+      waves: [["api/very-long-ref-01"]],
+      tasks: tasksOf([task("api/very-long-ref-01", "ready")]),
+    });
+    expect(waveCards(wide, 80, 0).inner).toBe(
+      "api/very-long-ref-01".length + 6,
+    );
     const s = snap({ waves: [six.map((t) => t.ref)], tasks: tasksOf(six) });
     const { inner, groups } = waveCards(s, 80, 0);
     expect(inner).toBe(17);
@@ -200,6 +209,22 @@ describe("waveCards", () => {
       expect(c.head.length).toBeLessThanOrEqual(inner);
       expect(c.sub.length).toBe(inner);
     }
+  });
+
+  test('a short ref still shows a scored "Final review" title whole, since the card never narrows below it', () => {
+    const s = snap({
+      waves: [["x/01"]],
+      tasks: tasksOf([
+        {
+          ...task("x/01", "done"),
+          title: "Final review",
+          score: { weighted: 4.56, threshold: 4, passed: true },
+        },
+      ]),
+    });
+    expect(waveCards(s, 80, 0).groups[0].cards[0].sub).toStartWith(
+      "Final review ",
+    );
   });
 
   test("a long title clips to the card, and the card never outgrows the pane", () => {
@@ -220,14 +245,28 @@ describe("waveCards", () => {
     const s = snap({
       waves: [["a", "b", "c"]],
       tasks: tasksOf([
-        { ...task("a", "done"), time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:03:12Z" }, tokens: 1_234_567 },
-        { ...task("b", "in-progress"), time: { startedAt: "2026-01-01T00:09:15Z", endedAt: null } },
+        {
+          ...task("a", "done"),
+          time: {
+            startedAt: "2026-01-01T00:00:00Z",
+            endedAt: "2026-01-01T00:03:12Z",
+          },
+          tokens: 1_234_567,
+        },
+        {
+          ...task("b", "in-progress"),
+          time: { startedAt: "2026-01-01T00:09:15Z", endedAt: null },
+        },
         task("c", "ready"),
       ]),
     });
     const { inner, groups } = waveCards(s, 80, now);
     const [a, b, c] = groups[0].cards;
-    expect([a.head, a.time, a.tokens]).toEqual(["✓ a", "3m12s", "1.2M tok".padStart(inner)]);
+    expect([a.head, a.time, a.tokens]).toEqual([
+      "✓ a",
+      "3m12s",
+      "1.2M tok".padStart(inner),
+    ]);
     expect([b.time, b.tokens]).toEqual(["45s", null]);
     expect([c.time, c.tokens]).toEqual([null, null]);
   });
@@ -243,7 +282,10 @@ describe("waveCards", () => {
       ]),
     });
     const refs = (x: DeckSnapshot) =>
-      waveCards(x, 80, 0).groups.map((g) => [g.label, g.cards.map((c) => c.ref)]);
+      waveCards(x, 80, 0).groups.map((g) => [
+        g.label,
+        g.cards.map((c) => c.ref),
+      ]);
     expect(refs(s)).toEqual([
       ["W1 ", ["a"]],
       ["W? ", ["b", "c"]],
@@ -312,7 +354,9 @@ describe("summary / compactSummary / endState", () => {
     expect(endState(s)).toBe("stuck");
     const [l1, l3] = summary(s, true);
     expect(l1).toEqual([{ text: "stuck · 1 unschedulable", color: "#f85149" }]);
-    expect(text(l3)).toBe("stale · 2 errors · ● 0 running  ○ 0 ready  · 1 waiting  ✗ 0");
+    expect(text(l3)).toBe(
+      "stale · 2 errors · ● 0 running  ○ 0 ready  · 1 waiting  ✗ 0",
+    );
     expect(l3.find((g) => g.text === "✗ 0")?.color).toBeUndefined();
     expect(text(compactSummary(s, true))).toBe(
       "stale · 2 errors · 19/20 · stuck · demo",
@@ -364,8 +408,18 @@ describe("summary / compactSummary / endState", () => {
       time: { startedAt: "2026-01-01T00:00:00Z", endedAt: null },
     });
     expect(runTotals(s, now)).toEqual({ time: "4m12s", tokens: null });
-    const ended = { ...s, time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:01:05Z" }, tokens: 12_345_678 };
-    expect(runTotals(ended, now)).toEqual({ time: "1m05s", tokens: "12.3M tok" });
+    const ended = {
+      ...s,
+      time: {
+        startedAt: "2026-01-01T00:00:00Z",
+        endedAt: "2026-01-01T00:01:05Z",
+      },
+      tokens: 12_345_678,
+    };
+    expect(runTotals(ended, now)).toEqual({
+      time: "1m05s",
+      tokens: "12.3M tok",
+    });
     expect(runTotals({ ...s, time: null }, now)).toBeNull();
   });
 
@@ -434,9 +488,27 @@ describe("formatElapsed / agent rows", () => {
     const now = Date.parse("2026-01-01T00:00:03Z");
     const s = snap({
       crew: [
-        { role: "scout", label: "scout-wave-2", status: "in-flight", startedAt: "2026-01-01T00:00:00Z", elapsedMs: null },
-        { role: "commit", label: "commit-wave-2", status: "finished", startedAt: null, elapsedMs: 12_000 },
-        { role: "scout", label: "scout-wave-1", status: "abandoned", startedAt: null, elapsedMs: null },
+        {
+          role: "scout",
+          label: "scout-wave-2",
+          status: "in-flight",
+          startedAt: "2026-01-01T00:00:00Z",
+          elapsedMs: null,
+        },
+        {
+          role: "commit",
+          label: "commit-wave-2",
+          status: "finished",
+          startedAt: null,
+          elapsedMs: 12_000,
+        },
+        {
+          role: "scout",
+          label: "scout-wave-1",
+          status: "abandoned",
+          startedAt: null,
+          elapsedMs: null,
+        },
       ],
     });
     const lines = crewLines(s, now);
@@ -457,7 +529,9 @@ describe("docked", () => {
       const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true);
       for (const line of [d.wave, ...d.bars, d.states, ...d.crew])
         expect(cols(line)).toBeLessThanOrEqual(w);
-      expect(d.cards.inner + 2 + d.cards.groups[0].label.length).toBeLessThanOrEqual(w);
+      expect(
+        d.cards.inner + 2 + d.cards.groups[0].label.length,
+      ).toBeLessThanOrEqual(w);
     }
   });
 
@@ -470,7 +544,18 @@ describe("docked", () => {
     expect(text(d.states)).toContain("running");
     expect(d.cards.groups).toHaveLength(5);
     expect(d.crew).toEqual([]);
-    const withCrew = { ...s, crew: [{ role: "scout", label: "s", status: "finished" as const, startedAt: null, elapsedMs: 1000 }] };
+    const withCrew = {
+      ...s,
+      crew: [
+        {
+          role: "scout",
+          label: "s",
+          status: "finished" as const,
+          startedAt: null,
+          elapsedMs: 1000,
+        },
+      ],
+    };
     expect(docked(withCrew, 80, 0, false).crew).toHaveLength(1);
   });
 });

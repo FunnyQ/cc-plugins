@@ -131,7 +131,6 @@ export function bucketBars(s: DeckSnapshot, w: number): Line[] {
   });
 }
 
-// a card's inner width never drops below "Final review" plus a score and some slack, so short refs still show their title
 const MIN_INNER = 17;
 const SLACK = 4;
 
