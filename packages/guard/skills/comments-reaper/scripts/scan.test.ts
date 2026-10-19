@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_FILES, scan } from "./scan.ts";
+import { MAX_BLOCKS, SHARD_BLOCKS, scan } from "./scan.ts";
 
 let repo: string;
 
@@ -33,31 +33,51 @@ describe("scan with paths", () => {
   test("a directory reports every comment under it, one-liners and the header included", () => {
     const out = scan(repo, ["src"]);
     expect(out.files).toBe(1);
-    expect(out.report).toContain("+ 1  // header");
-    expect(out.report).toContain("+ 3  // lone");
-    expect(out.report).not.toContain("ruby");
+    expect(out.reports[0]).toContain("+ 1  // header");
+    expect(out.reports[0]).toContain("+ 3  // lone");
+    expect(out.reports[0]).not.toContain("ruby");
   });
 
   test("a single file reports only that file", () => {
     const out = scan(repo, ["lib/c.rb"]);
-    expect(out.report).toContain("lib/c.rb:2");
-    expect(out.report).not.toContain("src/a.ts");
+    expect(out.reports[0]).toContain("lib/c.rb:2");
+    expect(out.reports[0]).not.toContain("src/a.ts");
   });
 
   test("a path resolves from the cwd, and the report names files from the root", () => {
     const out = scan(join(repo, "src"), ["a.ts"]);
-    expect(out.report).toContain("src/a.ts:1");
+    expect(out.reports[0]).toContain("src/a.ts:1");
   });
 
   test("a path that matches nothing reports nothing", () => {
     expect(scan(repo, ["nope"]).files).toBe(0);
   });
 
-  test("too many files refuses instead of reporting", () => {
-    for (let i = 0; i <= MAX_FILES; i++) put(`many/f${i}.ts`, "// c\n");
+  test("a small scope fits one report", () => {
+    expect(scan(repo, ["src", "lib"]).reports).toHaveLength(1);
+  });
+
+  test("a wide scope splits into reports of at most SHARD_BLOCKS blocks, never splitting a file", () => {
+    for (let i = 0; i < SHARD_BLOCKS + 5; i++)
+      put(`many/f${i}.ts`, "// c\nconst x = 1;\n");
     const out = scan(repo, ["many"]);
-    expect(out.report).toBe("");
-    expect(out.refused).toContain(`${MAX_FILES + 1} files`);
+    expect(out.reports).toHaveLength(2);
+    const counts = out.reports.map((r) => r.match(/^\s+\+ /gm)?.length ?? 0);
+    expect(counts).toEqual([SHARD_BLOCKS, 5]);
+  });
+
+  test("a file holding more blocks than SHARD_BLOCKS gets a report of its own", () => {
+    put("big.ts", "// c\nconst x = 1;\n".repeat(SHARD_BLOCKS + 1));
+    put("small.ts", "// c\n");
+    const out = scan(repo, ["big.ts", "small.ts"]);
+    expect(out.reports).toHaveLength(2);
+  });
+
+  test("past MAX_BLOCKS refuses instead of reporting", () => {
+    put("huge.ts", "// c\nconst x = 1;\n".repeat(MAX_BLOCKS + 1));
+    const out = scan(repo, ["huge.ts"]);
+    expect(out.reports).toEqual([]);
+    expect(out.refused).toContain(`${MAX_BLOCKS + 1} comment blocks`);
   });
 });
 
@@ -69,14 +89,14 @@ describe("scan with no paths", () => {
     );
     const out = scan(repo, []);
     expect(out.files).toBe(1);
-    expect(out.report).toContain("    3  // lone");
-    expect(out.report).toContain("+ 4  // fresh");
-    expect(out.report).not.toContain("header");
+    expect(out.reports[0]).toContain("    3  // lone");
+    expect(out.reports[0]).toContain("+ 4  // fresh");
+    expect(out.reports[0]).not.toContain("header");
   });
 
   test("an untracked file counts in full", () => {
     put("src/new.ts", "// brand new\nconst d = 4;\n");
-    expect(scan(repo, []).report).toContain("+ 1  // brand new");
+    expect(scan(repo, []).reports.join("")).toContain("+ 1  // brand new");
   });
 
   test("a clean tree reports nothing", () => {

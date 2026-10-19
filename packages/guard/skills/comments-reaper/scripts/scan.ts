@@ -7,7 +7,7 @@
  *
  *   bun scan.ts [path ...]
  *
- * Prints a one-line summary and the path of the report file, never the report.
+ * Prints a one-line summary and one `report <path>` line per shard, never a report.
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -21,12 +21,18 @@ import {
 } from "../../../hooks/comment-core.ts";
 import { parseHunks } from "../../../hooks/comment-sweep.ts";
 
-// Past this, one reviewer cannot read every file it would have to check claims against.
-export const MAX_FILES = 50;
+// Measured: one reviewer handed 357 blocks judged them from the comment text alone, reading no code.
+export const SHARD_BLOCKS = 60;
+export const MAX_BLOCKS = SHARD_BLOCKS * 8;
 
 const LABEL = "🪦 comments-reaper";
 
-type Scan = { files: number; blocks: number; report: string; refused?: string };
+type Scan = {
+  files: number;
+  blocks: number;
+  reports: string[];
+  refused?: string;
+};
 
 function git(cwd: string, args: string[]): string | null {
   const result = Bun.spawnSync(["git", "-C", cwd, ...args], {
@@ -41,7 +47,12 @@ const split = (out: string | null) => (out ?? "").split("\0").filter(Boolean);
 export function scan(cwd: string, paths: string[]): Scan {
   const root = git(cwd, ["rev-parse", "--show-toplevel"])?.trim();
   if (!root) {
-    return { files: 0, blocks: 0, report: "", refused: "not a git repository" };
+    return {
+      files: 0,
+      blocks: 0,
+      reports: [],
+      refused: "not a git repository",
+    };
   }
 
   const whole = new Set(
@@ -111,18 +122,26 @@ export function scan(cwd: string, paths: string[]): Scan {
   }
 
   const blocks = found.reduce((n, f) => n + f.blocks, 0);
-  if (found.length > MAX_FILES) {
+  if (blocks > MAX_BLOCKS) {
     return {
       files: found.length,
       blocks,
-      report: "",
-      refused: `${found.length} files carry comments, over the ${MAX_FILES}-file limit; name a narrower path`,
+      reports: [],
+      refused: `${blocks} comment blocks, over the ${MAX_BLOCKS}-block limit; name a narrower path`,
     };
+  }
+  const shards: { report: string[]; blocks: number }[] = [];
+  for (const f of found) {
+    const last = shards.at(-1);
+    if (last && last.blocks + f.blocks <= SHARD_BLOCKS) {
+      last.report.push(f.report);
+      last.blocks += f.blocks;
+    } else shards.push({ report: [f.report], blocks: f.blocks });
   }
   return {
     files: found.length,
     blocks,
-    report: found.map((f) => f.report).join("\n\n"),
+    reports: shards.map((s) => s.report.join("\n\n")),
   };
 }
 
@@ -140,10 +159,13 @@ if (import.meta.main) {
   }
   const base = "/tmp/q-lab/guard/comments-reaper";
   mkdirSync(base, { recursive: true });
-  const reportPath = join(mkdtempSync(join(base, "scan-")), "report.txt");
-  writeFileSync(reportPath, out.report);
+  const dir = mkdtempSync(join(base, "scan-"));
   console.log(
     `${LABEL}: ${out.blocks} comment block(s) in ${out.files} file(s) of ${scope}`,
   );
-  console.log(`report ${reportPath}`);
+  out.reports.forEach((report, i) => {
+    const reportPath = join(dir, `report-${i + 1}.txt`);
+    writeFileSync(reportPath, report);
+    console.log(`report ${reportPath}`);
+  });
 }
