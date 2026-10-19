@@ -41,6 +41,9 @@ export type Syntax = {
   block: readonly (readonly [string, string])[];
 };
 
+/** An added line asked about at any size, header included: neither says why or what, so the plain question misses both. */
+export type Tag = "suppression" | "constraint";
+
 /** A contiguous run of comment lines, with the ones this edit added marked. */
 export type CommentBlock = {
   start: number;
@@ -48,9 +51,26 @@ export type CommentBlock = {
   added: boolean[];
   /** Comment lines, not counting blanks bridged in from between paragraphs. */
   height: number;
+  tags: (Tag | null)[];
 };
 
 const MIN_BLOCK_LINES = 3;
+
+// Anywhere after a marker, not leading only: `# noqa` and `# type: ignore` trail the code they silence.
+const SUPPRESSION =
+  /(?:\/\/|\/\*|#|--)\s*(?:eslint-disable|@ts-(?:ignore|expect-error|nocheck)|biome-ignore|oxlint-disable|deno-lint-ignore|stylelint-disable|noqa|type:\s*ignore|pyright:\s*ignore|pylint:\s*disable|rubocop:disable|standard:disable|nolint|NOLINT|shellcheck\s+disable|swiftlint:disable|istanbul\s+ignore|c8\s+ignore|pragma:\s*no\s+cover)/;
+
+// Split by case: lower-case "important" is ordinary prose, while "Do not remove" opens a sentence.
+const SHOUTED = /\b(?:IMPORTANT|DO NOT)\b/;
+const CONSTRAINT =
+  /\b(?:do not|don't) (?:remove|delete|change|edit|modify|touch|move|rename|reorder)\b|\b(?:talk to|check with) \S+(?: \S+)? before\b/i;
+
+function tagFor(line: string, comment: boolean): Tag | null {
+  if (SUPPRESSION.test(line)) return "suppression";
+  return comment && (SHOUTED.test(line) || CONSTRAINT.test(line))
+    ? "constraint"
+    : null;
+}
 
 const SKIP_EXTS = new Set([".md", ".mdx", ".txt", ".json"]);
 
@@ -235,7 +255,7 @@ export function commentFlags(lines: string[], syntax: Syntax): boolean[] {
 function commentLines(text: string, syntax: Syntax): string[] {
   const lines = text.split("\n").map((l) => l.trim());
   const flags = commentFlags(lines, syntax);
-  return lines.filter((_, i) => flags[i]);
+  return lines.filter((l, i) => flags[i] || SUPPRESSION.test(l));
 }
 
 /**
@@ -347,6 +367,14 @@ export function flaggedBlocks(
   if (!(added instanceof Set)) {
     for (const line of added) pending.set(line, (pending.get(line) ?? 0) + 1);
   }
+  const claim = (i: number): boolean => {
+    if (byNumber) return byNumber.has(i + 1);
+    const left = pending.get(lines[i]!) ?? 0;
+    // Consume in file order so each added occurrence claims one line, and so a
+    // hit landing in an exempt or short block still spends itself.
+    if (left > 0) pending.set(lines[i]!, left - 1);
+    return left > 0;
+  };
 
   const blocks: CommentBlock[] = [];
   let sawCode = false;
@@ -356,6 +384,15 @@ export function flaggedBlocks(
     const line = lines[i]!;
     if (!flags[i]) {
       if (line !== "" && !line.startsWith("#!")) sawCode = true;
+      if (SUPPRESSION.test(line) && claim(i)) {
+        blocks.push({
+          start: i + 1,
+          lines: [line],
+          added: [true],
+          height: 1,
+          tags: ["suppression"],
+        });
+      }
       i++;
       continue;
     }
@@ -364,6 +401,7 @@ export function flaggedBlocks(
     const start = i + 1;
     const body: string[] = [];
     const marked: boolean[] = [];
+    const tags: (Tag | null)[] = [];
     let bridged = 0;
 
     while (i < lines.length) {
@@ -372,31 +410,25 @@ export function flaggedBlocks(
         if (lines[i] !== "" || !flags[i + 1]) break;
         body.push("");
         marked.push(false);
+        tags.push(null);
         bridged++;
         i++;
         continue;
       }
 
       const text = lines[i]!;
-      let hit: boolean;
-      if (byNumber) {
-        hit = byNumber.has(i + 1);
-      } else {
-        const left = pending.get(text) ?? 0;
-        // Consume in file order so each added occurrence claims one line, and so a
-        // hit landing in an exempt or short block still spends itself.
-        if (left > 0) pending.set(text, left - 1);
-        hit = left > 0;
-      }
+      const hit = claim(i);
       body.push(text);
       marked.push(hit);
+      tags.push(hit ? tagFor(text, true) : null);
       i++;
     }
 
     // Counted, not filtered on empty text: a blank line inside a `/* */` is a comment line and still counts, while a bridged one is not and does not.
     const height = body.length - bridged;
-    if (!header && height >= MIN_BLOCK_LINES && marked.some(Boolean)) {
-      blocks.push({ start, lines: body, added: marked, height });
+    const sized = !header && height >= MIN_BLOCK_LINES && marked.some(Boolean);
+    if (sized || tags.some(Boolean)) {
+      blocks.push({ start, lines: body, added: marked, height, tags });
     }
   }
   return blocks;
@@ -445,7 +477,22 @@ export async function blocksFor(
 
 // Kept out of formatReason so the sweep asks once however many files it reports.
 export const ASK =
-  "Answer for every line marked +: does it say why, or what? Delete the ones that say what.";
+  "Answer for every line marked +: does it say why, or what? Delete the ones that say what. " +
+  "A why that excuses a workaround or surprise in our own code is a refactor, not a comment: rename, extract, or type the code until the why is obvious, then delete it. " +
+  "Keep a why only when it names something we cannot change: a dependency, platform, vendor, or protocol.";
+
+const TAG_ASK: Record<Tag, string> = {
+  suppression:
+    "For a line tagged [suppression]: look up the rule it silences. If the rule catches real bugs or guards correctness or safety, delete the suppression and fix the code it hid. Keep it only for a style-only or faulty rule.",
+  constraint:
+    "For a line tagged [constraint]: a comment enforces nothing. If the code you are already changing can carry the rule as a test, type, runtime check, or lint, encode it and delete the comment. Otherwise tell the user which check would enforce it.",
+};
+
+export function askFor(blocks: CommentBlock[]): string {
+  const present = new Set(blocks.flatMap((b) => b.tags));
+  const extra = (Object.keys(TAG_ASK) as Tag[]).filter((t) => present.has(t));
+  return [ASK, ...extra.map((t) => TAG_ASK[t])].join("\n");
+}
 
 export function formatReason(
   fileName: string,
@@ -461,7 +508,10 @@ export function formatReason(
     const end = block.start + block.lines.length - 1;
     out.push(`  ${fileName}:${block.start}-${end}`);
     block.lines.forEach((line, k) => {
-      out.push(`  ${block.added[k] ? "+" : " "} ${block.start + k}  ${line}`);
+      const tag = block.tags[k] ? `  [${block.tags[k]}]` : "";
+      out.push(
+        `  ${block.added[k] ? "+" : " "} ${block.start + k}  ${line}${tag}`,
+      );
     });
   }
   return out.join("\n");

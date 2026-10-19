@@ -21,7 +21,7 @@
  */
 
 import {
-  ASK,
+  askFor,
   baseName,
   blocksFor,
   formatReason,
@@ -71,7 +71,7 @@ async function main(): Promise<number> {
     if (note) console.log(JSON.stringify({ systemMessage: note }));
     return 0;
   }
-  const reason = `${formatReason(fileName, screen.kept)}\n${ASK}`;
+  const reason = `${formatReason(fileName, screen.kept)}\n${askFor(screen.kept)}`;
   console.error(note ? `${reason}\n${note}` : reason);
   return 2;
 }

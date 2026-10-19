@@ -3,6 +3,7 @@ import { basename, extname } from "node:path";
 import {
   addedCommentLines,
   ASK,
+  askFor,
   baseName,
   commentFlags,
   extName,
@@ -788,5 +789,83 @@ describe("formatReason", () => {
     expect(out).toContain("2 comment block(s), 7 lines, in a.rb.");
     expect(out).toContain("  a.rb:2-4");
     expect(out).toContain("  a.rb:7-10");
+  });
+});
+
+describe("suppressions and constraints", () => {
+  test("a one-line suppression reports under the block threshold", () => {
+    const file = "const a = 1;\n// @ts-expect-error\nconst b: string = a;";
+    const blocks = flaggedBlocks(file, ts, new Set([2]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.lines).toEqual(["// @ts-expect-error"]);
+    expect(blocks[0]!.tags).toEqual(["suppression"]);
+  });
+
+  test("a trailing suppression on a code line reports", () => {
+    const file = "import os\nx = f()  # type: ignore[attr-defined]\n";
+    const blocks = flaggedBlocks(file, rb, new Set([2]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.lines).toEqual(["x = f()  # type: ignore[attr-defined]"]);
+    expect(blocks[0]!.tags).toEqual(["suppression"]);
+  });
+
+  test("a created file reports its trailing suppression through the text path", () => {
+    const content = "import os\nx = f()  # noqa: E501\n";
+    const added = addedCommentLines("Write", { content }, rb);
+    expect(added).toContain("x = f()  # noqa: E501");
+    expect(flaggedBlocks(content, rb, added)).toHaveLength(1);
+  });
+
+  test("a file-wide suppression in the header still reports", () => {
+    const file = "/* eslint-disable no-console */\nconsole.log(1);";
+    const blocks = flaggedBlocks(file, ts, new Set([1]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.tags).toEqual(["suppression"]);
+  });
+
+  test("a suppression the edit did not add stays quiet", () => {
+    const file = "a();\n// eslint-disable-next-line\nb();\nc();";
+    expect(flaggedBlocks(file, ts, new Set([4]))).toEqual([]);
+  });
+
+  test("a one-line constraint comment reports", () => {
+    const file = "a();\n// IMPORTANT: keep this before init\nb();";
+    const blocks = flaggedBlocks(file, ts, new Set([2]));
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.tags).toEqual(["constraint"]);
+  });
+
+  test("constraint wording in code or lower-case prose stays quiet", () => {
+    const file = [
+      "a();",
+      'throw new Error("do not remove the lock");',
+      "// the important part is the order",
+      "b();",
+    ].join("\n");
+    expect(flaggedBlocks(file, ts, new Set([2, 3]))).toEqual([]);
+  });
+
+  test("an untagged line in a tagged short block carries no tag", () => {
+    const file = "a();\n// do not remove: vendor reads it\n// see below\nb();";
+    const blocks = flaggedBlocks(file, ts, new Set([2, 3]));
+    expect(blocks[0]!.tags).toEqual(["constraint", null]);
+  });
+
+  test("formatReason names the tag on its line", () => {
+    const blocks = flaggedBlocks("a();\n// @ts-ignore\nb();", ts, new Set([2]));
+    expect(formatReason("a.ts", blocks)).toContain(
+      "  + 2  // @ts-ignore  [suppression]",
+    );
+  });
+
+  test("askFor adds a tag's question only when a block carries it", () => {
+    const plain = flaggedBlocks("def a\n  # one\n  # two\n  # three\nend", rb, [
+      "# three",
+    ]);
+    const tagged = flaggedBlocks("a();\n// @ts-ignore\nb();", ts, new Set([2]));
+    expect(askFor(plain)).toBe(ASK);
+    expect(askFor(plain)).toContain("cannot change");
+    expect(askFor(tagged)).toContain("[suppression]");
+    expect(askFor(tagged)).not.toContain("[constraint]");
   });
 });

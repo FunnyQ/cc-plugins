@@ -21,7 +21,7 @@ import { copyFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  ASK,
+  askFor,
   flaggedBlocks,
   formatReason,
   isGuardedPath,
@@ -150,7 +150,11 @@ export async function snapshot(payload: Payload): Promise<void> {
 }
 
 /** The Stop hook's stdout; `systemMessage` alone means Jev withdrew every block. */
-type SweepOutput = { decision?: "block"; reason?: string; systemMessage?: string };
+type SweepOutput = {
+  decision?: "block";
+  reason?: string;
+  systemMessage?: string;
+};
 
 export async function sweep(payload: Payload): Promise<SweepOutput | null> {
   const sessionId = payload.session_id;
@@ -254,7 +258,9 @@ export async function sweep(payload: Payload): Promise<SweepOutput | null> {
   const out: SweepOutput = {};
   if (reasons.length > 0) {
     out.decision = "block";
-    out.reason = [...reasons, ASK].join("\n\n");
+    out.reason = [...reasons, askFor(screened.flatMap((s) => s.kept))].join(
+      "\n\n",
+    );
   }
   if (note) out.systemMessage = note;
   return Object.keys(out).length > 0 ? out : null;

@@ -8,7 +8,7 @@
 
 import type { Register } from "claude-code";
 import {
-  ASK,
+  askFor,
   baseName,
   blocksFor,
   formatReason,
@@ -65,7 +65,7 @@ export const register: Register = (on) => {
       if (note) $.ui.toast(note);
       return ran;
     }
-    const reason = `${formatReason(fileName, screen.kept)}\n${ASK}`;
+    const reason = `${formatReason(fileName, screen.kept)}\n${askFor(screen.kept)}`;
     return {
       ...ran,
       context: [...(ran.context ?? []), note ? `${reason}\n${note}` : reason],
