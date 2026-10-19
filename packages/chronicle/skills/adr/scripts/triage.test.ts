@@ -146,7 +146,7 @@ describe("buildTriage", () => {
       triage.clusters.map((cluster) => [
         cluster.decision,
         cluster.entryIds,
-        cluster.watched,
+        cluster.pulledFromWatch,
       ]),
     ).toEqual([
       ["Cache keys", ["t", "w1"], true],
@@ -201,7 +201,7 @@ describe("buildTriage", () => {
     );
 
     expect(
-      triage.clusters.map((cluster) => [cluster.decision, cluster.watched]),
+      triage.clusters.map((cluster) => [cluster.decision, cluster.pulledFromWatch]),
     ).toEqual([
       ["F", false],
       ["Q", true],
@@ -212,7 +212,7 @@ describe("buildTriage", () => {
 });
 
 describe("prescreen", () => {
-  function cluster(n: number, watched = false): Cluster {
+  function cluster(n: number, pulledFromWatch = false): Cluster {
     return {
       clusterId: `c${n}`,
       decision: `decision ${n}`,
@@ -220,7 +220,7 @@ describe("prescreen", () => {
       sessionIds: ["s1"],
       kinds: ["decision"],
       files: [`f${n}.ts`],
-      watched,
+      pulledFromWatch,
     };
   }
 
@@ -394,7 +394,7 @@ const batch: Batch = {
       sessionIds: ["s1"],
       kinds: ["decision"],
       files: [],
-      watched: false,
+      pulledFromWatch: false,
     },
     {
       clusterId: "c2",
@@ -403,7 +403,7 @@ const batch: Batch = {
       sessionIds: ["s2"],
       kinds: ["caveat"],
       files: [],
-      watched: false,
+      pulledFromWatch: false,
     },
   ],
 };

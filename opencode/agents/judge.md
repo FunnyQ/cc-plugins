@@ -29,8 +29,9 @@ report it and stop. Never search the skill directory for a script.
 
 - `{batchPath}` — the batch file `triage.ts prep` wrote. It holds `batch`, `adrs` (the
   existing records: `id`, `title`, `status`), and `clusters`. Each cluster carries
-  `clusterId`, `decision`, `entryIds`, `sessionIds`, `kinds`, `files`, and `watched` —
-  true when the cluster holds an entry pulled back from the watched bucket.
+  `clusterId`, `decision`, `entryIds`, `sessionIds`, `kinds`, `files`, and
+  `pulledFromWatch` — true when the cluster holds an entry from the watched bucket, woken by
+  a matching inbox decision or pulled in by evidence mode.
 - `{bodyFetchPath}` — absolute path to the trail collector script. Its `--bodies` flag is
   the body-fetch capability.
 - `{triagePath}` — absolute path to `triage.ts`. Its `record` subcommand stores your
@@ -63,7 +64,7 @@ Settle a cluster as `skip` without fetching its bodies when its `decision`, `kin
   or partial textual echo is not a match; treat the cluster as plausible instead.
 
 Treat every other cluster as plausible. When unsure, treat it as plausible: a needless
-fetch costs one read, and a wrong screen-out is never reviewed again. A `watched` cluster
+fetch costs one read, and a wrong screen-out is never reviewed again. A `pulledFromWatch` cluster
 is always plausible, because an earlier triage already judged it might matter.
 
 ### 3. Fetch bodies for the plausible clusters, in one call

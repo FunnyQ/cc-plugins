@@ -38,8 +38,7 @@ export type Cluster = {
   sessionIds: string[];
   kinds: string[];
   files: string[];
-  /** True when the cluster holds an entry pulled back from the watched bucket. */
-  watched: boolean;
+  pulledFromWatch: boolean;
 };
 
 export type Batch = {
@@ -159,7 +158,7 @@ export function buildTriage(
         sessionIds: [],
         kinds: [],
         files: [],
-        watched: false,
+        pulledFromWatch: false,
       };
       byDecision.set(entry.decision, cluster);
     }
@@ -168,7 +167,7 @@ export function buildTriage(
     if (entry.kind) pushUnique(cluster.kinds, entry.kind);
     for (const file of entry.files) pushUnique(cluster.files, file);
     if (woken.has(sessionId) || (evidence && watchIds.has(sessionId))) {
-      cluster.watched = true;
+      cluster.pulledFromWatch = true;
     }
   }
 
@@ -230,7 +229,7 @@ export async function prescreen(
   skipped: RecordedCandidate[];
   jev: JevResult | null;
 }> {
-  const asked = clusters.filter(({ watched }) => !watched);
+  const asked = clusters.filter(({ pulledFromWatch }) => !pulledFromWatch);
   if (asked.length === 0) return { kept: clusters, skipped: [], jev: null };
   if (!opts.apiKey) {
     return {
@@ -650,7 +649,7 @@ async function prep(argv: string[]): Promise<void> {
         await fetchBodies(
           context.trailRoot,
           triage.clusters
-            .filter(({ watched }) => !watched)
+            .filter(({ pulledFromWatch }) => !pulledFromWatch)
             .flatMap(({ entryIds }) => entryIds),
         ),
         { apiKey: process.env.TYPESAFE_API_KEY },
