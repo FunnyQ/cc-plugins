@@ -6,11 +6,13 @@ const block = (
   start: number,
   lines: string[],
   added: boolean[],
+  tags: CommentBlock["tags"] = lines.map(() => null),
 ): CommentBlock => ({
   start,
   lines,
   added,
   height: lines.length,
+  tags,
 });
 
 const WHY = block(1, ["// a", "// b", "// c"], [true, false, true]);
@@ -70,6 +72,18 @@ describe("screenBlocks", () => {
     expect(asked[1]).toContain("`comment.lines[2]`");
   });
 
+  test("offers an excuse choice, so a workaround's why cannot pass as why", async () => {
+    const sent: Sent[] = [];
+    await screenBlocks("a.ts", [WHY], {
+      apiKey: "k",
+      fetch: fakeJev({ "// a": 0.9 }, sent),
+    });
+    const q = Object.values(sent[0]!.questions)[0] as unknown as {
+      criteria: Record<string, string>;
+    };
+    expect(Object.keys(q.criteria)).toEqual(["why", "excuse", "what"]);
+  });
+
   test("keeps every block without a key, and sends nothing", async () => {
     const sent: Sent[] = [];
     const { kept } = await screenBlocks("a.ts", [WHY], {
@@ -100,6 +114,17 @@ describe("screenBlocks", () => {
     expect(screenNote("💬 comment-guard", { ...screen, ms: 231 })).toBe(
       "💬 comment-guard: Jev withdrew 1 of 2 comment block(s) as why (231 ms)",
     );
+  });
+
+  test("never sends a tagged block, so a suppression is always asked", async () => {
+    const sent: Sent[] = [];
+    const tagged = block(5, ["// @ts-ignore"], [true], ["suppression"]);
+    const { kept } = await screenBlocks("a.ts", [tagged], {
+      apiKey: "k",
+      fetch: fakeJev({ "// @ts-ignore": 0.99 }, sent),
+    });
+    expect(kept).toEqual([tagged]);
+    expect(sent).toHaveLength(0);
   });
 
   test("stays silent when it withdrew nothing", () => {

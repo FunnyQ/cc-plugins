@@ -1,10 +1,13 @@
 /**
- * Asks TypeSafe's Jev whether each added comment line says why or what, and
- * drops the blocks it is sure are all why, so the model is not stopped to
- * re-answer a question with an obvious answer. Measured over 708 reported lines
- * (160 labelled by opus): at 0.8 it spares 84 of 222 blocks and passes 4 of 36
- * what-lines, at p50 220 ms per block. Every failure keeps every block, so the
- * hook degrades to asking the model, never to staying silent.
+ * Asks TypeSafe's Jev whether each added comment line says why, excuses our
+ * own code, or says what, and drops the blocks it is sure are all why, so the
+ * model is not stopped to re-answer a question with an obvious answer.
+ * Measured over 206 blocks (974 lines from six repos, labelled by opus): at 0.8
+ * it withdraws 25, 19 of them all-why, and lets 8 of 473 what-lines and 4 of 21
+ * excuse-lines out with them. The two-choice criteria it replaced withdrew 40,
+ * only 25 all-why, leaking 25 what and 12 excuse. p50 220 ms per block. Every
+ * failure keeps every block, so the hook degrades to asking the model, never to
+ * staying silent.
  *
  * A port of chronicle's `askJev`, not an import: plugins never import each other.
  */
@@ -17,8 +20,11 @@ const MODEL = "jev-latest";
 export const TIMEOUT_MS = 2_000;
 const PASS_WHY = 0.8;
 
+// `excuse` is its own choice so a workaround's why draws mass away from `why`; folding it into `what` instead leaked 11 of 21 excuse lines at 0.8, against 4.
 const CRITERIA = {
-  why: "Carries a reason, constraint, invariant, history, measured fact, rejected alternative, or consequence the code alone cannot show; a line continuing such a sentence counts",
+  why: "Carries a reason the code cannot be reshaped to show: an outside constraint (dependency, platform, vendor, protocol, harness), an invariant, a measured fact, history, a rejected alternative, or a consequence; a line continuing such a sentence counts",
+  excuse:
+    "Justifies a workaround, hack, special case, or surprising shape in this codebase's own code, or calls it temporary; a rename, extraction, type, or redesign of our own code could make it obvious or remove it",
   what: "Restates what the code does, narrates steps, labels a section, describes the edit itself, or names what a thing is without saying why it matters",
 };
 
@@ -80,8 +86,13 @@ export async function screenBlocks(
   const { apiKey } = opts;
   if (!apiKey) return { kept: blocks, withdrawn: 0 };
   const started = performance.now();
+  // A tagged line asks more than why-or-what, so a confident "why" from Jev answers the wrong question.
   const passed = await Promise.all(
-    blocks.map((block) => allWhy(file, block, { apiKey, fetch: opts.fetch })),
+    blocks.map((block) =>
+      block.tags.some(Boolean)
+        ? false
+        : allWhy(file, block, { apiKey, fetch: opts.fetch }),
+    ),
   );
   const kept = blocks.filter((_, i) => !passed[i]);
   return {
