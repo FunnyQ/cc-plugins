@@ -16,7 +16,7 @@ import {
   CLEAN,
   deliverPrompt,
   MARK,
-  REVIEWER_PROMPT,
+  promptBody,
   reviewTask,
 } from "./reviewer.ts";
 
@@ -60,11 +60,19 @@ async function runSweep(
 export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     const ran = await next(e);
+    const agentFile = `${$.plugin.root}/agents/comments-reaper.md`;
+    let prompt: string;
+    try {
+      prompt = promptBody((await $.fs.read(agentFile)) as string);
+    } catch (err) {
+      $.ui.toast(`${MARK}: no reviewer, cannot read ${agentFile}: ${err}`);
+      return ran;
+    }
     await $.agent.register({
       name: NAME,
       description:
         "Reviews the comment lines a turn added, with no stake in them. Spawned by guard alone.",
-      prompt: REVIEWER_PROMPT,
+      prompt,
       tools: ["Read", "Grep", "Glob"],
       model: "sonnet",
       effort: "medium",

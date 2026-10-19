@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { expect, mock, test } from "claude-code/testing";
-import { CLEAN, MARK, REVIEWER_PROMPT } from "./reviewer.ts";
+import { CLEAN, MARK } from "./reviewer.ts";
 
 const REPORT = "🧹 comment-sweep: 1 comment block(s), 3 lines, in app.ts.";
 const turn = { turnId: "t", text: "go" };
@@ -13,7 +13,10 @@ const end = {
 } as const;
 
 // Stands for the engine beneath the mod: the sweep script's answers, the agent runner, the prompt queue, and toasts. A noun answering a primitive answers `{ value }`.
-function world(on: On, opts: { report?: string; bun?: false } = {}) {
+function world(
+  on: On,
+  opts: { report?: string; bun?: false; agentFile?: false } = {},
+) {
   const runs: { argv: readonly string[]; stdin?: string }[] = [];
   const spawns: { subagent_type?: string; prompt: string }[] = [];
   const registered: Record<string, unknown>[] = [];
@@ -43,6 +46,14 @@ function world(on: On, opts: { report?: string; bun?: false } = {}) {
         isStdoutTruncated: false,
         isStderrTruncated: false,
       },
+    } as never;
+  });
+  on("fs.read", (_$, e) => {
+    if (opts.agentFile === false || !e.path.endsWith("/agents/comments-reaper.md")) {
+      throw new Error("ENOENT");
+    }
+    return {
+      value: "---\nname: comments-reaper\ntools: [\"Read\"]\n---\n\nJudge each + line.\n",
     } as never;
   });
   on("agent.register", (_$, e) => {
@@ -109,8 +120,20 @@ test("the session registers the reviewer on sonnet at medium effort, read-only",
       model: "sonnet",
       effort: "medium",
       tools: ["Read", "Grep", "Glob"],
+      prompt: "Judge each + line.",
     }),
   );
+});
+
+test("an unreadable agent file registers no reviewer and says so", async ($, on) => {
+  const w = world(on, { agentFile: false });
+  await $.session.start({
+    cwd: "/repo",
+    surface: "terminal",
+    isInteractive: true,
+  } as never);
+  expect(w.registered).toHaveLength(0);
+  expect(w.toasts.join("\n")).toContain("comments-reaper.md");
 });
 
 test("a main turn's start snapshots the worktree for this session", async ($, on) => {
@@ -272,8 +295,4 @@ test("another agent's hand-back goes through", async ($, on) => {
     report: "x",
   } as never);
   expect((ran as { deny?: string }).deny).toBeUndefined();
-});
-
-test("the reviewer is told to skip a + line that is not a comment", () => {
-  expect(REVIEWER_PROMPT).toContain("not a comment");
 });
