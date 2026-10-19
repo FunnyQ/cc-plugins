@@ -1,11 +1,4 @@
 /**
- * comment-guard on Claude Code: one review per turn, by a reviewer that did
- * not write the comments. Each main turn's start snapshots the worktree
- * through comment-sweep.ts; its end diffs against it, so Edit, Write and a
- * Bash `sed -i` alike reach the same report. A non-empty report goes to the
- * `guard:comment-reviewer` subagent in the background, and its verdicts come
- * back as a prompt the main agent audits and acts on.
- *
  * The author is no longer asked mid-edit: it defends what it just wrote, and
  * a reviewer asked after it would re-judge the same lines. Codex and OpenCode
  * have no function hooks, so they keep the command hooks and that question.
@@ -25,8 +18,7 @@ const CARRY = { plugin: "guard", key: "carry" } as const;
 const OWN_TURN = { plugin: "guard", key: "ownTurn" } as const;
 const NAME = "comment-reviewer";
 const AGENT = `guard:${NAME}`;
-// A reviewer that never reports back must not hold off every later review.
-const STALE_MS = 10 * 60_000;
+const MAX_REVIEW_HOLD_MS = 10 * 60_000;
 
 type Found = { report: string; blocks: number; note: string | null };
 
@@ -129,7 +121,7 @@ export const register: Register = (on) => {
     }
 
     const { value: review } = await $.state.get(REVIEW);
-    const busy = review && (await $.clock.now()) - review.since < STALE_MS;
+    const busy = review && (await $.clock.now()) - review.since < MAX_REVIEW_HOLD_MS;
     if (e.reason !== "answer" || busy) {
       await $.state.set(CARRY, true);
       return ran;
