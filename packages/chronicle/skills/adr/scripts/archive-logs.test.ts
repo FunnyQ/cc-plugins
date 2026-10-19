@@ -14,18 +14,24 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import {
+  STALE_MS,
+  trustRoot,
+  type TrustedRoot,
+} from "../../../shared/scripts/cockpit-trail";
 import type { ArchivePlan, Move } from "./archive-plan";
 import { applyArchive, validatePlan } from "./archive-logs";
 
 type Fixture = {
-  root: string;
+  root: TrustedRoot;
   logs: string;
   cleanup: () => void;
 };
 
 function fixture(): Fixture {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "archive-logs-")));
+  const root = trustRoot(
+    realpathSync(mkdtempSync(join(tmpdir(), "archive-logs-"))),
+  );
   const logs = join(root, ".cockpit", "logs");
   mkdirSync(logs, { recursive: true });
   return {
@@ -339,5 +345,18 @@ describe("applyArchive", () => {
     } finally {
       item.cleanup();
     }
+  });
+});
+
+describe("trusted root", () => {
+  test("a plan's own trailRoot does not type-check as a trusted root", () => {
+    const archivePlan = plan("/project", []);
+    const fromPlan = () => [
+      // @ts-expect-error
+      validatePlan(archivePlan, archivePlan.trailRoot),
+      // @ts-expect-error
+      applyArchive(archivePlan, archivePlan.trailRoot),
+    ];
+    expect(fromPlan).toBeInstanceOf(Function);
   });
 });

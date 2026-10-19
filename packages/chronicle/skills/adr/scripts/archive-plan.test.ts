@@ -348,3 +348,20 @@ describe("writePlan", () => {
     expect(Object.keys(parsed)).toEqual(["trailRoot", "moves", "refused"]);
   });
 });
+
+describe("bucketDirectory", () => {
+  test("no other adr script spells a bucket path itself", async () => {
+    const bucketLiteral =
+      /["'`]\.cockpit\/(archive|logs)|["'`]\.cockpit["'`]\s*,\s*["'`](archive|logs)["'`]/;
+    const offenders: string[] = [];
+    for (const name of new Bun.Glob("*.ts").scanSync(import.meta.dir)) {
+      if (name.endsWith(".test.ts") || name === "archive-plan.ts") continue;
+      const text = await readFile(join(import.meta.dir, name), "utf8");
+      text.split("\n").forEach((line, index) => {
+        if (/^\s*(\/\/|\/?\*)/.test(line)) return;
+        if (bucketLiteral.test(line)) offenders.push(`${name}:${index + 1}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
+});

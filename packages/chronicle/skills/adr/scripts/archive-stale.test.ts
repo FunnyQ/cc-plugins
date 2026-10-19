@@ -12,7 +12,11 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import {
+  STALE_MS,
+  trustRoot,
+  type TrustedRoot,
+} from "../../../shared/scripts/cockpit-trail";
 import {
   archiveIgnored,
   archiveTrail,
@@ -36,10 +40,10 @@ function temporaryRoot(): string {
   return root;
 }
 
-function trail(root: string, ...segments: string[]): string {
+function trail(root: string, ...segments: string[]): TrustedRoot {
   const directory = join(root, ...segments);
   mkdirSync(join(directory, ".cockpit", "logs"), { recursive: true });
-  return directory;
+  return trustRoot(directory);
 }
 
 function session(

@@ -7,7 +7,11 @@ import {
   type Stats,
 } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
-import { logRoot, STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import {
+  logRoot,
+  STALE_MS,
+  type TrustedRoot,
+} from "../../../shared/scripts/cockpit-trail";
 import { bucketDirectory } from "./archive-plan";
 import type {
   ArchivePlan,
@@ -41,11 +45,9 @@ function validateDestinationAncestors(
   target: ArchiveTarget,
   errors: string[],
 ): void {
-  const components = [
-    join(trustedRoot, ".cockpit"),
-    join(trustedRoot, ".cockpit", "archive"),
-    bucketDirectory(trustedRoot, target),
-  ];
+  const bucket = bucketDirectory(trustedRoot, target);
+  const archive = dirname(bucket);
+  const components = [dirname(archive), archive, bucket];
 
   for (const component of components) {
     if (probeLstat(component)?.isSymbolicLink()) {
@@ -54,7 +56,10 @@ function validateDestinationAncestors(
   }
 }
 
-export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
+export function validatePlan(
+  plan: ArchivePlan,
+  trustedRoot: TrustedRoot,
+): string[] {
   const errors: string[] = [];
   let realTrustedRoot: string;
 
@@ -113,8 +118,8 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[] {
     }
 
     if (targetValid) {
-      // Layout comes from the shared helper; the filename stays derived from the
-      // move's own source, so a destination renamed away from its source still fails.
+      // The filename stays derived from the move's own source, so a destination
+      // renamed away from its source still fails.
       const expectedDestination = join(
         bucketDirectory(realTrustedRoot, move.target),
         basename(move.from),
@@ -147,13 +152,10 @@ function refusal(
   return { sessionId: sessionIdOf(move), reason, detail };
 }
 
-/**
- * The only function that touches the trail.
- * `trustedRoot` is resolved by the CALLER from cwd — never read from the plan.
- */
+/** The only function that touches the trail. */
 export async function applyArchive(
   plan: ArchivePlan,
-  trustedRoot: string,
+  trustedRoot: TrustedRoot,
 ): Promise<ApplyResult> {
   const errors = validatePlan(plan, trustedRoot);
   if (errors.length > 0) throw new Error(errors.join("\n"));

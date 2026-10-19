@@ -71,23 +71,29 @@ export function gitRootOf(cwd: string): string | null {
 
 // Ported from packages/monitor/cockpit-rs/src/log_root.rs — chronicle cannot
 // import across the plugin boundary. That file is the spec; keep this in sync by hand.
-export function logRoot(cwd: string, deps: LogRootDeps = {}): string {
+export function logRoot(cwd: string, deps: LogRootDeps = {}): TrustedRoot {
   const resolveGitRoot = deps.gitRoot ?? gitRootOf;
   const start = realpathOr(cwd);
   const resolvedRoot = resolveGitRoot(start);
-  if (!resolvedRoot) return start;
+  if (!resolvedRoot) return trustRoot(start);
 
-  const root = realpathOr(resolvedRoot);
+  const root = trustRoot(realpathOr(resolvedRoot));
   if (start !== root && !isInside(root, start)) return root;
 
   let directory = start;
   for (;;) {
-    if (isDir(join(directory, ".cockpit"))) return directory;
+    if (isDir(join(directory, ".cockpit"))) return trustRoot(directory);
     if (directory === root) return root;
     const parent = dirname(directory);
     if (parent === directory) return root;
     directory = parent;
   }
+}
+
+export type TrustedRoot = string & { readonly __brand: "TrustedRoot" };
+
+export function trustRoot(directoryFoundOnDisk: string): TrustedRoot {
+  return directoryFoundOnDisk as TrustedRoot;
 }
 
 export function normalizePath(path: string): string {

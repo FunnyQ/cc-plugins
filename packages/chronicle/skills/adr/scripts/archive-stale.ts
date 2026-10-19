@@ -2,8 +2,12 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join, relative } from "node:path";
-import { logRoot } from "../../../shared/scripts/cockpit-trail";
+import { basename, dirname, join, relative } from "node:path";
+import {
+  logRoot,
+  trustRoot,
+  type TrustedRoot,
+} from "../../../shared/scripts/cockpit-trail";
 import { applyArchive } from "./archive-logs";
 import {
   bucketDirectory,
@@ -55,8 +59,8 @@ function isForwardTestFixtures(parent: string, name: string): boolean {
   return name === "fixtures" && basename(parent) === "references";
 }
 
-export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
-  const found = new Set<string>();
+export function findTrailRoots(scanRoots: ScanRoot[]): TrustedRoot[] {
+  const found = new Set<TrustedRoot>();
 
   const visit = (directory: string): void => {
     let entries;
@@ -69,7 +73,7 @@ export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
       // A symlink is never a Dirent directory, so a link loop is never walked.
       if (!entry.isDirectory()) continue;
       if (entry.name === ".cockpit" && isTrail(directory)) {
-        found.add(realpathSync(directory));
+        found.add(trustRoot(realpathSync(directory)));
       }
       if (PRUNED.has(entry.name)) continue;
       if (isForwardTestFixtures(directory, entry.name)) continue;
@@ -79,7 +83,7 @@ export function findTrailRoots(scanRoots: ScanRoot[]): string[] {
 
   for (const { dir, deep } of scanRoots) {
     if (deep) visit(dir);
-    else if (isTrail(dir)) found.add(realpathSync(dir));
+    else if (isTrail(dir)) found.add(trustRoot(realpathSync(dir)));
   }
   return [...found].sort();
 }
@@ -101,7 +105,7 @@ export function archiveIgnored(
 }
 
 export async function archiveTrail(
-  trailRoot: string,
+  trailRoot: TrustedRoot,
   opts: { apply: boolean },
 ): Promise<TrailResult> {
   const assignments: Assignment[] = readdirSync(
@@ -140,6 +144,8 @@ export async function archiveTrail(
   };
 }
 
+const ARCHIVE_IGNORE_PATTERN = `${dirname(bucketDirectory("", "done"))}/`;
+
 export function formatTrail(result: TrailResult, apply: boolean): string[] {
   const reasons = new Map<string, number>();
   for (const { reason } of result.skipped) {
@@ -153,7 +159,7 @@ export function formatTrail(result: TrailResult, apply: boolean): string[] {
   ];
   if (result.archiveIgnored === false) {
     lines.push(
-      '  warning: .cockpit/archive/ is not git-ignored, so archived logs can be committed. Add ".cockpit/archive/" to .gitignore — not ".cockpit/", which also hides files a repo tracks there.',
+      `  warning: ${ARCHIVE_IGNORE_PATTERN} is not git-ignored, so archived logs can be committed. Add "${ARCHIVE_IGNORE_PATTERN}" to .gitignore — not ".cockpit/", which also hides files a repo tracks there.`,
     );
   }
   return lines;

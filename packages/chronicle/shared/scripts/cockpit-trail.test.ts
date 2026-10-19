@@ -54,7 +54,7 @@ describe("logRoot", () => {
     mkdirSync(join(parent, ".cockpit"));
     mkdirSync(cwd, { recursive: true });
 
-    expect(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(root));
+    expect<string>(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(root));
   });
 
   test("returns the nearest .cockpit between cwd and the git root", () => {
@@ -65,7 +65,7 @@ describe("logRoot", () => {
     mkdirSync(join(nearer, ".cockpit"), { recursive: true });
     mkdirSync(cwd, { recursive: true });
 
-    expect(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(nearer));
+    expect<string>(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(nearer));
   });
 
   test("normalizes a symlinked temporary directory", () => {
@@ -76,7 +76,7 @@ describe("logRoot", () => {
     mkdirSync(cwd, { recursive: true });
     symlinkSync(root, link);
 
-    expect(
+    expect<string>(
       logRoot(join(link, "nested"), { gitRoot: () => realpathSync(root) }),
     ).toBe(realpathSync(root));
   });
@@ -85,8 +85,8 @@ describe("logRoot", () => {
     const cwd = tempDir();
     const parentCockpit = join(resolve(cwd, ".."), ".cockpit");
 
-    expect(logRoot(cwd, { gitRoot: () => null })).toBe(realpathSync(cwd));
-    expect(logRoot(cwd, { gitRoot: () => null })).not.toBe(parentCockpit);
+    expect<string>(logRoot(cwd, { gitRoot: () => null })).toBe(realpathSync(cwd));
+    expect<string>(logRoot(cwd, { gitRoot: () => null })).not.toBe(parentCockpit);
   });
 
   test("returns the reported root when cwd is outside it", () => {
@@ -94,7 +94,7 @@ describe("logRoot", () => {
     const root = tempDir();
     mkdirSync(join(cwd, ".cockpit"));
 
-    expect(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(root));
+    expect<string>(logRoot(cwd, { gitRoot: () => root })).toBe(realpathSync(root));
   });
 });
 

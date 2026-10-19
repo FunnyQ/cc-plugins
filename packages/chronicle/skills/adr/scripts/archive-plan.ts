@@ -41,8 +41,6 @@ export type PlanDeps = {
 
 export type TrailBucket = SourceBucket | ArchiveTarget;
 
-// The one place the on-disk trail layout is written down. The collector, the planner
-// and the applier's validator all route through it, so no two of them can drift apart.
 export function bucketDirectory(
   trailRoot: string,
   bucket: TrailBucket,
