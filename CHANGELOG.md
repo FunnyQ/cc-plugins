@@ -1,5 +1,50 @@
 # Changelog
 
+## [dispatch 5.7.5] - 2026-10-20
+
+_tracks tag `dispatch-v5.7.5`_
+
+### Changed
+- Pinned the delegation-marker contract with relay and monitor in tests, so a shape drift now fails loudly instead of silently.
+
+## [guard 0.8.5] - 2026-10-20
+
+_tracks tag `guard-v0.8.5`_
+
+### Changed
+- Moved guard's comment claims into tests and clearer names, with no change in behaviour.
+
+## [herdr 0.7.13] - 2026-10-20
+
+_tracks tag `herdr-v0.7.13`_
+
+### Changed
+- Moved herdr-browser, herd.ts, and the protocol and ask checks' claims from comments into tests, with a small dependency seam and a flag parser extracted; behaviour is unchanged.
+
+## [monitor 8.2.1] - 2026-10-20
+
+_tracks tag `monitor-v8.2.1`_
+
+### Changed
+- The Rust delegation-marker reader is now tested against relay's shared fixture, so the cross-plugin shape cannot drift unnoticed.
+
+## [relay 0.9.2] - 2026-10-20
+
+_tracks tag `relay-v0.9.2`_
+
+### Changed
+- Replaced about 280 explanatory comments in relay with tests, and added a shared delegation-marker fixture; behaviour is unchanged.
+
+## [runes 0.8.8] - 2026-10-20
+
+_tracks tag `runes-v0.8.8`_
+
+### Changed
+- Moved runes' comment claims into tests and clearer names across Clawd, minimap, teacher, config and the transcript cards; behaviour is unchanged.
+
+### Fixed
+- Fixed a flaky Clawd animation test that missed the short 100ms frame, which made the director's random pick fail intermittently.
+
 ## [dispatch 5.7.4] - 2026-10-20
 
 _tracks tag `dispatch-v5.7.4`_
