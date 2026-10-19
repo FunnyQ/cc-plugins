@@ -14,10 +14,8 @@ import {
 
 export type DeckSource = "tasks" | "graph" | "none";
 
-/** The two sources that actually carry a plan. */
 export type DeckSourceKind = Exclude<DeckSource, "none">;
 
-/** Impure: looks for a tasks/ directory, then a graph.json file. */
 export function detectSource(planDir: string): DeckSource {
   // Every stat error is swallowed, not just ENOENT: `throwIfNoEntry: false` still
   // throws ENOTDIR when planDir is itself a file, and the caller owns that message.
@@ -28,25 +26,21 @@ export function detectSource(planDir: string): DeckSource {
       return undefined;
     }
   };
-  // An existing task plan keeps its behaviour when someone drops a graph file beside it.
   if (stat("tasks")?.isDirectory()) return "tasks";
   if (stat("graph.json")?.isFile()) return "graph";
   return "none";
 }
 
-/** One error shape for both loaders, so the payload can concatenate them. */
 export type PlanError = { file: string; bucket: string; reason: string };
 
 export type ParsedGraph = {
   title: string;
   repoRoot: string;
   lanes: string[];
-  /** Keyed by ref. Empty when the file failed validation. */
   nodes: Record<string, GraphNode>;
   errors: PlanError[];
 };
 
-// Empty bucket means no lane can be attributed to a whole-file or unplaceable-node error.
 const FILE_BUCKET = "";
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -63,7 +57,6 @@ function display(value: unknown): string {
   return value === undefined ? "missing" : JSON.stringify(value);
 }
 
-/** Pure: the fallback is supplied explicitly because an error label is not a directory. */
 export function parseGraph(
   text: string,
   fileLabel: string,
@@ -108,7 +101,6 @@ export function parseGraph(
     );
   } else result.repoRoot = root.repoRoot;
 
-  // Doubles as the per-node membership test below, so nodes never rescan the array.
   const declaredLanes = new Set<string>();
   if (!isStrings(root.lanes) || root.lanes.length === 0) {
     error(
@@ -209,12 +201,10 @@ export function parseGraph(
     };
   }
 
-  // A broken contract cannot be partially trusted; loading any nodes would suggest a run in progress.
   if (result.errors.length > 0) {
     result.nodes = {};
     return result;
   }
-  // A bad edge leaves a sound graph: remove it so readiness cannot wait forever on a missing node.
   for (const node of Object.values(result.nodes)) {
     node.dependsOn = node.dependsOn.filter((ref) => {
       if (Object.hasOwn(result.nodes, ref)) return true;
@@ -228,7 +218,6 @@ export function parseGraph(
   return result;
 }
 
-/** Impure: reads <dir>/graph.json and turns read failures into the same error shape. */
 export async function loadGraph(dir: string): Promise<ParsedGraph> {
   const file = join(dir, "graph.json");
   const fallbackTitle = basename(dir);
@@ -253,7 +242,6 @@ export async function loadGraph(dir: string): Promise<ParsedGraph> {
   return parseGraph(text, file, fallbackTitle);
 }
 
-/** Pure. Folds state declarations into a new node map without changing either input. */
 export function applyStateEntries(
   nodes: Record<string, GraphNode>,
   entries: FlightlogEntry[],
@@ -264,7 +252,6 @@ export function applyStateEntries(
   const file = runLogPath("");
   for (const entry of entries) {
     if (!Object.hasOwn(nodes, entry.task)) {
-      // One error per unknown ref, in first-seen order.
       if (unknownRefs.has(entry.task)) continue;
       unknownRefs.add(entry.task);
       errors.push({
@@ -279,7 +266,6 @@ export function applyStateEntries(
 
   const mapped = Object.fromEntries(
     Object.entries(nodes).map(([ref, node]) => {
-      // The existing ladder requires todo for an unstarted node to become ready or in-progress.
       const updated = { ...node, status: node.status ?? "todo" };
       const entry = latest.get(ref);
       if (entry !== undefined) {
@@ -317,7 +303,6 @@ export function applyStateEntries(
   return { nodes: mapped, errors };
 }
 
-/** Impure: adapts the graph and shared trail for the existing pure payload builder. */
 export async function loadGraphPlan(planDir: string) {
   const [graph, entries] = await Promise.all([
     loadGraph(planDir),

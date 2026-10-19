@@ -215,7 +215,6 @@ describe("deriveTaskViews", () => {
     const [view] = deriveTaskViews({ "ui/03": task("ui/03") }, [withProse]);
     expect(view.latestScore?.rationale).toBe("Grounded in the gate evidence.");
 
-    // A trail written before `--rationale-file` leaves the key off entirely.
     const [older] = deriveTaskViews({ "ui/03": task("ui/03") }, [
       score("ui/03", 1, "2026-01-01T00:03:00Z"),
     ]);
@@ -459,7 +458,6 @@ describe("aggregateFleet", () => {
     ]);
     const dev = rows.find((row) => row.key === "dev#2");
     expect(dev).toMatchObject({ status: "abandoned" });
-    // Nothing is invented: no end was logged, so no end time and no duration.
     expect(dev?.endedAt).toBeUndefined();
     expect(dev?.elapsedMs).toBeUndefined();
   });
@@ -521,7 +519,6 @@ describe("aggregateFleet", () => {
     expect(rows.find((row) => row.key === "commit-wave-2")).toMatchObject({
       status: "abandoned",
     });
-    // Nothing invented for the row that never closed.
     expect(
       rows.find((row) => row.key === "commit-wave-2")?.elapsedMs,
     ).toBeUndefined();
@@ -530,9 +527,7 @@ describe("aggregateFleet", () => {
     });
   });
 
-  test("leaves the newest commit agent in flight", () => {
-    // The commit agent currently running has nothing after it. Reaping it would
-    // blank the elapsed ticker on a live commit.
+  test("leaves the newest commit agent in flight, keeping its elapsed ticker live", () => {
     const rows = aggregateFleet([
       note(
         "commit",
@@ -591,9 +586,7 @@ describe("aggregateFleet", () => {
     });
   });
 
-  test("a commit agent never reaps a scout, or vice versa", () => {
-    // Both are sequential, but they are separate sequences — the run interleaves
-    // them, so ordering one against the other would close a live agent.
+  test("a commit agent never reaps a scout, or vice versa, since the run interleaves the two sequences", () => {
     const rows = aggregateFleet([
       note(
         "scout",
@@ -620,9 +613,7 @@ describe("aggregateFleet", () => {
     });
   });
 
-  test("leaves a genuinely running row in flight", () => {
-    // The newest agent of a live run has nothing after it. Reaping this would
-    // blank the elapsed ticker on every currently-working agent.
+  test("leaves a genuinely running row in flight, keeping its elapsed ticker live", () => {
     const rows = aggregateFleet([
       note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev#1"),
       note("core/03", "dev", 1, "2026-01-01T00:01:00Z", "end", "dev#1"),
@@ -633,9 +624,7 @@ describe("aggregateFleet", () => {
     });
   });
 
-  test("does not let parallel review lenses abandon each other", () => {
-    // The final-review fan-out runs every lens at the same identity
-    // (ref, role, attempt). They are concurrent, not sequential.
+  test("does not let concurrent review lenses sharing one identity abandon each other", () => {
     const rows = aggregateFleet([
       note("core/05", "review", 1, "2026-01-01T00:00:00Z", "start", "lens-a"),
       note("core/05", "review", 1, "2026-01-01T00:00:01Z", "start", "lens-b"),
@@ -736,9 +725,6 @@ describe("gate outcome", () => {
     );
   });
 
-  // The normal shape of a passing message: the verifier quotes its test summary,
-  // and that summary contains the word `fail`. Scanning the whole message paints
-  // a green run red.
   test("the leading PASS wins over a `0 fail` in the quoted test summary", () => {
     expect(
       outcomeOf([
@@ -841,4 +827,12 @@ describe("state declarations are inert in fleet", () => {
     expect(deriveTaskViews(byRef, mixed)[0]).toMatchObject({ attempts: 2, state: "in-progress" });
     expect(deriveTaskViews(byRef, states)[0]).toMatchObject({ attempts: 0, latestScore: null, state: "ready" });
   });
+});
+
+test("row identity pairs on the raw logged task, role and attempt, not on the parsed label", () => {
+  const [row] = aggregateFleet([
+    note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev:other/09#4"),
+  ]);
+  expect(row).toMatchObject({ ref: "other/09", attempt: 4 });
+  expect(row!.identity).toBe("core/03|dev|1");
 });

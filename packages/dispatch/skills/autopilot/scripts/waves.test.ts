@@ -76,8 +76,6 @@ describe("remainingWaves", () => {
     ).toEqual([1, 1]);
   });
 
-  // An invalid task is not complete, so it blocks — the header must not read as
-  // one wave from done while a gate result is missing.
   test("an invalid task keeps its dependents waiting", () => {
     expect(
       remainingWaves([

@@ -25,7 +25,6 @@ const ORCHESTRATOR = join(
   "orchestrator.md",
 );
 
-// A field left at its placeholder ('/abs/repo/...') scouts a tree that does not exist, which reads as "no work".
 const REQUIRED = [
   "slug",
   "repoRoot",
@@ -48,7 +47,6 @@ const PATHS = [
   "attestationFile",
 ];
 
-/** The first ```javascript block of the orchestrator doc. */
 export function extractScript(doc: string): string {
   const start = doc.indexOf("```javascript");
   if (start === -1)
@@ -59,7 +57,6 @@ export function extractScript(doc: string): string {
   return doc.slice(bodyStart, end);
 }
 
-/** Replace `CFG` field values with JS source literals, keeping each line's comment. */
 export function bakeConfig(
   script: string,
   literals: Record<string, string>,
@@ -86,7 +83,6 @@ export function bakeConfig(
   return script.slice(0, cfgStart) + cfg + script.slice(cfgEnd);
 }
 
-/** Validate scouted CFG values and bake them into the orchestrator doc's script. */
 export function bakeOrchestrator(
   doc: string,
   values: Record<string, unknown>,
@@ -102,7 +98,6 @@ export function bakeOrchestrator(
       throw new Error(`CFG.${field} must be an absolute path: ${value}`);
     }
   }
-  // worktree.ts cannot assume docs/<slug>: a waypoints leg nests its plan deeper.
   values = { planDir: dirname(values.planPath as string), ...values };
   const literals = Object.fromEntries(
     Object.entries(values).map(([field, value]) => [
@@ -113,7 +108,6 @@ export function bakeOrchestrator(
   return bakeConfig(extractScript(doc), literals);
 }
 
-/** Where the baked script lands: beside the run log, inside the self-ignored `.flightlog/`. */
 export function bakedScriptPath(planPath: string): string {
   return join(dirname(planPath), FLIGHTLOG_DIRNAME, "orchestrator.js");
 }
@@ -130,7 +124,6 @@ if (import.meta.main) {
     );
     const out = bakedScriptPath(values.planPath as string);
     await mkdir(dirname(out), { recursive: true });
-    // Without the self-ignore, the inter-wave commit would sweep the baked script into the branch.
     const gitignore = join(dirname(out), ".gitignore");
     if (!existsSync(gitignore)) await writeFile(gitignore, "*\n");
     await writeFile(out, script);

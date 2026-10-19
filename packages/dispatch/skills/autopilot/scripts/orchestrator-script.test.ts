@@ -53,7 +53,6 @@ type ScoutResult = {
   stdout: string;
   exitCode: number;
   stderr: string;
-  /** The scout's structured copy of the cap; optional so a scout can omit it. */
   maxParallel?: unknown;
   readyModels?: { ref: string; modelsRaw?: unknown }[];
 } | null;
@@ -98,9 +97,7 @@ type RunResult = {
 type Scenario = {
   worktree?: Record<string, (Record<string, unknown> | Throws | null)[]>;
   worktreeHolds?: Record<string, Promise<void>>;
-  /** One entry per wave, consumed in order. THROWS models a rejecting agent. */
   scouts: (ScoutResult | Throws)[];
-  /** Omit to leave the Workflow runtime's `budget` global undeclared. */
   budget?: { total: number | null; spent: number; spendAfterDev?: number };
   commit?: (
     | {
@@ -112,7 +109,6 @@ type Scenario = {
     | Throws
     | null
   )[];
-  /** Keyed by task ref; null models an agent that returned no structured result. */
   gate?: Record<
     string,
     (
@@ -138,27 +134,19 @@ type Scenario = {
     string,
     ({ ok: boolean; status: string; error?: string } | Throws | null)[]
   >;
-  /** Keyed by lens key (`codex`, `reuse`, ...); the review lens's structured result per attempt. */
   review?: Record<
     string,
     ({ reviewed: boolean; reason: string } | Throws | null)[]
   >;
-  /** Keyed by ref; models a park that reports failure, or returns nothing at all. */
   park?: Record<
     string,
     ({ ok: boolean; status: string; error?: string } | Throws | null)[]
   >;
-  /** Refs whose dev step throws, simulating a pipeline that dies mid-flight. */
   devThrows?: string[];
-  /** Keyed by ref; the dev step's returned prose, one entry per attempt. */
   devReply?: Record<string, string[]>;
-  /** Keyed by ref; the stubbed dev step awaits this before returning. */
   devHolds?: Record<string, Promise<void>>;
-  /** Keyed by ref; the stubbed park agent awaits this before returning. */
   parkHolds?: Record<string, Promise<void>>;
-  /** Keyed by ref; the stubbed mark-done agent awaits this before returning. */
   doneHolds?: Record<string, Promise<void>>;
-  /** Optional live call sink for tests that coordinate held pipeline steps. */
   agentCalls?: string[];
 };
 
@@ -193,7 +181,6 @@ const ready = (
   path: `/abs/repo/docs/my-plan/tasks/${ref}.md`,
 });
 
-/** Pull the canonical script out of the markdown, ready for `new Function`. */
 type ConfigOverrides = Record<string, string>;
 
 async function loadScript(overrides: ConfigOverrides = {}): Promise<string> {
@@ -216,11 +203,8 @@ type AgentSchema = {
 
 type RunLog = {
   result: RunResult;
-  /** Every agent label, in call order. */
   labels: string[];
-  /** Every agent prompt, in call order. */
   prompts: string[];
-  /** Every agent model, in call order. */
   models: (string | undefined)[];
   efforts: (string | undefined)[];
   effortKeys: boolean[];
@@ -261,8 +245,6 @@ async function runOrchestrator(
     }
     const queue = queues.get(key)!;
     const next = queue.length > 0 ? queue.shift() : fallback;
-    // Faithful to the runtime at EVERY schema'd call, not just the scout and the
-    // commit agents: queue THROWS to model a subagent that text-emits its payload.
     if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
     return next;
   };
@@ -386,7 +368,6 @@ async function runOrchestrator(
     return "ok";
   };
 
-  // Mirrors the runtime: a thrown thunk resolves to null, the call never rejects.
   const parallel = async (thunks: (() => Promise<unknown>)[]) =>
     Promise.all(
       thunks.map((thunk) =>
@@ -423,7 +404,6 @@ const counts = (over: Partial<Counts> & { total: number }): Counts => ({
   ...over,
 });
 
-/** One wave offering `ref` as the only ready task in a tree of `total`. */
 const wave = (ref: string, total: number, done: number): ScoutResult =>
   snapshot({
     ready: [ready(ref)],
@@ -431,7 +411,6 @@ const wave = (ref: string, total: number, done: number): ScoutResult =>
     unfinished: [{ ref, state: "todo" }],
   });
 
-/** One wave offering every ref in `refs` as ready, in a tree of exactly those. */
 const multiWave = (refs: string[]): ScoutResult =>
   snapshot({
     ready: refs.map((ref) => ready(ref)),
@@ -439,7 +418,6 @@ const multiWave = (refs: string[]): ScoutResult =>
     unfinished: refs.map((ref) => ({ ref, state: "todo" })),
   });
 
-/** The scout every finished run ends on: nothing ready, everything done. */
 const complete = (total: number): ScoutResult =>
   snapshot({
     ready: [],
@@ -447,7 +425,6 @@ const complete = (total: number): ScoutResult =>
     unfinished: [],
   });
 
-/** The invariant the whole plan exists to protect. */
 function accountsForEveryTask(result: RunResult, refs: string[]): boolean {
   return refs.every((ref) => {
     const inCompleted = result.completed.includes(ref);
@@ -477,10 +454,6 @@ function effortFor(log: Pick<RunLog, "labels" | "efforts">, label: string) {
   return log.efforts[index];
 }
 
-/**
- * A promise a test releases by hand, to hold a stubbed agent inside its window.
- * Replaces the `let releaseX!: () => void` idiom at every hold site.
- */
 const latch = () => {
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
@@ -526,8 +499,6 @@ describe("orchestrator wave loop", () => {
   });
 
   test("a resumed tree counts earlier-run done tasks and does not false-stall", async () => {
-    // Wave 2 shows done === total. `completed` holds only ui/03 — one entry for
-    // a three-task tree — so a completed.length test would report a stall here.
     const { result } = await runOrchestrator({
       scouts: [
         snapshot({
@@ -550,12 +521,6 @@ describe("orchestrator wave loop", () => {
   });
 
   test("a task rolled back after passing escalates as divergence, naming the ref", async () => {
-    // Wave 1 passes ui/01 and ui/02. Wave 2's disk snapshot has only ui/01 done:
-    // something rewrote ui/02's task file after mark-done confirmed it, so the
-    // scout still lists ui/02 as todo. `completed` and `unfinished` now overlap.
-    // Note counts.done (1) is BELOW completed.length (2) here, but the check is
-    // the intersection — see the resume test above, where the counts point the
-    // other way and nothing must fire.
     const { result } = await runOrchestrator({
       scouts: [
         snapshot({
@@ -586,9 +551,7 @@ describe("orchestrator wave loop", () => {
     expect(divergence.infrastructure).toBe(true);
     expect(divergence.reason).toMatch(/divergence/);
     expect(divergence.reason).toContain("ui/02");
-    // The untouched sibling must not be blamed.
     expect(divergence.reason).not.toContain("ui/03");
-    // It must NOT be reported as a stall — that is the wrong cause.
     expect(divergence.reason).not.toMatch(/stalled/);
   });
 
@@ -658,9 +621,6 @@ describe("orchestrator wave loop", () => {
   });
 
   test("unparseable files escalate even when every PARSED task is done", async () => {
-    // The trap: a file that fails to parse never enters byRef, so it never
-    // enters counts either. counts reads done === total over a tree that still
-    // holds a task nobody could read, and the run would report clean completion.
     const { result } = await runOrchestrator({
       scouts: [
         snapshot({
@@ -690,13 +650,6 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations[0].infrastructure).toBe(true);
   });
 
-  // The failure a null-guard cannot see. `agent({schema})` rejects when the
-  // subagent text-emits its payload instead of calling StructuredOutput, so an
-  // unguarded scout call takes the whole run down with it — and every finished
-  // wave's `completed` and `escalations` die with the throw, leaving the tree
-  // reading `done` on disk while the run reports nothing at all.
-  // Two throws, because the first one is retried; see "structured-output
-  // resilience" for the retry itself.
   test("a scout that throws twice escalates instead of killing the run", async () => {
     const { result } = await runOrchestrator({ scouts: [THROWS, THROWS] });
     expect(result.completed).toEqual([]);
@@ -723,9 +676,6 @@ describe("orchestrator wave loop", () => {
     expect(result.escalations[0].reason).toMatch(/stdout was not JSON/);
   });
 
-  // A primitive parses fine, so only a shape test catches it. `null` and `0` are
-  // also falsy, so a truthiness guard would skip validation entirely and let the
-  // first field read throw past the (scout) escalation.
   test.each([
     ["null", "null"],
     ["0", "number"],
@@ -931,7 +881,6 @@ describe("orchestrator failure handling", () => {
     expect(esc.parked).toBe(true);
     expect(esc.reason).toMatch(/verification did not run or did not return/);
     expect(esc.reason).toMatch(/no original cause/);
-    // Exactly one dev attempt: an infrastructure failure never retries.
     expect(labels.filter((l) => l.startsWith("dev:"))).toHaveLength(1);
     expect(labels).toContain("block:ui/01");
   });
@@ -1155,7 +1104,6 @@ describe("orchestrator failure handling", () => {
     expect(exhausted.result.escalations[0].reason).toContain(
       "attempt 1 (ran on final-review)",
     );
-    // The fixer edited the main tree, and no worktree holds those ungated edits back.
     expect(exhausted.labels).not.toContain("commit-post-loop");
   });
 
@@ -1191,9 +1139,6 @@ describe("orchestrator failure handling", () => {
   });
 
   test("a park that does not confirm reports parked: false", async () => {
-    // The agent answered, but the reread still shows in-progress. Reporting
-    // parked: true here would hide the one instruction the user needs — reset
-    // that Status by hand, because next-ready will never re-offer the task.
     const { result } = await runOrchestrator({
       scouts: [oneTask("ui/01")],
       gate: { "ui/01": [null] },
@@ -1261,8 +1206,6 @@ describe("orchestrator failure handling", () => {
       gate: { "api/01": [null] },
     });
     expect(result.completed).toEqual(["ui/01"]);
-    // api/01 was parked with its own escalation; the next wave's empty ready set
-    // must NOT be re-reported as a fresh tree stall.
     expect(result.escalations.map((e) => e.task)).toEqual(["api/01"]);
     expect(accountsForEveryTask(result, ["ui/01", "api/01"])).toBe(true);
   });
@@ -1412,7 +1355,6 @@ describe("orchestrator commits", () => {
 });
 
 describe("orchestrator cross-vendor review lens", () => {
-  /** One wave offering only the Final review task, then a drained tree. */
   const finalWave: ScoutResult = snapshot({
     ready: [ready("integration/01", true)],
     counts: counts({ total: 1, todo: 1 }),
@@ -1441,7 +1383,6 @@ describe("orchestrator cross-vendor review lens", () => {
       review: { codex: [{ reviewed: false, reason: "codex exited 127" }] },
     });
 
-    // The fixer still runs, but no verifier or judge can pass the un-reviewed round.
     expect(log.labels).toContain("fix:integration/01#1");
     expect(log.labels).not.toContain("verify:integration/01#1");
     expect(log.labels).not.toContain("judge:integration/01#1");
@@ -1569,11 +1510,6 @@ describe("orchestrator cross-vendor review lens", () => {
     }
   });
 
-  /**
-   * Pins the lens SET, not just each member. The loop above passes even if a
-   * removed lens is reintroduced, so it cannot protect the 4→3 consolidation
-   * that replaced `simplification` + `altitude` with `leanness`.
-   */
   test("fans out exactly the external lens plus reuse / leanness / efficiency", async () => {
     const log = await runOrchestrator({ scouts: [finalWave, complete(1)] });
 
@@ -1593,7 +1529,6 @@ describe("orchestrator cross-vendor review lens", () => {
       expect(prompt).toContain(tag);
     }
     expect(prompt).toContain("net: -<N> lines possible.");
-    // Correctness/security/perf belong to other lenses; overlap wastes a pass.
     expect(prompt).toContain("OUT of scope");
   });
 
@@ -1829,17 +1764,9 @@ test("a held catch-path park still reconciles", async () => {
   expect(escalation.parked).toBe(true);
 });
 
-// STRUCTURED-OUTPUT RESILIENCE
-// ══════════════════════════════════════════════════════════════════════════
-// A schema'd agent that text-emits its payload has usually already done all of
-// the real work — the live case wrote a green PASS row to the flightlog first.
-// Catching the throw records that failure; only a retry recovers from it. What
-// these tests pin is that the retry happens exactly once, on the intended model,
-// at every idempotent call site — and at no other.
 const callsTo = (labels: string[], label: string) =>
   labels.filter((seen) => seen === label).length;
 
-/** Every model a given label ran on, in call order. */
 const modelsFor = (log: Pick<RunLog, "labels" | "models">, label: string) =>
   log.labels.flatMap((seen, index) =>
     seen === label ? [log.models[index]] : [],
@@ -1859,7 +1786,6 @@ describe("judge scratch files", () => {
       "mktemp -d /tmp/q-lab/dispatch/autopilot/repo/my-plan/judge-ui-01-a1-XXXXXX",
     );
     expect(prompt).toContain("--rationale-file <dir>/rationale.md");
-    // A fixed path let another plan's leftover rationale reach this run's trail.
     expect(prompt).not.toContain("/tmp/rationale-");
     expect(prompt).not.toContain("/tmp/scores-");
   });
@@ -1883,8 +1809,6 @@ describe("structured-output resilience", () => {
   });
 
   test("the retry does not consume an attempt", async () => {
-    // The throw is an infrastructure fault, not a verdict on the work. Charging
-    // it to the attempt budget would park a task the dev could still have fixed.
     const log = await runOrchestrator({
       scouts: [wave("ui/01", 1, 0), complete(1)],
       gate: {
@@ -1904,7 +1828,6 @@ describe("structured-output resilience", () => {
     expect(escalation.task).toBe("ui/01");
     expect(escalation.infrastructure).toBe(true);
     expect(escalation.reason).toMatch(/StructuredOutput/);
-    // Once, and only once: a retry loop would burn the run instead of parking.
     expect(callsTo(labels, "verify:ui/01#1")).toBe(2);
   });
 
@@ -1918,11 +1841,6 @@ describe("structured-output resilience", () => {
   });
 
   test("the judge is NOT retried — it persists a verdict before it returns", async () => {
-    // `score-task.ts --log` appends a row keyed by ref+attempt, and fleet.ts
-    // keeps the FIRST row for that key. Retrying would score the same attempt
-    // twice and the orchestrator would act on the second, leaving the trail
-    // contradicting the decision it records. Parking is what happened before
-    // this helper existed, and it is never worse than a lying trail.
     const { result, labels } = await runOrchestrator({
       scouts: [wave("ui/01", 1, 0), complete(1)],
       judge: { "ui/01": [THROWS] },
@@ -1951,8 +1869,6 @@ describe("structured-output resilience", () => {
   });
 
   test("the commit agents are NOT retried", async () => {
-    // The one call here that is not idempotent: a retry after a partial commit
-    // writes a second, incoherent one. It keeps settled() — report, never re-run.
     const { result, labels } = await runOrchestrator({
       scouts: [wave("ui/01", 2, 0), wave("ui/02", 2, 1), complete(2)],
       commit: [THROWS],
@@ -1990,21 +1906,12 @@ describe("structured-output resilience", () => {
         "the harness rejects the call and the work you just did is discarded.",
       );
     }
-    // The clause must not read as a hedge on the verifier's exit rule.
     expect(promptFor(log, "verify:ui/main#1")).not.toMatch(
       /unless|except|may still pass|can be ignored|disregard/i,
     );
   });
 });
 
-// PLAN-LEVEL CONCURRENCY CAP
-// ══════════════════════════════════════════════════════════════════════════
-// A plan whose tasks share a resource the working tree cannot express — one
-// SwiftPM target, one live device — declares `> **Max parallel**: N` in
-// PLAN.md, and the scout carries it as `maxParallel`. The cap wraps the WHOLE
-// task pipeline, not just dev: the live incident was a verifier running
-// `swift build` while a sibling's delegate was mid-reinstall, and a verifier is
-// not a writer, so capping writers alone would have let it through.
 describe("plan concurrency cap", () => {
   const capped = (refs: string[], maxParallel: number | null) =>
     snapshot({
@@ -2024,7 +1931,6 @@ describe("plan concurrency cap", () => {
     });
 
     await waitForCall(calls, "dev:ui/01#1");
-    // Give a wrongly-parallel run every chance to dispatch the second task.
     for (let turn = 0; turn < 20; turn++) await Promise.resolve();
     expect(calls).not.toContain("dev:ui/02#1");
     first.release();
@@ -2129,8 +2035,6 @@ describe("plan concurrency cap", () => {
     expect(result.completed).toEqual(["ui/01", "ui/02"]);
   });
 
-  // A scout that omits the structured cap must not read as "no cap": that is
-  // the silent parallel run a serial plan exists to prevent.
   test("a scout missing the structured maxParallel escalates", async () => {
     const { maxParallel: _dropped, ...scout } = capped(["ui/01"], 1)!;
     const { result, labels } = await runOrchestrator({ scouts: [scout] });
@@ -2140,7 +2044,6 @@ describe("plan concurrency cap", () => {
     expect(labels.some((label) => label.startsWith("dev"))).toBe(false);
   });
 
-  // Two copies that disagree mean one is wrong, and nothing says which.
   test("a structured cap that contradicts stdout escalates", async () => {
     const { result, labels } = await runOrchestrator({
       scouts: [{ ...capped(["ui/01"], 1)!, maxParallel: null }],
@@ -2193,8 +2096,6 @@ describe("orchestrator human-only gate items", () => {
     });
 
     expect(result.completed).toEqual(["ui/01"]);
-    // A pending human item is not a park. Reporting it as one would send the
-    // user to reset a Status that is legitimately `done`.
     expect(result.escalations).toEqual([]);
     expect(result.needsHuman).toEqual([
       {
@@ -2205,8 +2106,6 @@ describe("orchestrator human-only gate items", () => {
   });
 
   test("a failed gate's pending list never reaches needsHuman", async () => {
-    // The retry re-derives the list from the same task file, so carrying a
-    // rejected attempt's list forward would report an item twice.
     const { result } = await runOrchestrator({
       scouts: [humanWave],
       gate: {
@@ -2255,7 +2154,6 @@ describe("orchestrator human-only gate items", () => {
     const prompt = promptFor(withFile, "verify:ui/01#1");
     expect(prompt).toContain("/abs/repo/docs/my-plan/.flightlog/attested.md");
     expect(prompt).toContain("It is not a blanket pass");
-    // The bound that stops one sentence of attestation excusing every red item.
     expect(prompt).toContain("covers ONLY the items it names");
     expect(prompt).toContain("that entry is invalid");
   });
@@ -2321,8 +2219,6 @@ describe("orchestrator single-task resume", () => {
   });
 
   test("resuming past the cap runs the attempts instead of silently re-parking", async () => {
-    // The trap: `for (attempt = 3; attempt <= FINAL_MAX)` is false on entry, so
-    // a cap-keyed loop parks the task having executed nothing at all.
     const { result, labels } = await runOrchestrator(
       {
         scouts: [],
@@ -2357,8 +2253,6 @@ describe("orchestrator single-task resume", () => {
       { ...RESUME_CFG, resumeFrom: "'verify'", resumeAttempt: "3" },
     );
 
-    // Attempt 3 skipped the round; attempt 4 must not — a red verify means the
-    // skipped work genuinely does need redoing.
     expect(labels).not.toContain("review:reuse#3");
     expect(labels).toContain("review:reuse#4");
     expect(labels).toContain("fix:review/01#4");
@@ -2402,8 +2296,6 @@ describe("orchestrator single-task resume", () => {
   });
 
   test("a resumed Claude ladder raises effort only on its final rung", async () => {
-    // Keyed off `cap` rather than `last`, `attempt >= claudeCap` is already true
-    // at attempt 2, so the whole ladder would raise effort from its first rung.
     const log = await runOrchestrator(
       {
         scouts: [],
@@ -2454,8 +2346,6 @@ describe("orchestrator single-task resume", () => {
     [{ resumeFrom: "'score'" }, 'unknown resumeFrom "score"'],
     [{ resumeTaskPath: "''" }, "resumeTaskPath is empty"],
     [{ resumeFrom: "'judge'" }, "CFG.attestationFile is required"],
-    // `Math.trunc(Number(0)) || 1` silently renumbers this to attempt 1, which
-    // then collides with the parked run's own attempt 1 in the score rows.
     [
       { resumeAttempt: "0" },
       "resumeAttempt must be a whole number 1 or greater",
@@ -2775,7 +2665,6 @@ describe("task worktree isolation", () => {
         "--repo /abs/repo --slug my-plan",
       );
       expect(promptFor(log, label)).toContain("StructuredOutput");
-      // The land agent resolves conflicts, so it alone runs on opus.
       expect(modelFor(log, label)).toBe(label.startsWith("wt-land:") ? "opus" : "haiku");
       expect(effortFor(log, label)).toBe("low");
     }
@@ -3514,7 +3403,6 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
       await waitForCall(calls, `dev:${b}#1`);
       await waitForCall(calls, `wt-land:${a}`);
       land.release();
-      // Drain the released land's promise chain while the sibling stays in dev.
       await new Promise((resolve) => setTimeout(resolve, 0));
     } finally {
       land.release();
@@ -3984,7 +3872,6 @@ describe("worktree contract boundaries", () => {
       const schema = log.schemas[index]!;
       expect(schema.type).toBe("object");
       expect(schema.required).toEqual(fields[label.split(":")[0]]);
-      // Only the drain-guarded create prints `drained`, so it is the one optional field.
       expect(Object.keys(schema.properties!)).toEqual(
         label.startsWith("wt-create:") ? [...schema.required!, "drained"] : schema.required!,
       );

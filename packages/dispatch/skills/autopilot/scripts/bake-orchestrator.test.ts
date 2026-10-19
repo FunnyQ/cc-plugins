@@ -61,7 +61,7 @@ describe("bakeOrchestrator", () => {
     expect(script).toContain("--plan-dir ${CFG.planDir}");
   });
 
-  test("refuses a missing required field", () => {
+  test("refuses a missing required field, which would scout its placeholder tree as no work", () => {
     const { baseRef: _, ...values } = scouted("/r");
     expect(() => bakeOrchestrator(DOC, values)).toThrow(
       "missing required CFG fields: baseRef",
@@ -98,7 +98,7 @@ test("bakedScriptPath lands in the plan's .flightlog", () => {
   );
 });
 
-test("CLI writes the script beside a self-ignore and prints its path", async () => {
+test("CLI writes the script beside a self-ignore, so no inter-wave commit sweeps it in, and prints its path", async () => {
   const root = await mkdtemp(join(tmpdir(), "bake-orchestrator-"));
   try {
     const proc = Bun.spawn(["bun", SCRIPT], {

@@ -107,7 +107,6 @@ describe("parseGraph", () => {
   });
 
   test("accepts unspecified shapes without inventing validation rules", () => {
-    // Empty strings, multiline titles, cycles, duplicate edges, and advisory dangling blocks are legal.
     const result = parseGraph(
       fixture({
         title: "",
@@ -639,7 +638,6 @@ describe("applyStateEntries", () => {
 
   test("state declarations cannot close an open start even with a matching runtime identity", () => {
     const original = loadedNode({ status: "todo" });
-    // Parsed notes allow free-form roles, including the value an unguarded state entry would read.
     const entries = parseLog(
       [
         {
@@ -772,9 +770,6 @@ describe("committed deckplan example", () => {
     expect(literals.repoRoot).toBe(graph.repoRoot);
     for (const key of ["runDir", "flightlog", "repoRoot"])
       expect(literals[key]).toMatch(/^\//);
-    // Run the shipped script under stubbed Workflow globals: it spawns nothing and
-    // touches no filesystem, so this reads the prompts it really builds rather than
-    // a regex's guess at them.
     const calls: { prompt: string; label: string }[] = [];
     const globals = globalThis as unknown as Record<string, unknown>;
     globals.agent = async (prompt: string, options: { label: string }) => {
@@ -810,7 +805,6 @@ describe("committed deckplan example", () => {
       expect(prompt).toContain(
         `state "${literals.runDir}/.flightlog/run.jsonl" --task ${ref} --state done`,
       );
-      // The fleet table enriches a row only when the spawn label names the same node.
       expect(label).toBe(`dev:${ref}#1`);
       expect(start.match(identity)![4]).toBe(label);
     }

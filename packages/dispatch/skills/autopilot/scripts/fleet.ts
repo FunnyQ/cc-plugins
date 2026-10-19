@@ -8,7 +8,6 @@ import type {
 } from "../../flightplan/scripts/lib/flightlog";
 import type { TokenCounts } from "./usage-types";
 
-/** Every role the orchestrator logs. The type is derived so the two never drift. */
 const KNOWN_ROLES = [
   "scout",
   "dev",
@@ -49,7 +48,6 @@ export type TaskView = {
   title: string;
   status: string | null;
   state: TaskState;
-  /** Why the task is `invalid`, straight from `taskValidity`. Null otherwise. */
   invalidReason: string | null;
   blockedBy: string[];
   dependsOn: string[];
@@ -63,7 +61,6 @@ export type TaskView = {
     passed: boolean;
     hardFailed: boolean;
     breakdown: { name: string; weight: number; score: number }[];
-    /** The judge's prose. Absent on a verdict logged before `--rationale-file`. */
     rationale?: string;
   } | null;
 };
@@ -77,16 +74,9 @@ export type TaskView = {
  */
 export type FleetStatus = "in-flight" | "abandoned" | "finished";
 
-/** Whether a gate role let the attempt through. Absent for every other role. */
 export type GateOutcome = "passed" | "failed";
 
 export type FleetRow = {
-  /**
-   * `fleetIdentity` over the raw logged `task`/`role`/`attempt`. Exported because the
-   * transcript reader parses those same three flags off an agent's announce prompt and
-   * pairs on this string — `ref`/`attempt` below are label-parse-preferred display
-   * fields and diverge from it whenever an agent's free-text label parses.
-   */
   identity: string;
   key: string;
   label: string;
@@ -103,11 +93,6 @@ export type FleetRow = {
   outcome?: GateOutcome;
   /** Tokens burned. Absent (never 0) when no transcript paired — render as unavailable. */
   usage?: TokenCounts;
-  /**
-   * Tokens the external codex CLI burned for this row, kept apart from `usage` so the
-   * cheap driver and the expensive delegate stay separately readable. Absent when the
-   * row drove no external engine.
-   */
   codexUsage?: TokenCounts;
   /**
    * Claude model ids that produced a billed turn for this row, first-seen order,
@@ -122,7 +107,6 @@ export type FleetRow = {
   codexModels?: string[];
 };
 
-/** `dev:<ref>#<attempt>`, plus the external-engine form `dev-codex:<ref>#<attempt>`. */
 const DEV = /^dev(?:-[a-z]+)?:(.+)#(\d+)$/;
 const REF_ATTEMPT = /^(verify|requalify|reverify|judge|land|fix):(.+)#(\d+)$/;
 const REVIEW = /^review:([^#]+)#(\d+)$/;
@@ -171,7 +155,6 @@ export function parseAgentLabel(label: string): ParsedLabel {
   return { role: "unknown", raw: label };
 }
 
-/** The one place the fleet identity string is built. */
 export function fleetIdentity(
   task: string,
   role: string,
@@ -181,20 +164,11 @@ export function fleetIdentity(
 }
 
 type TaskAggregate = {
-  /** Open start count per identity — never a set. See `aggregateByTask`. */
   openStarts: Map<string, number>;
   attempts: number;
   latestScore: ScoreEntry | null;
 };
 
-/**
- * One pass over the whole trail, grouped by task.
- *
- * Parallel agents share a `(task, role, attempt)` identity — the five closing review
- * lenses all log as `review` on the same attempt — so open starts are counted, not
- * set-tracked. One end cancels exactly one start; otherwise the first lens to finish
- * would take the task out of `in-progress` while four agents were still flying.
- */
 function aggregateByTask(
   entries: FlightlogEntry[],
 ): Map<string, TaskAggregate> {
@@ -207,7 +181,6 @@ function aggregateByTask(
       byTask.set(entry.task, aggregate);
     }
 
-    // Keep state-only tasks in the map, but declarations contribute no attempts or agent lifecycle.
     if (entry.kind === "state") continue;
 
     aggregate.attempts = Math.max(aggregate.attempts, entry.attempt ?? 0);
@@ -252,9 +225,6 @@ export function deriveTaskViews(
     const blockedBy = unmetNodeDependencies(task, byRef);
     const validity = task.validity;
     let state: TaskState;
-    // Validity outranks the raw Status: a task claiming `done` over an unticked
-    // gate box must read as invalid, never as done, or the dashboard would show
-    // the tree as complete while the gate result is missing.
     if (validity.kind === "invalid") state = "invalid";
     else if (task.status === "done") state = "done";
     else if (task.status === "blocked") state = "blocked";
@@ -312,15 +282,6 @@ function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
     : "unknown";
 }
 
-/**
- * The two gate roles carry a pass/fail the dashboard should colour differently.
- *
- * A judge always has a verdict object, so read that. A verifier has only prose,
- * and the orchestrator requires it to lead with PASS or FAIL — so read that word
- * and stop. Only an off-contract message (older logs, an agent that ignored the
- * convention) falls through to scanning the prose, failure first. A message that
- * says neither stays unjudged rather than being guessed into a colour.
- */
 function gateOutcome(row: FleetRow): GateOutcome | undefined {
   if (row.role === "judge") {
     if (!row.score) return undefined;
@@ -331,28 +292,14 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
   const message = row.message?.trim();
   if (!message) return undefined;
 
-  // The leading verdict is authoritative and settles the row on its own. It has
-  // to win outright: a verifier quoting its test summary writes "PASS — bun test
-  // (7 pass, 0 fail)", and scanning the whole message finds `fail` there and
-  // paints a green run red. That is the normal shape of a passing message, not
-  // an edge case.
   const verdict = /^(PASS|FAIL)\b/i.exec(message);
   if (verdict) return verdict[1].toUpperCase() === "FAIL" ? "failed" : "passed";
 
-  // Off-contract message. Scan it, failure first — "3 passed, 1 failed" is a
-  // failure, and reading a real failure as uncoloured is the worse mistake.
   if (/\bfail(ed|ure|s|ing)?\b/i.test(message)) return "failed";
   if (/\bpass(ed|es|ing)?\b/i.test(message)) return "passed";
   return undefined;
 }
 
-/**
- * How far through one attempt a role sits. The per-task loop is strictly
- * dev → review → fix → verify → judge → land → reverify, so a role starting proves every lower
- * role of that attempt is over. Review shares one rank on purpose: the
- * final-review fan-out runs its lenses concurrently at the same identity, and
- * they must never close each other.
- */
 const ROLE_PROGRESS: Partial<Record<AgentRole, number>> = {
   dev: 0,
   review: 1,
@@ -364,37 +311,17 @@ const ROLE_PROGRESS: Partial<Record<AgentRole, number>> = {
   reverify: 7,
 };
 
-/** Ordinal of (attempt, role) within one ref. Monotonic as the run advances. */
 function progressOf(row: IndexedRow): number | undefined {
   const rank = ROLE_PROGRESS[row.role];
   if (rank === undefined) return undefined;
   return (row.attempt ?? 0) * 10 + rank;
 }
 
-/**
- * Roles the orchestrator awaits one at a time and never places inside
- * `parallel()`: the wave scout, and the per-wave and post-loop commit agents.
- * They share one ref and carry no attempt, so `progressOf` cannot rank them —
- * but because they never overlap, a later `start` of the same role is itself
- * proof that every earlier open row of that role is over.
- */
 const SEQUENTIAL_ROLES: ReadonlySet<AgentRole> = new Set(["commit", "scout"]);
 
-/**
- * Close rows the run has moved past. A row still open at the end of the log is
- * only genuinely running if nothing for its ref got further — the newest agent
- * of a live run must keep ticking.
- *
- * Two passes, because the roles order themselves two different ways: everything
- * in `ROLE_PROGRESS` reaps on (attempt, role) within one ref, and everything in
- * `SEQUENTIAL_ROLES` reaps on start order within one role. A role in neither is
- * left alone.
- */
 function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
   if (open.length === 0) return;
 
-  // Scanned over every row, not just the open ones: the row proving the run
-  // moved on has usually closed itself already.
   const furthest = new Map<string, number>();
   for (const row of rows) {
     if (row.ref === undefined) continue;
@@ -414,8 +341,6 @@ function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
       row.status = "abandoned";
   }
 
-  // Scanned over every row for the same reason as above: the commit agent that
-  // proves an earlier one is over has almost always closed itself already.
   const newestStart = new Map<AgentRole, number>();
   for (const row of rows) {
     if (!SEQUENTIAL_ROLES.has(row.role)) continue;
@@ -434,9 +359,7 @@ function reapAbandoned(rows: IndexedRow[], open: IndexedRow[]): void {
 
 export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   const rows: IndexedRow[] = [];
-  // Only an in-flight row can be closed, so pairing scans the open rows, not every row.
   const open: IndexedRow[] = [];
-  // Judge rows still waiting for a verdict, oldest first, keyed by ref and attempt.
   const unscoredJudges = new Map<string, IndexedRow[]>();
   const scoreByAttempt = new Map<string, ScoreEntry>();
 
@@ -454,7 +377,6 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   };
 
   entries.forEach((entry, order) => {
-    // Node declarations never open, close, or create an agent row.
     if (entry.kind === "state") return;
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
     const identity =
@@ -474,8 +396,6 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
       lens: parsed.lens,
     };
 
-    // A verdict is not the end of the judge's work — its own end note closes the row.
-    // Closing here would leave that end note to open a second, duplicate row.
     if (entry.kind === "score") {
       const scoreKey = `${entry.task}|${entry.attempt}`;
       if (!scoreByAttempt.has(scoreKey)) scoreByAttempt.set(scoreKey, entry);
@@ -508,8 +428,6 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
       return;
     }
 
-    // A label alone is not an identity — parallel external delegates share one
-    // label — so an end event must match the task, role, and attempt it closes.
     let index =
       entry.agentLabel === undefined
         ? -1
