@@ -268,7 +268,8 @@ describe("codex-run errors", () => {
     expect(await readdir(tmp)).toEqual([]);
   });
 
-  test("empty prompt → exit 2", () => {
+  test("a whitespace-only prompt exits 2 and spawns nothing, since the no-ask contract is added only after the empty check", async () => {
+    await rm(argsLog, { force: true });
     const res = Bun.spawnSync(["bun", SCRIPT, "delegate"], {
       stdin: Buffer.from("   \n"),
       stdout: "pipe",
@@ -276,6 +277,7 @@ describe("codex-run errors", () => {
       env: { ...process.env, CODEX_BIN: codexBin, ARGS_LOG: argsLog },
     });
     expect(res.exitCode).toBe(2);
+    expect(await Bun.file(argsLog).exists()).toBe(false);
   });
 });
 

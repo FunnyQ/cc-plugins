@@ -29,13 +29,6 @@ export const NO_ASK_CONTRACT =
   "you, never substitute your own scope, framework, or gate to get past it — " +
   "finish what you can, then name the blocker in your final answer.\n\n";
 
-/**
- * The prompt: `--prompt-file <path>` when given, otherwise stdin.
- *
- * Returns the caller's text alone. Each wrapper prepends the contract at the spawn
- * instead, after its empty-prompt guard: prepending here makes every prompt
- * non-empty, so "nothing to send" becomes a billed call on boilerplate.
- */
 export function readPrompt(args: string[]): string {
   const path = flagValue(args, "--prompt-file");
   if (path) return readFileSync(path, "utf-8");
