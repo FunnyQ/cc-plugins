@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import {
   chmodSync,
   mkdirSync,
@@ -489,6 +490,31 @@ describe("createTranscriptSource", () => {
       const second = source.read();
       expect(second).toEqual(first);
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("an unchanged transcript costs one stat and zero bytes read, which keeps a read per snapshot affordable", () => {
+    const { root, planDir, projectsRoot, slug } = setup();
+    const stat = spyOn(fs, "statSync");
+    const open = spyOn(fs, "openSync");
+    try {
+      jsonl(agentPath(projectsRoot, slug, "a"), [
+        announceUser(planDir, "work/01", "dev", 1),
+        assistant("m", { input_tokens: 7 }),
+      ]);
+      const source = createTranscriptSource(planDir, projectsRoot);
+      source.read();
+      stat.mockClear();
+      open.mockClear();
+
+      source.read();
+
+      expect(stat).toHaveBeenCalledTimes(1);
+      expect(open).not.toHaveBeenCalled();
+    } finally {
+      stat.mockRestore();
+      open.mockRestore();
       rmSync(root, { recursive: true, force: true });
     }
   });

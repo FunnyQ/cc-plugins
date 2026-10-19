@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
 import {
   createDebouncer,
@@ -8,11 +8,19 @@ import {
   newFrameMemory,
   nextFleetFrame,
 } from "./events-api";
+import * as usageSource from "./usage-source";
 import { projectSlug, type TranscriptSource } from "./usage-source";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { FleetSnapshot } from "./events-api";
+import { readRangeChunks } from "./tail";
 import { emptyCounts, type AgentUsage, type TokenCounts } from "./usage-types";
 
 const entry: FlightlogEntry = {
@@ -549,6 +557,54 @@ describe("eventsHandler transcript membership", () => {
       rmSync(f.root, { recursive: true, force: true });
     }
   });
+
+  test("creates the transcript source once per stream, never per snapshot, because its cursors are what keep each re-read incremental", async () => {
+    const f = fixture();
+    const factory = spyOn(usageSource, "createTranscriptSource");
+    const first = connect(f);
+    try {
+      await first.read();
+      appendFileSync(
+        f.logPath,
+        JSON.stringify({ ...entry, task: "server/07" }) + "\n",
+      );
+      expect((await first.read()).entryCount).toBe(3);
+      expect(factory).toHaveBeenCalledTimes(1);
+
+      const second = connect(f);
+      try {
+        await second.read();
+        expect(factory).toHaveBeenCalledTimes(2);
+      } finally {
+        await second.close();
+      }
+    } finally {
+      factory.mockRestore();
+      await first.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  });
+
+  test("moves the flightlog cursor per chunk, so a read that dies partway never re-ingests what already landed", async () => {
+    const f = fixture();
+    const firstLine = Buffer.byteLength(JSON.stringify(entry)) + 1;
+    let calls = 0;
+    const stream = connect(f, {
+      *readChunks(path, from, size) {
+        calls += 1;
+        if (calls > 1) return yield* readRangeChunks(path, from, size);
+        yield* readRangeChunks(path, from, from + firstLine);
+        throw new Error("read died partway");
+      },
+    });
+    try {
+      expect((await stream.read()).entryCount).toBe(1);
+      expect((await stream.read()).entryCount).toBe(2);
+    } finally {
+      await stream.close();
+      rmSync(f.root, { recursive: true, force: true });
+    }
+  }, 10_000);
 
   test("keeps the transcript reader injection and passes the current graph identity", async () => {
     const f = fixture();

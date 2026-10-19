@@ -258,7 +258,7 @@ describe("attachCodexUsage", () => {
     expect(judge!.codexCounts).toBeUndefined();
   });
 
-  test("never lets a non-driver claim a run by time window", () => {
+  test("a non-driver running beside the user's own codex window absorbs none of its spend", () => {
     // The failure this guards: judge:foundation/02#1 absorbed 30,039 tokens from a
     // codex window the user had open in the same repo.
     const [judge] = attachCodexUsage(
@@ -409,7 +409,17 @@ describe("attachCodexUsage", () => {
     }
   });
 
-  test("leaves the driver's own Claude counts untouched", () => {
+  test("an agent that drove no codex run carries no codexCounts or codexModels, never a zeroed or empty one", () => {
+    const [judge] = attachCodexUsage(
+      [agent({ file: "/judge.jsonl", role: "judge" })],
+      [],
+      "/repo",
+    );
+    expect("codexCounts" in judge!).toBe(false);
+    expect("codexModels" in judge!).toBe(false);
+  });
+
+  test("keeps codex spend out of the driver's Claude counts, so one merged figure never hides which side burned what", () => {
     const agents = [agent({ file: "/a1.jsonl", externalDriver: true })];
     const [driver] = attachCodexUsage(agents, [run({})], "/repo");
 

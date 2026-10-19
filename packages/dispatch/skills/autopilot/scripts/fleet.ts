@@ -91,19 +91,9 @@ export type FleetRow = {
   message?: string;
   score?: ScoreEntry;
   outcome?: GateOutcome;
-  /** Tokens burned. Absent (never 0) when no transcript paired — render as unavailable. */
   usage?: TokenCounts;
   codexUsage?: TokenCounts;
-  /**
-   * Claude model ids that produced a billed turn for this row, first-seen order,
-   * deduplicated. Absent (never an empty array) when no transcript paired — matching
-   * how `usage` distinguishes "no data" from a measured zero.
-   */
   models?: string[];
-  /**
-   * Codex model ids from the external CLI runs joined to this row, first-seen order,
-   * deduplicated. Absent (never an empty array) when the row drove no external engine.
-   */
   codexModels?: string[];
 };
 

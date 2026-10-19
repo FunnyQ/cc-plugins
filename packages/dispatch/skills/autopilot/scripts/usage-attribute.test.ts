@@ -269,7 +269,7 @@ describe("attributeUsage — pairing", () => {
     expect(unpaired[0]!.usage).toBeUndefined();
   });
 
-  test("an unpaired row's usage is undefined, never a zeroed object", () => {
+  test("an unpaired row's usage is undefined, never a zeroed object that would read as a measured zero", () => {
     const rows = [
       row({
         key: "r1",
@@ -588,12 +588,34 @@ describe("attributeUsage — edge shapes", () => {
     expect(rollup.codexByTask["work/02"]).toEqual(counts(0, 0));
   });
 
-  test("a paired row with Claude usage and no codex run carries usage but no codexUsage key", () => {
+  test("a paired row that drove no external engine carries usage but no codexUsage or codexModels key", () => {
     const rows = [row({ key: "r", ref: "work/01", attempt: 1, startedAt: "2026-08-28T00:00:00.000Z" })];
-    const outRow = attributeUsage(rows, [agent({ file: "a.jsonl" })]).rows[0]!;
+    const outRow = attributeUsage(rows, [agent({ file: "a.jsonl", codexModels: [] })]).rows[0]!;
 
     expect(outRow.usage).toEqual(counts(1, 1));
     expect("codexUsage" in outRow).toBe(false);
+    expect("codexModels" in outRow).toBe(false);
+  });
+
+  test("an agent with a null task or role never pairs, even with a row logged under the string null, but still counts in the rollup", () => {
+    const rows = [
+      row({ key: "null-task", ref: "null", role: "dev", attempt: 1, startedAt: "2026-08-28T00:00:00.000Z" }),
+      row({
+        key: "null-role",
+        ref: "work/03",
+        identity: fleetIdentity("work/03", "null", 1),
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+      }),
+    ];
+    const { rows: outRows, rollup } = attributeUsage(rows, [
+      agent({ file: "a.jsonl", task: null, role: "dev", counts: counts(1, 2) }),
+      agent({ file: "b.jsonl", task: "work/03", role: null, counts: counts(3, 4) }),
+    ]);
+
+    expect(outRows.every((r) => !("usage" in r))).toBe(true);
+    expect(rollup.unattributed).toEqual(counts(1, 2));
+    expect(rollup.byTask["work/03"]).toEqual(counts(3, 4));
   });
 
   test("the usage fixture leaves exactly its transcript-less row without usage", async () => {

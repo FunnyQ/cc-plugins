@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { detectSource } from "./graph-source";
-import { parseArgs, planLine, validatePlanDir } from "./launch";
+import { readRecord, writeRecord } from "./daemon-record";
+import { canReuse, identifyDaemon, parseArgs, planLine, supersede, validatePlanDir } from "./launch";
 
 describe("parseArgs", () => {
   test("parses valid arguments", () => {
@@ -97,5 +98,59 @@ describe("detectSource and validatePlanDir", () => {
 describe("planLine", () => {
   test("names the plan the launcher served, for the dispatch mod to read back", () => {
     expect(planLine("/abs/docs/x")).toBe("flightdeck plan: /abs/docs/x");
+  });
+});
+
+function answering(body: unknown) {
+  return Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => Response.json(body) });
+}
+
+describe("identifyDaemon", () => {
+  test("an HTTP answer is not proof of a flightdeck: only a body naming itself, its pid and its plan identifies", async () => {
+    const foreign = answering({ pid: 1234, plan: "/plan" });
+    const wrongPid = answering({ flightdeck: true, pid: "1234", plan: "/plan" });
+    const ours = answering({ flightdeck: true, pid: 1234, plan: "/plan" });
+    try {
+      expect(await identifyDaemon(foreign.port!)).toBeNull();
+      expect(await identifyDaemon(wrongPid.port!)).toBeNull();
+      expect(await identifyDaemon(ours.port!)).toEqual({ pid: 1234, plan: "/plan" });
+    } finally {
+      for (const server of [foreign, wrongPid, ours]) server.stop(true);
+    }
+  });
+});
+
+describe("supersede and canReuse", () => {
+  const savedDataHome = process.env.XDG_DATA_HOME;
+  afterEach(() => {
+    if (savedDataHome === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = savedDataHome;
+  });
+
+  test("a recycled pid behind a port that does not identify as ours gets no SIGTERM, and its stale record is dropped", async () => {
+    process.env.XDG_DATA_HOME = scratch();
+    const stranger = Bun.spawn(["sleep", "30"]);
+    const foreign = answering({ status: "ok" });
+    try {
+      const info = { pid: stranger.pid, port: foreign.port!, root: "/root", plan: "/plan" };
+      writeRecord(info);
+      expect(await supersede(info, foreign.port!)).toBeTrue();
+      await Bun.sleep(50);
+      expect(stranger.signalCode).toBeNull();
+      expect(readRecord()).toBeNull();
+    } finally {
+      stranger.kill();
+      foreign.stop(true);
+    }
+  });
+
+  test("a live pid is not a live daemon: pids recycle and a hung server holds one, so reuse needs the port to answer as that very daemon", async () => {
+    const foreign = answering({ flightdeck: true, pid: process.pid + 1, plan: "/plan" });
+    try {
+      const info = { pid: process.pid, port: foreign.port!, root: "/root", plan: "/plan" };
+      expect(await canReuse({ action: "reuse", info }, foreign.port!)).toBeFalse();
+    } finally {
+      foreign.stop(true);
+    }
   });
 });

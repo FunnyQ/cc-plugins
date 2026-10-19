@@ -16,8 +16,7 @@ function toEpochMs(iso: string | null | undefined): number | null {
 const groupRowsByIdentity = (rows: FleetRow[]): Map<string, FleetRow[]> =>
   Map.groupBy(rows, (row) => row.identity);
 
-// A null task or role belongs to no group — never paired, but still counted in the
-// rollup. The two role vocabularies are already the same strings, so no translation
+// The two role vocabularies are already the same strings, so no translation
 // layer sits between an agent's parsed role and a row's role.
 const groupAgentsByIdentity = (
   agents: AgentUsage[],

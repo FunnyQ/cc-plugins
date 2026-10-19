@@ -152,6 +152,7 @@ export function eventsHandler(
     source?: TranscriptSource;
     codexRoot?: string;
     codexSource?: CodexSource;
+    readChunks?: typeof readRangeChunks;
   },
 ): Response {
   let fileWatcher: FSWatcher | null = null;
@@ -166,8 +167,6 @@ export function eventsHandler(
   let logPresent = false;
   const decoder = new TextDecoder();
   let cleanupStream = (): void => {};
-  // Created once per stream, never per snapshot: its cursors are what make each
-  // re-read incremental. Two open tabs get two sources with independent cursors.
   const repoRoot = options?.repoRoot || repoRootOf(planDir);
   const usageSource =
     options?.source ??
@@ -178,6 +177,7 @@ export function eventsHandler(
     );
   const codexSource =
     options?.codexSource ?? createCodexSource(options?.codexRoot);
+  const readChunks = options?.readChunks ?? readRangeChunks;
 
   // The identities the flightlog still reports running. A driver blocked on the codex
   // CLI writes nothing while it waits, so its own last transcript line lands before the
@@ -223,8 +223,6 @@ export function eventsHandler(
       };
       const memory = newFrameMemory();
       const emitSnapshot = (): void => {
-        // Affordable only because `read()` is incremental: an unchanged transcript
-        // costs one `stat` and zero bytes read.
         const frame = nextFleetFrame(entries, logPresent, readAgents(), memory);
         if (frame !== undefined) enqueue(frame);
       };
@@ -306,11 +304,8 @@ export function eventsHandler(
           const from = reset ? 0 : next.from;
           const grew = stat.size > from;
           if (grew) {
-            // The cursor moves per chunk, like the two usage readers: entries are
-            // appended as each chunk decodes, so leaving it until the loop ends
-            // means a read that dies partway re-ingests what already landed.
             let consumed = from;
-            for (const chunk of readRangeChunks(logPath, from, stat.size)) {
+            for (const chunk of readChunks(logPath, from, stat.size)) {
               const decoded = decodeLogChunk(decoder, chunk, heldPartial);
               entries.push(...decoded.entries);
               heldPartial = decoded.partial;

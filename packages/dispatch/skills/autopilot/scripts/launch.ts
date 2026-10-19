@@ -1,8 +1,8 @@
 import { existsSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { detectSource } from "./graph-source";
-import { decideStartup } from "./daemon-decision";
-import { readRecord, removeRecord } from "./daemon-record";
+import { decideStartup, type StartupDecision } from "./daemon-decision";
+import { type DaemonInfo, readRecord, removeRecord } from "./daemon-record";
 
 const DEFAULT_PORT = 5757;
 const POLL_ATTEMPTS = 30;
@@ -87,14 +87,6 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-/**
- * Which flightdeck daemon answers this port, or null when none does.
- *
- * "Something answered HTTP" is not proof of a flightdeck: another service may
- * hold the port, and the operating system recycles pids. The daemon states its
- * own pid and plan here, so reuse opens our page and never a stranger's, and a
- * SIGTERM only ever reaches a process that identified itself as ours.
- */
 export async function identifyDaemon(
   port: number,
 ): Promise<{ pid: number; plan: string } | null> {
@@ -145,6 +137,40 @@ function openBrowser(url: string): void {
   }
 }
 
+export async function supersede(
+  info: DaemonInfo,
+  port: number,
+): Promise<boolean> {
+  const running = await identifyDaemon(info.port);
+
+  if (running?.pid === info.pid) {
+    try {
+      process.kill(info.pid, "SIGTERM");
+    } catch {
+      // The server may exit between the liveness check and the signal.
+    }
+
+    if (!(await poll(async () => (await identifyDaemon(port)) === null))) {
+      console.error(`flightdeck error: port ${info.port} did not close`);
+      return false;
+    }
+  } else {
+    removeRecord();
+  }
+
+  return true;
+}
+
+export async function canReuse(
+  decision: StartupDecision,
+  port: number,
+): Promise<boolean> {
+  return (
+    decision.action === "reuse" &&
+    (await identifyDaemon(port))?.pid === decision.info.pid
+  );
+}
+
 export async function main(): Promise<void> {
   const parsed = parseArgs(Bun.argv.slice(2));
 
@@ -169,37 +195,15 @@ export async function main(): Promise<void> {
     isProcessAlive,
   );
 
-  if (decision.action === "supersede") {
-    // Signal only a daemon that identified itself as the one in the record. An
-    // unidentified port is left alone: the bind below then fails loudly instead
-    // of this launcher killing a process that merely inherited a recycled pid.
-    const running = await identifyDaemon(decision.info.port);
-
-    if (running?.pid === decision.info.pid) {
-      try {
-        process.kill(decision.info.pid, "SIGTERM");
-      } catch {
-        // The server may exit between the liveness check and the signal.
-      }
-
-      if (!(await poll(async () => (await identifyDaemon(port)) === null))) {
-        console.error(
-          `flightdeck error: port ${decision.info.port} did not close`,
-        );
-        process.exitCode = 1;
-        return;
-      }
-    } else {
-      removeRecord();
-    }
+  if (
+    decision.action === "supersede" &&
+    !(await supersede(decision.info, port))
+  ) {
+    process.exitCode = 1;
+    return;
   }
 
-  // A live pid is not a live daemon: the operating system recycles pids, and a
-  // hung server still holds one. Reuse only a record whose port answers as that
-  // very daemon, or the launcher prints a URL that opens something else.
-  const reusable =
-    decision.action === "reuse" &&
-    (await identifyDaemon(port))?.pid === decision.info.pid;
+  const reusable = await canReuse(decision, port);
 
   if (decision.action === "reuse" && !reusable) {
     removeRecord();
