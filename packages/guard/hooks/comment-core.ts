@@ -370,6 +370,7 @@ export function flaggedBlocks(
   fileText: string,
   syntax: Syntax,
   added: string[] | Set<number>,
+  { every = false }: { every?: boolean } = {},
 ): CommentBlock[] {
   const lines = fileText.split("\n").map((l) => l.trim());
   const flags = commentFlags(lines, syntax);
@@ -438,7 +439,8 @@ export function flaggedBlocks(
 
     // Counted, not filtered on empty text: a blank line inside a `/* */` is a comment line and still counts, while a bridged one is not and does not.
     const height = body.length - bridged;
-    const sized = !header && height >= MIN_BLOCK_LINES && marked.some(Boolean);
+    const sized =
+      (every || (!header && height >= MIN_BLOCK_LINES)) && marked.some(Boolean);
     if (sized || tags.some(Boolean)) {
       blocks.push({ start, lines: body, added: marked, height, tags });
     }

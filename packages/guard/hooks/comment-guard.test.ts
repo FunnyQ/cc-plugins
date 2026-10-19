@@ -347,6 +347,12 @@ describe("flaggedBlocks", () => {
     expect(flaggedBlocks(short, rb, ["# one", "# two"])).toEqual([]);
   });
 
+  test("every: a one-line comment and the file header report too", () => {
+    const short = "# header\nputs 1\n# lone\nputs 2";
+    const blocks = flaggedBlocks(short, rb, new Set([1, 3]), { every: true });
+    expect(blocks.map((b) => b.start)).toEqual([1, 3]);
+  });
+
   test("a long block nobody touched never fires", () => {
     expect(flaggedBlocks(file, rb, [])).toEqual([]);
   });
