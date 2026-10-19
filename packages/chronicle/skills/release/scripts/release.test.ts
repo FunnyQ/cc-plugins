@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -128,7 +134,8 @@ const scratch: string[] = [];
 
 afterEach(() => {
   process.chdir(cwd);
-  for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of scratch.splice(0))
+    rmSync(dir, { recursive: true, force: true });
 });
 
 function repo(files: Record<string, string>): string {
@@ -143,12 +150,17 @@ function repo(files: Record<string, string>): string {
 }
 
 async function commitAll(dir: string, message: string): Promise<void> {
-  await $`git add -A && git -c user.name=t -c user.email=t@t commit -qm ${message}`.cwd(dir).quiet();
+  await $`git add -A && git -c user.name=t -c user.email=t@t commit -qm ${message}`
+    .cwd(dir)
+    .quiet();
 }
 
 async function initRepo(files: Record<string, string>): Promise<string> {
   const dir = repo(files);
   await $`git init -q -b main`.cwd(dir).quiet();
+  await $`git config commit.gpgsign false && git config tag.gpgsign false`
+    .cwd(dir)
+    .quiet();
   await commitAll(dir, "init");
   return dir;
 }
@@ -190,7 +202,10 @@ describe("plan", () => {
     const shim = join(dir, "..", `${dir.split("/").pop()}-bin`);
     scratch.push(shim);
     mkdirSync(shim);
-    writeFileSync(join(shim, "git"), `#!/bin/sh\necho "$*" >> "${log}"\nexec "${realGit}" "$@"\n`);
+    writeFileSync(
+      join(shim, "git"),
+      `#!/bin/sh\necho "$*" >> "${log}"\nexec "${realGit}" "$@"\n`,
+    );
     chmodSync(join(shim, "git"), 0o755);
     const path = process.env.PATH;
     process.env.PATH = `${shim}:${path}`;
@@ -203,7 +218,9 @@ describe("plan", () => {
 
     const calls = (await Bun.file(log).text()).split("\n");
     expect(calls.some((c) => c.startsWith("rev-parse"))).toBe(true);
-    expect(calls.filter((c) => c.startsWith("remote get-url")).length).toBeLessThanOrEqual(1);
+    expect(
+      calls.filter((c) => c.startsWith("remote get-url")).length,
+    ).toBeLessThanOrEqual(1);
   });
 });
 
@@ -229,19 +246,29 @@ describe("run", () => {
     const dir = await initRepo({ VERSION: "0.1.0\n" });
     await $`git checkout -qb feat`.cwd(dir).quiet();
     writeFileSync(join(dir, "VERSION"), "0.2.0\n");
-    writeFileSync(join(dir, "CHANGELOG.md"), "# Changelog\n\n## [0.2.0] - 2026-01-01\n");
+    writeFileSync(
+      join(dir, "CHANGELOG.md"),
+      "# Changelog\n\n## [0.2.0] - 2026-01-01\n",
+    );
 
-    const result = await run(githubFlow, choices, { ...noPersist, through: "commit" });
+    const result = await run(githubFlow, choices, {
+      ...noPersist,
+      through: "commit",
+    });
 
     expect(result.executed).toEqual(["commit"]);
-    expect(await gitText(dir, ["log", "-1", "--format=%s", "main"])).toBe("🔧 release: 0.2.0");
+    expect(await gitText(dir, ["log", "-1", "--format=%s", "main"])).toBe(
+      "🔧 release: 0.2.0",
+    );
   });
 
   test("stops on a stale artifact with no build configured, before a tag can bake in the mismatch", async () => {
     await toolRepo();
     await expect(
       run(withTool(), choices, { ...noPersist, through: "artifacts" }),
-    ).rejects.toThrow(/bin\/tool: reports "tool 0.1.0", expected 0.2.0 — rebuild it, then re-run/);
+    ).rejects.toThrow(
+      /bin\/tool: reports "tool 0.1.0", expected 0.2.0 — rebuild it, then re-run/,
+    );
   });
 
   test("runs the configured build for a stale artifact", async () => {

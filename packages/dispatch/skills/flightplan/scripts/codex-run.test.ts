@@ -20,6 +20,7 @@ import { join } from "node:path";
 const SCRIPT = join(import.meta.dir, "codex-run.ts");
 
 let dir: string;
+let originalHome: string | undefined;
 let fakeCodex: string;
 let argsLog: string;
 
@@ -39,6 +40,7 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
   // Every spawn inherits this HOME, so the developer's own relay config never
   // reaches a test that expects the wrapper default.
+  originalHome = process.env.HOME;
   process.env.HOME = dir;
   fakeCodex = join(dir, "fake-codex.ts");
   argsLog = join(dir, "args.json");
@@ -47,6 +49,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  process.env.HOME = originalHome;
   await rm(dir, { recursive: true, force: true });
 });
 

@@ -21,6 +21,7 @@ import { parseJsonl, DEFAULT_MODEL, REVIEW_GUARD } from "./opencode-run.ts";
 const SCRIPT = join(import.meta.dir, "opencode-run.ts");
 
 let dir: string;
+let originalHome: string | undefined;
 let fakeOpencode: string;
 let argsLog: string;
 
@@ -41,6 +42,7 @@ beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "opencode-run-test-"));
   // Every spawn inherits this HOME, so the developer's own relay config never
   // reaches a test that expects the wrapper default.
+  originalHome = process.env.HOME;
   process.env.HOME = dir;
   fakeOpencode = join(dir, "fake-opencode.ts");
   argsLog = join(dir, "args.json");
@@ -49,6 +51,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  process.env.HOME = originalHome;
   await rm(dir, { recursive: true, force: true });
 });
 
