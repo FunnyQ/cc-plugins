@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -36,7 +36,6 @@ One sentence.
 | Test coverage | ×1 | covers edges |
 `;
 
-/** The header flightplan actually scaffolds today — annotated before the colon. */
 const ANNOTATED_HEADER =
   "> **Required reading** (read before starting; do not need to open other files):";
 
@@ -85,6 +84,14 @@ async function makeTaskTree(taskBody: string): Promise<{
   await writeFile(taskFile, taskBody);
   return { root, taskFile };
 }
+
+test("ANNOTATED_HEADER is the header the task template scaffolds", async () => {
+  const template = await readFile(
+    join(PLUGIN_ROOT, "skills/flightplan/references/task-template.md"),
+    "utf8",
+  );
+  expect(template).toContain(`\n${ANNOTATED_HEADER}\n`);
+});
 
 describe("flightplan-lint hook", () => {
   test("non-task path → silent exit 0", async () => {
@@ -135,6 +142,14 @@ describe("flightplan-lint hook", () => {
     await rm(root, { recursive: true });
   });
 
+  test("a payload that escapes its slashes as \\/ still reaches the lint", async () => {
+    const bad = VALID_TASK.replace("One sentence.", "See PLAN.md for context.");
+    const { root, taskFile } = await makeTaskTree(bad);
+    const { code } = await runHook(payload(taskFile).replaceAll("/", "\\/"));
+    expect(code).toBe(2);
+    await rm(root, { recursive: true });
+  });
+
   test("flightplan task missing Eval rubric → exit 2 + stderr", async () => {
     const bad = VALID_TASK.slice(0, VALID_TASK.indexOf("## Eval rubric"));
     const { root, taskFile } = await makeTaskTree(bad);
@@ -175,8 +190,7 @@ describe("flightplan-lint hook", () => {
     await rm(root, { recursive: true });
   });
 
-  test("near-miss marker `Required reading later` → silent exit 0", async () => {
-    // A malformed body, so a hook that DID fire would exit 2 and fail this test.
+  test("near-miss marker `Required reading later` → silent exit 0, though its body would fail the lint", async () => {
     const nearMiss = VALID_TASK.replace(
       "> **Required reading**:",
       "> **Required reading later**:",
@@ -188,8 +202,7 @@ describe("flightplan-lint hook", () => {
     await rm(root, { recursive: true });
   });
 
-  test("path filter rejects bucket with dashes", async () => {
-    // tasks/my-bucket/... — bucket isn't a single kebab token; should silent skip
+  test("path filter rejects a bucket with dashes, which is not one kebab token", async () => {
     const root = await mkdtemp(join(tmpdir(), "flightplan-hook-"));
     await mkdir(join(root, "docs/sample/tasks/my-bucket"), { recursive: true });
     const file = join(root, "docs/sample/tasks/my-bucket/01-foo.md");

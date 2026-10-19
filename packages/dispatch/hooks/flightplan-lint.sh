@@ -1,28 +1,15 @@
 #!/bin/bash
 
-# Auto-lint flightplan task files after Write/Edit.
-#
 # Input (stdin): JSON with tool_input.file_path
 # Output: silent unless the file is a flightplan task with violations.
 # Exit codes:
 #   0 = ok / not a flightplan file / hook short-circuited
 #   2 = violations found (PostToolUse exit 2 + stderr surfaces feedback to the LLM)
-#
-# Scope: this hook is plugin-wide, but two filters narrow it to flightplan tasks:
-#   1. Path matches docs/<slug>/tasks/<bucket>/NN-*.md (task-path.test.ts holds
-#      it equal to task-path.ts and opencode/plugin.ts)
-#   2. lint-task.ts --authoring passes a file without the Required-reading header
-# Either check failing → silent exit 0, no false positives on unrelated files.
 
 set -e
 
 input=$(cat)
 
-# 0. Cheap bash prefilter before spawning jq. This hook runs on EVERY Edit/Write,
-# and the path filter below rejects almost all of them — so the ~5ms jq spawn is
-# pure waste on that majority. Match the bare word `tasks`, not `/tasks/`: JSON
-# may escape the slash as `\/`, and matching the escaped form would silently
-# skip the lint on such a payload.
 case "$input" in
   *tasks*) ;;
   *) exit 0 ;;
@@ -34,13 +21,10 @@ if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
   exit 0
 fi
 
-# 1. Path filter — looks like a flightplan task file path
 if ! [[ "$file_path" =~ (^|/)docs/.+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; then
   exit 0
 fi
 
-# Resolve lint script via CLAUDE_PLUGIN_ROOT (set by Claude Code) with a
-# best-effort fallback for direct invocation / tests.
 lint_script="${CLAUDE_PLUGIN_ROOT:-}/skills/flightplan/scripts/lint-task.ts"
 if [ ! -f "$lint_script" ]; then
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,19 +32,13 @@ if [ ! -f "$lint_script" ]; then
 fi
 
 if [ ! -f "$lint_script" ]; then
-  # Hook can't find the linter — fail open rather than blocking the write.
   exit 0
 fi
 
-# --authoring adds the task-size check. It belongs on this surface only: the
-# write just landed, so the author is present and splitting is still cheap.
-# Autopilot's own lint calls (the external-dev driver, the pre-flight scout) omit
-# the flag, so a plan authored before the rule existed still flies.
 if output=$(bun "$lint_script" --authoring "$file_path" 2>&1); then
   exit 0
 fi
 
-# Violations: surface as feedback to the LLM via stderr + exit 2.
 echo "flightplan lint violations in $file_path:" >&2
 echo "$output" >&2
 exit 2

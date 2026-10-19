@@ -19,7 +19,6 @@ export const register: Register = (on) => {
       if (ran.deny !== undefined || ran.isError) return ran;
       if ((ran.result as { staged?: boolean }).staged) return ran;
 
-      // --authoring adds the task-size check, which only the author's own write should face, and passes a file without the task header.
       const lint = await $.process.run([
         "bun",
         `${$.plugin.root}/skills/flightplan/scripts/lint-task.ts`,
