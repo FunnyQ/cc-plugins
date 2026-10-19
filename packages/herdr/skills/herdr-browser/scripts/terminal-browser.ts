@@ -1,6 +1,3 @@
-// terminal-browser owns the Chromium behind a Herdr pane and hands out a plain
-// CDP endpoint, so the rest of the skill only needs it reduced to a Target.
-
 export type Tab = {
   // The backend's own id for this tab. terminal-browser needs it to bring a tab
   // to the front; CDP alone cannot.
@@ -16,8 +13,6 @@ export type Target = {
   cdpHttp: string;
   activeTargetId: string;
   pane: string | null;
-  // The herdr tab holding that pane. `open` makes a tab per browser, so this is
-  // what has to be cleaned up when the last page tab closes the browser.
   hostTab: string | null;
   url: string;
   title: string;
@@ -37,8 +32,6 @@ export function cdpBase(port: number): string {
   return `http://127.0.0.1:${port}`;
 }
 
-// `terminal-browser ls --all --json`. One browser is one target: its tabs share
-// the port, and `tabs`/`activate` already drive them through CDP.
 export function parseTerminalBrowsers(raw: string): Target[] {
   const browsers = JSON.parse(raw)?.browsers ?? [];
   return browsers
@@ -153,8 +146,6 @@ export function newcomer(before: Target[], after: Target[]): Target | undefined 
   return after.find((target) => !known.has(target.id));
 }
 
-// Only a tab this skill made carries the label, and closing a tab the human
-// made would take their work with it. A label we cannot read means no close.
 export function herdrTabLabel(raw: string): string | null {
   try {
     const label = JSON.parse(raw)?.result?.tab?.label;

@@ -1,10 +1,5 @@
 #!/usr/bin/env bun
 
-// One entry point for the whole skill: parse the argv, dispatch, print. Every
-// page operation itself lives in ops.ts, which this file only calls — keeping
-// the two apart is what stops "where does X live" from being a grep of both.
-// terminal-browser answers "where is the CDP endpoint"; ops.ts takes it from
-// there. Output is lines, not pretty JSON, to stay cheap to read.
 
 import {
   INSTALL_HINT,
@@ -76,8 +71,6 @@ export type Invocation = {
   ratio: string | null;
   output: string | null;
   full: boolean;
-  // Everything after a bare `--`, verbatim. Our own flag parser must not touch
-  // it: `raw -- snapshot --json` is agent-browser's --json, not ours.
   passthrough: string[] | null;
 };
 
@@ -178,7 +171,6 @@ export function parseArgv(argv: string[]): Invocation {
   return parsed;
 }
 
-// Target ids are 32 hex characters. Let the printed row number stand in.
 export function resolveTargetId(tabs: Tab[], argument: string): string {
   if (/^\d+$/.test(argument)) {
     const tab = tabs[Number.parseInt(argument, 10) - 1];
@@ -235,8 +227,6 @@ export function documentOrder(nodes: any[]): any[] {
       .filter((node) => node.nodeId !== undefined)
       .map((node) => [node.nodeId, node]),
   );
-  // Identity, not nodeId: a node carrying no nodeId must not collapse into
-  // every other one that also carries none.
   const seen = new Set<any>();
   const ordered: any[] = [];
   const walk = (node: any): void => {
@@ -314,16 +304,13 @@ export async function closeTab(base: string, targetId: string): Promise<void> {
 // process is detached and meant to outlive the CLI call.
 export type RunOpts = {
   timeoutMs?: number;
-  // Overlaid on this process's environment, for the child alone.
   env?: Record<string, string>;
-  // Names the command in the failure message when the real one is mostly
-  // plumbing the caller never typed.
-  label?: string;
+  failureName?: string;
 };
 
 export async function run(
   command: string[],
-  { timeoutMs, env, label }: RunOpts = {},
+  { timeoutMs, env, failureName }: RunOpts = {},
 ): Promise<string> {
   const child = Bun.spawn(command, {
     stdout: "pipe",
@@ -357,14 +344,12 @@ export async function run(
   clearTimeout(timer);
   if (code !== 0) {
     throw new Error(
-      `${label ?? command.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`,
+      `${failureName ?? command.join(" ")} failed: ${stderr.trim() || `exit ${code}`}`,
     );
   }
   return stdout;
 }
 
-// Which size the flags meant. Driving the override is ops.emulate's job; this
-// side only reads --device and --size.
 export function resolveMetrics(
   device: string | null,
   size: string | null,
@@ -400,8 +385,6 @@ function requireArg(value: string | null | undefined, message: string): string {
   return value;
 }
 
-// Long enough for a healthy terminal-browser to answer, short enough that a
-// wedged one costs a pause rather than a hang.
 const PROBE_TIMEOUT_MS = 3_000;
 
 async function terminalTargets(): Promise<Target[]> {
@@ -578,7 +561,7 @@ async function main(argv: string[]): Promise<void> {
       // The default error echoes the whole command line back, which here is the
       // agent's own words plus plumbing it never typed. Errors are the common
       // case with a guessed selector, so that echo is the expensive one.
-      { label: `raw ${passthrough[0]}` },
+      { failureName: `raw ${passthrough[0]}` },
     );
     const trimmed = out.trimEnd();
     if (trimmed) {

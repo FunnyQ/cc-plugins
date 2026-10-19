@@ -1,13 +1,4 @@
-// The CDP driver: the transport, every page operation, and the data those
-// operations produce. Nothing here formats for a human or reads argv — that is
-// browser.ts's half, and the split is the rule, not a habit. The herdr plugin
-// CLI answers each of these with pretty-printed JSON, which is the same fact
-// spread over ten lines; going to CDP directly is what lets one line be the
-// answer.
-
 export type CdpSession = {
-  // A rejected send means the call did not happen. timeoutMs 0 waives the
-  // transport deadline for a call the caller's own expression bounds.
   send: (method: string, params?: unknown, timeoutMs?: number) => Promise<any>;
   onEvent: (handler: (message: any) => void) => void;
   close: () => void;
@@ -129,14 +120,10 @@ export async function evaluate(
   const response = await session.send(
     "Runtime.evaluate",
     { expression, returnByValue: true, awaitPromise },
-    // Awaiting the caller's promise is unbounded by definition — `eval` on an
-    // expression that sleeps a minute is a legitimate use, not a wedged page.
     awaitPromise ? 0 : undefined,
   );
   if (response?.exceptionDetails) {
     const details = response.exceptionDetails;
-    // The stack belongs to the injected wrapper, never to the caller, so it
-    // only costs tokens; the first line already names what went wrong.
     throw new Error(
       (
         details.exception?.description ??
@@ -148,8 +135,6 @@ export async function evaluate(
   return response?.result;
 }
 
-// One round trip: find the node, act on it, and answer with what it now says.
-// A selector that matches nothing has to throw, or a typo reads as success.
 async function onSelector(
   session: CdpSession,
   selector: string,
@@ -482,7 +467,6 @@ export async function setHeaders(
   return names.length === 0 ? "cleared" : names.join(" ");
 }
 
-// --- watch ------------------------------------------------------------------
 // CDP only reports while a client is attached, so recording means driving the
 // navigation ourselves. A request that never gets a response still matters — a
 // blocked or refused fetch is usually the bug — and an uncaught exception never
@@ -510,14 +494,12 @@ export function renderCallArguments(args: any[] = []): string {
     .join(" ");
 }
 
-// Whichever field of exceptionDetails carries the description this time.
 export function exceptionText(details: any): string {
   return (
     details?.exception?.description ?? details?.text ?? "uncaught exception"
   );
 }
 
-// One CDP message yields at most one event; null means we do not report it.
 function watchEvent(message: {
   method?: string;
   params?: any;
@@ -545,7 +527,6 @@ function watchEvent(message: {
     };
   }
   if (message.method === "Network.requestWillBeSent") {
-    // Only used to give a failed exchange its url once the failure arrives.
     const { requestId, request } = message.params;
     return {
       kind: "net",
@@ -580,7 +561,6 @@ export function applyWatchMessage(
   return event ? [...events, event] : events;
 }
 
-// requestWillBeSent rows exist to name the failures; drop the ones that landed.
 export function settleEvents(events: WatchEvent[]): WatchEvent[] {
   const urls = new Map<string, string>();
   for (const event of events) {
@@ -631,7 +611,6 @@ export async function watchPage(
     }
   });
 
-  // Three independent domains — enabling them concurrently saves two round trips.
   await Promise.all([
     session.send("Network.enable"),
     session.send("Runtime.enable"),
@@ -669,8 +648,6 @@ export async function watchPage(
   }
   return { events: settled, body };
 }
-
-// --- console ----------------------------------------------------------------
 
 export type ConsoleEntry = {
   level: string;
@@ -730,8 +707,6 @@ export async function collectConsole(
   return entries;
 }
 
-// --- accessibility and emulation --------------------------------------------
-
 // The flat array is Chromium's own serialization order, not the document's.
 // Putting it back in document order is the caller's job.
 export async function axTree(session: CdpSession): Promise<any[]> {
@@ -790,8 +765,6 @@ export async function emulate(
   return `${metrics.width}x${metrics.height}`;
 }
 
-// --- transport ---------------------------------------------------------------
-
 type PendingCall = {
   resolve: (result: any) => void;
   reject: (error: Error) => void;
@@ -799,9 +772,6 @@ type PendingCall = {
   timer?: ReturnType<typeof setTimeout>;
 };
 
-// The transport decides only whether the call happened. Whether it did what the
-// caller meant stays with the ops, which is why their own sentinel checks —
-// exceptionDetails, errorText, success:false — remain on top of this.
 export async function attach(pageWsUrl: string): Promise<CdpSession> {
   const socket = new WebSocket(pageWsUrl);
   const pending = new Map<number, PendingCall>();
@@ -817,12 +787,6 @@ export async function attach(pageWsUrl: string): Promise<CdpSession> {
     return call;
   };
 
-  // A socket that dies mid-command leaves every call in flight unsettled, and
-  // an unsettled call is a CLI that never exits — the hang run()'s timeout
-  // exists to prevent on the subprocess path. The reason is remembered because
-  // draining what is pending right now is not enough: a send issued after the
-  // close would join an empty map that nothing will ever drain again, and a
-  // send that waived its deadline would then wait forever.
   let closedReason: string | null = null;
   const drain = (reason: string): void => {
     closedReason = reason;
@@ -838,8 +802,6 @@ export async function attach(pageWsUrl: string): Promise<CdpSession> {
       handler?.(message);
       return;
     }
-    // Handing message.error back as the result is a silent wrong answer: every
-    // op then reads it as data and blames its own sentinel for the failure.
     if (message.error) {
       call.reject(
         new Error(
@@ -864,8 +826,6 @@ export async function attach(pageWsUrl: string): Promise<CdpSession> {
   });
 
   return {
-    // timeoutMs 0 disables the deadline, for a call whose duration is the
-    // caller's own expression to decide.
     send: (method, params = {}, timeoutMs = CDP_TIMEOUT_MS) =>
       new Promise((resolve, reject) => {
         if (closedReason) {
@@ -884,8 +844,6 @@ export async function attach(pageWsUrl: string): Promise<CdpSession> {
         try {
           socket.send(JSON.stringify({ id, method, params }));
         } catch (error) {
-          // A synchronous send failure would otherwise leave the entry and its
-          // timer behind with nothing left to answer them.
           settle(id);
           reject(error instanceof Error ? error : new Error(String(error)));
         }

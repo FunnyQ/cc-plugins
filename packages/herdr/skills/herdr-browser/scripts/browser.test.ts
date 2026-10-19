@@ -4,6 +4,7 @@ import {
   cdp,
   DEVICES,
   closeTab,
+  documentOrder,
   formatEntries,
   formatSnapshot,
   formatWatch,
@@ -14,8 +15,6 @@ import {
   run,
   type Tab,
 } from "./browser";
-// The watch/console data model moved to the driver; these tests span both
-// layers on purpose — they check that what ops produces is what browser prints.
 import {
   applyWatchMessage,
   attach,
@@ -55,7 +54,6 @@ describe("parseArgv", () => {
     ]);
     expect(parsed.command).toBe("raw");
     expect(parsed.passthrough).toEqual(["snapshot", "--json", "--view", "x"]);
-    // our own parser must not have eaten the agent-browser flags
     expect(parsed.view).toBeNull();
     expect(parsed.args).toEqual([]);
   });
@@ -323,6 +321,17 @@ describe("formatSnapshot document order", () => {
   });
 });
 
+describe("documentOrder", () => {
+  test("keeps every node without a nodeId instead of collapsing them into one", () => {
+    const a = { role: { value: "link" } };
+    const b = { role: { value: "button" } };
+    const c = { role: { value: "link" } };
+    const ordered = documentOrder([a, b, c]);
+    expect(ordered).toHaveLength(3);
+    expect(new Set(ordered)).toEqual(new Set([a, b, c]));
+  });
+});
+
 describe("formatSnapshot", () => {
   const node = (id: number, role: string, name: string) => ({
     backendDOMNodeId: id,
@@ -507,8 +516,9 @@ describe("gateway calls", () => {
   });
 });
 
+const NO_DEADLINE = 0;
+
 describe("attach", () => {
-  // Each method drives one transport outcome; "Silent.hang" answers nothing.
   const server = Bun.serve({
     port: 0,
     fetch(request, server) {
@@ -551,7 +561,6 @@ describe("attach", () => {
 
   test("rejects a protocol error instead of answering with it", async () => {
     const session = await attach(wsUrl);
-    // Resolving here is what let a failed eval print an empty line as success.
     await expect(session.send("Fail.protocol")).rejects.toThrow(
       /Fail\.protocol failed: Cannot find context/,
     );
@@ -569,9 +578,7 @@ describe("attach", () => {
     const session = await attach(wsUrl);
     await session.send("Drop.socket").catch(() => {});
     await Bun.sleep(50);
-    // timeoutMs 0 on purpose: with no deadline to rescue it, a call the drain
-    // does not catch stays pending forever.
-    await expect(session.send("Ok.echo", {}, 0)).rejects.toThrow(
+    await expect(session.send("Ok.echo", {}, NO_DEADLINE)).rejects.toThrow(
       /closed the CDP connection/,
     );
   });
