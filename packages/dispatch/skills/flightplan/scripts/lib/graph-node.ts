@@ -44,10 +44,7 @@ export function nodesFromParsedTasks(
  * The readiness rule lives here alone: a dependency is satisfied only when the
  * upstream node is *validly* complete. A task claiming `Status: done` over an
  * unticked gate box, or a graph node whose trail declared `failed`, keeps
- * blocking, so a lost gate result can never unlock downstream work. `findReady`
- * (the scout CLI) and `deriveTaskViews` (the dashboard) both read this, so the
- * two can never disagree about what blocks, and a graph run and a task tree are
- * judged by one rule.
+ * blocking, so a lost gate result can never unlock downstream work.
  */
 export function unmetNodeDependencies(
   node: GraphNode,

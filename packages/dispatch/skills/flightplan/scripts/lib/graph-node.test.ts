@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { type ParsedTask, taskValidity } from "./parse-task";
 import { findReady } from "../next-ready";
+import { deriveTaskViews } from "../../../autopilot/scripts/fleet";
 import {
   type GraphNode,
   type NodeValidity,
@@ -148,5 +149,26 @@ describe("unmetNodeDependencies", () => {
       "invalid/01",
     ]);
     expect(findReady(byRef)).toEqual([{ bucket: "unfinished", nn: "01" }]);
+  });
+
+  test("the dashboard blocks on exactly the refs the scout does, so the two never disagree about what is ready", () => {
+    const byRef = {
+      "api/01": parsed({
+        dependsOn: ["missing", "unfinished", "invalid", "complete"].map(
+          (bucket) => ({ bucket, nn: "01" }),
+        ),
+      }),
+      "unfinished/01": parsed({ bucket: "unfinished", dependsOn: [] }),
+      "invalid/01": parsed({ status: null }),
+      "complete/01": parsed({ status: "done" }),
+    };
+    const nodes = nodesFromParsedTasks(byRef);
+    const views = deriveTaskViews(nodes, []);
+    expect(
+      views.filter((view) => view.state === "ready").map((view) => view.ref),
+    ).toEqual(findReady(byRef).map(({ bucket, nn }) => `${bucket}/${nn}`));
+    expect(views.find((view) => view.ref === "api/01")?.blockedBy).toEqual(
+      unmetNodeDependencies(nodes["api/01"], nodes),
+    );
   });
 });
