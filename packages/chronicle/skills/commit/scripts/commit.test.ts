@@ -537,14 +537,19 @@ describe("apply", () => {
   test("reports leftover work the plan never knew about", async () => {
     await baseCommit();
     await seed("a.ts", "a\n");
+    await seed(".git/hooks/pre-commit", "#!/bin/sh\necho stray > stray.ts\n");
+    await $`chmod +x .git/hooks/pre-commit`.cwd(repo).quiet();
     const planPath = await writePlan({
       commits: [
         { emoji: "✨", type: "feat", subject: "add a", files: ["a.ts"] },
       ],
     });
+
     const { exitCode, json } = await run("apply", planPath);
-    expect(exitCode).toBe(0);
-    expect(json.verify.leftover).toEqual([]);
+    expect(exitCode).toBe(3);
+    expect(json.ok).toBe(false);
+    expect(json.verify.leftover).toEqual(["stray.ts"]);
+    expect(await subjects()).toEqual(["✨ feat: add a", "🔧 chore: init"]);
   });
 
   test("a failed commit keeps its message file and reports the path, so the user can commit it by hand", async () => {
