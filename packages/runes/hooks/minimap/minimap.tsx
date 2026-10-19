@@ -5,7 +5,6 @@ import { config } from "../config";
 import type { Ui } from "../ui";
 import { kindAt, lines, type Row } from "./rows";
 
-// polls for on-screen changes every TICK ms and re-reads the transcript every REREAD ticks, while the rune is on
 const TICK = 250;
 const REREAD = 12;
 
@@ -24,7 +23,7 @@ export const noteRow = (id: string, isShown: boolean) => {
 
 let ticker: { cancel: () => void } | undefined;
 
-const COLOR: Record<string, () => string> = {
+export const COLOR: Record<string, () => string> = {
   prompt: () => config.prompt.color,
   reply: () => config.reply.color,
   bash: () => config.bash.color,
@@ -36,10 +35,8 @@ const COLOR: Record<string, () => string> = {
 };
 const colorOf = (kind: string) => COLOR[kind]?.() ?? "#808080";
 
-// the transcript's path, learned from the first read, and its size and mtime as last read
 let transcript: string | undefined;
 let lastSeen: string | undefined;
-// the last rows read, so an unchanged transcript redraws nothing
 let lastRows = "";
 
 // a bun child, because a transcript outgrows the mod's 4 MiB $.fs.read cap; true once the transcript has been read
@@ -60,7 +57,6 @@ const reread = async ($: EngineInterface) => {
 };
 
 // a stat of the transcript is one file-system call; the spawn it spares is a process and up to 76 MB.
-// A stat counts as seen only once its read succeeded, so a failed read is tried again
 const rereadIfChanged = async ($: EngineInterface) => {
   const stat = transcript
     ? await $.fs.stat(transcript).catch(() => undefined)
@@ -80,11 +76,10 @@ export const inlineMap = (
   jump: (target: string) => () => void,
 ) => {
   const drawn = lines(list, here, Math.max(1, width - 1), barRows);
-  // drawn top down, so the earliest cell (0) lands on the bottom row and a bar reads upward in time
-  const strip = Array.from({ length: barRows }, (_, i) => barRows - 1 - i);
+  const cellsTopDown = Array.from({ length: barRows }, (_, i) => barRows - 1 - i);
   return (
     <Box flexDirection="column">
-      {strip.map((cell) => (
+      {cellsTopDown.map((cell) => (
         <Box flexDirection="row">
           {drawn.map((line) => {
             const kind = kindAt(line, cell);
@@ -118,11 +113,14 @@ export const inlineMap = (
   );
 };
 
-const startTicker = ($: EngineInterface) => {
-  ticker?.cancel();
-  // a new session reads its own transcript, whatever the last one's stat says
+const forgetTranscript = () => {
   transcript = lastSeen = undefined;
   lastRows = "";
+};
+
+const startTicker = ($: EngineInterface) => {
+  ticker?.cancel();
+  forgetTranscript();
   let n = 0;
   ticker = $.clock.every(TICK, () => {
     if (isDirty) {
@@ -135,7 +133,6 @@ const startTicker = ($: EngineInterface) => {
 };
 
 export const minimap = (on: On) => {
-  // Clawd's band draws the map, so the transcript is read from the session's start
   on("session.start", { isInteractive: true }, async ($, e, next) => {
     startTicker($);
     return next(e);

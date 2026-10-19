@@ -1,6 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
-import { kindAt, lines, rowsOfStream, stem } from "./rows";
+import { COLOR } from "./minimap";
+import { TOOL_KIND, kindAt, lines, rowsOfStream, stem } from "./rows";
 
 const jsonl = (...entries: object[]) =>
   entries.map((e) => JSON.stringify(e)).join("\n");
@@ -122,4 +123,9 @@ test("rowsOfStream gives rowsOf's rows however the text is cut, with or without 
       })();
       expect(await rowsOfStream(chunks)).toEqual(await rowsOf(text));
     }
+});
+
+test("every kind a row can take has a bubble colour", () => {
+  for (const kind of ["prompt", "reply", ...Object.values(TOOL_KIND)])
+    expect(Object.keys(COLOR)).toContain(kind);
 });

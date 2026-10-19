@@ -1,5 +1,3 @@
-// the minimap's rows, read from the session transcript, and how they pack into the pane's lines
-
 export type Row = { id: string; kind: string; size: number };
 export type Line = {
   target: string;
@@ -22,8 +20,7 @@ type Entry = {
   message?: { content?: Block[] | string };
 };
 
-// a tool row takes its runes bubble's colour; any other tool is `tool`
-const TOOL_KIND: Record<string, string> = {
+export const TOOL_KIND: Record<string, string> = {
   Bash: "bash",
   Read: "read",
   Edit: "edit",
@@ -82,7 +79,6 @@ export const rowsOfStream = async (
 // an assistant row's requestId is its uuid with the last group zeroed (…-b80d-000000000000), so ids match on the rest
 export const stem = (id: string) => id.slice(0, 23);
 
-// each line is one bucket of consecutive rows, so the whole session fits `height` lines without scrolling
 export const lines = (
   rows: Row[],
   onScreen: Set<string>,
@@ -101,7 +97,6 @@ export const lines = (
       bucket.find((r) => r.kind === "reply") ??
       bucket[0]!
     ).id;
-    // the full bar is split by sqrt(size); rounding drift lands on the last segment, and a crowded bucket drops its tail
     const weights = bucket.map((r) => Math.sqrt(r.size) || 1);
     const total = weights.reduce((n, w) => n + w, 0);
     let left = bar;
@@ -127,7 +122,6 @@ export const lines = (
   return out;
 };
 
-// the kind drawn at one cell of a line's strip, for the sideways map that draws each line as a column
 export const kindAt = (line: Line, cell: number): string | undefined => {
   let at = 0;
   for (const s of line.segments) {

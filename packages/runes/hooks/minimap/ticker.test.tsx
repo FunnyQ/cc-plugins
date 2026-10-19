@@ -22,14 +22,12 @@ test('an idle transcript is read once, and read again only when it changes', asy
   on('session.start', (_$, e) => e as never)
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await clock.advance(30_000)
-  // the first read learns the path; the next tick sees a stat it has not matched once, then none changes
   expect(spawns).toBeLessThanOrEqual(2)
   const idle = spawns
   mtimeMs = 2
   await clock.advance(5_000)
   expect(spawns).toBe(idle + 1)
 
-  // a read that fails leaves the transcript unread, so the next tick tries again though nothing changed
   isFailing = true
   mtimeMs = 3
   await clock.advance(3_000)
@@ -56,7 +54,6 @@ test('a new session reads its own transcript even when the old one has not chang
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await clock.advance(30_000)
   const before = spawns
-  // /resume into another session fires session.start again; the stat the old one left must not hide the new file
   await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
   await clock.advance(3_000)
   expect(spawns).toBeGreaterThan(before)
