@@ -1,6 +1,6 @@
 {
   "name": "guard",
-  "version": "0.7.3",
+  "version": "0.8.0",
   "description": "Turn coding rules into harness-enforced ones. At the end of each turn, comment-guard diffs what the turn wrote (Edit, Write, or Bash) and hands the comment blocks it added, plus any suppression or constraint comment, to a reviewer subagent that judges each line why or what.",
   "types": "./types/index.d.ts",
   "author": {

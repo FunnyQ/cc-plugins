@@ -1,5 +1,46 @@
 # Changelog
 
+## [guard 0.8.0] - 2026-10-19
+
+_tracks tag `guard-v0.8.0`_
+
+### Added
+- On Claude Code, comments are now reviewed at turn end by a separate guard:comment-reviewer subagent instead of asking the author mid-edit, and the sweep also covers sed -i and heredoc edits that bypass Edit and Write.
+- Added suppressions (@ts-expect-error, eslint-disable, # noqa) and constraint comments (IMPORTANT, DO NOT) are now reported at any size, with a tag-specific question and a reworded prompt that favours refactoring over excusing a workaround.
+- Jev screening gained an excuse criterion so comments that justify a workaround are no longer waved through as a good why, and tagged blocks skip Jev.
+
+## [chronicle 0.22.3] - 2026-10-19
+
+_tracks tag `chronicle-v0.22.3`_
+
+### Fixed
+- Opening a PR from Codex no longer fails: the storykeeper now runs its scripts through bun, and a stale Mermaid themeCSS reference is gone.
+
+## [dispatch 5.7.3] - 2026-10-19
+
+_tracks tag `dispatch-v5.7.3`_
+
+### Fixed
+- Autopilot now enforces its cross-vendor final review: an unreachable reviewer records a failed gate and retries instead of letting an unreviewed deliverable pass, and two misleading prompt statements were corrected.
+
+## [herdr 0.7.12] - 2026-10-19
+
+_tracks tag `herdr-v0.7.12`_
+
+### Changed
+- The herdr skill is now the source of truth over `herdr --skill`, and the herdr-browser usage notes correctly say `open` creates its own Herdr tab.
+
+## [monitor 8.2.0] - 2026-10-19
+
+_tracks tag `monitor-v8.2.0`_
+
+### Added
+- Cockpit diagrams document every pele diagram type with an example, and eight series color variables keep colors in downloaded SVGs; every documented Mermaid example is now linted.
+
+### Fixed
+- Cockpit tests no longer leave scratch directories (once a full binary) in the repo when a run is killed.
+- The OpenCode thoughtful command now matches the Claude version, and usage-dashboard docs point to the real OpenCode reader file.
+
 ## [dispatch 5.7.2] - 2026-10-18
 
 _tracks tag `dispatch-v5.7.2`_
