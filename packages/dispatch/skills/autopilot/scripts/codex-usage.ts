@@ -11,27 +11,12 @@ import { fleetIdentity } from "./fleet";
 import { tailFileChunks } from "./tail";
 import { addCounts, emptyCounts, type AgentUsage } from "./usage-types";
 
-/** One codex CLI run, distilled from its rollout file. */
 export type CodexRun = {
-  /** Absolute path of the rollout. The stable identity across passes. */
   file: string;
-  /** Working directory codex was launched in. Null when the meta line is missing. */
   cwd: string | null;
-  /** ISO timestamp of the rollout's first line. Null when the file is empty. */
   startedAt: string | null;
-  /**
-   * Relay scratch directory this run was driven from, when relay drove it. The
-   * delegation prompt arrives as `Read the file /tmp/q-lab/relay/relay/<dir>/live-prompt.md`,
-   * and the driver's own transcript names the same directory.
-   */
   relayDir: string | null;
-  /**
-   * Who launched codex: `codex_exec` for a headless `codex exec`, `codex-tui` for an
-   * interactive session. The discriminator the time-window join leans on — see
-   * `attachCodexUsage`. Null when the meta line is missing.
-   */
   originator: string | null;
-  /** Model id from the run's `turn_context` payload. Null when the rollout has none. */
   model: string | null;
   counts: ReturnType<typeof emptyCounts>;
 };
@@ -80,9 +65,6 @@ export function mapCodexUsage(raw: unknown): ReturnType<typeof emptyCounts> {
 
   counts.output = output;
   counts.cacheRead = cached;
-  // Never negative: a rollout mid-write can carry a total that trails its parts, and a
-  // negative drives the row's figure below zero, which the formatter renders as N/A —
-  // corruption disguised as "no data".
   counts.cacheWrite = Math.max(0, total - output - cached - cacheWrite);
   return counts;
 }
@@ -143,6 +125,11 @@ export function discoverRollouts(sessionsRoot: string): string[] {
   return found;
 }
 
+function relayDirOf(line: string): string | null {
+  if (!line.includes("/relay/")) return null;
+  return RELAY_DIR.exec(line)?.[1] ?? null;
+}
+
 function ingestLine(state: FileState, rawLine: string): void {
   const line = rawLine.trim();
   if (!line) return;
@@ -172,12 +159,7 @@ function ingestLine(state: FileState, rawLine: string): void {
     return;
   }
 
-  // The delegation prompt is a plain user message, so the relay path is matched on the
-  // raw line — cheaper than reaching into the content-block array to find it.
-  if (state.relayDir === null && line.includes("/relay/")) {
-    const match = RELAY_DIR.exec(line);
-    if (match) state.relayDir = match[1]!;
-  }
+  if (state.relayDir === null) state.relayDir = relayDirOf(line);
 
   // `session_meta` carries no model key — verified against real rollouts. The model
   // lives on `turn_context`, one per turn; the first is enough, so later ones are
@@ -203,9 +185,6 @@ function processFile(file: string, state: FileState, size: number): void {
     state,
     size,
     (s) => {
-      // A reset re-reads from byte 0, so nothing derived from the old content may
-      // survive it — identity included, or a reused path files its tokens under
-      // whatever run used to live there.
       s.cwd = null;
       s.startedAt = null;
       s.relayDir = null;
@@ -217,18 +196,12 @@ function processFile(file: string, state: FileState, size: number): void {
   );
 }
 
-/**
- * Bind a source to the codex sessions tree. Does no I/O until `read()` is called.
- * `sessionsRoot` is the seam that makes this testable against a temp directory
- * instead of the developer's real codex state.
- */
 export function createCodexSource(sessionsRoot?: string): CodexSource {
   const root = sessionsRoot ?? join(homedir(), ".codex", "sessions");
   const files = new Map<string, FileState>();
 
   return {
     read(): CodexRun[] {
-      // Enumerated every call: a delegation starts mid-run and writes a new rollout.
       const discovered = discoverRollouts(root);
       const discoveredSet = new Set(discovered);
       for (const file of files.keys()) {
@@ -250,7 +223,6 @@ export function createCodexSource(sessionsRoot?: string): CodexSource {
             files.delete(file);
             continue;
           }
-          // Unreadable this pass: keep the last-known state rather than zeroing it.
         }
 
         results.push({
@@ -268,18 +240,12 @@ export function createCodexSource(sessionsRoot?: string): CodexSource {
   };
 }
 
-/** Epoch ms, or null when unparseable — never NaN/0, which would read as 1970. */
 function toEpochMs(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? null : ms;
 }
 
-/**
- * Whether the flightlog still reports this agent's row running. An agent whose opening
- * prompt named no task or role has no fleet identity at all, so it can never be one of
- * the open rows and keeps the ordinary window.
- */
 function isOpen(
   agent: AgentUsage,
   openIdentities: ReadonlySet<string> | undefined,
@@ -291,7 +257,6 @@ function isOpen(
   );
 }
 
-/** Whether `cwd` is at or under `root`, on a segment boundary. */
 function insideRepo(cwd: string | null, root: string): boolean {
   if (cwd === null) return false;
   if (cwd === root) return true;
@@ -341,9 +306,6 @@ export function attachCodexUsage(
     counts: { ...agent.counts },
   }));
 
-  // One driver can make several delegations — relay's collect loop reattaches to the
-  // same pane, and a pane that restarts writes a second rollout. Accumulate rather
-  // than assign, or only the last one counts.
   const attach = (agent: (typeof folded)[number], run: CodexRun): void => {
     const into = (agent.codexCounts ??= emptyCounts());
     addCounts(into, run.counts);
@@ -356,8 +318,6 @@ export function attachCodexUsage(
   const byRelayDir = new Map<string, (typeof folded)[number]>();
   for (const agent of folded) {
     for (const dir of agent.relayDirs) {
-      // First writer wins: a directory named by two agents is ambiguous, and the
-      // driver that created it is the one that logged it first.
       if (!byRelayDir.has(dir)) byRelayDir.set(dir, agent);
     }
   }
@@ -384,14 +344,7 @@ export function attachCodexUsage(
     let best: (typeof folded)[number] | undefined;
     let bestDistance = Infinity;
     for (const agent of folded) {
-      // Only an agent that actually shelled out to an external CLI may claim a run
-      // this way. Both originators count — a relay live pane is `codex-tui` and a
-      // headless delegation is `codex_exec` — but so is the user's own codex window,
-      // and without this gate a judge running beside it absorbs its whole spend.
-      // Observed: judge:foundation/02#1 picked up 30,039 fresh tokens from a session
-      // it never launched.
       if (!agent.externalDriver) continue;
-      // An agent already paired by relay directory drove that run, not this one.
       if (claimed.has(agent)) continue;
       const startMs = toEpochMs(agent.startedAt);
       if (startMs === null || runMs < startMs) continue;
@@ -400,7 +353,6 @@ export function attachCodexUsage(
         if (endMs === null || runMs > endMs) continue;
       }
       const distance = runMs - startMs;
-      // Ties break on file path so the pairing is deterministic across calls.
       if (
         distance < bestDistance ||
         (distance === bestDistance &&

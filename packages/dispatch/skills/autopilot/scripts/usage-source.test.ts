@@ -42,10 +42,6 @@ function appendJsonl(path: string, lines: unknown[]): void {
   );
 }
 
-/**
- * Build a minimal `<projectsRoot>/<slug>/session/subagents/workflows/wf_x/agent-<n>.jsonl`
- * layout, and return its path, ready for the test to write lines into.
- */
 function agentPath(projectsRoot: string, slug: string, name: string): string {
   return join(
     projectsRoot,
@@ -82,7 +78,6 @@ function assistant(model: string | undefined, usage: Record<string, unknown>) {
   return { type: "assistant", message };
 }
 
-/** One snapshot of a billed request: several share a `requestId`/`message.id` pair. */
 function snapshot(
   requestId: string,
   messageId: string,
@@ -232,9 +227,7 @@ describe("emptyCounts / addUsage", () => {
     expect(counts).toEqual(emptyCounts());
   });
 
-  // A negative would render as `N/A` once it drove a total below zero, so corrupt
-  // data would read as "no transcript" instead of as corruption.
-  test("skips a negative counter", () => {
+  test("skips a negative counter, which would render a corrupt total as N/A", () => {
     const counts = emptyCounts();
     addUsage(counts, { input_tokens: 100 });
     addUsage(counts, { input_tokens: -100, output_tokens: -1 });
@@ -365,8 +358,6 @@ describe("createTranscriptSource", () => {
   test("a run id that is a prefix of an earlier one inherits none of its tokens", () => {
     withTempDir((dir) => {
       const projectsRoot = join(dir, "projects");
-      // Both are unique ids, and both satisfy the contract. Only the boundary rule
-      // keeps `retry-10`'s transcript out of `retry-1`'s totals.
       for (const [id, input] of [
         ["retry-10", 3],
         ["retry-1", 7],
@@ -516,7 +507,6 @@ describe("createTranscriptSource", () => {
       const first = source.read();
       expect(first[0]!.counts.input).toBe(200);
 
-      // Truncate and replace with fresh, smaller content naming the same plan.
       jsonl(file, [
         announceUser(planDir, "work/01", "dev", 1, "2026-01-01T00:09:00.000Z"),
         assistant("m", { input_tokens: 9 }),
@@ -544,7 +534,6 @@ describe("createTranscriptSource", () => {
       const source = createTranscriptSource(planDir, projectsRoot);
       expect(source.read()).toEqual([]);
 
-      // Append content that would match the plan, if it were re-examined.
       appendJsonl(file, [assistant("m", { input_tokens: 1 })]);
       appendJsonl(file, [
         {
@@ -585,16 +574,12 @@ describe("createTranscriptSource", () => {
       expect(agents).toHaveLength(1);
       expect(agents[0]).toMatchObject({ task: "work/02", role: "dev" });
       expect(agents[0]!.counts.input).toBe(42);
-      // The file's own opening timestamp, not the frame that decided membership:
-      // pairing matches an agent to its fleet row by start time.
       expect(agents[0]!.startedAt).toBe("2026-01-01T00:00:00.000Z");
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  // `docs/foo` and `docs/foo-bar` are siblings under one repo, so a plain substring
-  // test hands every `foo-bar` transcript to `foo` and inflates its plan total.
   test("a sibling plan whose name merely starts with this one's is excluded", () => {
     const { root, planDir, projectsRoot, slug } = setup();
     try {
@@ -630,7 +615,6 @@ describe("createTranscriptSource", () => {
       const source = createTranscriptSource(planDir, projectsRoot);
       expect(source.read()[0]).toMatchObject({ task: "work/01", role: "dev" });
 
-      // Shorter content at the same path: a different agent, not more of the old one.
       jsonl(file, [
         announceUser(planDir, "ui/02", "judge", 3, "2026-01-01T00:09:00.000Z"),
       ]);
@@ -684,7 +668,6 @@ describe("createTranscriptSource", () => {
       const source = createTranscriptSource(planDir, projectsRoot);
       expect(source.read()).toEqual([]);
 
-      // Complete the partial line.
       writeFileSync(partialFile, fullLine + "\n");
       const agents = source.read();
       expect(agents).toHaveLength(1);
@@ -884,9 +867,7 @@ describe("createTranscriptSource — billing dedup", () => {
     }
   });
 
-  // The snapshots of one request routinely straddle a tail boundary, so the
-  // dedup state has to outlive a single read() or the second half double-bills.
-  test("dedups across an incremental read", () => {
+  test("dedups a request whose snapshots straddle two reads", () => {
     const { root, planDir, projectsRoot, slug } = setup();
     try {
       const file = agentPath(projectsRoot, slug, "a");
@@ -909,9 +890,7 @@ describe("createTranscriptSource — billing dedup", () => {
     }
   });
 
-  // Without a per-line fallback key every unkeyed line collapses onto one entry
-  // and only the last would count.
-  test("falls back to the uuid, then to a per-line key, when unkeyed", () => {
+  test("falls back to the uuid, then to a per-line key, so unkeyed lines never collapse onto one", () => {
     const { root, planDir, projectsRoot, slug } = setup();
     try {
       jsonl(agentPath(projectsRoot, slug, "a"), [

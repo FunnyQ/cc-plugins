@@ -1,8 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  type FlightlogEntry,
+  readLog,
+  runLogPath,
+} from "../../flightplan/scripts/lib/flightlog";
 import { aggregateFleet, fleetIdentity, type FleetRow } from "./fleet";
 import { addCounts, type AgentUsage, type TokenCounts } from "./usage-types";
 import { attributeUsage } from "./usage-attribute";
+import { buildFixture } from "./usage-fixture";
+import { createTranscriptSource } from "./usage-source";
 
 function counts(
   input: number,
@@ -155,12 +164,10 @@ describe("attributeUsage — pairing", () => {
     const { rows: outRows, rollup } = attributeUsage(rows, agents);
 
     expect(outRows[0]!.usage).toBeUndefined();
-    // Still counted toward the rollup even though it never paired to a row.
     expect(rollup.byTask["work/02"]).toEqual(agents[0]!.counts);
   });
 
   test("a 5x5 group pairs by nearest start time, not by array order", () => {
-    // Row start times, in ascending order: 0, 10, 20, 30, 40 (seconds).
     const base = Date.parse("2026-08-28T00:00:00.000Z");
     const rowTimes = [0, 10, 20, 30, 40];
     const rows = rowTimes.map((s, i) =>
@@ -172,8 +179,6 @@ describe("attributeUsage — pairing", () => {
       }),
     );
 
-    // Agents deliberately listed out of order relative to their true nearest
-    // row, so array-order pairing would produce a different (wrong) result.
     const agentTimes = [40, 0, 30, 10, 20];
     const agents = agentTimes.map((s, i) =>
       agent({
@@ -188,8 +193,6 @@ describe("attributeUsage — pairing", () => {
 
     const { rows: outRows } = attributeUsage(rows, agents);
 
-    // Each row's usage must match the agent whose start time equals its own,
-    // not the agent that happens to share its array index.
     for (let i = 0; i < outRows.length; i++) {
       const expectedAgentIndex = agentTimes.indexOf(rowTimes[i]!);
       expect(outRows[i]!.usage).toEqual(agents[expectedAgentIndex]!.counts);
@@ -227,7 +230,6 @@ describe("attributeUsage — pairing", () => {
     const { rows: outRows, rollup } = attributeUsage(rows, agents);
     expect(outRows).toHaveLength(1);
     expect(outRows[0]!.usage).toBeDefined();
-    // Both agents still count toward the rollup regardless of pairing.
     expect(rollup.agentCount).toBe(2);
   });
 
@@ -322,8 +324,6 @@ describe("attributeUsage — pairing", () => {
 
     const withTsRow = outRows.find((r) => r.key === "with-ts-row")!;
     const noTsRow = outRows.find((r) => r.key === "no-ts-row")!;
-    // The timestamped pair wins the nearest-time pass; the two leftovers with
-    // no usable timestamp pair only afterward.
     expect(withTsRow.usage).toEqual(counts(1, 1));
     expect(noTsRow.usage).toEqual(counts(2, 2));
   });
@@ -441,16 +441,11 @@ describe("attributeUsage — rollup", () => {
 
     expect(grandTotal).toEqual(rollup.totals);
     expect(rollup.agentCount).toBe(4);
-    // A null role still belongs to a task total, so it is not unattributed.
     expect(rollup.byTask["work/03"]).toEqual(counts(5, 5, 5, 5));
     expect(rollup.unattributed).toEqual(counts(100, 200, 300, 400));
   });
 
-  // Task refs are parsed out of a transcript prompt, so these two names can reach
-  // the rollup's key space. On a plain object they resolve to an inherited value
-  // instead of `undefined`, and the accumulator would then write onto
-  // `Object.prototype` — NaN totals here and a polluted process everywhere else.
-  test("a task ref named after a prototype key stays an ordinary task", () => {
+  test("a task ref named after a prototype key stays an ordinary task and never writes onto Object.prototype", () => {
     const agents = [
       agent({
         file: "/proto.jsonl",
@@ -505,19 +500,13 @@ describe("attributeUsage — purity", () => {
     expect(() => attributeUsage(rows, agents)).not.toThrow();
 
     const { rows: outRows } = attributeUsage(rows, agents);
-    // The returned rows are new objects, not the frozen originals.
     expect(outRows[0]).not.toBe(rows[0]);
     expect("usage" in rows[0]!).toBe(false);
   });
 });
 
-// The identity the pairing keys on must be the one aggregateFleet actually grouped
-// by — built from the raw --task/--role/--attempt flags an agent announces with, not
-// re-derived from the label-parse-preferred display fields. A free-text agent label
-// that parses as one of the known shapes overrides `ref`/`attempt` for display, and a
-// second derivation would then silently fail to pair that agent's tokens.
 describe("attributeUsage — identity comes from aggregateFleet", () => {
-  test("pairs when the label's parsed attempt overrides the logged attempt", () => {
+  test("pairs on the logged identity when the label's parsed attempt overrides the logged attempt", () => {
     const entries: FlightlogEntry[] = [
       {
         kind: "note",
@@ -575,5 +564,50 @@ describe("attributeUsage — identity comes from aggregateFleet", () => {
     ]);
 
     expect(attributed[0]!.usage).toEqual(counts(3, 4));
+  });
+});
+
+describe("attributeUsage — edge shapes", () => {
+  test("an unparseable start time pairs last, never as 1970", () => {
+    const rows = [row({ key: "r", ref: "work/01", attempt: 1, startedAt: "1970-01-01T00:00:00.000Z" })];
+    const agents = [
+      agent({ file: "a.jsonl", startedAt: "not-a-date", counts: counts(1, 1) }),
+      agent({ file: "b.jsonl", startedAt: "1970-01-01T01:00:00.000Z", counts: counts(2, 2) }),
+    ];
+
+    expect(attributeUsage(rows, agents).rows[0]!.usage).toEqual(counts(2, 2));
+  });
+
+  test("codexByTask has no key for a task codex never ran, and a zero entry for one where it cost nothing", () => {
+    const { rollup } = attributeUsage([], [
+      agent({ file: "a.jsonl", task: "work/01" }),
+      agent({ file: "b.jsonl", task: "work/02", codexCounts: counts(0, 0) }),
+    ]);
+
+    expect("work/01" in rollup.codexByTask).toBe(false);
+    expect(rollup.codexByTask["work/02"]).toEqual(counts(0, 0));
+  });
+
+  test("a paired row with Claude usage and no codex run carries usage but no codexUsage key", () => {
+    const rows = [row({ key: "r", ref: "work/01", attempt: 1, startedAt: "2026-08-28T00:00:00.000Z" })];
+    const outRow = attributeUsage(rows, [agent({ file: "a.jsonl" })]).rows[0]!;
+
+    expect(outRow.usage).toEqual(counts(1, 1));
+    expect("codexUsage" in outRow).toBe(false);
+  });
+
+  test("the usage fixture leaves exactly its transcript-less row without usage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "usage-attribute-fixture-"));
+    try {
+      const { planDir, projectsRoot, expected } = buildFixture(dir);
+      const fleet = aggregateFleet(await readLog(runLogPath(planDir)));
+      const agents = createTranscriptSource(planDir, projectsRoot).read();
+      const { rows, rollup } = attributeUsage(fleet, agents);
+
+      expect(rows.filter((r) => r.usage === undefined)).toHaveLength(expected.rowsWithoutUsage);
+      expect(rollup.agentCount).toBe(expected.agentCount);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

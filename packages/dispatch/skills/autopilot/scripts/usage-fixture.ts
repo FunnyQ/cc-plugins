@@ -32,8 +32,6 @@ function writeJsonl(path: string, lines: unknown[]): void {
   );
 }
 
-/** The announce-line shape from ../_context/data-model.md, embedding `runLog` (which
- * embeds `planDir`) so discovery's plan-membership check finds it in the first line. */
 function announcePrompt(
   runLog: string,
   task: string,
@@ -87,17 +85,12 @@ export function buildFixture(root: string): {
 } {
   mkdirSync(root, { recursive: true });
 
-  // A plain marker file — a git worktree's `.git` is a regular file too, so
-  // `repoRootOf` must find this by existence, not by insisting on a directory.
   writeFileSync(join(root, ".git"), "gitdir: fixture\n");
 
   const planDir = join(root, "plan");
   mkdirSync(join(planDir, "tasks"), { recursive: true });
   const runLog = join(planDir, ".flightlog", "run.jsonl");
 
-  // A task file for the ref the agents below name. Without it `/api/tree` returns an
-  // empty tree, the lanes panel renders "No tasks in this flight tree", and the one
-  // gate that watches a per-task total render has nothing to look at.
   mkdirSync(join(planDir, "tasks", "work"), { recursive: true });
   writeFileSync(
     join(planDir, "tasks", "work", "01-fixture-task.md"),
@@ -118,8 +111,6 @@ export function buildFixture(root: string): {
   const sessionDir = join(projectsRoot, slug, "session-1");
   const wfDir = join(sessionDir, "subagents", "workflows", "wf_fixture");
 
-  // Two agents leave a transcript; a third logs to the flightlog but never gets one —
-  // the only way a later gate can prove "unavailable" renders differently from zero.
   const devFile = join(wfDir, "agent-dev.jsonl");
   const reviewFile = join(wfDir, "agent-review.jsonl");
 
@@ -186,7 +177,6 @@ export function buildFixture(root: string): {
       "2026-01-01T00:07:00.000Z",
       "done",
     ),
-    // The third agent: a flightlog row with no matching transcript on disk.
     noteEntry(
       "work/01",
       "verify",

@@ -10,10 +10,6 @@ import {
 } from "./usage-types";
 
 export type TranscriptSource = {
-  /**
-   * Re-scan and return the current state of every discovered agent.
-   * Cheap to call repeatedly: only appended bytes are read unless the run id changes.
-   */
   read(runId?: string): AgentUsage[];
 };
 
@@ -45,7 +41,6 @@ const ANNOUNCE = /--task (\S+) --role (\S+)/;
 const ATTEMPT = /--attempt (\d+)/;
 const FINALIZE = /Finalize flightplan task (\S+) at /;
 
-/** `message.content` is usually a string but may be an array of content blocks. */
 function contentText(content: unknown): string {
   return typeof content === "string" ? content : JSON.stringify(content ?? "");
 }
@@ -58,7 +53,6 @@ export function parseAgentPrompt(content: unknown): {
   return parseAgentPromptText(contentText(content));
 }
 
-/** The same parse over already-stringified content — the caller may hold the text. */
 function parseAgentPromptText(text: string): {
   task: string | null;
   role: string | null;
@@ -79,7 +73,6 @@ function parseAgentPromptText(text: string): {
     return { task: finalize[1]!, role: "mark-done", attempt: undefined };
   }
 
-  // Unrecognised agent, not a failure — its usage still counts toward the plan total.
   return { task: null, role: null, attempt: undefined };
 }
 
@@ -92,11 +85,6 @@ const WIRE_KEYS: [string, keyof TokenCounts][] = [
   ["cache_creation_input_tokens", "cacheWrite"],
 ];
 
-/**
- * Sum only the four named counters: a blind reduce would crash or invent tokens on a
- * field a future version adds. A negative drives a total below zero, which the display
- * formatter renders as `N/A` — corruption disguised as "no data".
- */
 export function addUsage(into: TokenCounts, raw: unknown): void {
   if (typeof raw !== "object" || raw === null) return;
   const record = raw as Record<string, unknown>;
@@ -119,7 +107,6 @@ type FileState = {
   partial: string;
   decoder: TextDecoder;
   counts: TokenCounts;
-  /** Last-seen usage per billed request, the subtrahend `applyUsage` swaps out. */
   byRequest: Map<string, TokenCounts>;
   models: string[];
   task: string | null;
@@ -199,12 +186,6 @@ function discoverAgentFiles(slugDir: string): string[] {
   return found;
 }
 
-/**
- * Whether `text` contains `needle` at a position `accept` approves, given the
- * characters on either side (`undefined` at a string edge). A bare `includes` is
- * never enough for either caller below: both would let a longer identifier claim
- * a shorter one's transcripts and absorb its tokens.
- */
 function containsDelimited(
   text: string,
   needle: string,
@@ -219,11 +200,6 @@ function containsDelimited(
   }
 }
 
-/**
- * Whether `text` names a path at or under `planDir`: `docs/foo` would otherwise
- * claim every transcript of the sibling `docs/foo-bar`, so the character after
- * the match must end the path or separate the next segment.
- */
 function mentionsPlanDir(text: string, planDir: string): boolean {
   return containsDelimited(
     text,
@@ -232,12 +208,8 @@ function mentionsPlanDir(text: string, planDir: string): boolean {
   );
 }
 
-// What can continue an identifier. A run id is opaque, so the boundary rule is
-// what separates `retry-1` from a previous run's `retry-10` — both are unique
-// ids, yet a substring test would hand the older run's tokens to the newer one.
 const ID_CHAR = /[A-Za-z0-9_-]/;
 
-/** Whether `text` carries this run's identifier, and not one it is a substring of. */
 function mentionsRunId(text: string, runId: string): boolean {
   return containsDelimited(
     text,
@@ -297,11 +269,6 @@ function decideMembership(
   state.attempt = prompt.attempt;
 }
 
-/**
- * Identify the billed request a line belongs to. `requestId:message.id` names it;
- * the entry uuid, then a per-line counter, keep unkeyed lines from collapsing onto
- * one another — that would drop every line but the last.
- */
 function requestKey(
   record: Record<string, unknown>,
   message: Record<string, unknown>,
@@ -352,8 +319,6 @@ const RELAY_DIR = /\/relay\/(\d{8}-\d{6}-\d+-\d+-[0-9a-f]+)/g;
 const ENGINE_WRAPPER = /\b(?:codex|opencode)-run\.ts\b/;
 
 function collectExternalMarks(state: FileState, line: string): void {
-  // The guards are the optimisation: the regexes run on the few lines that can match,
-  // not on every line of every transcript.
   if (line.includes("/relay/")) {
     state.externalDriver = true;
     RELAY_DIR.lastIndex = 0;
@@ -391,8 +356,6 @@ function ingestLine(
   collectExternalMarks(state, line);
   if (typeof record.timestamp === "string") state.lastAt = record.timestamp;
 
-  // A `started` or `result` line has no `message` key at all, so this guard is what
-  // stops `line.message.usage` from throwing and killing the whole pass.
   if (
     record.type === "assistant" &&
     typeof record.message === "object" &&
@@ -409,7 +372,6 @@ function ingestLine(
   }
 }
 
-/** Tail one file from `state.cursor` to `size`. */
 function processFile(
   planDir: string,
   file: string,
@@ -422,9 +384,6 @@ function processFile(
     state,
     size,
     (s) => {
-      // A reset re-reads from byte 0, so nothing derived from the old content may
-      // survive it: the counts would double, and identity — read off the first line —
-      // would file a reused path's tokens under whatever agent used to live there.
       s.counts = emptyCounts();
       s.byRequest.clear();
       s.models = [];
@@ -441,11 +400,6 @@ function processFile(
   );
 }
 
-/**
- * Bind a source to one plan directory. Does no I/O until `read()` is called.
- * `projectsRoot` is the seam that makes this layer testable: a test points it at a
- * temp directory instead of the developer's real Claude Code state.
- */
 export function createTranscriptSource(
   planDir: string,
   projectsRoot?: string,
@@ -456,17 +410,11 @@ export function createTranscriptSource(
   // Run identity arrives per `read()`: it is re-read from run.id on every snapshot,
   // so binding it at construction would only ever hold a stale copy.
   let cachedRunId: string | undefined;
-  // Even when the directory does not exist yet (explicit root, pre-run), the cache succeeds.
-  // The walk "never located" (null root, cache never populated) is a different failure mode from
-  // "located but unattributed" (directory found but no transcripts carry this run's id).
   let cachedSlugDir: string | null = null;
 
   function resolveSlugDir(): string | null {
     if (cachedSlugDir !== null) return cachedSlugDir;
-    // planDir stays the membership anchor; the repo root only chooses the directory to enumerate.
     const resolvedRoot = repoRoot || repoRootOf(planDir);
-    // The run directory may sit outside any repository (contract: ~/.local/share/q-lab/flightdeck/<slug>),
-    // so a walk up from planDir would find nothing and silently report zero agents. The caller supplies the repo root instead.
     if (resolvedRoot === null) return null;
     cachedSlugDir = join(root, projectSlug(resolvedRoot));
     return cachedSlugDir;
@@ -474,7 +422,6 @@ export function createTranscriptSource(
 
   return {
     read(currentRunId?: string): AgentUsage[] {
-      // Membership verdicts and their derived usage are keyed by run identity as well as file path.
       if (currentRunId !== cachedRunId) {
         files.clear();
         cachedRunId = currentRunId;
@@ -482,12 +429,9 @@ export function createTranscriptSource(
       const slugDir = resolveSlugDir();
       if (slugDir === null) return [];
 
-      // Enumerated on every call: new agents appear mid-run, so this cannot be cached.
       const discovered = discoverAgentFiles(slugDir);
       const discoveredSet = new Set(discovered);
 
-      // A file gone from the enumeration is gone for good: drop its state so its
-      // tokens leave the totals rather than lingering as a ghost.
       for (const file of files.keys()) {
         if (!discoveredSet.has(file)) files.delete(file);
       }
@@ -508,17 +452,12 @@ export function createTranscriptSource(
             // Told apart by errno, not a preceding `existsSync` — that would stat
             // every file twice on every pass to learn what this stat already reports.
             if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-              // Vanished between enumeration and here: drop it, do not report it.
               files.delete(file);
               continue;
             }
-            // Unreadable this pass (a lock, a permission blip): keep the last-known
-            // state and retry next pass rather than zeroing it.
           }
         }
 
-        // A `pending` file has not yet said it belongs to this plan, so it is
-        // omitted entirely — returning it would mix in an unrelated transcript.
         if (state.membership === "included") {
           results.push(toAgentUsage(file, state));
         }

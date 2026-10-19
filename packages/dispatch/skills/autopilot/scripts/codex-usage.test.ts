@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -74,12 +74,10 @@ describe("mapCodexUsage", () => {
   test("treats cached input as a subset of input, not an addition to it", () => {
     const counts = mapCodexUsage(REAL_USAGE);
     expect(counts.cacheRead).toBe(1_405_952);
-    // Fresh = the prompt tokens that were NOT served from cache.
     expect(counts.cacheWrite).toBe(1_487_898 - 1_405_952);
   });
 
   test("does not give reasoning a counter of its own", () => {
-    // reasoning_output_tokens is inside output_tokens; a fifth field would bill it twice.
     expect(mapCodexUsage(REAL_USAGE).output).toBe(7_766);
   });
 
@@ -125,7 +123,6 @@ describe("createCodexSource", () => {
     ]);
 
     const [run] = createCodexSource(root).read();
-    // 300, not 400: summing cumulative snapshots multiplies a run by its turn count.
     expect(run!.counts.cacheWrite).toBe(300);
   });
 
@@ -184,6 +181,52 @@ describe("createCodexSource", () => {
     const source = createCodexSource(root);
     expect(source.read()).toEqual(source.read());
   });
+
+  test("a rollout truncated and rewritten under the same path keeps nothing of the old run", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-"));
+    const file = writeRollout(root, "rollout-a.jsonl", [
+      meta("/repo/app"),
+      turnContext("gpt-6-astra"),
+      { type: "x", text: "/tmp/relay/20260829-164034-617-28486-7d4298ab/p.md" },
+    ]);
+    const source = createCodexSource(root);
+    source.read();
+
+    writeFileSync(file, "{}\n");
+    const [run] = source.read();
+    expect(run!.cwd).toBeNull();
+    expect(run!.startedAt).toBeNull();
+    expect(run!.relayDir).toBeNull();
+    expect(run!.originator).toBeNull();
+    expect(run!.model).toBeNull();
+  });
+
+  test("a second read sees a rollout written after the first", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-"));
+    const source = createCodexSource(root);
+    expect(source.read()).toEqual([]);
+    writeRollout(root, "rollout-a.jsonl", [meta("/repo")]);
+    expect(source.read()).toHaveLength(1);
+  });
+
+  test("an unreadable pass keeps the last-known counts rather than zeroing them", () => {
+    const root = mkdtempSync(join(tmpdir(), "codex-"));
+    const file = writeRollout(root, "rollout-a.jsonl", [
+      meta("/repo"),
+      tokenCount({ input_tokens: 500, total_tokens: 500 }),
+    ]);
+    const source = createCodexSource(root);
+    source.read();
+
+    writeFileSync(file, "{}\n");
+    chmodSync(file, 0o000);
+    try {
+      const [run] = source.read();
+      expect(run!.counts.cacheWrite).toBe(500);
+    } finally {
+      chmodSync(file, 0o644);
+    }
+  });
 });
 
 describe("attachCodexUsage", () => {
@@ -200,7 +243,7 @@ describe("attachCodexUsage", () => {
     ...overrides,
   });
 
-  test("joins on the relay directory both sides name", () => {
+  test("joins on the relay directory both sides name, whatever the run's cwd", () => {
     const agents = [
       agent({ file: "/a1.jsonl", relayDirs: ["dir-1"], externalDriver: true }),
       agent({ file: "/a2.jsonl", role: "judge" }),
@@ -211,7 +254,6 @@ describe("attachCodexUsage", () => {
       "/repo",
     );
 
-    // The exact join ignores cwd entirely — the identifier is proof enough.
     expect(driver!.codexCounts?.cacheWrite).toBe(5000);
     expect(judge!.codexCounts).toBeUndefined();
   });
@@ -264,8 +306,6 @@ describe("attachCodexUsage", () => {
   });
 
   test("a driver still in flight claims a run that started after its last write", () => {
-    // The driver blocks on the codex CLI, so its transcript stops before the rollout
-    // it is waiting on even opens.
     const [driver] = attachCodexUsage(
       [agent({ file: "/a1.jsonl", externalDriver: true })],
       [run({ startedAt: "2026-08-29T09:30:00.000Z" })],
@@ -310,7 +350,6 @@ describe("attachCodexUsage", () => {
       "/repo",
       { openIdentities: new Set(["work/01|dev|1", "work/02|dev|1"]) },
     );
-    // Both billed, neither doubled: the later driver takes the first run it fits.
     expect(attached[1]!.codexCounts?.cacheWrite).toBe(5000);
     expect(attached[0]!.codexCounts?.cacheWrite).toBe(5000);
   });
@@ -341,8 +380,33 @@ describe("attachCodexUsage", () => {
       [run({ relayDir: "dir-1" }), run({ relayDir: "dir-2" })],
       "/repo",
     );
-    // A collect loop reattaches to the same pane; assigning would keep only the last.
     expect(attached[0]!.codexCounts?.cacheWrite).toBe(10_000);
+  });
+
+  test("a relay directory two agents name goes to the first, which created it", () => {
+    const attached = attachCodexUsage(
+      [
+        agent({ file: "/a1.jsonl", relayDirs: ["dir-1"], externalDriver: true }),
+        agent({ file: "/a2.jsonl", relayDirs: ["dir-1"], externalDriver: true }),
+      ],
+      [run({ relayDir: "dir-1" })],
+      "/repo",
+    );
+    expect(attached[0]!.codexCounts?.cacheWrite).toBe(5000);
+    expect(attached[1]!.codexCounts).toBeUndefined();
+  });
+
+  test("equal start distances go to the lower file path, whatever the input order", () => {
+    const low = agent({ file: "/a1.jsonl", externalDriver: true });
+    const high = agent({ file: "/a2.jsonl", externalDriver: true, attempt: 2 });
+    for (const agents of [
+      [low, high],
+      [high, low],
+    ]) {
+      const attached = attachCodexUsage(agents, [run({})], "/repo");
+      const winner = attached.find((a) => a.codexCounts !== undefined);
+      expect(winner!.file).toBe("/a1.jsonl");
+    }
   });
 
   test("leaves the driver's own Claude counts untouched", () => {
