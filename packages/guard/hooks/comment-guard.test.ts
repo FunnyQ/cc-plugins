@@ -5,6 +5,7 @@ import {
   ASK,
   askFor,
   baseName,
+  blocksFor,
   commentFlags,
   extName,
   flaggedBlocks,
@@ -14,9 +15,8 @@ import {
   resolveAdded,
   syntaxFor,
 } from "./comment-core.ts";
-import type { Syntax } from "./comment-core.ts";
+import type { Syntax, ToolResponse } from "./comment-core.ts";
 
-// A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
 delete process.env.TYPESAFE_API_KEY;
 
 const rb = syntaxFor("a/user.rb")!;
@@ -138,7 +138,6 @@ describe("syntaxFor", () => {
 });
 
 describe("isGuardedPath", () => {
-  // Policy, not lookup — `syntaxFor` still answers for a `/docs/` .py file.
   test("excludes prose files and anything under /docs/", () => {
     expect(isGuardedPath("repo/docs/gen.py")).toBe(false);
     expect(isGuardedPath("a/README.md")).toBe(false);
@@ -318,6 +317,10 @@ describe("addedCommentLines", () => {
   });
 });
 
+test("the suite runs with no TypeSafe key, so no fixture is ever sent to Jev", () => {
+  expect(process.env.TYPESAFE_API_KEY).toBeUndefined();
+});
+
 describe("flaggedBlocks", () => {
   const file = [
     "def a", // 1
@@ -340,6 +343,14 @@ describe("flaggedBlocks", () => {
     const blocks = flaggedBlocks(file, rb, ["# three"]);
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.added).toEqual([false, false, true]);
+  });
+
+  test("a Haml `-#` block scopes by indentation, so its body is not comment and it never fires", () => {
+    const haml = syntaxFor("a/page.haml")!;
+    const file = "%p\n-# one\n  two\n  three\n  four\n%p";
+    expect(
+      flaggedBlocks(file, haml, ["-# one", "two", "three", "four"]),
+    ).toEqual([]);
   });
 
   test("a two-line block never fires", () => {
@@ -391,8 +402,6 @@ describe("flaggedBlocks", () => {
       "  # three",
       "end",
     ].join("\n");
-    // One "# note" was added; the header block consumes it, so the later block
-    // has no added line of its own left to claim.
     expect(flaggedBlocks(twins, rb, ["# note"])).toEqual([]);
   });
 
@@ -479,15 +488,11 @@ describe("resolveAdded", () => {
     expect(resolveAdded(patch, onDisk)).toEqual(new Set([3]));
   });
 
-  // A formatter hook sharing this PostToolUse event can reflow the file in
-  // parallel, which shifts every line the diff named.
   test("falls back to text when a parallel write shifted the lines", () => {
     const reflowed = ["const x =", "  0;", "const a = 1;", "// why"];
     expect(resolveAdded(patch, reflowed)).toEqual(["// why"]);
   });
 
-  // Wrapping code in an `if` rewrites every line inside it, so the diff shows
-  // the whole block removed and re-added at a deeper indent.
   test("re-indenting a block adds nothing", () => {
     const reindent = [
       {
@@ -531,8 +536,6 @@ describe("resolveAdded", () => {
 });
 
 describe("flaggedBlocks by line number", () => {
-  // Two identical comment texts; only the second copy is new. The text path has
-  // to guess and marks the first, which is the reason the diff path exists.
   const twins = [
     "const a = 1;", // 1
     "// note", // 2
@@ -672,7 +675,6 @@ describe("main", () => {
     expect(out.stderr).toBe("");
   });
 
-  // A staged edit never reached the disk, so the diff's lines miss and the text fallback would mark the untouched block that repeats them.
   test("an edit held for review reports nothing", async () => {
     const out = await run(
       {
@@ -698,8 +700,6 @@ describe("main", () => {
     expect(out.stderr).toBe("");
   });
 
-  // Claude Code sends an empty patch for a create, so the whole file is new and
-  // the text path is the only one that can answer.
   test("a Write that created the file reports through the text path", async () => {
     const out = await run(
       {
@@ -758,7 +758,42 @@ describe("main", () => {
   });
 });
 
+describe("blocksFor", () => {
+  const skipped: [string, ToolResponse][] = [
+    ["docs/gen.py", {}],
+    ["a/notes.unknownext", {}],
+    ["a/app.ts", { staged: true }],
+    ["a/app.ts", { type: "update", structuredPatch: [] }],
+  ];
+  test.each(skipped)(
+    "a skipped edit of %p never reads the file",
+    async (file_path, response) => {
+      let reads = 0;
+      const out = await blocksFor(
+        "Write",
+        { file_path, content: "// one\n// two\n// three\n" },
+        response,
+        async () => {
+          reads++;
+          return "// one\n// two\n// three\n";
+        },
+      );
+      expect(out).toEqual({ blocks: [], asked: [] });
+      expect(reads).toBe(0);
+    },
+  );
+});
+
 describe("formatReason", () => {
+  test("leaves the question out, so a sweep over many files asks it once", () => {
+    const blocks = flaggedBlocks(
+      "def a\n  # one\n  # two\n  # three\nend",
+      rb,
+      ["# three"],
+    );
+    expect(formatReason("a.rb", blocks)).not.toContain(ASK);
+  });
+
   test("marks the added lines and gives the block range", () => {
     const blocks = flaggedBlocks(
       "def a\n  # one\n  # two\n  # three\nend",

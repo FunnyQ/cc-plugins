@@ -35,37 +35,30 @@ export type ToolResponse = {
   staged?: boolean;
 };
 
-/** A language's comment forms: line markers, plus open/close block pairs. */
 export type Syntax = {
   line: readonly string[];
   block: readonly (readonly [string, string])[];
 };
 
-/** An added line asked about at any size, header included: neither says why or what, so the plain question misses both. */
 export type Tag = "suppression" | "constraint";
 
-/** A contiguous run of comment lines, with the ones this edit added marked. */
 export type CommentBlock = {
   start: number;
   lines: string[];
   added: boolean[];
-  /** Comment lines, not counting blanks bridged in from between paragraphs. */
   height: number;
   tags: (Tag | null)[];
 };
 
 const MIN_BLOCK_LINES = 3;
 
-// Anywhere after a marker, not leading only: `# noqa` and `# type: ignore` trail the code they silence.
 const SUPPRESSION =
   /(?:\/\/|\/\*|#|--)\s*(?:eslint-disable|@ts-(?:ignore|expect-error|nocheck)|biome-ignore|oxlint-disable|deno-lint-ignore|stylelint-disable|noqa|type:\s*ignore|pyright:\s*ignore|pylint:\s*disable|rubocop:disable|standard:disable|nolint|NOLINT|shellcheck\s+disable|swiftlint:disable|istanbul\s+ignore|c8\s+ignore|pragma:\s*no\s+cover)/g;
 
-// Split by case: lower-case "important" is ordinary prose, while "Do not remove" opens a sentence.
 const SHOUTED = /\b(?:IMPORTANT|DO NOT)\b/g;
 const CONSTRAINT =
   /\b(?:do not|don't) (?:remove|delete|change|edit|modify|touch|move|rename|reorder)\b|\b(?:talk to|check with) \S+(?: \S+)? before\b/gi;
 
-// Odd quotes before a match put it inside a string or a quotation: a test fixture, or prose naming the directive. An apostrophe inside a word opens nothing.
 function unquoted(line: string, pattern: RegExp): boolean {
   for (const m of line.matchAll(pattern)) {
     const before = line.slice(0, m.index).replace(/\w'\w/g, "");
@@ -86,7 +79,6 @@ function tagFor(line: string, comment: boolean): Tag | null {
 
 const SKIP_EXTS = new Set([".md", ".mdx", ".txt", ".json"]);
 
-// Third-party and generated trees. Their comments are someone else's to justify.
 const SKIP_SEGMENTS = new Set(["docs", "vendor", "node_modules"]);
 
 const HASH: Syntax = { line: ["#"], block: [] };
@@ -104,10 +96,7 @@ const ERB: Syntax = {
     ["<!--", "-->"],
   ],
 };
-// Haml/Slim scope by indentation and the scan sees trimmed lines, so a multi-line `-#` block reports as one and never reaches MIN_BLOCK_LINES.
 const HAML: Syntax = { line: ["-#", "/"], block: [["<!--", "-->"]] };
-// A single-file component mixes a markup template with a script and a style
-// block, so it needs every form its three sections can carry.
 const COMPONENT: Syntax = {
   line: ["//"],
   block: [
@@ -196,7 +185,6 @@ export const BY_EXT: Record<string, Syntax> = {
   ".hs": HASKELL,
 };
 
-/** Build files carry no extension, so they are matched on the name instead. */
 export const BY_NAME: Record<string, Syntax> = {
   ".env": HASH,
   rakefile: HASH,
@@ -210,10 +198,8 @@ export const BY_NAME: Record<string, Syntax> = {
   justfile: HASH,
 };
 
-// Policy, not lookup: `COMMENT_GUARDED` in opencode/plugin.ts mirrors syntaxFor's half alone, so folding these checks in would leave it compared against a set it cannot encode.
 export function isGuardedPath(filePath: string): boolean {
   if (/\.min\.(js|css)$/.test(filePath)) return false;
-  // Segments, not a substring: a relative `docs/gen.py` has no leading slash.
   if (filePath.split("/").some((part) => SKIP_SEGMENTS.has(part))) return false;
   return !SKIP_EXTS.has(extName(filePath));
 }
@@ -223,22 +209,11 @@ export function syntaxFor(filePath: string): Syntax | null {
   const known = BY_EXT[ext];
   if (known) return known;
 
-  // `Dockerfile.DEV` is still a Dockerfile, and basename's own suffix match is case-sensitive, so both halves are lowered before the extension comes off.
   const name = baseName(filePath).toLowerCase();
   const stem = ext ? name.slice(0, name.length - ext.length) : name;
   return BY_NAME[stem] ?? null;
 }
 
-/**
- * Stateful across every open/close pair the language has, so a docblock, an
- * HTML comment and a Lua long comment all count their full height rather than
- * just the opening line. Tracking the open pair is also what lets a `*`
- * continuation count without becoming a marker of its own — as a marker it
- * would read `*ptr = 0` and a wrapped multiplication as comments.
- *
- * Block openers are tested before line markers because several overlap: Lua's
- * `--[[` also starts with its line marker `--`.
- */
 export function commentFlags(lines: string[], syntax: Syntax): boolean[] {
   const flags: boolean[] = [];
   let closer: string | null = null;
@@ -257,8 +232,6 @@ export function commentFlags(lines: string[], syntax: Syntax): boolean[] {
       continue;
     }
 
-    // Leading marker only. A trailing `#` or `//` is usually inside a string —
-    // matching those flags every `url = "http://..."` as a comment.
     flags.push(syntax.line.some((m) => line.startsWith(m)));
   }
   return flags;
@@ -270,11 +243,6 @@ function commentLines(text: string, syntax: Syntax): string[] {
   return lines.filter((l, i) => flags[i] || isSuppression(l));
 }
 
-/**
- * A multiset difference, not a line diff: we only care about comment lines, and
- * on those the multiset answer is the better one — moving an existing comment
- * is not an addition, while rewording one is a new claim to justify.
- */
 export function addedCommentLines(
   toolName: string,
   input: ToolInput,
@@ -296,12 +264,6 @@ export function addedCommentLines(
   return added;
 }
 
-/**
- * A `-` line consumes no line in the new file, so only context and additions
- * advance the counter. `\ No newline at end of file` is a diff annotation
- * rather than a line and is skipped the same way. Text is trimmed on both
- * sides, because the block scan compares trimmed lines too.
- */
 export function patchLines(patch: Hunk[]): {
   added: { n: number; text: string }[];
   removed: string[];
@@ -323,19 +285,6 @@ export function patchLines(patch: Hunk[]): {
   return { added, removed };
 }
 
-/**
- * A line the diff also removed is not new — re-indenting a block, or moving one
- * between two points of the same edit, rewrites every line it touches and would
- * otherwise re-ask for a comment nobody wrote. Subtracting the removed texts as
- * a multiset is what keeps the diff path agreeing with `addedCommentLines`:
- * moving a comment is not an addition, rewording one is.
- *
- * A formatter running as a second PostToolUse hook rewrites the file in
- * parallel with this one, and every line the diff named then shifts — marks
- * land on the wrong lines, or the block falls silent because they land on code.
- * Text is the weaker answer but it cannot be shifted, so a lost race degrades
- * instead of lying.
- */
 export function resolveAdded(
   patch: Hunk[],
   lines: string[],
@@ -383,8 +332,6 @@ export function flaggedBlocks(
   const claim = (i: number): boolean => {
     if (byNumber) return byNumber.has(i + 1);
     const left = pending.get(lines[i]!) ?? 0;
-    // Consume in file order so each added occurrence claims one line, and so a
-    // hit landing in an exempt or short block still spends itself.
     if (left > 0) pending.set(lines[i]!, left - 1);
     return left > 0;
   };
@@ -419,7 +366,6 @@ export function flaggedBlocks(
 
     while (i < lines.length) {
       if (!flags[i]) {
-        // One blank keeps the run open so a paragraph break cannot split a block below the threshold; two blanks read as a real separation.
         if (lines[i] !== "" || !flags[i + 1]) break;
         body.push("");
         marked.push(false);
@@ -437,7 +383,6 @@ export function flaggedBlocks(
       i++;
     }
 
-    // Counted, not filtered on empty text: a blank line inside a `/* */` is a comment line and still counts, while a bridged one is not and does not.
     const height = body.length - bridged;
     const sized =
       (every || (!header && height >= MIN_BLOCK_LINES)) && marked.some(Boolean);
@@ -448,7 +393,6 @@ export function flaggedBlocks(
   return blocks;
 }
 
-// The read is injected rather than done up front so a skipped edit never touches the disk.
 export async function blocksFor(
   toolName: string,
   input: ToolInput,
@@ -463,8 +407,6 @@ export async function blocksFor(
 
   if (response.staged) return none;
   const patch = response.structuredPatch;
-  // A Write that creates a file reports no hunks at all (78 of 78 measured), so
-  // an empty patch means "nothing changed" only when the file already existed.
   if (response.type === "update" && patch?.length === 0) return none;
 
   // PostToolUse runs after the write landed, so the file on disk is the shape
@@ -476,7 +418,6 @@ export async function blocksFor(
     return none;
   }
 
-  // Live on both harnesses, not dead code: a create Write sends an empty patch, and OpenCode's `commentPayload` sends none at all.
   const added = patch?.length
     ? resolveAdded(
         patch,
@@ -489,7 +430,6 @@ export async function blocksFor(
   return { blocks, asked };
 }
 
-// Kept out of formatReason so the sweep asks once however many files it reports.
 export const ASK =
   "Answer for every line marked +: does it say why, or what? Delete the ones that say what. " +
   "A why that excuses a workaround or surprise in our own code is a refactor, not a comment: rename, extract, or type the code until the why is obvious, then delete it. " +

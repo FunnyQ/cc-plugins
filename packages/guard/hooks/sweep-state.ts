@@ -1,12 +1,3 @@
-/**
- * Per-session state shared by comment-guard (writer of what it asked) and
- * comment-sweep (the turn's baseline tree, and the reader of what was asked).
- *
- * It lives in the temp dir because losing it costs one skipped sweep, never a
- * wrong answer. Kept apart from both hooks so neither imports the other's
- * entry point.
- */
-
 import {
   appendFileSync,
   mkdirSync,
@@ -15,7 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_STATE_DIR, reportedFile, reportedLine, safe } from "./ledger.ts";
+import { DEFAULT_STATE_DIR, reportedFile, reportedLine, fileNameSafeSessionId } from "./ledger.ts";
 
 export type Baseline = { root: string; tree: string };
 
@@ -25,7 +16,7 @@ function dir(): string {
   return path;
 }
 
-const baselinePath = (id: string) => join(dir(), `${safe(id)}.baseline.json`);
+const baselinePath = (id: string) => join(dir(), `${fileNameSafeSessionId(id)}.baseline.json`);
 const reportedPath = (id: string) => reportedFile(dir(), id);
 
 export function writeBaseline(sessionId: string, baseline: Baseline): void {
@@ -59,7 +50,6 @@ export function recordReported(
   );
 }
 
-/** Comment texts already put to the model this turn, as a multiset per file. */
 export function readReported(
   sessionId: string,
 ): Map<string, Map<string, number>> {

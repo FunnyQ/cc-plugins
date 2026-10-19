@@ -6,7 +6,6 @@ import { ASK } from "./comment-core.ts";
 import { collect, snapshot, sweep } from "./comment-sweep.ts";
 import { recordReported } from "./sweep-state.ts";
 
-// A key in the developer's shell would send these fixtures to Jev; jev-screen.test.ts covers that path offline.
 delete process.env.TYPESAFE_API_KEY;
 
 let repo: string;
@@ -121,6 +120,35 @@ describe("sweep", () => {
       "// three",
     ]);
     expect(await sweep(payload)).toBeNull();
+  });
+
+  const TRIPLE = "const a = 1;\n// same\n// same\n// same\nconst b = 2;\n";
+  const addedLines = (reason: string | undefined) =>
+    (reason ?? "").split("\n").filter((l) => /^\s*\+ \d+/.test(l)).length;
+
+  test("one already-reported copy excuses one added twin, not every copy", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), TRIPLE);
+    recordReported(SESSION, join(repo, "app.ts"), ["// same"]);
+    expect(addedLines((await sweep(payload))?.reason)).toBe(2);
+  });
+
+  test("one copy moved from another file excuses one added twin, not every copy", async () => {
+    await Bun.write(join(repo, "old.ts"), "const a = 1;\n// same\n");
+    await snapshot(payload);
+    await Bun.write(join(repo, "old.ts"), "const a = 1;\n");
+    await Bun.write(join(repo, "app.ts"), TRIPLE);
+    expect(addedLines((await sweep(payload))?.reason)).toBe(2);
+  });
+
+  test("asks the question once however many files it reports", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "a.ts"), BLOCK);
+    await Bun.write(join(repo, "b.ts"), BLOCK);
+    const reason = (await sweep(payload))?.reason ?? "";
+    expect(reason).toContain("in a.ts");
+    expect(reason).toContain("in b.ts");
+    expect(reason.split(ASK)).toHaveLength(2);
   });
 
   test("a second sweep in the same turn does not repeat the first", async () => {

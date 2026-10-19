@@ -23,7 +23,6 @@ type Sent = {
   questions: Record<string, { instructions: string }>;
 };
 
-/** Answers every added line of a block with P(why) taken from `pWhy` by first line. */
 function fakeJev(pWhy: Record<string, number>, sent: Sent[] = []) {
   return (async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)) as Sent;
@@ -110,8 +109,8 @@ describe("screenBlocks", () => {
       fetch: fakeJev({ "// a": 0.93, "// x": 0.2 }),
     });
     expect(screen.withdrawn).toBe(1);
-    expect(screen.ms).toBeGreaterThanOrEqual(0);
-    expect(screenNote("💬 comment-guard", { ...screen, ms: 231 })).toBe(
+    expect(screen.slowestMs).toBeGreaterThanOrEqual(0);
+    expect(screenNote("💬 comment-guard", { ...screen, slowestMs: 231 })).toBe(
       "💬 comment-guard: Jev withdrew 1 of 2 comment block(s) as why (231 ms)",
     );
   });
@@ -129,7 +128,7 @@ describe("screenBlocks", () => {
 
   test("stays silent when it withdrew nothing", () => {
     expect(
-      screenNote("💬 comment-guard", { kept: [WHY], withdrawn: 0, ms: 200 }),
+      screenNote("💬 comment-guard", { kept: [WHY], withdrawn: 0, slowestMs: 200 }),
     ).toBeNull();
   });
 });

@@ -1,8 +1,5 @@
 #!/usr/bin/env bun
 /**
- * PostToolUse hook: surface the comment blocks an edit added or grew, so the
- * model re-judges why vs what.
- *
  * Input (stdin): JSON with tool_name, tool_input, and on Claude Code a
  * tool_response carrying the diff the write produced.
  * Output: silent unless a reportable block exists.
@@ -10,14 +7,9 @@
  *   0 = ok / skipped file type / nothing to report
  *   2 = block reported (PostToolUse exit 2 + stderr surfaces feedback to the LLM)
  *
- * Detects only. The why-vs-what judgement is the model's — this hook never
- * guesses at meaning, it just hands the lines back.
- *
- * A block reports when it runs MIN_BLOCK_LINES or longer AND this edit put at
- * least one line in it. One- and two-line comments never fire: measured over
+ * One- and two-line comments never fire: measured over
  * this repo, that silences 68% of blocks, which is what keeps the hook quiet
- * enough to leave switched on. The file-header block is exempt — it documents
- * the module, which is the one place prose is the point.
+ * enough to leave switched on.
  */
 
 import {

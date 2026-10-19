@@ -75,8 +75,7 @@ async function allWhy(
   }
 }
 
-/** `ms` is the slowest request, since they run in parallel; absent when nothing was sent. */
-export type Screen = { kept: CommentBlock[]; withdrawn: number; ms?: number };
+export type Screen = { kept: CommentBlock[]; withdrawn: number; slowestMs?: number };
 
 export async function screenBlocks(
   file: string,
@@ -86,7 +85,6 @@ export async function screenBlocks(
   const { apiKey } = opts;
   if (!apiKey) return { kept: blocks, withdrawn: 0 };
   const started = performance.now();
-  // A tagged line asks more than why-or-what, so a confident "why" from Jev answers the wrong question.
   const passed = await Promise.all(
     blocks.map((block) =>
       block.tags.some(Boolean)
@@ -98,13 +96,12 @@ export async function screenBlocks(
   return {
     kept,
     withdrawn: blocks.length - kept.length,
-    ms: Math.round(performance.now() - started),
+    slowestMs: Math.round(performance.now() - started),
   };
 }
 
-// Silent when nothing was withdrawn: a withdrawal is the one outcome nobody would otherwise see.
 export function screenNote(label: string, screen: Screen): string | null {
   if (screen.withdrawn === 0) return null;
   const total = screen.kept.length + screen.withdrawn;
-  return `${label}: Jev withdrew ${screen.withdrawn} of ${total} comment block(s) as why (${screen.ms} ms)`;
+  return `${label}: Jev withdrew ${screen.withdrawn} of ${total} comment block(s) as why (${screen.slowestMs} ms)`;
 }

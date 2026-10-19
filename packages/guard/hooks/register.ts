@@ -108,7 +108,6 @@ export const register: Register = (on) => {
     const ran = await next(e);
 
     if (e.agentId) {
-      // By type, not by the id spawn answered: any reviewer's answer is guard's to deliver.
       const agents = await $.agent.list();
       if (agents.find((a) => a.id === e.agentId)?.type !== AGENT) return ran;
       await $.state.set(REVIEW, null);

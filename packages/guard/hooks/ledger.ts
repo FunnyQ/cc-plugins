@@ -6,11 +6,10 @@
 
 export const DEFAULT_STATE_DIR = "/tmp/q-lab/guard";
 
-// Session ids come off stdin and become file names.
-export const safe = (sessionId: string) => sessionId.replace(/[^\w.-]/g, "_");
+export const fileNameSafeSessionId = (sessionId: string) => sessionId.replace(/[^\w.-]/g, "_");
 
 export const reportedFile = (dir: string, sessionId: string) =>
-  `${dir}/${safe(sessionId)}.reported.jsonl`;
+  `${dir}/${fileNameSafeSessionId(sessionId)}.reported.jsonl`;
 
 export const reportedLine = (file: string, texts: string[]) =>
   JSON.stringify({ file, texts }) + "\n";

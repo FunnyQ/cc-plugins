@@ -1,19 +1,5 @@
 #!/usr/bin/env bun
 /**
- * Turn-level companion to comment-guard: catches the comment blocks a turn
- * wrote without Edit or Write — `sed -i`, a heredoc, a codegen script — which
- * no PostToolUse Edit|Write hook ever sees.
- *
- *   snapshot  (UserPromptSubmit) stores the worktree as a git tree object.
- *   sweep     (Stop) diffs the worktree against it and hands back every block
- *             the turn added or grew, as a Stop `decision: block`.
- *
- * The tree is written through a throwaway index, so untracked files are
- * included while the worktree and the real index stay untouched. The diff runs
- * through comment-guard's own `resolveAdded` and `flaggedBlocks`, so the two
- * hooks agree on every rule: re-indenting is not an addition, blocks under
- * three lines stay quiet, the file header is exempt.
- *
  * Output: silent unless a reportable block exists. Always exits 0.
  */
 
@@ -41,7 +27,6 @@ import {
   writeBaseline,
 } from "./sweep-state.ts";
 
-// A checkout, pull or formatter run rewrites files nobody in this turn authored; past this many, the report would be noise.
 const MAX_FILES = 20;
 
 type Payload = { session_id?: string; cwd?: string };
@@ -79,7 +64,6 @@ function worktreeTree(root: string): string | null {
   }
 }
 
-/** `git diff -U0` hunks in the shape comment-guard reads off `structuredPatch`. */
 export function parseHunks(diff: string): Hunk[] {
   const hunks: Hunk[] = [];
   let current: Hunk | null = null;
@@ -95,11 +79,6 @@ export function parseHunks(diff: string): Hunk[] {
   return hunks;
 }
 
-/**
- * A block moved between files reads as removed here and added there, and the
- * per-file diff only cancels a move within one file. A deleted file counts too,
- * since moving a block out of a file often ends with removing the file.
- */
 export function movedOut(diff: string): Map<string, number> {
   const pool = new Map<string, number>();
   for (const section of diff.split(/^diff --git /m).slice(1)) {
@@ -120,7 +99,6 @@ export function movedOut(diff: string): Map<string, number> {
   return pool;
 }
 
-// Spends `seen` as it matches, so one removed or reported line excuses one added line, not every copy of it.
 function without(
   added: Set<number> | string[],
   lines: string[],
@@ -149,14 +127,12 @@ export async function snapshot(payload: Payload): Promise<void> {
   else clearBaseline(sessionId);
 }
 
-/** The Stop hook's stdout; `systemMessage` alone means Jev withdrew every block. */
 type SweepOutput = {
   decision?: "block";
   reason?: string;
   systemMessage?: string;
 };
 
-/** What the turn added, screened: `report` is empty when Jev withdrew every block, `note` says so. */
 export type Found = {
   report: string;
   blocks: number;
@@ -174,7 +150,6 @@ export async function collect(payload: Payload): Promise<Found | null> {
   const tree = worktreeTree(root);
   if (!tree || tree === baseline.tree) return null;
 
-  // Advance first, so a Stop that re-fires after the model's fix-up judges only the fix-up.
   const reported = readReported(sessionId);
   writeBaseline(sessionId, { root, tree });
   clearReported(sessionId);
@@ -232,7 +207,6 @@ export async function collect(payload: Payload): Promise<Found | null> {
       continue;
     }
     const lines = text.split("\n").map((l) => l.trim());
-    // The Edit hook already put the reported lines to the model this turn; asking again would repeat the question it answered.
     const added = without(
       without(resolveAdded(hunks, lines), lines, reported.get(abs)),
       lines,
@@ -261,7 +235,7 @@ export async function collect(payload: Payload): Promise<Found | null> {
   const note = screenNote("🧹 comment-sweep", {
     kept: screened.flatMap((s) => s.kept),
     withdrawn: screened.reduce((n, s) => n + s.withdrawn, 0),
-    ms: Math.max(0, ...screened.map((s) => s.ms ?? 0)),
+    slowestMs: Math.max(0, ...screened.map((s) => s.slowestMs ?? 0)),
   });
   const kept = screened.flatMap((s) => s.kept);
   if (reasons.length === 0 && !note) return null;
@@ -294,7 +268,6 @@ async function main(): Promise<void> {
   }
   if (process.argv[2] === "snapshot") return snapshot(payload);
   if (process.argv[2] !== "sweep") return;
-  // --json is the Claude Code mod's: it hands the report to a reviewer instead of blocking Stop.
   const out =
     process.argv[3] === "--json"
       ? await collect(payload)

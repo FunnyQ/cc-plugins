@@ -10,7 +10,6 @@ export const MARK = "🔎 comment-reviewer";
 
 export const CLEAN = "CLEAN";
 
-/** The agent file `agents/comments-reaper.md` holds the prompt, so the skill's agent and the mod's reviewer cannot drift apart. */
 export function promptBody(agentFile: string): string {
   return agentFile.replace(/^---\n[\s\S]*?\n---\n/, "").trim();
 }
