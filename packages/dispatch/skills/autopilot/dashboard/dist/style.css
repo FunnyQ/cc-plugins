@@ -20,9 +20,6 @@
   --text-md: 13px;
   --text-lg: 16px;
   --text-xl: 22px;
-  /* Off the scanning scale on purpose. Every other size on the deck is sized for
-     a value read at a glance down a column; this one is sized for the judge's
-     rationale, which is the only place a reader spends four hundred words. */
   --text-reading: 14px;
 
   --space-1: 4px;
@@ -35,16 +32,9 @@
   --radius-md: 4px;
 
   --border-width: 1px;
-  /* Token budget tiers, thresholds in modules/format.js. Warning and danger
-     reuse the state palette so one amber and one red mean one thing across the
-     whole deck. Normal is deliberately brighter than --muted: the count is a
-     figure to read, not a caption. */
   --token-normal: var(--text);
   --token-warn: var(--state-flight);
   --token-danger: var(--state-alert);
-  /* The external engine's ink, used only where tiers do not reach — the lane card.
-     In the fleet the codex figure takes the same tier colours as the Claude one, so
-     a single amber means a single amount down that column. */
   --token-codex: var(--state-ready);
   --header-min-height: 64px;
   --ring-size: 32px;
@@ -141,7 +131,6 @@ button {
   white-space: nowrap;
 }
 
-/* The repo anchors the plan: same line as the slug, read as one path. */
 .repo {
   color: var(--text);
 
@@ -152,9 +141,6 @@ button {
   }
 }
 
-/* The wave figure is a countdown, so it reads in the ready hue — the colour of
-   work cleared to fly — while the wave number beside it stays an index, not a
-   status, and keeps the muted label colour. */
 .plan-waves {
   display: grid;
   gap: var(--space-1);
@@ -187,7 +173,6 @@ button {
     }
   }
 
-  /* A task no wave can reach means the countdown is not the whole story. */
   &.-stalled > .value {
     color: var(--state-alert);
   }
@@ -301,8 +286,6 @@ button {
   color: var(--state-blocked);
 }
 
-/* A malformed completion state is an alert, not a status — it reuses the alert
-   colour so an invalid task can never read as ordinary progress. */
 .plan-counts .-invalid dd {
   color: var(--state-alert);
 }
@@ -451,8 +434,6 @@ button {
      answer "what is holding this up", and the answer was invisible. PRODUCT.md
      has blocked recede into slate *without disappearing*. */
   --unlit-berth: color-mix(in oklab, var(--state-blocked) 75%, var(--ground));
-  /* One travelling segment per period, with a long dark gap after it, so the eye
-     follows a single light rather than a moving ladder. */
   --graph-flow-dash: 26px;
   --graph-flow-gap: 82px;
   --graph-flow-duration: 1.25s;
@@ -460,7 +441,6 @@ button {
   display: block;
   min-inline-size: 100%;
 
-  /* The road exists whether or not the plan reaches the end of it. */
   .graph-road > .rail {
     stroke: var(--unlit);
     stroke-linecap: butt;
@@ -532,8 +512,6 @@ button {
     animation: flight-pulse var(--flight-duration) ease-in-out infinite;
   }
 
-  /* Crossovers are track too, at the road's weight, so a dependency that leaves
-     its bucket reads as a physical connection and not as an annotation. */
   .graph-crossover {
     fill: none;
     stroke: var(--unlit);
@@ -547,8 +525,6 @@ button {
     stroke: color-mix(in oklab, var(--state-done) 50%, var(--ground));
   }
 
-  /* The running line inside one bucket. It lies over the rail at the rail's own
-     weight and colour, so it shows only once a route is set through it. */
   .graph-link {
     stroke: var(--unlit);
     stroke-linecap: butt;
@@ -592,17 +568,11 @@ button {
     text-anchor: middle;
   }
 
-  /* All three live inside the plate, so they set against its edges rather than
-     centring: the ref owns the first line off the leading edge, and the two
-     figures split the second between the leading and trailing edges. Each then
-     forms a column down its road and can be compared by shape. */
   .graph-ref {
     font-weight: 600;
     text-anchor: start;
   }
 
-  /* Untiered — a berth totals several agents, so the fleet's per-agent
-     thresholds would light every berth on a real run. */
   .graph-tokens {
     fill: var(--muted);
     font-weight: 700;
@@ -864,8 +834,6 @@ button {
       text-transform: uppercase;
     }
 
-    /* Placement only. The type and the tier ink live with the fleet's figure,
-       so the same count reads the same way in both views. */
     > .summary > .token-figure {
       justify-self: end;
     }
@@ -1009,8 +977,6 @@ button {
       font-size: var(--text-xs);
     }
 
-    /* The cap and the scroll live on the well above, so the prose here is a
-       plain block that grows to its full height inside it. */
     > .rationale {
       max-block-size: none;
       overflow: visible;
@@ -1108,7 +1074,6 @@ button {
   }
 }
 
-/* Collapsed, the panel is just its heading — hand the height back to the tree. */
 #app:has(.c-fleet.-collapsed) {
   grid-template-rows: auto minmax(40vh, 1fr) auto;
 }
@@ -1211,8 +1176,6 @@ button {
   background: var(--state-alert);
 }
 
-/* Muted, not alarming: an abandoned agent reported no verdict either way, and
-   the default dot is the green of a clean finish. */
 .fleet-row.-abandoned .fleet-status {
   background: var(--state-blocked);
 }
@@ -1235,8 +1198,6 @@ button {
   row-gap: var(--space-1);
 }
 
-/* Both span the tracks: the badge heads the table rather than sitting in a column of
-   it, and an unknown role's raw label is a caption on the whole cell. */
 .fleet-cell.-role > .role-badge,
 .fleet-cell.-role > .raw-label {
   grid-column: 1 / -1;
@@ -1250,8 +1211,6 @@ button {
   grid-column: 2;
 }
 
-/* Nothing in the model column means no column to gap away from, and the lone figure
-   would otherwise hang 8px off the badge above it. */
 .fleet-cell.-role:not(:has(.role-model)) {
   column-gap: 0;
 }
@@ -1290,14 +1249,10 @@ button {
   letter-spacing: 0.02em;
 }
 
-/* The same vendor accent the codex token figure would carry if tiers didn't own its
-   ink — see the comment on .role-tokens.-codex. The model chip has no tier to defer
-   to, so it takes that accent directly. */
 .role-model.-codex {
   color: var(--token-codex);
 }
 
-/* The message is where a rejected gate says WHY, so it stops being secondary. */
 .fleet-row.-rejected .fleet-cell.-message {
   color: var(--text);
 }
@@ -1305,14 +1260,9 @@ button {
 /* One rule for every token figure on the deck: the fleet's under-chip count and
    the lane card's. Tabular figures so a stack of them lines up on the decimal,
    and --text-sm rather than --text-xs — this stopped being a caption the moment
-   it started carrying a warning.
-
-   The lane selector has to spell out its nesting to reach the rule it replaces
-   inside .c-task-lanes. That makes it four classes deep, which would then
-   outrank the tier variants below — so the ink travels as a custom property,
-   which each variant sets on the element itself and specificity never touches. */
+   it started carrying a warning. */
 .role-tokens,
-.c-task-lanes .c-task-card > .summary > .token-figure {
+.token-figure {
   color: var(--token-ink, var(--token-normal));
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -1321,8 +1271,6 @@ button {
   letter-spacing: 0.02em;
 }
 
-/* Tiers are the fleet's alone. A lane card and a graph berth both total several
-   agents, so per-agent thresholds would light them up on every real run. */
 .role-tokens.-warn {
   --token-ink: var(--token-warn);
 }
@@ -1331,24 +1279,16 @@ button {
   --token-ink: var(--token-danger);
 }
 
-/* No measurement, no reading: N/A stays caption grey wherever it prints. Absence is
-   not a tier — the lane card carries no thresholds but still has to say "unknown". */
 .role-tokens:not(.-normal, .-warn, .-danger),
 .token-figure.-absent {
   --token-ink: var(--muted);
 }
 
-/* The external engine's spend, as a second smaller figure on the line below the Claude
-   one. It sets size only and deliberately NOT --token-ink: the fleet's tier rules above
-   have to reach it, so one amber means one amount down the whole column. The model name
-   in the column beside it carries the vendor instead. */
 .role-tokens.-codex {
   font-size: var(--text-xs);
 }
 
-/* The lane card carries no tiers at all — a card totals several agents — so there
-   the codex figure keeps its own ink as the only thing telling the two apart. */
-.c-task-lanes .c-task-card > .summary > .token-figure.-codex {
+.token-figure.-codex {
   --token-ink: var(--token-codex);
   font-size: var(--text-xs);
 }
@@ -1489,7 +1429,6 @@ button {
   display: block;
 }
 
-/* A fleet row spans the panel, so its well gets the taller cap of the two. */
 .c-fleet-rubric > .rationale {
   max-block-size: 32lh;
 }
@@ -1507,12 +1446,8 @@ button {
   font-size: var(--text-reading);
   line-height: 1.65;
   margin: 0;
-  /* The measure, not the well: the well spans its panel so a code block can use
-     the width, while the prose inside it stays at a readable line length. */
   max-inline-size: 78ch;
   overflow-y: auto;
-  /* The well is a scrollport inside two more; without this, reaching its end
-     hands the wheel to the fleet pane and the reader loses their place. */
   overscroll-behavior: contain;
   padding-block: var(--space-3) var(--space-2);
 }
@@ -1532,10 +1467,6 @@ button {
   margin-block: 0 0.9em;
 }
 
-/* Headings start at h3 — see renderRationale. Two grades, not four: the judge
-   writes a title and its sections, so h3 takes a size step and everything under
-   it becomes a section label. A third grade would be a distinction the source
-   text does not make. */
 .rationale h3,
 .rationale h4,
 .rationale h5,
@@ -1692,8 +1623,6 @@ button {
   }
 }
 
-/* The period is dash + gap, so one cycle of the offset moves each segment exactly
-   into the place the one behind it left — the loop has no seam. */
 @keyframes graph-flow-run {
   from {
     stroke-dashoffset: 0;

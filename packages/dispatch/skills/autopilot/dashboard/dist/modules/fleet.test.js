@@ -18,11 +18,6 @@ import { formatDuration } from "./format.js";
 
 const expandedKeys = new Set();
 
-/**
- * Run `fn` with a minimal `document` in place. `renderFleet` builds a real element,
- * and this file has no DOM; every render test needs the same stub, so it is written
- * once here rather than re-declared inside each describe block.
- */
 function withStubDocument(fn) {
   const originalDocument = globalThis.document;
   globalThis.document = {
@@ -37,9 +32,10 @@ function withStubDocument(fn) {
   }
 }
 
-/** The rendered markup of a single row, the shape most render tests assert on. */
 const rowHtml = (row) =>
   withStubDocument(() => renderFleet([row], 1, true, "connected").innerHTML);
+
+const bodyAfterHeading = (html) => html.split("</header>")[1] ?? "";
 
 function isExpanded(rowKey) {
   return withStubDocument(() => {
@@ -57,10 +53,7 @@ function isExpanded(rowKey) {
       true,
       "connected",
     );
-    // Scope past the heading: the panel's own collapse toggle carries an
-    // aria-expanded too, and matching the whole string would always find it.
-    const body = root.innerHTML.split("</header>")[1] ?? "";
-    return body.includes('aria-expanded="true"');
+    return bodyAfterHeading(root.innerHTML).includes('aria-expanded="true"');
   });
 }
 
@@ -96,7 +89,6 @@ describe("elapsedText", () => {
 
   test("ticks an in-flight row against the current time", () => {
     expect(elapsedText({ status: "in-flight", startedAt }, now)).toBe("40.0s");
-    // No end was ever logged, so there is no duration to claim.
     expect(elapsedText({ status: "abandoned", startedAt }, now)).toBe("");
   });
 
@@ -186,14 +178,12 @@ describe("toggleRubric", () => {
       },
     };
 
-    // Collapsed, the prose stays out of the DOM entirely.
     expect(rowHtml(row)).not.toContain('<div class="rationale">');
     expand("quiet-row");
     const html = rowHtml(row);
     expect(html).toContain('<div class="rationale">');
     expect(html).toContain("&lt;exit 2&gt;");
     expect(html).toContain("<code>kind.rs:68</code>");
-    // The meters still lead — the prose is the supporting evidence, not the verdict.
     expect(html.indexOf("Correctness")).toBeLessThan(html.indexOf("rationale"));
   });
 });
@@ -278,9 +268,6 @@ describe("elapsedByTask", () => {
   const at = (offsetMs) => new Date(t0 + offsetMs).toISOString();
 
   test("counts concurrent agents of one task once, not once each", () => {
-    // The closing review fans five lenses out at the same moment. Summing their
-    // elapsed would answer how much agent time the task burned — which is what
-    // the berth's token figure already says — instead of how long it took.
     const rows = ["a", "b", "c", "d", "e"].map((key) => ({
       key,
       ref: "review/01",
@@ -362,8 +349,6 @@ describe("tickGraphElapsed", () => {
 });
 
 describe("fleet collapse", () => {
-  // Asserts on the root element itself (className), not on markup, so it cannot
-  // use `rowHtml`.
   const render = () =>
     withStubDocument(() =>
       renderFleet(
@@ -413,8 +398,6 @@ describe("fleet sticky offsets", () => {
   // and the ROLE bar slid over the panel title. Both offsets must now come from
   // the same declaration, so neither can drift again.
   const css = readFileSync(new URL("../style.css", import.meta.url), "utf-8");
-  // A selector can head more than one block (`.fleet-row, .fleet-columns` and
-  // `.fleet-columns` alone), so read them all, not the first one found.
   const rule = (selector) =>
     (
       css.match(new RegExp(`\\${selector}[,\\s][^{]*\\{[^}]*\\}`, "g")) ?? []
@@ -466,6 +449,30 @@ describe("gate outcome colouring", () => {
 
     expect(html).not.toContain("-rejected");
     expect(html).toContain("-finished");
+  });
+
+  test("never gives an abandoned row the finished look", () => {
+    const html = rowHtml({
+      key: "dev:ui/01#1",
+      role: "dev",
+      ref: "ui/01",
+      status: "abandoned",
+    });
+
+    expect(html).toContain("-abandoned");
+    expect(html).not.toContain("-finished");
+  });
+
+  test("keys a rationale exactly as scripts/events-api.ts does", () => {
+    const keyTemplate = (path) =>
+      readFileSync(new URL(path, import.meta.url), "utf-8").match(
+        /function rationaleKey\([^)]*\)\s*\{\s*return (`[^`]*`)/,
+      )?.[1];
+
+    expect(keyTemplate("./fleet.js")).toBeDefined();
+    expect(keyTemplate("./fleet.js")).toBe(
+      keyTemplate("../../../scripts/events-api.ts"),
+    );
   });
 
   test("keeps the hard-fail state distinct from a plain rejection", () => {
@@ -524,8 +531,6 @@ describe("renderMessage", () => {
     expect(html).toContain("<code>32b4ea0</code>");
   });
 
-  // The reason escaping runs per token instead of once over the whole string: an
-  // entity like `&#039;` contains a run the hex-sha branch would otherwise split.
   test("escapes the text and never breaks an entity apart", () => {
     const html = renderMessage("<script>alert('x')</script> & done");
 
@@ -574,14 +579,13 @@ describe("Tokens under the role chip", () => {
     );
   });
 
-  test("carries the budget tier the fresh count falls in", () => {
+  test("carries the budget tier the fresh count falls in, unmoved by cache reads", () => {
     const tierOf = (cacheWrite) =>
       rowHtml({
         key: "dev:ui/01#1",
         role: "dev",
         ref: "ui/01",
         status: "finished",
-        // Cache reads dwarf the fresh count and must not move the tier.
         usage: { input: 0, output: 0, cacheRead: 5_000_000, cacheWrite },
       }).match(/class="role-tokens ([^"]+)"/)[1];
 
@@ -603,7 +607,6 @@ describe("Tokens under the role chip", () => {
 
     expect(html).toContain(">35.1K</span>");
     expect(html).toContain(">54.8K</span>");
-    // Merged it would read 89.9K, which is a Claude agent that never existed.
     expect(html).not.toContain(">89.9K<");
   });
 
@@ -617,8 +620,6 @@ describe("Tokens under the role chip", () => {
       codexUsage: { input: 0, output: 500, cacheRead: 900, cacheWrite: 54_800 },
     });
 
-    // The figure lost its `cdx` prefix to the model column beside it, so an unnamed
-    // codex line would leave a bare number with nothing saying whose spend it is.
     expect(html).toContain(
       '<span class="role-model -codex" title="codex">codex</span>',
     );
@@ -712,7 +713,6 @@ describe("Model chip under the role chip", () => {
     );
   });
 
-  // Format first, then dedupe: two builds of the same family read as one chip.
   test("dedupes several raw ids into one chip and carries all of them in the title", () => {
     const html = rowHtml({
       key: "dev:ui/01#1",

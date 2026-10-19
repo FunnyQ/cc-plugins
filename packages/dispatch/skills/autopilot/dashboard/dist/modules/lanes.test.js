@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { buildLanes, Lanes } from "./lanes.js";
 
-// `buckets` arrives already ordered from /api/tree, which owns that rule.
 const tree = {
   buckets: ["api", "empty", "ui"],
   tasks: [
@@ -70,8 +69,6 @@ describe("Lanes", () => {
     const html = component.renderRubric(score);
     expect(html).toContain('<div class="rationale">');
     expect(html).toContain("&lt;b&gt;exit 2&lt;/b&gt;");
-    // Trimmed at the edges, and the judge's own paragraph break becomes a break
-    // the reader can see rather than two escaped newlines in one run of text.
     expect(html).toContain("exit 2&lt;/b&gt;.</p><p>I ran it.</p></div>");
     expect(html).toContain("<code>kind.rs:68</code>");
     // A verdict logged before --rationale-file existed renders bars only.

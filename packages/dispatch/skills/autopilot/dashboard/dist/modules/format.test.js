@@ -1,18 +1,25 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
-  TOKEN_DANGER,
-  TOKEN_WARN,
+  PER_AGENT_TOKEN_DANGER,
+  PER_AGENT_TOKEN_WARN,
+  SCORE_MAX,
   allHarnessTokens,
   formatModel,
+  formatDuration,
   formatModelList,
   formatTokens,
   freshTokens,
   hasTokenReading,
+  percent,
   renderRationale,
+  renderRubric,
   tokenTier,
   totalTokens,
   waveHint,
 } from "./format.js";
+
+const source = (name) => readFileSync(new URL(name, import.meta.url), "utf8");
 
 describe("formatTokens", () => {
   test("reports missing measurements as unavailable, never zero", () => {
@@ -49,16 +56,16 @@ describe("formatTokens", () => {
 describe("tokenTier", () => {
   test("tiers on the documented thresholds, inclusive at each step", () => {
     expect(tokenTier(0)).toBe("-normal");
-    expect(tokenTier(TOKEN_WARN - 1)).toBe("-normal");
-    expect(tokenTier(TOKEN_WARN)).toBe("-warn");
-    expect(tokenTier(TOKEN_DANGER - 1)).toBe("-warn");
-    expect(tokenTier(TOKEN_DANGER)).toBe("-danger");
+    expect(tokenTier(PER_AGENT_TOKEN_WARN - 1)).toBe("-normal");
+    expect(tokenTier(PER_AGENT_TOKEN_WARN)).toBe("-warn");
+    expect(tokenTier(PER_AGENT_TOKEN_DANGER - 1)).toBe("-warn");
+    expect(tokenTier(PER_AGENT_TOKEN_DANGER)).toBe("-danger");
     expect(tokenTier(7_183_857)).toBe("-danger");
   });
 
   test("keeps the thresholds at 60K and 100K", () => {
-    expect(TOKEN_WARN).toBe(60_000);
-    expect(TOKEN_DANGER).toBe(100_000);
+    expect(PER_AGENT_TOKEN_WARN).toBe(60_000);
+    expect(PER_AGENT_TOKEN_DANGER).toBe(100_000);
   });
 
   test("gives no tier to everything formatTokens calls N/A", () => {
@@ -107,9 +114,7 @@ describe("allHarnessTokens", () => {
   const claude = { input: 0, output: 0, cacheRead: 9_000, cacheWrite: 788_700 };
   const codex = { input: 0, output: 0, cacheRead: 9_000, cacheWrite: 488_500 };
 
-  // The header asks "what did this flight cost", not "which side spent what" — that
-  // question belongs to the fleet row and the lane card, which keep the two apart.
-  test("sums every harness into the one figure the header prints", () => {
+  test("sums every harness into the one figure the header prints, unlike the per-side rows", () => {
     expect(allHarnessTokens(claude, codex)).toBe(1_277_200);
   });
 
@@ -148,10 +153,8 @@ describe("totalTokens", () => {
   });
 });
 
-// The panels that carry no thresholds still have to tell a measured 0 from an
-// unknown, so the presence test is shared rather than re-derived per panel.
 describe("hasTokenReading", () => {
-  test("accepts every count formatTokens prints a number for", () => {
+  test("accepts every count formatTokens prints a number for, so a measured 0 is not an unknown", () => {
     for (const present of [0, 1, 999, 92_400, 7_183_857]) {
       expect(hasTokenReading(present)).toBe(true);
       expect(formatTokens(present)).not.toBe("N/A");
@@ -193,7 +196,7 @@ describe("waveHint", () => {
 });
 
 describe("renderRationale", () => {
-  test("promotes the judge's headings, starting at h3", () => {
+  test("promotes the judge's headings, starting at h3 under the page h1 and panel h2", () => {
     expect(renderRationale("# Verdict\n\n## The blocking defect")).toBe(
       "<h3>Verdict</h3><h4>The blocking defect</h4>",
     );
@@ -229,9 +232,7 @@ describe("renderRationale", () => {
     );
   });
 
-  // The trail is tailed from a running agent, so the last block on screen is
-  // routinely half-written; dropping it would blank what the reader waits on.
-  test("renders a fence the judge has not closed yet", () => {
+  test("renders a fence the judge has not closed yet, as a running agent's trail ends half-written", () => {
     expect(renderRationale("```\nhalf a line")).toBe(
       "<pre><code>half a line</code></pre>",
     );
@@ -243,9 +244,7 @@ describe("renderRationale", () => {
     );
   });
 
-  // A judge walking a seven-step pipeline numbers it 0..6. Renumbering from 1
-  // would print step 0 as step 1 and misreport every reference in the prose.
-  test("keeps the judge's own starting number", () => {
+  test("keeps the judge's own starting number, so a step 0 is never printed as step 1", () => {
     expect(renderRationale("0. zero\n1. one")).toBe(
       '<ol start="0"><li>zero</li><li>one</li></ol>',
     );
@@ -254,9 +253,7 @@ describe("renderRationale", () => {
     );
   });
 
-  // Hard-wrapping split the item in two and restarted the next number at 1 —
-  // one seven-step list became four lists that all began again.
-  test("folds a hard-wrapped item back into the item it continues", () => {
+  test("folds a hard-wrapped item back into the item it continues, never restarting the numbering", () => {
     expect(renderRationale("1. first line\nwrapped on\n2. second")).toBe(
       "<ol><li>first line\nwrapped on</li><li>second</li></ol>",
     );
@@ -272,8 +269,7 @@ describe("renderRationale", () => {
     expect(renderRationale("a\n\n---\n\nb")).toBe("<p>a</p><hr><p>b</p>");
   });
 
-  // No sanitizer ships with this, so nothing may reach the DOM unescaped.
-  test("escapes markup the judge quoted, including inside a fence", () => {
+  test("escapes markup the judge quoted, including inside a fence, since no sanitizer ships", () => {
     expect(renderRationale("<b>x</b> & 'y'")).toBe(
       "<p>&lt;b&gt;x&lt;/b&gt; &amp; &#039;y&#039;</p>",
     );
@@ -282,9 +278,6 @@ describe("renderRationale", () => {
     );
   });
 
-  // The only attribute this emits is the fence language, and the fence pattern
-  // admits `\w*` there — anything else is not a fence, so it can carry nothing
-  // into the attribute and falls through to escaped prose.
   test("refuses a fence whose info string could reach the attribute", () => {
     expect(renderRationale('```js"onload=alert(1)')).toBe(
       "<p>```js&quot;onload=alert(1)</p>",
@@ -308,9 +301,7 @@ describe("formatModel", () => {
     expect(formatModel("gpt-6-astra")).toBe("gpt 6 astra");
   });
 
-  // A silent blank would read as "no model", a different fact than an id from
-  // an unlisted family — it must still print something, never vanish.
-  test("falls back to dash-to-space for an id matching no known family", () => {
+  test("falls back to dash-to-space for an id matching no known family, never a blank that reads as no model", () => {
     expect(formatModel("mystery-model-9")).toBe("mystery model 9");
   });
 });
@@ -334,5 +325,52 @@ describe("formatModelList", () => {
     expect(formatModelList(undefined)).toBe("");
     expect(formatModelList(null)).toBe("");
     expect(formatModelList([])).toBe("");
+  });
+});
+
+describe("shared score rendering", () => {
+  test("keeps SCORE_MAX on the 0-5 rubric scale ScoreEntry.weighted uses", () => {
+    expect(SCORE_MAX).toBe(5);
+    expect(percent(5)).toBe("100%");
+  });
+
+  test("fleet and lanes import the score meter from here and define no copy", () => {
+    for (const panel of ["./fleet.js", "./lanes.js"]) {
+      const text = source(panel);
+      const imports = text.match(/import \{([^}]*)\} from "\.\/format\.js"/)?.[1] ?? "";
+      for (const name of ["percent", "formatScore", "scoreClass"]) {
+        expect(imports).toContain(name);
+        expect(text).not.toMatch(new RegExp(`(function|const|let) ${name}\\b`));
+      }
+      expect(text).not.toMatch(/SCORE_MAX\s*=/);
+    }
+  });
+});
+
+describe("formatDuration", () => {
+  test("keeps a decimal under a minute and drops it past one", () => {
+    expect(formatDuration(4_200)).toBe("4.2s");
+    expect(formatDuration(59_900)).toBe("59.9s");
+    expect(formatDuration(61_000)).toBe("1m 1s");
+  });
+
+  test("stays within the seven characters a berth plate reserves", () => {
+    for (const ms of [0, 59_900, 600_000, 3_599_000]) {
+      expect(formatDuration(ms).length).toBeLessThanOrEqual(7);
+    }
+  });
+});
+
+describe("renderRubric", () => {
+  const breakdown = [{ name: "tests", weight: 1, score: 4 }];
+
+  test("renders an older verdict with bars and no prose as the bars alone", () => {
+    const html = renderRubric({ breakdown });
+    expect(html).toContain('class="dimension"');
+    expect(html).not.toContain("rationale");
+  });
+
+  test("renders nothing for a verdict with neither bars nor prose", () => {
+    expect(renderRubric({})).toBe("");
   });
 });

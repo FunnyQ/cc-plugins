@@ -14,18 +14,13 @@ import {
 
 const MAX_ROWS = 200;
 const expandedRows = new Set();
-// Collapse state lives here, not in the DOM: every SSE frame rebuilds the panel,
-// so a class on the old node would be thrown away a second later.
 let fleetCollapsed = false;
-// The server sends each judge's prose once per connection; later frames rely on this.
 const rationales = new Map();
 
-/** Spelled identically in `scripts/events-api.ts`, which has no import path to this file. */
 function rationaleKey(score) {
   return `${score.task}|${score.attempt}|${score.ts}`;
 }
 
-/** Puts back on each row's score the rationale an earlier frame carried. Mutates `payload`. */
 export function rememberRationales(payload) {
   for (const [key, text] of Object.entries(payload?.rationales ?? {})) {
     rationales.set(key, text);
@@ -61,8 +56,6 @@ function renderScore(score) {
     </span>`;
 }
 
-// Local to this module: it has one caller, renderRow. The chip prints fresh tokens
-// only, so the title carries the billed total and the counters behind both.
 function tokenTitle(usage) {
   return usage
     ? `fresh ${usage.cacheWrite} · billed total ${totalTokens(usage)} (cache read ${usage.cacheRead} · input ${usage.input} · output ${usage.output})`
@@ -105,40 +98,15 @@ function renderCodexTokens(codexUsage, codexModels) {
 
 function renderTokens(usage, codexUsage, models, codexModels) {
   const fresh = freshTokens(usage);
-  // An unmeasured count carries no tier, so it gets no class rather than an
-  // empty one — the CSS reads the absence, and the markup stays legible.
   const tier = tokenTier(fresh);
   return `${renderModelChip(models, "")}<span class="role-tokens${tier ? ` ${tier}` : ""}" title="${escapeHtml(tokenTitle(usage))}">${escapeHtml(formatTokens(fresh))}</span>${renderCodexTokens(codexUsage, codexModels)}`;
 }
 
-// A leading PASS / FAIL is structure, not prose — agents write it on nearly every
-// verify and judge message. The dash after it is the separator the chip replaces.
 const VERDICT_PREFIX = /^(PASS|FAIL|SKIP|BLOCKED)\s*(?:[—–-]\s*)?/;
 
-/*
- * Identifiers the agents write bare, with no backticks to mark them:
- *   Foo::Bar          ActiveRecord::InvalidMigrationTimestampError
- *   snake_case        cms_kit, change_reason
- *   cmd:sub           db:prepare
- *   long digit runs   20260901000100 (a migration timestamp)
- *   short hex         32b4ea0 (a commit sha)
- *
- * Deliberately narrow. Ordinary English carries no underscores and no `::`, and the
- * colon form needs a letter on both sides, so `shas: 32b4ea0` does not match across
- * the space. Over-matching here would tint half the sentence and the emphasis would
- * stop meaning anything.
- */
 const CODEISH =
   /([A-Za-z][\w.]*::[\w.:]+|\b\w+_\w+\b|\b[a-z][\w.-]*:[a-z][\w.:-]*\b|\b\d{6,}\b|\b[0-9a-f]{7,40}\b)/g;
 
-/**
- * The message cell's markup.
- *
- * Escaping runs per token rather than once over the whole string. Escaping first
- * would put `&amp;` and `&#039;` into the text, and the hex-sha branch of CODEISH
- * would then match inside those entities and split them — turning a rendered `&`
- * into visible markup. Splitting first, then escaping each piece, cannot.
- */
 export function renderMessage(message) {
   const text = String(message ?? "");
   if (!text) return "";
@@ -169,11 +137,7 @@ function renderBreakdown(row) {
 function renderRow(row, nowMs) {
   const inFlight = isInFlight(row);
   const hardFailed = Boolean(row.score?.hardFailed);
-  // A gate that rejected the attempt reads as a rejection, not as a finish.
-  // -failed stays reserved for a rubric veto, which is the louder of the two.
   const rejected = !hardFailed && row.outcome === "failed";
-  // An agent that died without logging its end reported no verdict at all, so it
-  // must not borrow the finished look — nothing here was completed.
   const abandoned = row.status === "abandoned";
   const stateClass = hardFailed
     ? "-failed"
@@ -190,8 +154,6 @@ function renderRow(row, nowMs) {
       ? `<span class="raw-label">${escapeHtml(row.label)}</span>`
       : "";
   const expandable = Boolean(row.score?.breakdown?.length);
-  // A ticking row carries its own start time so the ticker can update this one
-  // cell without rebuilding the table and throwing away keyboard focus.
   const ticking =
     inFlight && row.startedAt && row.elapsedMs === undefined
       ? ` data-started-at="${escapeHtml(row.startedAt)}"`
@@ -230,14 +192,6 @@ export function connectEvents({ onFleet, onState }) {
   };
 }
 
-/**
- * The one derived value we own is the elapsed display.
- *
- * A row still in flight arrives with `startedAt` set and `elapsedMs` undefined;
- * we tick it against the browser clock once per second for real-time feedback.
- * Once a row finishes we print `elapsedMs` as given and never recompute it.
- * Ticking is a rendering concern, not a derivation one, so the server leaves it here.
- */
 export function elapsedText(row, nowMs) {
   if (!row.startedAt) return "";
   if (row.elapsedMs !== undefined) return formatDuration(row.elapsedMs);
@@ -249,7 +203,6 @@ export function isInFlight(row) {
   return row.status === "in-flight";
 }
 
-/** Advance the elapsed cell of every ticking row in place. */
 export function tickElapsed(root, nowMs = Date.now()) {
   for (const row of root?.querySelectorAll?.("[data-started-at]") ?? []) {
     const cell = row.querySelector(".fleet-cell.-elapsed");
@@ -260,11 +213,6 @@ export function tickElapsed(root, nowMs = Date.now()) {
   }
 }
 
-/**
- * How long the whole run has been flying: earliest start to now while anything
- * is in flight, else to the last finish. Returns null before the first agent
- * starts. `live` tells the caller whether the value still needs ticking.
- */
 export function runElapsed(rows, nowMs = Date.now()) {
   const started = (Array.isArray(rows) ? rows : []).filter(
     (row) => row.startedAt,
@@ -283,17 +231,6 @@ export function runElapsed(rows, nowMs = Date.now()) {
   return { ms: endMs - startMs, live: false };
 }
 
-/**
- * How long each task held the route: earliest start to now while any of its
- * agents is in flight, else to its last finish. One clock per task, so the five
- * concurrent review lenses count once between them rather than five times — the
- * berth's question is how long the task took, not how much agent time it burned,
- * which is what its token figure already answers.
- *
- * `runElapsed` does the derivation; this only groups by ref, so the plan-wide
- * figure in the header and a berth's own figure can never disagree about what
- * elapsed means. `startMs` rides along so a live berth can be ticked in place.
- */
 export function elapsedByTask(rows, nowMs = Date.now()) {
   const byRef = new Map();
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -312,14 +249,6 @@ export function elapsedByTask(rows, nowMs = Date.now()) {
   return elapsed;
 }
 
-/**
- * Advance every live berth's elapsed text in place.
- *
- * The panel is an SVG string rebuilt whole on every data frame, so ticking it
- * that way would re-lay every path and plate once a second to move seven
- * characters — and would fight the hover highlight, which lives in classes the
- * render does not know about. The start time rides on the element instead.
- */
 export function tickGraphElapsed(root, nowMs = Date.now()) {
   for (const text of root?.querySelectorAll?.("[data-elapsed-since]") ?? []) {
     text.textContent = formatDuration(

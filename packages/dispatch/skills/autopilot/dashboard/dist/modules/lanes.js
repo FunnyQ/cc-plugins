@@ -19,7 +19,6 @@ export function buildLanes(tree) {
     else byBucket.set(task.bucket, [task]);
   }
 
-  // The bucket order arrives sorted from /api/tree, which owns that rule.
   return (tree?.buckets ?? []).map((bucket) => {
     const laneTasks = (byBucket.get(bucket) ?? []).sort(compareTaskOrder);
 
@@ -96,9 +95,6 @@ export function Lanes({ tree, usage }) {
       </div>
     `,
     expandedRefs: {},
-    // The template re-reads lanes() on every render, including a rubric toggle.
-    // Each /api/tree payload replaces the tasks array, so its identity is what
-    // decides whether the grouping and the sorts have to run again.
     lanes() {
       if (cachedFrom !== tree.tasks) {
         cachedFrom = tree.tasks;

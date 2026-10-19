@@ -1,33 +1,3 @@
-/*
- * DIRECTION CONTRACT — Interlocking Panel
- *
- * THESIS: a flight plan is a route set through a signalling panel, not a bag of
- * coloured boxes on a canvas. It refuses the node-graph editor this category
- * always ships — and that this file used to be.
- * OWN-WORLD: a railway NX entrance-exit desk on Hangar's near-black ground.
- * Buckets are named running roads; tasks are berth plates on them; cross-bucket
- * dependencies are crossovers changing road; gates are signal heads.
- * State is lit, not filled: every state colour carries lit / base / unlit steps
- * on one hue, by value alone — no gradient and no shadow, and no box takes a
- * corner above 4px. The panel held to exactly two angles — horizontal and 45 —
- * until the crossover became a curve; that is now its one curved element, and
- * the rule it broke is recorded rather than quietly dropped.
- * STORY: the reader asks what is holding a task up and what moves when it
- * lands, and reads the answer as one lit line instead of tracing edges.
- * FIRST VIEWPORT: roads stack down the pane with their bucket names in the left
- * and right gutters; berths sit along each road at dependency depth as plates
- * carrying their own ref and token, lit down the leading edge; crossovers carry
- * every dependency that leaves its own road; the whole field is lit at rest.
- * FORM: Interlocking Panel, rank 1 of my grounded list, taken by the user over
- * the roll's assigned Drawing Sheet. Seed key 5e8c7193.
- * Approved comps: .impeccable/mocks/comp/b-throat.png (rest) + c-route.png
- * (hover). Signature interaction: hovering a berth darkens the panel and lights
- * that task's whole lineage end to end. Motion: segments light, never fade.
- * FINISH: unreviewed and undocumented is unfinished; this build ends with the
- * finish review, the verdict, DESIGN.md, and every shipping raster carrying its
- * provenance.
- */
-
 import {
   allHarnessTokens,
   compareTaskOrder,
@@ -37,54 +7,19 @@ import {
   hasTokenReading,
 } from "./format.js";
 
-// Left-to-right layout: a dependency chain reads along the reading direction,
-// and a wide node fits a full `bucket/NN` ref at a legible size instead of
-// shrinking to fit a narrow column.
-//
-// The type size is the one fixed quantity — the SVG renders at its natural
-// size, so 14 here is 14 real pixels — and every box, gap, and margin is a
-// multiple of it. Change FONT_SIZE and the whole diagram rescales in
-// proportion; nothing has to be re-tuned by hand.
 const FONT_SIZE = 14;
 
-// The monospace stack's advance, and the three type sizes drawn against it.
-// One place, because the gutter and the berth plate both size themselves to
-// their own ink and a second copy of 0.6 drifts from the first.
-//
-// Declared above `geometry` because the plate's own height is now derived from
-// two of them rather than picked: a two-line plate is as tall as the lines it
-// holds, and a hand-tuned multiple of the type size would drift from them the
-// first time either scale moved.
 const MONO_ADVANCE = 0.6;
 const ROAD_NAME_SCALE = 0.8;
 const REF_SCALE = 0.85;
 const TOKEN_SCALE = 0.75;
-// The travelling light runs inside the rail, not over it: at the rail's own weight it
-// would erase the track it is supposed to be flowing through.
 const FLOW_SCALE = 0.45;
 
 const advance = (characters, scale, fontSize) =>
   characters * fontSize * scale * MONO_ADVANCE;
 
 const geometry = (fontSize) => ({
-  // A berth is a berth plate: the ref and the token ride *inside* it, with a
-  // state bar down its leading edge, the way a terminal prints one record per
-  // line. They used to hang beneath as two free-floating lines of text, which
-  // split every task into a coloured bar over here and an identity over there
-  // and made the reader pair them up before a single berth could be read.
-  //
-  // The plate is still a block of track, not a card: it sits ON the rail, keeps
-  // the panel's 2px corner, and takes no shadow and no gradient.
   fontSize,
-  // Two lines: the ref, then the two figures the task cost — tokens and wall
-  // clock. The height is the ink plus its padding rather than a chosen
-  // multiple, so it follows REF_SCALE and TOKEN_SCALE instead of drifting from
-  // them. It comes out near the 2.85 the single-line plate carried, because
-  // that plate was mostly air.
-  // Rounded to a whole pixel for the reason the gutter and the plate width are:
-  // every road's y is a multiple of the pitch offset by this, so a fractional
-  // height spreads float error down the panel — and the extent then misses a
-  // round number by 3e-14, which is a real assertion this broke.
   berthLineGap: fontSize * 0.35,
   berthPadY: fontSize * 0.55,
   berthHeight: Math.round(
@@ -94,53 +29,20 @@ const geometry = (fontSize) => ({
   statusWidth: fontSize * 0.3, // the lit leading edge
   refGap: fontSize * 0.9, // between the two figures on the plate's second line
   minBerthWidth: fontSize * 7, // never narrower than the bar it replaced
-  // The running line. It was the berth's own height while a berth *was* the
-  // line; now that the plate stands on it, the two are separate quantities and
-  // the rail keeps the weight it always drew at.
   railWidth: fontSize * 0.85,
   slotGap: fontSize * 6, // between berths along one road (x) — crossovers land here
   roadPitch: fontSize * 5, // between roads (y)
-  // A road band never grows past about twice the ink it carries: a signal head
-  // above the line and the berth plate. Past that the roads drift apart and the
-  // panel is dead space again, only moved inside itself.
   maxRoadPitch: fontSize * 9,
   gutter: fontSize * 9, // road name, both ends, mirrored as on the comp — a cap
   minGutter: fontSize * 2,
-  // The gap is now the crossover's entire horizontal reach, not just somewhere
-  // for a signal head to stand, so the floor answers to the curve: below about
-  // this a change of road has no room to be a curve and reads as a kink in the
-  // rail. It was fontSize * 2.5 while the diagonal spent its own drop in reach
-  // and only the head had to fit. Raising it means a long plan reaches the
-  // scroll sooner, which is the trade the panel already takes elsewhere.
   minSlotGap: fontSize * 4,
   padding: fontSize,
-  // A three-aspect head standing on the running line. Tall enough to break the
-  // plate's own silhouette — a head shorter than the berth reads as a fitting
-  // hanging off it rather than a signal standing beside it.
   signalWidth: fontSize * 1.25,
   signalHeight: fontSize * 4,
   signalLamp: fontSize * 0.34,
-  // How hard a crossover's S-curve bends, as a fraction of the gap it turns in.
-  // Unitless and deliberately not derived from the type size: it shapes a curve
-  // whose footprint is already fixed by that gap, so it rescales with nothing.
   crossoverEase: 0.5,
 });
 
-/*
- * The gutter holds the road name and nothing else.
- *
- * A flat allowance spends the same width on `ui` as on `contract`, and at four
- * roads that overspend — 126px a side against 54px of ink — is most of what
- * pushed the last berth and its token off the pane. The label renders at 0.8 of
- * the type size in the monospace stack, whose advance is ~0.6em, so the name's
- * own length plus one character of air is the honest width. The flat value
- * stays as the cap, so no road name can push the panel wider than it used to.
- *
- * Rounded to a whole pixel: every berth's x is this plus a multiple of the
- * stride, so a gutter carrying float error spreads it across the whole panel,
- * where the render's own two-decimal trim then rounds it back out and the
- * coordinates stop matching the layout that produced them.
- */
 const gutterFor = (roadNames, options) => {
   const longest = Math.max(0, ...roadNames.map((name) => name.length));
   return Math.round(
@@ -154,30 +56,6 @@ const gutterFor = (roadNames, options) => {
   );
 };
 
-/*
- * The plate holds its own text, so its width is that text's width.
- *
- * One shared value taken from the longest ref, not a per-node width: every
- * berth's x is the gutter plus a multiple of the stride, and a per-node width
- * would break the stride, which is the only reason slots read as columns across
- * roads. Rounded to a whole pixel for the same reason the gutter is.
- *
- * Both figure columns are held at a fixed width whether or not a reading has
- * arrived — six characters for the tokens (`145.0K`), seven for the elapsed
- * (`12m 34s`). Sizing them to the readings actually present would reflow the
- * entire panel the first time a task reports, and this panel is read while it
- * runs — the elapsed figure ticks every second — so a layout that moves under
- * the reader costs far more than a plate carrying some empty column.
- *
- * The width is the wider of the two lines, not their sum. Splitting the plate
- * onto two lines is what pays for the elapsed column: the ref no longer shares
- * a line with the figures, so the plate came out narrower than the single-line
- * one it replaced even after gaining a second number.
- *
- * There is no cap. A gutter is a flat allowance spent on a road name and can be
- * capped without lying; a plate that cannot fit its own ref renders a truncated
- * task id, which is a lie about the plan. Past the pane the panel scrolls.
- */
 const TOKEN_COLUMNS = 6;
 const ELAPSED_COLUMNS = 7;
 
@@ -217,10 +95,6 @@ export function layoutGraph(nodes, opts = {}) {
   const refs = new Set(orderedNodes.map(({ ref }) => ref));
   const depths = new Map();
 
-  // A valid longest path settles within node count passes. The cap leaves
-  // cycles and anything downstream of them visibly unsettled instead of hanging.
-  // Each pass reads the depths the previous pass left, so a node settles only
-  // after its dependencies did; a pass that changes nothing is the fixed point.
   for (let pass = 0; pass < orderedNodes.length; pass += 1) {
     const previous = new Map(depths);
     let changed = false;
@@ -252,12 +126,8 @@ export function layoutGraph(nodes, opts = {}) {
 
   const drawn = drawableEdges(orderedNodes, new Set(cyclic));
 
-  // Declared roads retain empty lanes; without declarations, task order decides.
   const roadNames = options.lanes?.length ? [...options.lanes] : [];
   const roadOf = new Map(roadNames.map((name, index) => [name, index]));
-  // Undeclared buckets append in input order, not depth order — see the
-  // "appends undeclared buckets in input order" test. In graph mode the loader
-  // rejects an undeclared lane, so this appends nothing there.
   for (const node of options.lanes?.length && Array.isArray(nodes)
     ? nodes
     : orderedNodes) {
@@ -338,19 +208,6 @@ export function layoutGraph(nodes, opts = {}) {
     if (!changed) break;
   }
 
-  /*
-   * Vertical composition.
-   *
-   * The panel is the instrument, not a picture hung inside one, so the roads
-   * spread into the height the pane actually offers instead of floating as a
-   * short band in the middle of it. `availableHeight` is the pane's content box;
-   * without it the panel keeps its natural pitch, which is what every test and
-   * every one-road plan gets.
-   *
-   * `headroom` is what a signal head needs above the first running line, and
-   * `footroom` what the berth plate needs below the last one. Both are fixed,
-   * so only the space between roads stretches — and only up to `maxRoadPitch`.
-   */
   const roadCount = Math.max(roadNames.length, 1);
   const headroom =
     options.padding +
@@ -363,19 +220,6 @@ export function layoutGraph(nodes, opts = {}) {
       ? Math.min(options.maxRoadPitch, Math.max(options.roadPitch, spread))
       : options.roadPitch;
 
-  /*
-   * Horizontal composition — the same rule as the vertical, in the other axis.
-   *
-   * The panel fits the pane it is given. `availableWidth` is the pane's content
-   * box; without it the panel keeps its natural gap, which is what every test
-   * gets. Only the gaps between berths compress: a berth plate holds a full
-   * `bucket/NN` and its token at a legible size and never shrinks, and the
-   * gutters are already sized to their own ink. Below `minSlotGap` the panel
-   * scrolls instead, which is the honest answer — `.c-dependency-graph` themes
-   * its scrollbar so that affordance is visible rather than inferred.
-   *
-   * The gaps are one per slot plus the trailing one the road runs out on.
-   */
   const lastSlot = slots.size ? Math.max(...slots.values()) : 0;
   const gutter = opts.gutter ?? gutterFor(roadNames, options);
   const berthWidth = opts.berthWidth ?? berthWidthFor(orderedNodes, options);
@@ -386,8 +230,6 @@ export function layoutGraph(nodes, opts = {}) {
       gutter * 2 -
       (lastSlot + 1) * berthWidth) /
     gapCount;
-  // Floored for the same reason the gutter is rounded, and floored rather than
-  // rounded so the fitted panel never comes out a pixel wider than it measured.
   const slotGap = Number.isFinite(room)
     ? Math.min(options.slotGap, Math.max(options.minSlotGap, Math.floor(room)))
     : options.slotGap;
@@ -409,22 +251,6 @@ export function layoutGraph(nodes, opts = {}) {
     y: headroom + index * roadPitch + options.berthHeight / 2,
   }));
 
-  /*
-   * Where each crossover is allowed to change roads.
-   *
-   * A diagonal drawn straight between two berths runs over whatever sits
-   * between them — on the first render of this panel, `contract/02 -> server/04`
-   * drove straight through `server/03`'s segment. Track crossing track is
-   * ordinary on a signalling diagram; track crossing a *berth* is not, and it
-   * reads as one task passing through another.
-   *
-   * The gaps between slots are the only columns nothing occupies, so a
-   * crossover changes roads inside one of them. A gap is usable when no road it
-   * has to cross holds a berth in that slot — the gap after slot n is blocked
-   * for a road that owns both slot n and slot n+1, because its own running line
-   * is continuous there. The first usable gap wins, so the change of road
-   * happens as early as it can and the diagonal stays short.
-   */
   const occupied = new Set();
   for (const [ref, p] of positions) occupied.add(`${p.road}:${p.slot}`);
   const turns = new Map();
@@ -456,26 +282,17 @@ export function layoutGraph(nodes, opts = {}) {
       }
       chosen = slot;
     }
-    // Centre of the gap that follows the chosen slot.
     turns.set(
       key,
       options.padding + gutter + chosen * stride + berthWidth + slotGap / 2,
     );
   }
 
-  // The road runs the full width whether or not a berth sits at the far end, so
-  // the extent is the track's length, not the last berth's edge.
   const extent = {
     width: options.padding * 2 + gutter * 2 + (lastSlot + 1) * stride + slotGap,
     height: headroom + (roadCount - 1) * roadPitch + footroom,
   };
 
-  // The three quantities that answer to the plan and the pane rather than to
-  // the type size. The render reads them back instead of re-deriving from the
-  // defaults, which is how the signal heads and the road ends would otherwise
-  // land on a gutter, a gap and a plate the layout never used. Named `fitted`,
-  // not `geometry`: the module already has a `geometry()` builder, and a local
-  // of that name here shadows it for the rest of this function.
   const fitted = { gutter, slotGap, berthWidth };
 
   return {
@@ -491,15 +308,6 @@ export function layoutGraph(nodes, opts = {}) {
   };
 }
 
-/**
- * Every node on the hovered node's lineage: itself, everything it transitively
- * depends on, and everything that transitively depends on it. Two breadth-first
- * walks over a `seen` set, so a cycle terminates instead of spinning.
- *
- * Lineage rather than immediate neighbours, because the two questions a
- * dependency graph gets asked are "what is holding this up" and "what starts
- * moving when this lands" — both reach past one hop.
- */
 export function relatedRefs(nodes, ref) {
   const graphNodes = Array.isArray(nodes) ? nodes : [];
   const known = new Set(graphNodes.map((node) => node.ref));
@@ -559,7 +367,6 @@ export function drawableEdges(graphNodes, cyclic = new Set()) {
   );
   const closures = new Map();
 
-  // Cycle-safe by the `seen` set: a cycle stops re-entering, it does not spin.
   const closureOf = (ref) => {
     const cached = closures.get(ref);
     if (cached) return cached;
@@ -591,7 +398,6 @@ export function drawableEdges(graphNodes, cyclic = new Set()) {
   }
   return keep;
 }
-/** Two decimals keeps the path readable in devtools without visible drift. */
 const trim = (value) => Math.round(value * 100) / 100;
 
 /**
@@ -629,9 +435,6 @@ function crossoverPath(x1, y1, x2, y2, turnX, { ease = 0.5, reach = 0 } = {}) {
   const span = x2 - x1;
   if (drop === 0) return `M ${trim(x1)},${trim(y1)} L ${trim(x2)},${trim(y2)}`;
 
-  // The change of road is centred on the reserved gap and no wider than it, so
-  // it happens in a column no berth occupies. Clamped to the span as well, for
-  // the crossover whose two berths sit closer together than one gap.
   const width = Math.min(reach, span);
   if (!(width > 0)) {
     return `M ${trim(x1)},${trim(y1)} L ${trim(x2)},${trim(y2)}`;
@@ -640,23 +443,6 @@ function crossoverPath(x1, y1, x2, y2, turnX, { ease = 0.5, reach = 0 } = {}) {
   const centre = Number.isFinite(turnX) ? turnX : x1 + span / 2;
   const start = Math.min(Math.max(centre - width / 2, x1), x2 - width);
 
-  /*
-   * How far each control point reaches across the curve's own width.
-   *
-   * Pinning both control points to their endpoints' y is what keeps the ends
-   * horizontal, and it also means this can never straighten back into the 45:
-   * at 0 it is the gentlest S the shape allows — a smoothstep — and as it grows
-   * the ends flatten against their roads while the middle steepens.
-   *
-   * Clamped to 1 because that is what holds the footprint. A bezier is contained
-   * by the convex hull of its control points, so while all four x's stay inside
-   * `[start, start + width]` the curve cannot leave the gap the routing reserved
-   * for it; past 1 the leading control point escapes that gap and the curve
-   * bulges out over whatever is beside it. Past 0.5 the two control points do
-   * cross each other, which looks alarming and is not: x stays monotonic for
-   * every ease in range — its derivative bottoms out at `0.5 * (1 - ease)` — so
-   * the curve steepens through the middle rather than doubling back.
-   */
   const bend = width * Math.min(Math.max(ease, 0), 1);
   return [
     `M ${trim(x1)},${trim(y1)}`,
@@ -666,19 +452,6 @@ function crossoverPath(x1, y1, x2, y2, turnX, { ease = 0.5, reach = 0 } = {}) {
   ].join(" ");
 }
 
-/**
- * A signal head: a three-aspect housing standing on the running line, with the
- * aspect it shows lit and the other two dark.
- *
- * Three lamps rather than one, in the real top-to-bottom order — green, yellow,
- * red — because the stacked silhouette is what makes it a signal at a glance,
- * and where in the stack the light sits is readable before its colour is. The
- * first build drew one lamp in a box the same height as the rail it sat on: the
- * box vanished into the track and the lamp read as a speck of dirt on it.
- *
- * The housing is opaque and centred on the line, so the rail passes behind it
- * exactly as it does behind a real head's backplate.
- */
 const SIGNAL_ASPECTS = ["clear", "caution", "danger"];
 
 function signalHead(x, y, options, aspect) {
@@ -697,10 +470,6 @@ function signalHead(x, y, options, aspect) {
 
 export function renderGraph(nodes, layout, opts = {}) {
   const { usage, elapsed: elapsedByRef = {}, ...geometryOpts } = opts;
-  // The layout's own gutter, gap and plate width win: it sized them to the road
-  // names, the refs and the pane, and a render that re-derived them from the
-  // defaults would put the signal heads and the road ends somewhere the berths
-  // are not.
   const options = { ...resolve(geometryOpts), ...(layout.geometry ?? {}) };
   const tokensByRef = usage?.byTask ?? {};
   const codexByRef = usage?.codexByTask ?? {};
@@ -718,8 +487,6 @@ export function renderGraph(nodes, layout, opts = {}) {
   const trackEnd = width - options.padding - options.gutter;
   const trackStart = options.padding + options.gutter;
 
-  // The running roads, drawn first and full width, so every berth sits ON a
-  // line that exists whether or not the plan reaches that far along it.
   const roadLines = roads
     .map(
       (road) => `<g class="graph-road" data-road="${escapeHtml(road.name)}">
@@ -730,24 +497,6 @@ export function renderGraph(nodes, layout, opts = {}) {
     )
     .join("");
 
-  /*
-   * The running line between two berths of one bucket.
-   *
-   * A dependency inside a bucket is the road itself, so at rest this draws
-   * nothing new: the same unlit stroke at the same weight, laid over the rail
-   * that is already there. It exists for the set route. The approved hover comp
-   * lights a route *end to end* — track included — and without these the lit
-   * line stopped at every berth edge and resumed at the next one, which reads as
-   * a route that is not set.
-   *
-   * It is drawn in segments, one per clear gap, because a dependency can reach
-   * past a berth of its own bucket: `ui/04` depends on both `ui/02` and `ui/03`,
-   * and the reduction keeps `ui/02 -> ui/04`, which spans `ui/03`'s slot. One
-   * unbroken line there lights straight through `ui/03` — a berth on neither end
-   * of the lineage — and says `ui/02` runs clear to `ui/04` when `ui/03` is
-   * holding it up too. The berth breaks the lit run instead, which is what an
-   * unset section of a route looks like on the real instrument.
-   */
   const berthsByRoad = new Map();
   for (const position of positions.values()) {
     const onRoad = berthsByRoad.get(position.road) ?? [];
@@ -788,7 +537,6 @@ export function renderGraph(nodes, layout, opts = {}) {
     })
     .join("");
 
-  // Crossovers carry only the dependencies that leave their own road.
   const crossovers = graphNodes
     .flatMap((node) => {
       const target = positions.get(node.ref);
@@ -846,48 +594,19 @@ export function renderGraph(nodes, layout, opts = {}) {
         options.berthLineGap +
         figureHeight / 2 +
         figureHeight * 0.35;
-      // One figure per plate: the whole task across every harness. The fleet row is
-      // where the driver and the delegate stay apart, because there the question is
-      // which side of one dev step spent what. A berth is the task, and a second
-      // number on every plate turned the panel into a table.
-      //
-      // Summed only when at least one side reported: `allHarnessTokens` reads an
-      // absent object as 0, so calling it blind would print a measured 0 on every
-      // berth that has not run yet.
       const claudeCounts = tokensByRef[node.ref];
       const codexCounts = codexByRef[node.ref];
       const tokens =
         claudeCounts === undefined && codexCounts === undefined
           ? undefined
           : allHarnessTokens(claudeCounts, codexCounts);
-      // Untiered: a berth's figure is the whole task, several agents deep, so the
-      // per-agent thresholds would paint every berth on any real run.
-      //
-      // The two figures set against opposite edges of the plate's second line,
-      // so each forms a column down its road and can be compared by shape
-      // without reading any of them.
       const tokenLine = !hasTokenReading(tokens)
         ? ""
         : `<text class="graph-tokens" font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.statusWidth + options.berthPadX)}" y="${trim(figureY)}">${escapeHtml(formatTokens(tokens))}</text>`;
-      /*
-       * Wall-clock span, not the sum of what every agent spent.
-       *
-       * A task runs agents in parallel — the closing review fans five lenses out
-       * at once — and summing them answers "how much agent time did this burn",
-       * which is the token column's question already. The berth's own question
-       * is how long the route was held here, and that is one clock: first start
-       * to last end. `elapsedByTask` in fleet.js owns the derivation.
-       *
-       * A running task carries `since` instead of a settled figure, so the
-       * render stamps the start and `tickGraphElapsed` advances the text in
-       * place. Redrawing the SVG once a second would rebuild every path in it to
-       * move seven characters.
-       */
       const elapsed = elapsedByRef[node.ref];
       const elapsedLine = !elapsed
         ? ""
         : `<text class="graph-elapsed"${elapsed.live ? ` data-elapsed-since="${trim(elapsed.startMs)}"` : ""} font-size="${options.fontSize * TOKEN_SCALE}" x="${trim(position.x + options.berthWidth - options.berthPadX)}" y="${trim(figureY)}">${escapeHtml(formatDuration(elapsed.ms))}</text>`;
-      // A gate stands at the entry of any berth something has to clear first.
       const aspect = isCyclic
         ? "danger"
         : node.state === "done"

@@ -74,10 +74,8 @@ const store = reactive({
   allHarnessTokens,
   waveHint,
   graphSvg: "",
-  // Total flight time, from the first agent start. Empty until one starts.
   elapsed: "",
   elapsedLive: false,
-  // Plan-wide token rollup, updated in place from the fleet stream — see onFleet.
   usage: emptyUsage(),
 });
 
@@ -86,8 +84,6 @@ let graphStructure = "";
 let graphNodes = [];
 let graphLanes;
 let graphPane = "";
-// The berth whose route is currently set, and whether a redraw was held back
-// while it was — see updateGraph.
 let hoverRef = null;
 let graphHeld = false;
 
@@ -130,8 +126,6 @@ function updateGraph(tasks, lanes) {
   const structure = JSON.stringify([taskStructure(graphTasks), lanes ?? []]);
   const box = paneBox();
   const pane = `${box.availableWidth}x${box.availableHeight}`;
-  // Keep coordinates frozen while polling changes only live task state. The pane
-  // box and declared lanes join the key because both affect road placement.
   const moved =
     !graphLayout || structure !== graphStructure || pane !== graphPane;
 
@@ -182,13 +176,6 @@ function repaintRoute() {
   paintLineage(container, focus);
 }
 
-/**
- * Hover lineage. The SVG is replaced wholesale on every redraw, so the handlers
- * live on the container that survives — one listener pair, not one per node.
- * Classes go on the elements rather than inline styles so the CSS owns how a
- * dimmed node looks. A redraw would clear them, which is why updateGraph holds
- * the redraw back while a route is set.
- */
 function litRefs(target) {
   const node = target?.closest?.(".graph-berth");
   if (!node) return null;
@@ -237,7 +224,6 @@ function bindGraphHover(container) {
     if (litRefs(event.relatedTarget)) return;
     hoverRef = null;
     paintLineage(container, null);
-    // Whatever the panel held back while the route was set lands now.
     if (graphHeld) updateGraph(store.tree.tasks, graphLanes);
   });
 }
@@ -250,8 +236,6 @@ async function loadTree() {
       throw new Error(`Failed to fetch /api/tree (${response.status})`);
     }
 
-    // `store.tree` is the only copy of the payload: the header, the lanes, and
-    // the graph all read it, so nothing can disagree about what was last loaded.
     const payload = await response.json();
     Object.assign(store.tree, payload, {
       planTitle: payload.planTitle ?? "",
@@ -292,9 +276,6 @@ function syncElapsed(nowMs = Date.now()) {
 // out would freeze that view's card totals at their first-frame values.
 function syncUsage(usage) {
   Object.assign(store.usage, usage ?? emptyUsage());
-  // The graph is an HTML string, not a reactive template, so a new token count
-  // only reaches a node when the SVG is rebuilt. The layout is cached, so this
-  // redraws the same coordinates with fresh numbers.
   updateGraph(store.tree.tasks, graphLanes);
 }
 
@@ -393,7 +374,6 @@ function refreshWhenVisible() {
   clearTimeout(pollTimer);
   if (document.hidden) return;
 
-  // A failed refresh only updates loadError, so the last good tree stays visible.
   loadTree().finally(scheduleRefresh);
 }
 
@@ -409,7 +389,6 @@ createApp(store).mount("#app");
 // is created once by the insertAdjacentHTML above and never replaced.
 const graphMount = document.querySelector(".deck-top");
 if (graphMount) bindGraphHover(graphMount);
-// The roads spread to the pane, so the pane changing size is a relayout.
 window.addEventListener("resize", () => updateGraph(graphNodes, graphLanes));
 window.__flightdeck = store;
 
