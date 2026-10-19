@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 5.7.4] - 2026-10-20
+
+_tracks tag `dispatch-v5.7.4`_
+
+### Fixed
+- Relaunching the autopilot dashboard on a different port now waits for the old daemon to actually shut down before starting the new one.
+
+## [chronicle 0.22.5] - 2026-10-20
+
+_tracks tag `chronicle-v0.22.5`_
+
+### Changed
+- The adr trail root is now a branded type and all bucket paths derive from one function, and Cluster.watched is renamed pulledFromWatch to describe both cases that set it.
+
 ## [guard 0.8.4] - 2026-10-19
 
 _tracks tag `guard-v0.8.4`_
