@@ -7,7 +7,6 @@ import { type CardModel, clip, COLOR, docked, inline, type Line } from "./rows.t
 import type { DeckSnapshot, DeckTask } from "./types.ts";
 
 const PANE = "flightdeck";
-// the dock width the layouts are drawn for, and the inline seat's height: a summary line and the current wave
 const COLUMNS = 40;
 const INLINE_ROWS = 2;
 // the snapshot child re-reads the task tree and run log; 2 s keeps elapsed times live without a busy child
@@ -22,13 +21,10 @@ const deck = atom({ plugin: "dispatch", key: "flightdeck" } as const, EMPTY);
 
 // the module keeps the truth and publishes it whole, so two writes racing on the atom both land the latest view
 let view: FlightdeckDeck = EMPTY;
-// bumped by every open and close; a snapshot or lookup that returns under an older value is dropped
 let generation = 0;
 let ticker: Timer | undefined;
-// the last snapshot stdout drawn; an identical tick skips the parse and the publish
 let lastOut = "";
-// the plan the open pane follows, so a bare /flightdeck can seat a pane that waits undrawn
-let current: string | null = null;
+let followedPlan: string | null = null;
 
 const publish = ($: EngineInterface) => update($, deck, () => view);
 
@@ -53,9 +49,7 @@ const toastText = (t: DeckTask) => {
   return parts.join(" · ");
 };
 
-// a done task's tokens never change, so each is read once and kept; null marks a read that found none
 const tokens = new Map<string, number | null>();
-// the run total from the last --usage read, carried onto every later snapshot
 let runTokens: number | null = null;
 const unread = (s: DeckSnapshot | null) =>
   Object.values(s?.tasks ?? {}).some((t) => t.state === "done" && !tokens.has(t.ref));
@@ -97,10 +91,9 @@ const refresh = async ($: EngineInterface, gen: number, plan: string) => {
     $.ui.invalidate("ui.render");
 };
 
-// only open and close touch the ticker, synchronously before their first await
 const openOn = async ($: EngineInterface, plan: string) => {
   const gen = ++generation;
-  current = plan;
+  followedPlan = plan;
   tokens.clear();
   runTokens = null;
   view = EMPTY;
@@ -117,7 +110,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
         // closed by hand: stop here, unless an open or close already moved on and owns the ticker
         if (gen === generation) {
           generation++;
-          current = null;
+          followedPlan = null;
           own.cancel();
         }
         return;
@@ -142,7 +135,7 @@ const openOn = async ($: EngineInterface, plan: string) => {
 
 const close = async ($: EngineInterface) => {
   generation++;
-  current = null;
+  followedPlan = null;
   ticker?.cancel();
   ticker = undefined;
   await $.ui.close({ id: PANE });
@@ -165,8 +158,7 @@ export const flightdeck = (on: On) => {
       await close($);
       return { text: "Flightdeck closed." };
     }
-    // a bare command while an auto-open waits undrawn is the person asking, which seats it at any width
-    const target = arg || current;
+    const target = arg || followedPlan;
     if (target) {
       await openOn($, target);
       return { text: `Flightdeck opened on ${target}.` };
@@ -178,7 +170,6 @@ export const flightdeck = (on: On) => {
     if (r.exitCode === 3)
       return { text: `No flightplan run found under ${root}/docs` };
     if (r.exitCode !== 0) return { text: firstLine(r.stderr) };
-    // a close or another open issued during the lookup wins
     if (gen !== generation) return { text: "Flightdeck lookup superseded." };
     const { plan } = JSON.parse(r.stdout) as { plan: string };
     await openOn($, plan);

@@ -1,8 +1,5 @@
 import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./types.ts";
 
-// Width is text.length: every glyph used here (✓ ● ○ · ✗ █ ░ … —) is one BMP code unit drawn one column wide.
-
-// `ref` is set only on card segments; the mod makes those pressable
 export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
 export type Line = Seg[];
 
@@ -60,9 +57,8 @@ function diagnostics(s: DeckSnapshot, stale: boolean): Line {
   return line;
 }
 
-const BAR = "━";
+export const BAR = "━";
 
-// a bar of `cells` heavy-rule cells: the done share green, the rest dim
 function bar(done: number, total: number, cells: number): Line {
   const filled = total > 0 ? Math.round((done / total) * cells) : 0;
   const line: Line = [];
@@ -71,7 +67,6 @@ function bar(done: number, total: number, cells: number): Line {
   return line;
 }
 
-// the web header's pair: the run's wall time and its token rollup; null before any agent started
 export function runTotals(s: DeckSnapshot, now: number): { time: string; tokens: string | null } | null {
   if (!s.time) return null;
   const end = s.time.endedAt === null ? now : Date.parse(s.time.endedAt);
@@ -138,7 +133,6 @@ export function bucketBars(s: DeckSnapshot, w: number): Line[] {
 
 // a card's inner width never drops below "Final review" plus a score and some slack, so short refs still show their title
 const MIN_INNER = 17;
-// columns past glyph + space + the longest ref, so the title line has room beside its score
 const SLACK = 4;
 
 export type CardModel = {
@@ -162,7 +156,6 @@ const fit = (text: string, w: number) =>
 const elapsedOf = (a: DeckAgent, now: number) =>
   a.startedAt === null ? "—" : formatElapsed(now - Date.parse(a.startedAt));
 
-// the label or text on the left, `right` flush to the inner width
 const spread = (left: string, right: string, inner: number) => {
   const leftW = Math.max(0, inner - right.length - 1);
   return `${fit(left, leftW).padEnd(leftW)} ${right}`.slice(0, inner);
@@ -284,7 +277,6 @@ export function docked(
     bars: bucketBars(s, w).map((l) => clip(l, w)),
     states: clip(states, w),
     cards: waveCards(s, w, now),
-    // the crew box spends two columns on its border
     crew: crewLines(s, now).map((l) => clip(l, w - 2)),
   };
 }

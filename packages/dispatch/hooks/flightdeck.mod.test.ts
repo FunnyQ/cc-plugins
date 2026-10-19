@@ -60,13 +60,11 @@ const good = (plan: string): Answer => ({
   stdout: JSON.stringify(snap(plan)),
 });
 
-// Stands for the engine beneath the mod: processes, panes, toasts, the clock and the tool's own answer.
 function world(
   on: On,
   answer: (argv: readonly string[]) => Answer,
   tool: { isError?: boolean; stdout?: string } = {},
-  // false stands for a terminal under the unasked floor: the pane opens but waits undrawn
-  place: { next: boolean } = { next: true },
+  fits: { next: boolean } = { next: true },
 ) {
   const clock = mock.clock(on);
   const runs: (readonly string[])[] = [];
@@ -104,7 +102,7 @@ function world(
   on("ui.open", (_$, e) => {
     panes.set(e.id, e.title ?? e.id);
     opens.push({ ...e });
-    if (!place.next)
+    if (!fits.next)
       return { value: { isPlaced: false, reason: "144 columns, 100 now" } } as never;
     placed.add(e.id);
     return { value: { isPlaced: true } } as never;
@@ -239,9 +237,9 @@ test("a launch whose --plan is a shell variable opens on the plan the launcher p
   expect(w.snapshots("/abs/docs/x")).toHaveLength(1);
 });
 
-test("an auto-open the terminal is too narrow to place toasts how to show it", async ($, on) => {
-  const place = { next: false };
-  const w = world(on, (argv) => good(argv[2]!), {}, place);
+test("an auto-open the terminal is too narrow to place toasts how to show it, and a bare /flightdeck then seats it", async ($, on) => {
+  const fits = { next: false };
+  const w = world(on, (argv) => good(argv[2]!), {}, fits);
   await $.tool.call({
     tool: "Bash",
     command: 'bun "$OWN"/flightdeck.ts --plan "/abs/docs/x"',
@@ -250,7 +248,7 @@ test("an auto-open the terminal is too narrow to place toasts how to show it", a
     "Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.",
   ]);
 
-  place.next = true;
+  fits.next = true;
   expect(await run($, "")).toContain("/abs/docs/x");
   expect(w.panes.has("flightdeck")).toBe(true);
   expect(w.opens).toHaveLength(2);
@@ -457,7 +455,6 @@ test("a pane with no taskless agents draws no agent box", async ($, on) => {
 
 test("a done task's tokens are read once, with --usage, and kept on later ticks", async ($, on) => {
   const w = world(on, (argv) => {
-    // every snapshot carries the run's time; only a --usage one carries tokens
     const s = snap(argv[2]!, { time: { startedAt: "2026-01-01T00:00:00Z", endedAt: "2026-01-01T00:04:12Z" } });
     if (argv.includes("--usage")) {
       s.tasks["api/01"]!.tokens = 1_234_567;

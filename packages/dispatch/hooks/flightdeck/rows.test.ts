@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { formatTokens as webFormatTokens } from "../../skills/autopilot/dashboard/dist/modules/format.js";
 import {
+  BAR,
   crewLines,
   bucketBars,
   card,
@@ -9,6 +11,7 @@ import {
   docked,
   endState,
   formatElapsed,
+  formatTokens,
   GLYPH,
   inline,
   type Line,
@@ -123,6 +126,15 @@ function big(): DeckSnapshot {
     errors: 2,
   });
 }
+
+test("every glyph is one code unit, since a line's width is its text.length", () => {
+  for (const glyph of [...Object.values(GLYPH), BAR, "…", "—"]) expect(glyph).toHaveLength(1);
+});
+
+test("formatTokens prints the web fleet's format, so both views show one number the same way", () => {
+  for (const n of [0, 7, 999, 1_000, 12_345, 999_999, 1_000_000, 2_468_000])
+    expect(formatTokens(n)).toBe(webFormatTokens(n));
+});
 
 describe("card", () => {
   test("each state gets its glyph and colour; blocked is dim", () => {
