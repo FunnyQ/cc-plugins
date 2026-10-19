@@ -43,12 +43,9 @@ const grid = [...CLIPS.smoking![23]!.grid.replace(/s/g, ".")];
 for (const [row, col, c] of EDITS) grid[row * 20 + col] = c;
 const SMOKER = octantsOf(grid.join(""));
 const SMOKER_COLUMNS = 10;
-// the bubble's tail sits in the blank left of Clawd's top row, which holds only smoke, so no line is spent on it
-const [[blank, ...smoke] = [], ...body] = SMOKER;
-const TALKER = [[{ text: "     \\".padEnd(blank?.text.length ?? 0), color: TEACHER_COLOR }, ...smoke], ...body];
+const [[tailSlot, ...smoke] = [], ...body] = SMOKER;
+const TALKER = [[{ text: "     \\".padEnd(tailSlot?.text.length ?? 0), color: TEACHER_COLOR }, ...smoke], ...body];
 
-// the rewrite under the prompt's own words, inside the prompt's bubble: Clawd says the title, cowsay style, and the
-// rewrite sits at its right
 export const lessonRows = (
   { Box, Text }: Pick<Elements["terminal"], "Box" | "Text">,
   text: string,

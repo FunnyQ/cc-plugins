@@ -53,7 +53,6 @@ export const same = (a: string, b: string) => plain(a) === plain(b);
 
 const bare = (word: string) => word.toLowerCase().replace(/^\W+|\W+$/g, "");
 
-// the rewrite as runs, each word not kept from the prompt (by a longest common subsequence, case- and punctuation-blind) marked
 export const changes = (text: string, better: string) => {
   const was = text.split(/\s+/).filter(Boolean).map(bare);
   const parts = better.split(/(\s+)/).filter(Boolean);
@@ -80,7 +79,6 @@ export const changes = (text: string, better: string) => {
   );
 };
 
-// a reply without the quip tag is all rewrite, so a haiku that skips the format still teaches
 export const parseReply = (reply: string) => {
   const m = /^\s*<quip>(.*?)<\/quip>[ \t]*\n?/.exec(reply);
   const quip = m?.[1]?.trim();
@@ -100,18 +98,15 @@ export const TITLES = [
   "Hold My Cigarette",
 ];
 
-// a hash of the prompt, not Math.random, so a redraw or a reload never swaps the title under the same lesson
 export const titleOf = (text: string) => {
   let h = 0;
   for (const ch of keyOf(text)) h = (h * 31 + ch.codePointAt(0)!) >>> 0;
   return TITLES[h % TITLES.length]!;
 };
 
-// a rewrite far longer than the prompt, or holding a fence, is haiku answering the prompt instead of correcting it
 export const isRewrite = (better: string, text: string) =>
   better.length <= 2 * text.length + 40 && !better.includes("```");
 
-// a row's text may carry <system-reminder> blocks the submitted text lacks, so both sides key on the prose alone
 export const keyOf = (text: string) =>
   text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
 
@@ -149,11 +144,9 @@ type Transport = {
 };
 let transport: Transport | undefined;
 
-// a prompt fine as written is kept as undefined, so a repeated one is never sent again
 type Lesson = { better: string; quip: string | undefined };
 const lessons = new Map<string, Lesson | undefined>();
 const asked = new Set<string>();
-// two identical prompts share a key, so the band scrolls to whichever was drawn last
 const rows = new Map<string, string>();
 let current: string | undefined;
 
@@ -183,12 +176,9 @@ const coach = async (t: Transport, text: string) => {
 };
 
 export const teacher = {
-  // the rewrite for a prompt, or undefined while unasked, pending, fine as written, or failed
   lesson: (text: string) =>
     config.enabled.teacher ? lessons.get(keyOf(text))?.better : undefined,
-  // what Clawd says over the rewrite: haiku's quip, or a stock title when it gave none
   title: (text: string) => lessons.get(keyOf(text))?.quip ?? titleOf(text),
-  // the latest prompt's lesson for the band, with the row it sits under once prompt.tsx has drawn it
   latest() {
     const better = current === undefined ? undefined : teacher.lesson(current);
     return better
@@ -201,7 +191,6 @@ export const teacher = {
   },
   seen(text: string, requestId: string) {
     const key = keyOf(text);
-    // every redraw reports its row, so only a new one pays for the LRU reorder
     if (rows.get(key) !== requestId) keep(rows, key, requestId);
   },
   submit(text: string) {
@@ -217,7 +206,6 @@ export const teacher = {
     )
       return;
     asked.add(key);
-    // any failure shows nothing
     void coach(t, key)
       .catch(() => undefined)
       .then((lesson) => {
@@ -226,9 +214,7 @@ export const teacher = {
         if (lesson) t.redraw();
       });
   },
-  // run from session.start, which holds `$`; no key leaves the teacher silent
   work(next: Omit<Transport, "apiKey"> & { apiKey: string | undefined }) {
-    // a cleared or resumed session starts with no notice pointing at a row it no longer has
     current = undefined;
     transport = next.apiKey ? { ...next, apiKey: next.apiKey } : undefined;
   },
@@ -237,7 +223,6 @@ export const teacher = {
 export const teach = (on: On) => {
   // the matcher keeps a peer's or a plugin's prompt out, and separates this hook from Clawd's
   on("prompt.submit", { origin: { kind: "composer" } }, async (_$, e, next) => {
-    // after next: a hook beneath may rewrite or drop the prompt, and the row shows what entered
     const r = await next(e);
     if (!("drop" in r)) teacher.submit(r.text);
     return r;
