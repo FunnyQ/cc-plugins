@@ -263,7 +263,6 @@ async fn run_probe(thread: Option<&str>, text: Option<&str>) -> ProbeReport {
                     && let (Some(thread), Some(turn)) = (thread, report.turn_id.clone())
                 {
                     let thread = thread.to_owned();
-                    // Keep the proxy alive until completion without delaying the dashboard response.
                     tokio::spawn(async move {
                         let _ = transport
                             .wait_for_notification(
@@ -330,5 +329,53 @@ mod tests {
             );
             assert!(!report.ok);
         }
+    }
+
+    #[tokio::test]
+    async fn transport_stays_open_until_the_turn_completes() {
+        use std::os::unix::fs::PermissionsExt;
+        let env = crate::paths::tests::TestEnv::new();
+        let bin = env.dir.path().join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let marker = env.dir.path().join("still-open");
+        let script = bin.join("codex");
+        std::fs::write(
+            &script,
+            format!(
+                r#"#!/usr/bin/env python3
+import sys, json, time, pathlib
+args = sys.argv[1:]
+if args == ['--version']:
+    print('codex 0'); sys.exit(0)
+if args[:1] == ['remote-control']:
+    sys.exit(1)
+for line in sys.stdin:
+    request = json.loads(line)
+    result = {{'turn': {{'id': 't'}}}} if request['method'] == 'turn/start' else {{}}
+    print(json.dumps({{'id': request['id'], 'result': result}}), flush=True)
+    if request['method'] == 'turn/start':
+        time.sleep(0.5)
+        pathlib.Path('{}').write_text('open')
+        print(json.dumps({{'method': 'turn/completed', 'params': {{'threadId': 'thread', 'turn': {{'id': 't'}}}}}}), flush=True)
+        break
+"#,
+                marker.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let path = std::env::var_os("PATH").unwrap_or_default();
+        let dirs = std::iter::once(bin).chain(std::env::split_paths(&path));
+        crate::paths::tests::TestEnv::set("PATH", std::env::join_paths(dirs).unwrap());
+        let report = run_probe(Some("thread"), Some("hello")).await;
+        assert_eq!(report.turn_id.as_deref(), Some("t"));
+        assert!(!marker.exists());
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !marker.exists() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("transport closed before turn/completed");
     }
 }

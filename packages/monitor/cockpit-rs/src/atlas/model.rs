@@ -30,6 +30,13 @@ impl Ctx {
             plugin_root,
         })
     }
+
+    pub fn without_plugin_root() -> Ctx {
+        Ctx {
+            now_ms: now_ms(),
+            plugin_root: PathBuf::new(),
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
@@ -113,7 +120,6 @@ pub struct UsageLimitWindow {
     pub reset_at: Option<String>,
     pub elapsed_percent: Option<f64>,
     pub remaining_ms: Option<f64>,
-    // The window's own length, so the UI never names a window from the slot it arrived in.
     pub duration_ms: i64,
 }
 
@@ -240,13 +246,11 @@ pub fn display_path(path: &Path) -> String {
     path.replacen(home.as_ref(), "~", 1)
 }
 
-// JS Date.parse for the ISO forms Claude, Codex and this dashboard write; other formats read as NaN.
 pub fn js_date_parse(text: &str) -> Option<i64> {
     let text = text.trim();
     if let Ok(ts) = text.parse::<Timestamp>() {
         return Some(ts.as_millisecond());
     }
-    // A date-only form is UTC in JS; a date-time without an offset is local.
     if !text.contains(['T', 't', ' ']) {
         let date = text.parse::<jiff::civil::Date>().ok()?;
         return TimeZone::UTC
@@ -276,7 +280,6 @@ pub fn fmt_date(ms: i64) -> String {
     let Ok(ts) = Timestamp::from_millisecond(ms) else {
         return String::new();
     };
-    // Local date, matching the activity heatmap's local hour-of-day semantics.
     ts.to_zoned(TimeZone::system())
         .date()
         .strftime("%Y-%m-%d")
@@ -505,6 +508,61 @@ mod tests {
         let home = env.dir.path();
         assert_eq!(display_path(&home.join("x/y")), "~/x/y");
         assert_eq!(display_path(Path::new("/other")), "/other");
+    }
+
+    #[test]
+    fn built_windows_serialize_their_own_duration() {
+        for duration in [18_000_000_i64, 604_800_000] {
+            for bucket in [
+                json!({"resets_at": 1_790_856_000}),
+                json!({"used_percentage": 1}),
+            ] {
+                let window = build_usage_limit_window(Some(&bucket), duration, 0).unwrap();
+                assert_eq!(
+                    serde_json::to_value(&window).unwrap()["durationMs"],
+                    duration
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn js_date_parse_forms() {
+        let utc_midnight = 1_790_812_800_000;
+        assert_eq!(js_date_parse("2026-10-01T00:00:00Z"), Some(utc_midnight));
+        assert_eq!(
+            js_date_parse("2026-10-01T02:00:00+02:00"),
+            Some(utc_midnight)
+        );
+        assert_eq!(js_date_parse("2026-10-01"), Some(utc_midnight));
+        let local = js_date_parse("2026-10-01T00:00:00").unwrap();
+        let datetime = jiff::civil::date(2026, 10, 1).at(0, 0, 0, 0);
+        let expected = datetime.to_zoned(TimeZone::system()).unwrap().timestamp();
+        assert_eq!(local, expected.as_millisecond());
+        assert_eq!(js_date_parse("not a date"), None);
+        assert_eq!(js_date_parse(""), None);
+    }
+
+    #[test]
+    fn fmt_date_uses_the_local_offset() {
+        let ts = Timestamp::from_millisecond(1_790_812_800_000 + 60_000).unwrap();
+        let zoned = ts.to_zoned(TimeZone::system());
+        let want = zoned.date().strftime("%Y-%m-%d").to_string();
+        assert_eq!(fmt_date(ts.as_millisecond()), want);
+        let near_midnight_local = jiff::civil::date(2026, 10, 1).at(0, 30, 0, 0);
+        let ms = near_midnight_local
+            .to_zoned(TimeZone::system())
+            .unwrap()
+            .timestamp()
+            .as_millisecond();
+        assert_eq!(fmt_date(ms), "2026-10-01");
+        let late = jiff::civil::date(2026, 10, 1).at(23, 30, 0, 0);
+        let ms = late
+            .to_zoned(TimeZone::system())
+            .unwrap()
+            .timestamp()
+            .as_millisecond();
+        assert_eq!(fmt_date(ms), "2026-10-01");
     }
 
     #[test]

@@ -1,4 +1,3 @@
-
 use super::dedup::{
     self, BilledTokens, DedupEntry, DedupMessage, DedupUsage, add_billed_tokens,
     count_claude_tool_calls, dedup_key, hour_start_ms, usage_token_total,
@@ -55,9 +54,6 @@ fn billed(usage: &DedupUsage) -> BilledTokens {
     out
 }
 
-// `ledger_duplicate` is a second gate, separate from seen_requests: a file whose ledger rows
-// were just cleared must ignore seen_requests to re-derive them, while every other read honours
-// it — including the first read of a brand-new file, whose requests a sibling may already hold.
 fn parse_slice(
     db: &Connection,
     lines: impl Iterator<Item = String>,
@@ -207,10 +203,15 @@ fn parse_slice(
     Ok(out)
 }
 
-// Returns false when a truncation was detected and the caller must run a deduplicated replay.
-fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyhow::Result<bool> {
+#[derive(Debug, PartialEq)]
+enum Ingest {
+    Ingested,
+    Truncated,
+}
+
+fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyhow::Result<Ingest> {
     let Ok(meta) = std::fs::metadata(file) else {
-        return Ok(true);
+        return Ok(Ingest::Ingested);
     };
     let size = meta.len() as i64;
     let mtime_ms = meta
@@ -222,11 +223,9 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
     let prior = rollup_db::get_ingested_file(db, file)?;
     let start = prior.as_ref().map_or(0, |p| p.bytes_parsed);
     if prior.is_some_and(|p| size < p.bytes_parsed) {
-        return Ok(false);
+        return Ok(Ingest::Truncated);
     }
 
-    // Not the same question as `start == 0`: a brand-new file also starts at zero, but its
-    // requests may already sit in a sibling's ledger rows, so it stays gated on seen_requests.
     let ledger_rebuild = ctx.ledger_rebuild.contains(file);
     let drop_stale_ledger = |db: &mut Connection| -> rusqlite::Result<()> {
         if ledger_rebuild {
@@ -239,7 +238,7 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
 
     if size <= start {
         drop_stale_ledger(db)?;
-        return Ok(true);
+        return Ok(Ingest::Ingested);
     }
 
     let mut lines = read_jsonl_lines(
@@ -264,7 +263,7 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
             },
             ctx.now_ms,
         )?;
-        return Ok(true);
+        return Ok(Ingest::Ingested);
     }
 
     let tx = db.transaction()?;
@@ -296,7 +295,7 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
         ctx.now_ms,
     )?;
     tx.commit()?;
-    Ok(true)
+    Ok(Ingest::Ingested)
 }
 
 fn rewind(db: &mut Connection) -> rusqlite::Result<()> {
@@ -336,7 +335,7 @@ pub fn update_rollup(
         ledger_seen: HashSet::new(),
     };
     for file in &files {
-        if ingest_file(db, file, &mut ctx)? {
+        if ingest_file(db, file, &mut ctx)? == Ingest::Ingested {
             continue;
         }
         rewind(db)?;
@@ -662,6 +661,43 @@ mod tests {
         assert_eq!(hourly.len(), 1);
         assert_eq!((hourly[0].input_tokens, hourly[0].message_count), (10, 1));
         assert_eq!(model_input(&f, &path), 10);
+    }
+
+    #[test]
+    fn hourly_rows_bucket_by_hour_start_ms_and_a_missing_timestamp_lands_in_hour_zero() {
+        let mut f = Fixture::new();
+        let mut untimed = assistant("S", "r2", "m2", 0, 3, false);
+        untimed.as_object_mut().unwrap().remove("timestamp");
+        f.write(
+            "p/S.jsonl",
+            &[assistant("S", "r1", "m1", 10, 5, false), untimed],
+        );
+        f.update(false);
+        let ts = js_date_parse("2026-09-28T15:10:00.000Z").unwrap();
+        let hours: Vec<(i64, i64)> = f
+            .hourly()
+            .iter()
+            .map(|r| (r.hour_ms, r.input_tokens))
+            .collect();
+        assert_eq!(hours, [(0, 3), (hour_start_ms(ts), 5)]);
+        assert_ne!(hour_start_ms(ts), ts);
+    }
+
+    #[test]
+    fn new_file_holding_a_request_a_sibling_billed_adds_no_ledger_model_rows() {
+        let mut f = Fixture::new();
+        f.write("p/S.jsonl", &[assistant("S", "rA", "mA", 2, 5, false)]);
+        f.update(false);
+        let sibling = f.write(
+            "p/S/subagents/agent.jsonl",
+            &[
+                assistant("S", "rA", "mA", 2, 5, false),
+                assistant("S", "rB", "mB", 3, 7, false),
+            ],
+        );
+        f.update(false);
+        assert_eq!(model_input(&f, &sibling), 7);
+        assert_eq!(f.hourly().iter().map(|r| r.input_tokens).sum::<i64>(), 12);
     }
 
     #[test]

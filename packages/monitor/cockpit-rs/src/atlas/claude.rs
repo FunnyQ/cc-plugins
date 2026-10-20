@@ -305,7 +305,6 @@ fn read_rollup(projects_dir: &Path) -> anyhow::Result<RollupRead> {
 }
 
 pub fn load(ctx: &Ctx) -> anyhow::Result<ClaudeSource> {
-    // Transcript bytes are read solely by update_rollup.
     let projects_dir = paths::projects_dir();
     let rollup = read_rollup(&projects_dir).unwrap_or_else(|_| {
         let mut files: Vec<PathBuf> = Vec::new();
@@ -653,6 +652,39 @@ mod tests {
         assert_eq!(json["statsCache"], json!({"version": 2, "extra": 1}));
         assert_eq!(json["transcriptFileCount"], json!(2));
         assert_eq!(json["usageLimits"]["error"], json!("missing"));
+    }
+
+    #[test]
+    fn load_reads_no_transcript_bytes_once_the_rollup_is_current() {
+        let env = TestEnv::new();
+        let home = env.dir.path();
+        write(&home.join(".claude/stats-cache.json"), r#"{"version":2}"#);
+        let transcript = home.join(".claude/projects/p/a.jsonl");
+        let line = r#"{"type":"assistant","sessionId":"s","requestId":"r","uuid":"u1","timestamp":"2026-09-28T15:00:00.000Z","cwd":"/w","message":{"id":"m","model":"claude-opus-4-7","usage":{"input_tokens":7,"output_tokens":2},"content":[{"type":"text","text":"x"}]}}"#;
+        write(&transcript, &format!("{line}\n"));
+        let first = load(&ctx()).unwrap();
+        dbg!(
+            first.usage.model_usage.keys().collect::<Vec<_>>(),
+            first.transcript_file_count
+        );
+        let tokens = first.usage.model_usage["claude-opus-4-7"].input_tokens;
+        assert_eq!(tokens, 7);
+
+        let rewritten = line
+            .replace(r#""sessionId":"s""#, r#""sessionId":"t""#)
+            .replace(r#""requestId":"r""#, r#""requestId":"q""#)
+            .replace(r#""uuid":"u1""#, r#""uuid":"u2""#)
+            .replace(r#""input_tokens":7"#, r#""input_tokens":9"#);
+        assert_eq!(rewritten.len(), line.len());
+        write(&transcript, &format!("{rewritten}\n"));
+        let second = load(&ctx()).unwrap();
+        assert_eq!(second.transcript_file_count, 1);
+        assert_eq!(
+            second.usage.model_usage["claude-opus-4-7"].input_tokens,
+            tokens
+        );
+        assert_eq!(second.ledger.len(), first.ledger.len());
+        assert_eq!(second.ledger[0].tokens, first.ledger[0].tokens);
     }
 
     #[test]

@@ -67,7 +67,6 @@ fn diagram_gate(sub: &str, source: Option<&str>) -> Result<(), String> {
         .stderr(Stdio::null())
         .spawn()
     else {
-        // TS never blocks trail writes when the Mermaid parser cannot be started.
         return Ok(());
     };
     if let Some(mut stdin) = child.stdin.take() {
@@ -338,6 +337,23 @@ pub fn run(sub: &str, args: &Args, cwd: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::paths::tests::TestEnv;
+
+    #[test]
+    fn missing_bun_lets_the_diagram_gate_pass() {
+        let env = TestEnv::new();
+        let bin = env.dir.path().join("no-bun-bin");
+        fs::create_dir_all(&bin).unwrap();
+        let original = std::env::var_os("PATH").unwrap_or_default();
+        let git = std::env::split_paths(&original)
+            .map(|dir| dir.join("git"))
+            .find(|git| git.is_file())
+            .unwrap();
+        std::os::unix::fs::symlink(git, bin.join("git")).unwrap();
+        TestEnv::set("PATH", &bin);
+        assert_eq!(diagram_gate("log", Some("graph TD; A-->B")), Ok(()));
+    }
+
     #[test]
     fn facets_split_first_colon_trim_and_drop_empty() {
         assert_eq!(

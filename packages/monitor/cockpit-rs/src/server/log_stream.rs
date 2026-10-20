@@ -100,7 +100,6 @@ impl TailSource for LogSource {
     }
 
     fn read_backlog(&self, path: &Path, size: u64) -> io::Result<Backlog> {
-        // Stop at the stat size: the tailer resumes from it, so reading past it would repeat an append.
         let mut bytes = Vec::new();
         fs::File::open(path)?.take(size).read_to_end(&mut bytes)?;
         let (complete, partial) = split_complete_lines(&bytes);
@@ -118,7 +117,6 @@ impl TailSource for LogSource {
             .filter(|line| !line.is_empty())
         {
             if let Ok(value) = serde_json::from_str::<serde_json::Value>(line) {
-                // Re-serialize through preserve_order to match the compact TS envelope.
                 out.push(format!("data: {value}\n\n"));
             }
         }

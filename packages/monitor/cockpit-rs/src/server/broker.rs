@@ -103,6 +103,94 @@ mod tests {
         assert_eq!(take_stash(&mut stash, "s", None), None);
         assert!(stash.is_empty());
     }
+
+    #[test]
+    fn default_budget_stays_below_the_daemon_idle_timeout() {
+        let _env = crate::paths::tests::TestEnv::new();
+        assert!(budget() < Duration::from_millis(255_000));
+    }
+
+    const SESSION: &str = "00000000-0000-4000-8000-000000000001";
+
+    fn wait_body(
+        env: &crate::paths::tests::TestEnv,
+        log: &str,
+        stash: Option<&str>,
+        query: &[(&str, &str)],
+    ) -> Value {
+        let home = env.dir.path();
+        crate::paths::tests::TestEnv::set("COCKPIT_HOME", home);
+        crate::paths::tests::TestEnv::set("COCKPIT_WAIT_TIMEOUT_MS", "50");
+        std::fs::write(
+            home.join("daemon.json"),
+            r#"{"pid":1,"port":1,"token":"t","root":"r"}"#,
+        )
+        .unwrap();
+        let log_path = home.join("log.jsonl");
+        std::fs::write(&log_path, log).unwrap();
+        let registry = json!({"sessions": [{"sessionId": SESSION, "logPath": log_path}]});
+        std::fs::write(home.join("registry.json"), registry.to_string()).unwrap();
+        let state = AppState {
+            presence: Default::default(),
+            broker: Default::default(),
+            inbox: Default::default(),
+            permission: Default::default(),
+            plugin_root: home.into(),
+        };
+        if let Some(call) = stash {
+            state.broker.stash.lock().unwrap().insert(
+                SESSION.into(),
+                Stash {
+                    text: "stashed".into(),
+                    call: Some(call.into()),
+                    expires: expires(),
+                },
+            );
+        }
+        let mut params: HashMap<String, String> = [("token", "t"), ("session", SESSION)]
+            .into_iter()
+            .chain(query.iter().copied())
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+        params.insert("require_watcher".into(), "1".into());
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let response = wait(State(state), Query(params)).await;
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            serde_json::from_slice(&bytes).unwrap()
+        })
+    }
+
+    const OPEN_C1: &str = "{\"type\":\"decision\",\"id\":\"c1\",\"needs_your_call\":true}\n";
+
+    #[test]
+    fn stashed_answer_returns_even_when_superseded_and_unwatched() {
+        let env = crate::paths::tests::TestEnv::new();
+        let body = wait_body(&env, OPEN_C1, Some("c2"), &[("call", "c2")]);
+        assert_eq!(body, json!({"answer": "stashed"}));
+    }
+
+    #[test]
+    fn moot_call_is_superseded_before_the_watcher_check() {
+        let env = crate::paths::tests::TestEnv::new();
+        let body = wait_body(&env, OPEN_C1, None, &[("call", "c2")]);
+        assert_eq!(body, json!({"answer": null, "superseded": true}));
+    }
+
+    #[test]
+    fn not_watching_refuses_only_a_live_call_with_no_stash() {
+        let env = crate::paths::tests::TestEnv::new();
+        let body = wait_body(&env, OPEN_C1, None, &[("call", "c1")]);
+        assert_eq!(
+            body,
+            json!({"answer": null, "not_watching": true, "reason": "toggle_off"})
+        );
+    }
 }
 
 #[derive(Default)]
@@ -143,7 +231,6 @@ pub(super) struct ParkGuard {
 impl Drop for ParkGuard {
     fn drop(&mut self) {
         let mut entries = self.parks.entries.lock().expect("park lock poisoned");
-        // A replaced request must never clear the newer request or its presence.
         if entries
             .get(&self.session)
             .is_some_and(|entry| entry.id == self.id)
@@ -226,7 +313,6 @@ pub(super) fn take_stash(
     (entry.expires > Instant::now()).then_some(entry.text)
 }
 
-// Keep each hop below the daemon's 255-second idle timeout.
 pub(super) fn budget() -> Duration {
     Duration::from_millis(tunables::env_int("COCKPIT_WAIT_TIMEOUT_MS", 240_000))
 }
@@ -281,7 +367,6 @@ async fn wait(
         .get("call")
         .filter(|s| !s.is_empty())
         .map(String::as_str);
-    // Drain first: an already logged answer must survive the superseded and presence checks.
     if let Some(answer) = take_stash(
         &mut state.broker.stash.lock().expect("stash lock poisoned"),
         session,
@@ -289,14 +374,12 @@ async fn wait(
     ) {
         return json_response(StatusCode::OK, json!({"answer": answer}));
     }
-    // A moot call gets the precise superseded sentinel even when no watcher is present.
     if let Some(call) = call
         && let Some(path) = log_path(session)
         && call_log::latest_open_call_in(&path).as_deref() != Some(call)
     {
         return json_response(StatusCode::OK, json!({"answer": null, "superseded": true}));
     }
-    // Presence comes last because it must not hide a delivered answer or superseded call.
     if query
         .get("require_watcher")
         .is_some_and(|value| value == "1")

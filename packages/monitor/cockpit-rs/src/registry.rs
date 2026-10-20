@@ -336,7 +336,6 @@ fn parse_timestamp(text: &str) -> Option<i64> {
         }
         _ => return None,
     };
-    // timegm handles UTC calendar arithmetic, including the TS rollover of days 29–31.
     let mut tm: libc::tm = unsafe { std::mem::zeroed() };
     tm.tm_year = year - 1900;
     tm.tm_mon = month - 1;
@@ -648,6 +647,9 @@ mod tests {
             ("2026-09-30T12:00:00.000Z", 1_790_769_600_000),
             ("2026-09-30T20:00:00+08:00", 1_790_769_600_000),
             ("1969-12-31T23:59:59.999Z", -1),
+            ("2026-02-30T00:00:00.000Z", 1_772_409_600_000),
+            ("2026-04-31T00:00:00.000Z", 1_777_593_600_000),
+            ("2026-02-29T00:00:00.000Z", 1_772_323_200_000),
         ] {
             assert_eq!(parse_timestamp(text), Some(ms));
             assert_eq!(parse_timestamp(&iso_timestamp(ms)), Some(ms));

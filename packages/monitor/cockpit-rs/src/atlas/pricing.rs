@@ -45,7 +45,6 @@ pub struct ModelPrice {
         serialize_with = "js_opt_number"
     )]
     pub cache_write: Option<f64>,
-    // TS spreads the whole object, so fields like the defaults' fallback `_comment` survive into the payload.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, serde_json::Value>,
 }
@@ -57,8 +56,6 @@ pub struct PricingTable {
     pub fallback: ModelPrice,
     #[serde(default)]
     pub external_model_prefixes: Vec<String>,
-    // Built on the first normalized lookup and reused for every later one in the build; every
-    // writer finishes inserting into `models` before anything is priced.
     #[serde(skip)]
     normalized: OnceLock<HashMap<String, String>>,
 }
@@ -631,6 +628,29 @@ mod tests {
     }
 
     #[test]
+    fn extra_fields_round_trip_into_the_payload() {
+        let price: ModelPrice =
+            serde_json::from_str(r#"{"_comment":"fallback","input":3.0,"output":15.0}"#).unwrap();
+        assert_eq!(price.extra["_comment"], "fallback");
+        let json = serde_json::to_value(&price).unwrap();
+        assert_eq!(json["_comment"], "fallback");
+    }
+
+    #[test]
+    fn normalized_index_is_built_once_and_not_refreshed_by_later_inserts() {
+        let mut t = norm_table();
+        assert_eq!(price_for("claude:utterly-unknown-xyz", &t), t.fallback);
+        t.models.insert(
+            "anthropic/utterly-unknown-xyz".into(),
+            price(7.0, 7.0, None, None),
+        );
+        assert_eq!(price_for("claude:utterly-unknown-xyz", &t), t.fallback);
+        assert_eq!(price_for("anthropic/utterly-unknown-xyz", &t).input, 7.0);
+        t.normalized = OnceLock::new();
+        assert_eq!(price_for("claude:utterly-unknown-xyz", &t).input, 7.0);
+    }
+
+    #[test]
     fn calc_cost_distinct_cache_pricing() {
         let m = 1_000_000;
         let cost = calc_cost(&usage(m, m, m, m), "claude-opus", &table());
@@ -724,8 +744,7 @@ mod tests {
         format!("http://{addr}/models")
     }
 
-    fn set_url(url: &str) {
-        // TestEnv holds the env lock for the test's lifetime.
+    fn set_url(_env: &TestEnv, url: &str) {
         unsafe { std::env::set_var("TOKEN_ATLAS_OPENROUTER_URL", url) };
     }
 
@@ -744,7 +763,7 @@ mod tests {
     async fn load_orders_defaults_live_override() {
         let env = TestEnv::new();
         let ctx = ctx_with_defaults(&env);
-        set_url(&stub(LIVE, "200 OK").await);
+        set_url(&env, &stub(LIVE, "200 OK").await);
         let over = env.dir.path().join(".config/cc-dashboard");
         std::fs::create_dir_all(&over).unwrap();
         std::fs::write(
@@ -780,11 +799,11 @@ mod tests {
     async fn failed_live_fetch_keeps_defaults_and_records_error() {
         let env = TestEnv::new();
         let ctx = ctx_with_defaults(&env);
-        set_url(&stub("{}", "503 Service Unavailable").await);
+        set_url(&env, &stub("{}", "503 Service Unavailable").await);
         clear_pricing_cache();
         let load = load_pricing_with_meta(&ctx).await.unwrap();
         clear_pricing_cache();
-        set_url("http://127.0.0.1:9/");
+        set_url(&env, "http://127.0.0.1:9/");
         let refused = load_pricing_with_meta(&ctx).await.unwrap();
         clear_pricing_cache();
         unset_url();
@@ -802,7 +821,7 @@ mod tests {
     async fn corrupt_override_is_reported_not_fatal() {
         let env = TestEnv::new();
         let ctx = ctx_with_defaults(&env);
-        set_url("http://127.0.0.1:9/");
+        set_url(&env, "http://127.0.0.1:9/");
         let over = env.dir.path().join(".config/cc-dashboard");
         std::fs::create_dir_all(&over).unwrap();
         std::fs::write(over.join("pricing.json"), "{nope").unwrap();
@@ -844,7 +863,7 @@ mod tests {
     async fn refresh_merges_into_existing_override() {
         let env = TestEnv::new();
         let ctx = ctx_with_defaults(&env);
-        set_url(&stub(LIVE, "200 OK").await);
+        set_url(&env, &stub(LIVE, "200 OK").await);
         let over = env.dir.path().join(".config/cc-dashboard");
         std::fs::create_dir_all(&over).unwrap();
         std::fs::write(
@@ -883,7 +902,7 @@ mod tests {
     async fn refresh_rejects_corrupt_override() {
         let env = TestEnv::new();
         let ctx = ctx_with_defaults(&env);
-        set_url("http://127.0.0.1:9/");
+        set_url(&env, "http://127.0.0.1:9/");
         let over = env.dir.path().join(".config/cc-dashboard");
         std::fs::create_dir_all(&over).unwrap();
         std::fs::write(over.join("pricing.json"), "{nope").unwrap();

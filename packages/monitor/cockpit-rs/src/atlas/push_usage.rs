@@ -14,11 +14,7 @@ pub fn run(_args: &[String]) -> ExitCode {
     if url.is_empty() {
         return ExitCode::SUCCESS;
     }
-    // Neither limits reader uses the plugin root, and the TS push never needed one.
-    let ctx = Ctx::from_env().unwrap_or_else(|_| Ctx {
-        now_ms: super::model::now_ms(),
-        plugin_root: Default::default(),
-    });
+    let ctx = Ctx::from_env().unwrap_or_else(|_| Ctx::without_plugin_root());
     let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

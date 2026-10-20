@@ -58,7 +58,6 @@ fn read_sessions(now_ms: i64) -> Map<String, Value> {
             ) && let Some(ts) = entry.get("ts").and_then(Value::as_f64)
                 && (now_ms as f64 - ts) < TTL_MS as f64
             {
-                // Keep numeric timestamps, including fractions, as the TS reader does.
                 store.insert(id, json!({"state":entry["state"], "ts":entry["ts"]}));
             }
         }
@@ -83,7 +82,6 @@ pub fn read_scopes(
         config::get_user_nudge(),
     )
 }
-// Lazy on purpose: the project scope forks git, which a session override makes moot.
 pub fn nudge_enabled_for(session_id: Option<&str>, cwd: &Path, now_ms: i64) -> bool {
     session_state(session_id, now_ms)
         .or_else(|| config::get_project_nudge(&project_key(cwd).to_string_lossy()))
@@ -214,6 +212,7 @@ mod tests {
             store.keys().map(String::as_str).collect::<Vec<_>>(),
             ["fresh", "fraction", "future"]
         );
+        assert_eq!(store["fraction"]["ts"], json!(now as f64 - 0.5));
         assert_eq!(
             read_scopes(Some("fresh"), &cwd, now).0,
             Some(NudgeState::Off)
@@ -263,5 +262,20 @@ mod tests {
             project_key(fixture.dir.path()),
             crate::log_root::git_root_of(fixture.dir.path()).unwrap()
         );
+    }
+
+    #[test]
+    fn session_override_skips_the_project_scope() {
+        let fixture = TestEnv::new();
+        let git_log = fixture.fake_git();
+        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        let cwd = fixture.dir.path().join("missing");
+        let now = 1_000_000_000_000;
+        set_scope(NudgeScope::Session, ToggleAction::Off, "s1", &cwd, now);
+        let _ = fs::remove_file(&git_log);
+        assert!(!nudge_enabled_for(Some("s1"), &cwd, now));
+        assert!(!git_log.exists());
+        assert!(nudge_enabled_for(Some("s2"), &cwd, now));
+        assert!(git_log.exists());
     }
 }

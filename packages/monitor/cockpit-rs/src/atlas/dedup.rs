@@ -98,7 +98,6 @@ pub fn add_billed_tokens(target: &mut BilledTokens, usage: &DedupUsage) {
     target.cache_creation += usage.cache_creation_input_tokens.unwrap_or(0);
 }
 
-// Local hour start: the rollup stores buckets under this exact value, so every producer must agree.
 pub fn hour_start_ms(ts_ms: i64) -> i64 {
     hour_start_ms_in(ts_ms, &TimeZone::system())
 }

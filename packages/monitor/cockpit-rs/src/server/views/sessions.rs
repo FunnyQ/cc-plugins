@@ -86,7 +86,6 @@ pub fn build_sessions(state: &AppState) -> Result<Vec<SessionView>, String> {
 }
 
 fn build_sessions_at(state: &AppState, now: i64) -> Result<Vec<SessionView>, String> {
-    // Replacing duplicates retains their first position, matching JavaScript Map.
     let mut live: Vec<LiveSession> = Vec::new();
     for session in live_sessions(now) {
         if let Some(existing) = live
@@ -457,5 +456,40 @@ mod tests {
                 expected
             );
         }
+    }
+
+    #[test]
+    fn duplicate_live_session_replaces_the_entry_and_keeps_its_first_position() {
+        let fixture = crate::paths::tests::TestEnv::new();
+        let now = 1_790_769_600_000;
+        let claude = fixture.dir.path().join("claude");
+        fs::create_dir_all(&claude).unwrap();
+        crate::paths::tests::TestEnv::set("COCKPIT_CLAUDE_SESSIONS_DIR", &claude);
+        for (file, id, name) in [
+            ("a", "dup", "first"),
+            ("b", "other", "other"),
+            ("c", "dup", "second"),
+        ] {
+            fs::write(
+                claude.join(format!("{file}.json")),
+                serde_json::json!({"sessionId": id, "cwd": "/repo", "name": name, "startedAt": now, "updatedAt": now}).to_string(),
+            )
+            .unwrap();
+        }
+        let state = AppState {
+            presence: Default::default(),
+            broker: Default::default(),
+            inbox: Default::default(),
+            permission: Default::default(),
+            plugin_root: fixture.dir.path().into(),
+        };
+        let sessions = build_sessions_at(&state, now).unwrap();
+        assert_eq!(
+            sessions
+                .iter()
+                .map(|s| (s.session_id.as_str(), s.title.as_str()))
+                .collect::<Vec<_>>(),
+            [("dup", "second"), ("other", "other")]
+        );
     }
 }

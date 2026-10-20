@@ -36,7 +36,6 @@ pub trait TailSource: Send + Sync + 'static {
     fn emit(&self, out: &mut Vec<String>, complete_text: &str);
 }
 
-// Dropping the body aborts the producer, so a closed client stops its poller and watcher.
 struct SseBody {
     receiver: mpsc::Receiver<String>,
     task: tokio::task::JoinHandle<()>,
@@ -119,7 +118,6 @@ fn cadence(name: &str, fallback: u64) -> Duration {
         .and_then(|value| value.trim().parse::<f64>().ok())
         .filter(|value| value.is_finite() && *value != 0.0)
         .unwrap_or(fallback as f64);
-    // Node clamps negative and sub-millisecond timer delays to one millisecond.
     Duration::from_millis(ms.clamp(1.0, i32::MAX as f64) as u64)
 }
 
@@ -278,7 +276,6 @@ impl<S: TailSource> TailStream<S> {
             self.offset = metadata.len();
             self.partial.extend_from_slice(&bytes);
             let (complete, partial) = split_complete_lines(&self.partial);
-            // Unlike TS chunk decoding, raw partial bytes preserve split UTF-8 characters.
             let complete = String::from_utf8_lossy(complete).into_owned();
             self.partial = partial.to_vec();
             self.emit(&complete);
@@ -313,7 +310,6 @@ impl<S: TailSource> TailStream<S> {
                     let _ = self.read_tail();
                 }
                 Some(()) = self.events.recv() => {
-                    // Keep the first event's deadline so continuous writes cannot starve reads.
                     self.debounce.get_or_insert(Instant::now() + Duration::from_millis(WATCH_DEBOUNCE_MS));
                 }
             }
@@ -544,5 +540,76 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn dropping_the_body_aborts_the_producer() {
+        let alive = Arc::new(());
+        let lifetime = Arc::downgrade(&alive);
+        let response = sse_response(|_sender| async move {
+            let _alive = alive;
+            std::future::pending::<()>().await;
+        });
+        tokio::task::yield_now().await;
+        assert!(lifetime.upgrade().is_some());
+        drop(response);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while lifetime.upgrade().is_some() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    #[test]
+    fn cadence_clamps_negative_and_sub_millisecond_values_to_one_millisecond() {
+        let _env = crate::paths::tests::TestEnv::new();
+        for (value, expected) in [
+            ("-5", 1),
+            ("0.4", 1),
+            ("1", 1),
+            ("250", 250),
+            ("0", 2000),
+            ("junk", 2000),
+        ] {
+            crate::paths::tests::TestEnv::set("COCKPIT_CADENCE_TEST", value);
+            assert_eq!(
+                cadence("COCKPIT_CADENCE_TEST", 2000),
+                Duration::from_millis(expected),
+                "{value}"
+            );
+        }
+        unsafe { std::env::remove_var("COCKPIT_CADENCE_TEST") };
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn continuous_events_still_trigger_a_read_within_the_debounce() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("log");
+        fs::write(&path, []).unwrap();
+        let mut stream = TailStream::with_cadences(
+            Source(path.clone()),
+            Duration::from_secs(3600),
+            Duration::from_secs(3600),
+        )
+        .unwrap();
+        stream.frames.clear();
+        let sender = stream.watch_sender.clone();
+        let pump = tokio::spawn(async move {
+            loop {
+                let _ = sender.try_send(());
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        fs::write(&path, b"fresh\n").unwrap();
+        let started = Instant::now();
+        let frame =
+            tokio::time::timeout(Duration::from_millis(WATCH_DEBOUNCE_MS * 4), stream.next())
+                .await
+                .expect("events starved the read");
+        pump.abort();
+        assert_eq!(frame.unwrap(), "data: fresh\n\n");
+        assert!(started.elapsed() < Duration::from_millis(WATCH_DEBOUNCE_MS * 4));
     }
 }

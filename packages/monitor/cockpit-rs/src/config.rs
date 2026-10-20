@@ -50,7 +50,6 @@ fn write_config(cfg: CockpitConfig) {
         fs::write(path, serde_json::to_string_pretty(&cfg)? + "\n")?;
         Ok(())
     })();
-    // TS setters throw on write failures; never silently report a successful update.
     if let Err(error) = result {
         panic!("cockpit: cannot write config: {error}");
     }
@@ -80,7 +79,6 @@ pub fn set_answer_here(on: bool) {
 }
 
 fn spread(value: Option<&Value>) -> CockpitConfig {
-    // JavaScript object spread retains indexed properties of malformed arrays and strings.
     match value {
         Some(Value::Object(map)) => map.clone(),
         Some(Value::Array(values)) => values
@@ -268,5 +266,13 @@ mod tests {
             read_config()["nudges"]["projects"],
             json!({"0":"a","1":"b","/a":"on"})
         );
+    }
+
+    #[test]
+    #[should_panic(expected = "cockpit: cannot write config")]
+    fn unwritable_config_path_panics() {
+        let env = TestEnv::new();
+        fs::write(env.dir.path().join("config"), "a file, not a directory").unwrap();
+        set_language("French");
     }
 }

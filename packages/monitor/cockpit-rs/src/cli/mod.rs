@@ -26,7 +26,6 @@ pub const USAGE: &str = r#"usage: cockpit <log|scribe|prep|config|wait|send|rest
   cockpit send   <sessionId> <answer>
   cockpit restart [--port N] [--no-open]
   cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#;
-// Subcommands that exist only in the Rust binary keep clap's own help and errors.
 const RUST_ONLY: [&str; 4] = ["server", "ensure-daemon", "hook", "atlas"];
 const KNOWN: [&str; 13] = [
     "log",
@@ -43,7 +42,12 @@ const KNOWN: [&str; 13] = [
     "hook",
     "atlas",
 ];
-/// Runs before clap so `--help` and an unknown subcommand match `cockpit.ts main`.
+fn unknown_subcommand(sub: &str) -> String {
+    format!(
+        "cockpit: unknown subcommand \"{sub}\"\n{}",
+        USAGE.lines().next().unwrap_or_default()
+    )
+}
 pub fn preflight(argv: &[String]) -> Option<ExitCode> {
     let sub = argv.first().map(String::as_str).unwrap_or("");
     if matches!(sub, "--version" | "-V") {
@@ -57,10 +61,7 @@ pub fn preflight(argv: &[String]) -> Option<ExitCode> {
         return Some(ExitCode::SUCCESS);
     }
     if !KNOWN.contains(&sub) {
-        eprintln!(
-            "cockpit: unknown subcommand \"{sub}\"\n{}",
-            USAGE.lines().next().unwrap_or_default()
-        );
+        eprintln!("{}", unknown_subcommand(sub));
         return Some(ExitCode::FAILURE);
     }
     None
@@ -193,6 +194,51 @@ pub fn flag_value<'a>(rest: &'a [String], name: &str) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn argv(args: &[&str]) -> Vec<String> {
+        args.iter().map(|s| s.to_string()).collect()
+    }
+    #[test]
+    fn rust_only_subcommands_leave_help_to_clap() {
+        for sub in RUST_ONLY {
+            assert!(preflight(&argv(&[sub, "--help"])).is_none(), "{sub}");
+            assert!(preflight(&argv(&[sub, "-h"])).is_none(), "{sub}");
+        }
+        assert!(preflight(&argv(&["--version"])).is_none());
+        assert!(preflight(&argv(&["log", "--help"])).is_some());
+        assert!(preflight(&argv(&["--help"])).is_some());
+    }
+    #[test]
+    fn help_text_and_unknown_subcommand_are_exact() {
+        assert_eq!(
+            USAGE,
+            r#"usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]
+  cockpit log    --session <id> --decision D --reason R [--tradeoff T]
+                 [--facet "LABEL: text"]... [--file p]... [--option o]...
+                 [--diagram MERMAID] [--needs-call]
+  cockpit scribe --type <kind> --text <body> [--title <headline>]
+                 [--file <path>]... [--diagram MERMAID] [--session <id>]
+  cockpit scribe --recent [N] | --prep [--provider <p>]
+  cockpit prep   [--provider <p>]
+  cockpit config --log-language <lang> | get-language
+                 | --answer-here on|off | get-answer-here
+  cockpit wait   <sessionId>
+  cockpit send   <sessionId> <answer>
+  cockpit restart [--port N] [--no-open]
+  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#
+        );
+        assert_eq!(
+            unknown_subcommand("bogus"),
+            "cockpit: unknown subcommand \"bogus\"\nusage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]"
+        );
+        assert_eq!(
+            preflight(&argv(&["bogus"])).map(|code| format!("{code:?}")),
+            Some(format!("{:?}", ExitCode::FAILURE))
+        );
+        assert_eq!(
+            preflight(&argv(&["log", "--help"])).map(|code| format!("{code:?}")),
+            Some(format!("{:?}", ExitCode::SUCCESS))
+        );
+    }
     fn parse(args: &[&str]) -> Result<Args, String> {
         parse_args(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>())
     }

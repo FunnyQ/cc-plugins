@@ -337,7 +337,6 @@ async fn stream(
     ) {
         let _ = sender.send(pending.frame.clone());
     }
-    // Dropping the body closes this receiver, so presence can prune without probe bytes.
     drop(sender);
     sse_response(receiver).await
 }
@@ -453,5 +452,33 @@ mod tests {
         drop(response);
         tokio::task::yield_now().await;
         assert!(!presence.has_visible_subscriber("session"));
+    }
+
+    #[tokio::test]
+    async fn stream_handler_prunes_its_subscriber_once_the_body_drops() {
+        let env = crate::paths::tests::TestEnv::new();
+        crate::paths::tests::TestEnv::set("COCKPIT_HOME", env.dir.path());
+        std::fs::write(
+            env.dir.path().join("daemon.json"),
+            r#"{"pid":1,"port":1,"token":"t","root":"r"}"#,
+        )
+        .unwrap();
+        let session = "00000000-0000-4000-8000-000000000001";
+        let state = AppState {
+            presence: Default::default(),
+            broker: Default::default(),
+            inbox: Default::default(),
+            permission: Default::default(),
+            plugin_root: env.dir.path().into(),
+        };
+        let query: HashMap<String, String> = [("token", "t"), ("session", session)]
+            .into_iter()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect();
+        let response = stream(State(state.clone()), Query(query)).await;
+        assert!(state.presence.has_visible_subscriber(session));
+        drop(response);
+        tokio::task::yield_now().await;
+        assert!(!state.presence.has_visible_subscriber(session));
     }
 }

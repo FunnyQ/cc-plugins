@@ -150,7 +150,6 @@ pub fn should_supersede_daemon(daemon_root: Option<&str>, my_root: &str) -> bool
     compare_versions(&mine, &theirs) == Ordering::Greater
 }
 
-// Keep the TS `<plugin root>/skills/cockpit/scripts` shape so a 5.x channel's version rule reads it.
 pub fn daemon_root() -> Result<String, String> {
     Ok(paths::plugin_root()?
         .join("skills/cockpit/scripts")
@@ -368,5 +367,14 @@ mod tests {
     #[test]
     fn version_needs_a_separator_after_it() {
         assert_eq!(version_from_root("/cache/q-lab/monitor/3.18.5"), None);
+    }
+
+    #[test]
+    fn daemon_root_keeps_the_version_segment_readable() {
+        let _env = TestEnv::new();
+        TestEnv::set("COCKPIT_PLUGIN_ROOT", "/cache/monitor/3.19.0");
+        let root = daemon_root().unwrap();
+        assert_eq!(root, version("3.19.0"));
+        assert_eq!(version_from_root(&root), Some("3.19.0".into()));
     }
 }

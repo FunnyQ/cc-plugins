@@ -9,6 +9,7 @@ use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use serde_json::{Number, Value, json};
 use std::future::Future;
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::{Arc, Mutex};
@@ -34,6 +35,10 @@ fn open_browser(url: &str, no_open: bool) {
     } else {
         "xdg-open"
     };
+    launch_opener(opener, url);
+}
+
+fn launch_opener(opener: &str, url: &str) {
     let mut command = Command::new(opener);
     command
         .arg(url)
@@ -41,7 +46,6 @@ fn open_browser(url: &str, no_open: bool) {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     process_alive::detach(&mut command);
-    // A spawn failure is ignored: the URL is already printed.
     if let Ok(child) = command.spawn() {
         process_alive::reap_in_background(child);
     }
@@ -158,7 +162,6 @@ struct App {
 }
 
 impl App {
-    // A fresh Ctx per request, so an unset TOKEN_ATLAS_NOW_MS means the clock at request time.
     fn ctx(&self) -> Ctx {
         Ctx {
             now_ms: now_ms(),
@@ -190,7 +193,6 @@ async fn handle_stats(app: &App, request_headers: &HeaderMap) -> anyhow::Result<
     let ctx = Arc::new(app.ctx());
     let fingerprint = current_fingerprint(&ctx).await?;
     let etag = format!("W/\"{}-{fingerprint}\"", app.boot_id);
-    // A 304 must repeat the cache-relevant headers its 200 would have carried.
     let mut headers = HeaderMap::new();
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     headers.insert(header::ETAG, HeaderValue::from_str(&etag)?);
@@ -240,7 +242,7 @@ async fn handle_pricing_refresh(app: &App, req: Request) -> anyhow::Result<Respo
         .await
         .ok()
         .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok());
-    let mut models: Vec<String> = body
+    let models: Vec<String> = body
         .as_ref()
         .and_then(|body| body.get("models"))
         .and_then(Value::as_array)
@@ -251,17 +253,24 @@ async fn handle_pricing_refresh(app: &App, req: Request) -> anyhow::Result<Respo
         .map(str::to_owned)
         .collect();
     let ctx = Arc::new(app.ctx());
-    // refreshPricingOverride derives the list from a build whenever the usable list is empty; the
-    // cached one for the current fingerprint has the same models, so reuse it or join the one in flight.
-    if models.is_empty() {
-        let fingerprint = current_fingerprint(&ctx).await?;
-        models = cached_stats(&app.stats, &fingerprint, || stats::build(&ctx))
-            .await?
-            .models
-            .clone();
-    }
+    let models = models_or_cached(app, &ctx, models).await?;
     let result = pricing::refresh_pricing_override(&ctx, models).await?;
     Ok(json_response(StatusCode::OK, serde_json::to_value(result)?))
+}
+
+async fn models_or_cached(
+    app: &App,
+    ctx: &Arc<Ctx>,
+    models: Vec<String>,
+) -> anyhow::Result<Vec<String>> {
+    if !models.is_empty() {
+        return Ok(models);
+    }
+    let fingerprint = current_fingerprint(ctx).await?;
+    Ok(cached_stats(&app.stats, &fingerprint, || stats::build(ctx))
+        .await?
+        .models
+        .clone())
 }
 
 fn write_atlas_info(home: &Path, port: u16, root: &str) -> std::io::Result<()> {
@@ -309,33 +318,25 @@ async fn serve(port: u16, plugin_root: PathBuf, my_root: String, no_open: bool) 
     }
 }
 
-// The startup decision sleeps and signals synchronously, so it runs before any runtime exists.
-pub fn run(args: &[String]) -> ExitCode {
-    let port = parse_port(args);
-    let no_open = args.iter().any(|arg| arg == "--no-open");
-    let plugin_root = match paths::plugin_root() {
-        Ok(root) => root,
-        Err(error) => {
-            eprintln!("{error}");
-            return ExitCode::FAILURE;
-        }
-    };
-    // The root the retired TS server wrote, so a Rust server reuses one still running from the same install.
-    let my_root = plugin_root
+fn install_root(plugin_root: &Path) -> String {
+    plugin_root
         .join("skills/usage-dashboard/scripts")
         .to_string_lossy()
-        .into_owned();
+        .into_owned()
+}
+
+fn decide_and_supersede(my_root: &str, no_open: bool) -> ControlFlow<ExitCode> {
     let info = std::fs::read_to_string(paths::cockpit_home().join("atlas.json"))
         .ok()
         .and_then(|raw| parse_atlas_info(&raw));
-    match decide_startup(info, &my_root, process_alive::is_alive) {
+    match decide_startup(info, my_root, process_alive::is_alive) {
         Startup::Reuse(info) => {
             println!(
                 "Claude Stats Dashboard already running → http://localhost:{} (pid {})",
                 info.port, info.pid
             );
             open_browser(&format!("http://localhost:{}", info.port), no_open);
-            return ExitCode::SUCCESS;
+            return ControlFlow::Break(ExitCode::SUCCESS);
         }
         Startup::Supersede(info) => {
             println!(
@@ -349,6 +350,23 @@ pub fn run(args: &[String]) -> ExitCode {
             std::thread::sleep(Duration::from_millis(100));
         }
         Startup::Start => {}
+    }
+    ControlFlow::Continue(())
+}
+
+pub fn run(args: &[String]) -> ExitCode {
+    let port = parse_port(args);
+    let no_open = args.iter().any(|arg| arg == "--no-open");
+    let plugin_root = match paths::plugin_root() {
+        Ok(root) => root,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let my_root = install_root(&plugin_root);
+    if let ControlFlow::Break(code) = decide_and_supersede(&my_root, no_open) {
+        return code;
     }
     match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -531,6 +549,77 @@ mod tests {
             );
             assert_eq!(builds.load(Ordering::SeqCst), 2);
         });
+    }
+
+    #[test]
+    fn missing_opener_binary_neither_panics_nor_errors() {
+        launch_opener("cockpit-no-such-opener-binary", "http://localhost:1");
+    }
+
+    fn app(plugin_root: PathBuf) -> App {
+        App {
+            dist: plugin_root.join("dist"),
+            plugin_root,
+            boot_id: "boot".into(),
+            stats: Mutex::new(None),
+        }
+    }
+
+    #[test]
+    fn ctx_rereads_the_clock_on_every_call() {
+        let _env = crate::paths::tests::TestEnv::new();
+        let app = app(PathBuf::from("/x"));
+        crate::paths::tests::TestEnv::set("TOKEN_ATLAS_NOW_MS", "1000");
+        assert_eq!(app.ctx().now_ms, 1000);
+        crate::paths::tests::TestEnv::set("TOKEN_ATLAS_NOW_MS", "2000");
+        assert_eq!(app.ctx().now_ms, 2000);
+    }
+
+    #[test]
+    fn not_modified_carries_the_cache_headers() {
+        let env = crate::paths::tests::TestEnv::new();
+        let app = app(env.dir.path().to_path_buf());
+        runtime().block_on(async {
+            let fingerprint = current_fingerprint(&Arc::new(app.ctx())).await.unwrap();
+            let etag = format!("W/\"boot-{fingerprint}\"");
+            let mut request = HeaderMap::new();
+            request.insert(header::IF_NONE_MATCH, HeaderValue::from_str(&etag).unwrap());
+            let response = handle_stats(&app, &request).await.unwrap();
+            assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+            let headers = response.headers();
+            assert_eq!(headers[header::CACHE_CONTROL], "no-cache");
+            assert_eq!(headers[header::ETAG], etag.as_str());
+            assert_eq!(headers[header::VARY], "Accept-Encoding");
+        });
+    }
+
+    #[test]
+    fn empty_refresh_models_come_from_the_cached_stats() {
+        let env = crate::paths::tests::TestEnv::new();
+        let app = app(env.dir.path().to_path_buf());
+        runtime().block_on(async {
+            let ctx = Arc::new(app.ctx());
+            let fingerprint = current_fingerprint(&ctx).await.unwrap();
+            cached_stats(&app.stats, &fingerprint, || async {
+                Ok(json!({"byModel": [{"model": "claude:cached"}]}))
+            })
+            .await
+            .unwrap();
+            let models = models_or_cached(&app, &ctx, vec![]).await.unwrap();
+            assert_eq!(models, ["claude:cached"]);
+            let given = models_or_cached(&app, &ctx, vec!["x".into()])
+                .await
+                .unwrap();
+            assert_eq!(given, ["x"]);
+        });
+    }
+
+    #[test]
+    fn install_root_is_the_path_the_ts_server_wrote() {
+        assert_eq!(
+            install_root(Path::new("/p")),
+            "/p/skills/usage-dashboard/scripts"
+        );
     }
 
     #[test]

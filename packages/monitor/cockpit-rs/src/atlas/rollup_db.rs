@@ -10,8 +10,6 @@ pub const SCHEMA_VERSION: i64 = 3;
 
 pub const LEDGER_REBUILD_PENDING: &str = "ledger_rebuild_pending";
 
-// `hour_ms` is the LOCAL hour start (dedup::hour_start_ms), so daily and heatmap maps rebuild
-// byte-identically; `0` buckets entries whose timestamp was missing.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HourlyRow {
     pub hour_ms: i64,
@@ -120,16 +118,12 @@ pub fn open_sqlite_file(path: &Path) -> anyhow::Result<Connection> {
 
 pub fn open_rollup_db(path: &Path) -> anyhow::Result<Connection> {
     let mut conn = open_sqlite_file(path)?;
-    // Already v3 and Rust-written, so both backups and the migration are no-ops: skip the write
-    // transaction every stats build and nudged ingest would otherwise take.
     if get_meta(&conn, "schema_version").ok().flatten() == Some(SCHEMA_VERSION.to_string())
         && get_meta(&conn, "writer").ok().flatten().as_deref() == Some("rust")
     {
         return Ok(conn);
     }
     let in_memory = path == Path::new(":memory:");
-    // First, so the snapshot is the file exactly as the TS last left it, before its own
-    // upgrade backup or cursor rewind below changes anything.
     if !in_memory {
         backup_before_rust(&conn, path)?;
         backup_before_upgrade(&conn, path);
@@ -154,9 +148,7 @@ fn backup_before_rust(conn: &Connection, path: &Path) -> anyhow::Result<()> {
     if writer.as_deref() == Some("rust") || dest.exists() {
         return Ok(());
     }
-    // Written to a per-process temp name and linked into place, so a crash mid-VACUUM can never
-    // leave a partial file under the name every later open trusts, and a concurrent opener's
-    // finished backup is never replaced.
+    // hard_link, never rename: a concurrent opener's finished backup must not be replaced.
     let tmp = sibling(path, &format!(".pre-rust.bak.tmp-{}", std::process::id()));
     let _ = std::fs::remove_file(&tmp);
     let published = vacuum_into(conn, &tmp).and_then(|()| match std::fs::hard_link(&tmp, &dest) {
@@ -178,8 +170,6 @@ fn backup_before_upgrade(conn: &Connection, path: &Path) {
     if dest.exists() {
         return;
     }
-    // Swallowed as in the TS: the migration is still transactional, so a full disk or a
-    // read-only dir should not block the dashboard.
     let _ = vacuum_into(conn, &dest);
 }
 
@@ -216,7 +206,6 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
     conn.execute_batch(SCHEMA_DDL)?;
 
     set_meta(conn, "schema_version", &SCHEMA_VERSION.to_string())?;
-    // Rust-only key, written only by a successful migration; the TS ignores unknown meta keys.
     set_meta(conn, "writer", "rust")?;
     Ok(())
 }
@@ -677,6 +666,75 @@ mod tests {
         );
         assert_eq!(meta(&path, "writer"), None);
         assert_eq!(dump(&path), before);
+    }
+
+    #[test]
+    fn second_open_of_a_rust_written_db_takes_no_write_transaction_and_no_backup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        drop(open_rollup_db(&path).unwrap());
+        let holder = Connection::open(&path).unwrap();
+        holder.execute_batch("BEGIN IMMEDIATE").unwrap();
+        let started = std::time::Instant::now();
+        let conn = open_rollup_db(&path).unwrap();
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
+        drop(conn);
+        holder.execute_batch("ROLLBACK").unwrap();
+        let baks: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".bak"))
+            .collect();
+        assert!(baks.is_empty(), "unexpected backups: {baks:?}");
+    }
+
+    #[test]
+    fn v2_db_leaves_a_pre_rust_backup_equal_to_the_original() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch(V2_DDL)
+            .unwrap();
+        let before = dump(&path);
+        drop(open_rollup_db(&path).unwrap());
+        assert_eq!(dump(&sibling(&path, ".pre-rust.bak")), before);
+    }
+
+    #[test]
+    fn failed_vacuum_leaves_nothing_at_the_backup_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        ts_v3_db(&path);
+        let tmp = sibling(&path, &format!(".pre-rust.bak.tmp-{}", std::process::id()));
+        std::fs::create_dir(&tmp).unwrap();
+        let err = open_rollup_db(&path).unwrap_err().to_string();
+        assert!(
+            err.starts_with("pre-rust backup failed: "),
+            "unexpected error: {err}"
+        );
+        assert!(!sibling(&path, ".pre-rust.bak").exists());
+    }
+
+    #[test]
+    fn unwritable_upgrade_backup_still_lets_the_migration_succeed() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch(V2_DDL)
+            .unwrap();
+        std::os::unix::fs::symlink(
+            dir.path().join("missing/dir/target.db"),
+            sibling(&path, ".v2.bak"),
+        )
+        .unwrap();
+        let conn = open_rollup_db(&path).unwrap();
+        assert_eq!(
+            get_meta(&conn, "schema_version").unwrap().as_deref(),
+            Some("3")
+        );
+        assert!(!sibling(&path, ".v2.bak").exists());
     }
 
     #[test]

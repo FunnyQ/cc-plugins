@@ -85,20 +85,6 @@ mod tests {
     #[test]
     fn channel_ttl_and_parked_presence() {
         let _env = TestEnv::new();
-        struct Restore(Option<std::ffi::OsString>);
-        impl Drop for Restore {
-            fn drop(&mut self) {
-                // TestEnv serializes environment mutation but does not track this server-only variable.
-                unsafe {
-                    if let Some(value) = &self.0 {
-                        std::env::set_var("COCKPIT_CHANNEL_TTL_MS", value);
-                    } else {
-                        std::env::remove_var("COCKPIT_CHANNEL_TTL_MS");
-                    }
-                }
-            }
-        }
-        let _restore = Restore(std::env::var_os("COCKPIT_CHANNEL_TTL_MS"));
         TestEnv::set("COCKPIT_CHANNEL_TTL_MS", "100");
         let presence = Presence::default();
         assert!(!presence.has_channel("session"));

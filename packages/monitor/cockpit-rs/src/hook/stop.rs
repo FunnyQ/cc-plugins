@@ -1,4 +1,4 @@
-use super::{Env, parse_input, reminder};
+use super::{Env, HookInput, parse_input, reminder};
 use crate::{nudge_toggle, paths};
 use serde_json::{Map, Value, json};
 use std::{
@@ -157,8 +157,17 @@ pub fn run() -> io::Result<()> {
         return Ok(());
     };
     let env: Env = std::env::vars().collect();
-    let now = crate::registry::now_ms();
-    if reminder::should_skip(&env, &input, now) {
+    run_input(&input, &env, crate::registry::now_ms())
+}
+
+fn signature(head: &str, numstat: &str, porcelain: &str) -> String {
+    sha1_smol::Sha1::from(format!("{head} {numstat} {porcelain}"))
+        .digest()
+        .to_string()
+}
+
+fn run_input(input: &HookInput, env: &Env, now: i64) -> io::Result<()> {
+    if reminder::should_skip(env, input, now) {
         return Ok(());
     }
     let cwd = input
@@ -183,8 +192,7 @@ pub fn run() -> io::Result<()> {
     let last = prev
         .and_then(|entry| entry.get("lastNudgeMs"))
         .and_then(Value::as_f64);
-    let window = throttle(&env);
-    // Throttle before config: its project scope probes git even on guaranteed no-op turns.
+    let window = throttle(env);
     if last.is_some_and(|last| now as f64 - last < window) {
         return Ok(());
     }
@@ -196,21 +204,18 @@ pub fn run() -> io::Result<()> {
     };
     let numstat = git(&cwd, &["diff", "HEAD", "--numstat"]).unwrap_or_default();
     let porcelain = git(&cwd, &["status", "--porcelain"]).unwrap_or_default();
-    let sig = sha1_smol::Sha1::from(format!("{head} {numstat} {porcelain}"))
-        .digest()
-        .to_string();
+    let sig = signature(&head, &numstat, &porcelain);
     let last_sig = prev
         .and_then(|entry| entry.get("lastSig"))
         .and_then(Value::as_str);
-    // The early gate preserves fractional Number windows; only signature gating remains here.
     if !decide_nudge(now, &sig, last_sig, None, 0) {
         return Ok(());
     }
-    let is_codex = reminder::is_codex(&env);
-    let session = reminder::resolve_parent_session(&env, &input);
+    let is_codex = reminder::is_codex(env);
+    let session = reminder::resolve_parent_session(env, input);
     marker.insert(key, json!({"lastNudgeMs": now, "lastSig": sig}));
     write_marker(&path, marker, now);
-    if reminder::is_claude_code(&env, &input)
+    if reminder::is_claude_code(env, input)
         && let Some(resume) = input.session_id.as_deref().filter(|id| !id.is_empty())
         && let Some(session) = session.as_deref()
         && let Some(claude) = env.get("PATH").and_then(|path| {
@@ -258,6 +263,107 @@ pub fn run() -> io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::paths::tests::TestEnv;
+
+    #[test]
+    fn signature_pins_digest_of_head_numstat_porcelain() {
+        assert_eq!(
+            signature("abc123", "1\t2\tf\n", " M f\n"),
+            "f1387da1a0a975bccc7bdf1f153c89c5fff6b608"
+        );
+    }
+
+    fn stop_input(cwd: &Path) -> HookInput {
+        HookInput {
+            session_id: Some("s1".into()),
+            cwd: Some(cwd.to_string_lossy().into_owned()),
+            ..Default::default()
+        }
+    }
+
+    fn seed_marker(nudge_ms: i64, sig: &str) -> std::path::PathBuf {
+        let path = paths::cockpit_home().join("scribe-nudge.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            json!({"s1": {"lastNudgeMs": nudge_ms, "lastSig": sig}}).to_string(),
+        )
+        .unwrap();
+        path
+    }
+
+    #[test]
+    fn throttled_turn_never_forks_git_and_windows_stay_fractional() {
+        let fixture = TestEnv::new();
+        let git_log = fixture.fake_git();
+        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        let cwd = fixture.dir.path().join("work");
+        fs::create_dir_all(&cwd).unwrap();
+        let input = stop_input(&cwd);
+        let now = 1_000_000_000_000;
+        let env = Env::new();
+        seed_marker(now - 1000, "old");
+        run_input(&input, &env, now).unwrap();
+        assert!(!git_log.exists());
+        seed_marker(now - 480_000, "old");
+        run_input(&input, &env, now).unwrap();
+        assert!(git_log.exists());
+        let _ = fs::remove_file(&git_log);
+        let half = Env::from([("COCKPIT_NUDGE_THROTTLE_MS".into(), "0.5".into())]);
+        seed_marker(now, "old");
+        run_input(&input, &half, now).unwrap();
+        assert!(!git_log.exists());
+        seed_marker(now - 1, "old");
+        run_input(&input, &half, now).unwrap();
+        assert!(git_log.exists());
+    }
+
+    #[test]
+    fn unchanged_signature_gates_after_the_throttle() {
+        let fixture = TestEnv::new();
+        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        let cwd = fixture.dir.path().join("work");
+        fs::create_dir_all(&cwd).unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec![
+                "-c",
+                "user.name=t",
+                "-c",
+                "user.email=t@t",
+                "commit",
+                "-q",
+                "--allow-empty",
+                "-m",
+                "x",
+            ],
+        ] {
+            assert!(
+                Command::new("git")
+                    .arg("-C")
+                    .arg(&cwd)
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        let head = git(&cwd, &["rev-parse", "HEAD"]).unwrap();
+        let numstat = git(&cwd, &["diff", "HEAD", "--numstat"]).unwrap();
+        let porcelain = git(&cwd, &["status", "--porcelain"]).unwrap();
+        let sig = signature(&head, &numstat, &porcelain);
+        let input = stop_input(&cwd);
+        let now = 1_000_000_000_000;
+        let env = Env::new();
+        let marker = seed_marker(now - 480_000, &sig);
+        let before = fs::read(&marker).unwrap();
+        run_input(&input, &env, now).unwrap();
+        assert_eq!(fs::read(&marker).unwrap(), before);
+        seed_marker(now - 480_000, "different");
+        run_input(&input, &env, now).unwrap();
+        let after: Value = serde_json::from_slice(&fs::read(&marker).unwrap()).unwrap();
+        assert_eq!(after["s1"], json!({"lastNudgeMs": now, "lastSig": sig}));
+    }
 
     #[test]
     fn complexity_counts_binary_untracked_and_thresholds() {

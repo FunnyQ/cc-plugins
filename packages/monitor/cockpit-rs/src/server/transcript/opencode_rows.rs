@@ -106,7 +106,6 @@ fn part_content(part: &Value) -> Vec<Value> {
 fn entries(rows: &[Row]) -> Vec<Value> {
     let mut groups: Vec<(&Row, Vec<Value>)> = Vec::new();
     for row in rows {
-        // read_rows orders by (message created, message id), so a message's rows are contiguous.
         if groups.last().is_none_or(|(first, _)| first.id != row.id) {
             groups.push((row, Vec::new()));
         }
@@ -339,6 +338,28 @@ mod tests {
         assert_eq!(
             content("{\"summary\":{\"a\":1}}"),
             Some(json!("{\n  \"a\": 1\n}"))
+        );
+    }
+
+    #[test]
+    fn non_adjacent_rows_with_the_same_id_stay_split() {
+        let row = |id: &str, text: &str| Row {
+            id: id.into(),
+            created: 0,
+            updated: 0,
+            data: "{}".into(),
+            part: Some(json!({"type":"text","text":text}).to_string()),
+        };
+        let mapped = entries(&[row("a", "one"), row("b", "two"), row("a", "three")]);
+        assert_eq!(
+            mapped
+                .iter()
+                .map(|entry| (
+                    entry["uuid"].as_str().unwrap(),
+                    entry["message"]["content"][0]["text"].as_str().unwrap()
+                ))
+                .collect::<Vec<_>>(),
+            [("a", "one"), ("b", "two"), ("a", "three")]
         );
     }
 }

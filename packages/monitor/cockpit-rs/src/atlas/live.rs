@@ -20,7 +20,6 @@ pub struct LiveSession {
     pub id: String,
     pub project_name: String,
     pub cwd: String,
-    // A session file without `status` leaves it undefined in TS, which JSON.stringify drops.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub status: String,
     pub status_source: String,
@@ -241,8 +240,6 @@ pub fn build_opencode_live_sessions(
         .collect()
 }
 
-// Stable, like Array.prototype.sort; every updatedAt comes from iso(), whose fixed width
-// makes a descending string compare equal to TS's Date.parse difference.
 pub fn sort_live_sessions(mut sessions: Vec<LiveSession>) -> Vec<LiveSession> {
     sessions.sort_by(|a, b| {
         status_rank(&a.status)
@@ -428,11 +425,7 @@ struct LiveOutput {
 
 pub fn run_cli(_args: &[String]) -> ExitCode {
     let cockpit_port = cockpit_daemon_port();
-    // Live sessions never read plugin files, so no plugin-root lookup can fail here.
-    let ctx = Ctx {
-        now_ms: now_ms(),
-        plugin_root: PathBuf::new(),
-    };
+    let ctx = Ctx::without_plugin_root();
     let out = LiveOutput {
         sessions: live_sessions(&ctx),
         cockpit_up: cockpit_port.is_some(),
@@ -700,6 +693,68 @@ mod tests {
             build_opencode_live_sessions(&[zero], &none, NOW)[0].age_ms,
             2000
         );
+    }
+
+    #[test]
+    fn sort_keeps_input_order_for_ties_and_iso_strings_sort_like_times() {
+        let s = |id: &str| LiveSession {
+            provider: "claude".into(),
+            id: id.into(),
+            project_name: "p".into(),
+            cwd: "/p".into(),
+            status: "busy".into(),
+            status_source: "claude-session-file".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
+            age_ms: 0,
+            is_stale: false,
+            transcript_path: None,
+            model: None,
+            version: None,
+            cockpit: None,
+        };
+        let ids = |v: Vec<LiveSession>| v.into_iter().map(|x| x.id).collect::<Vec<_>>();
+        assert_eq!(
+            ids(sort_live_sessions(vec![s("c"), s("a"), s("b")])),
+            ["c", "a", "b"]
+        );
+        let times = [
+            0.0,
+            999.0,
+            1000.0,
+            9_999_999_999.0,
+            1_700_000_000_123.0,
+            1_700_000_000_124.0,
+            4_102_444_800_000.0,
+        ];
+        for pair in times.windows(2) {
+            assert!(iso(pair[0]) < iso(pair[1]), "{pair:?}");
+        }
+    }
+
+    #[test]
+    fn session_without_status_serializes_no_status_key() {
+        let session = LiveSession {
+            provider: "claude".into(),
+            id: "x".into(),
+            project_name: "p".into(),
+            cwd: "/p".into(),
+            status: String::new(),
+            status_source: "claude-session-file".into(),
+            updated_at: "2026-01-01T00:00:00.000Z".into(),
+            age_ms: 0,
+            is_stale: false,
+            transcript_path: None,
+            model: None,
+            version: None,
+            cockpit: None,
+        };
+        let json = serde_json::to_value(&session).unwrap();
+        assert!(json.get("status").is_none());
+        let busy = LiveSession {
+            status: "busy".into(),
+            ..session
+        };
+        assert_eq!(serde_json::to_value(&busy).unwrap()["status"], "busy");
     }
 
     #[test]

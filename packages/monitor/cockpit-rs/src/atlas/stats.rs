@@ -139,7 +139,6 @@ fn mtime_ms(meta: &std::fs::Metadata) -> Option<f64> {
     Some(since.as_nanos() as f64 / 1_000_000.0)
 }
 
-// Node's `CODE: text, syscall 'path'` for the one errno a present source realistically hits.
 fn node_error(err: &std::io::Error, syscall: &str, path: &Path) -> String {
     match err.raw_os_error() {
         Some(libc::EACCES) => format!("EACCES: permission denied, {syscall} '{}'", path.display()),
@@ -454,7 +453,6 @@ fn serialize_ledger_rows(rows: Vec<InternalLedgerRow>, table: &PricingTable) -> 
     let mut out: Vec<LedgerRow> = rows
         .into_iter()
         .map(|row| {
-            // Summed off the serialized rows, in the same order: one pricing pass, same bits.
             let usage_by_model = serialize_usage_by_model(&row.usage_by_model, table);
             let cost_usd = (!usage_by_model.is_empty()
                 && row.cost_basis != LedgerCostBasis::Unavailable)
@@ -807,7 +805,6 @@ fn build_projects(loaded: &Loaded, table: &PricingTable) -> Vec<ProjectRow> {
         *project_cost.entry(path.clone()).or_insert(0.0) += cost;
     }
 
-    // Insertion order matters: the message-count sort below is stable.
     let mut project_paths: IndexSet<&str> = IndexSet::new();
     project_paths.extend(claude.history.by_project.keys().map(String::as_str));
     project_paths.extend(codex.project_activity.keys().map(String::as_str));
@@ -1002,7 +999,6 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
         + total_cache_read_tokens
         + total_cache_creation_tokens
         + total_reasoning_tokens;
-    // Summed before the cost sort, in insertion order, so f64 rounding matches the TS reduce.
     let estimated_cost_usd = by_model.iter().fold(0.0, |sum, m| sum + m.cost_usd);
 
     let projects = build_projects(&loaded, table);
@@ -1011,7 +1007,6 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
         Some(b) if d.messages <= b.messages => Some(b),
         _ => Some(d),
     });
-    // Reasoning tokens stay out of this one total, as in the TS.
     let most_used_model = by_model
         .iter()
         .map(|m| {
@@ -1104,7 +1099,6 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
         "firstSessionDate": cache.first_session_date,
         "longestSession": cache.longest_session,
     });
-    // The TS sorts byModel in place before pricingMeta reads it, so pricingMeta sees the sorted order.
     by_model.sort_by(|a, b| by_cost_desc(a.cost_usd, b.cost_usd));
     let by_model_keys: Vec<String> = by_model.iter().map(|m| m.model.clone()).collect();
 
@@ -1511,6 +1505,140 @@ mod tests {
 
         let (_, supplemental) = merge_daily_activity(&[], &history, None);
         assert_eq!(supplemental, ["2026-05-21"]);
+    }
+
+    const BIG: f64 = 2.4e13;
+    const SMALL: f64 = 0.0015;
+
+    fn priced(cost: f64) -> ModelUsage {
+        ModelUsage {
+            input_tokens: 1,
+            cost_usd: Some(cost),
+            ..Default::default()
+        }
+    }
+
+    fn small_small_big() -> IndexMap<String, ModelUsage> {
+        IndexMap::from([
+            ("a".to_string(), priced(SMALL)),
+            ("b".to_string(), priced(SMALL)),
+            ("c".to_string(), priced(BIG)),
+        ])
+    }
+
+    #[test]
+    fn small_small_big_sums_differently_in_each_order() {
+        let forward = (SMALL + SMALL) + BIG;
+        let descending = (BIG + SMALL) + SMALL;
+        assert_ne!(forward.to_bits(), descending.to_bits());
+    }
+
+    #[test]
+    fn node_error_spells_eacces_like_node_and_keeps_other_errors() {
+        let denied = std::io::Error::from_raw_os_error(libc::EACCES);
+        assert_eq!(
+            node_error(&denied, "open", Path::new("/x/y")),
+            "EACCES: permission denied, open '/x/y'"
+        );
+        let other = std::io::Error::from_raw_os_error(libc::ENOENT);
+        assert_eq!(
+            node_error(&other, "open", Path::new("/x")),
+            other.to_string()
+        );
+    }
+
+    #[test]
+    fn ledger_cost_is_the_in_order_sum_of_the_serialized_rows() {
+        let table = pricing_load().table;
+        let row = InternalLedgerRow {
+            id: "r".into(),
+            provider: Provider::Claude,
+            timestamp_ms: 0,
+            date: "2026-01-01".into(),
+            project_path: "/p".into(),
+            project_name: "p".into(),
+            model: "a".into(),
+            interactions: 1,
+            tool_calls: 0,
+            tokens: 3,
+            cost_basis: LedgerCostBasis::Usage,
+            usage_by_model: small_small_big(),
+        };
+        let rows = serialize_ledger_rows(vec![row], &table);
+        let expected = (SMALL + SMALL) + BIG;
+        assert_eq!(rows[0].cost_usd.unwrap().to_bits(), expected.to_bits());
+    }
+
+    #[test]
+    fn projects_with_equal_message_counts_keep_insertion_order() {
+        let mut src = loaded(StatsCache::default());
+        let seen = |path: &str| HistoryProject {
+            message_count: 5,
+            first_seen: 1,
+            last_seen: 2,
+            path: path.into(),
+        };
+        src.claude.history.by_project = IndexMap::from([
+            ("/b".to_string(), seen("/b")),
+            ("/a".to_string(), seen("/a")),
+        ]);
+        src.codex.project_activity = IndexMap::from([(
+            "/c".to_string(),
+            crate::atlas::codex::CodexProjectActivity {
+                thread_count: 1,
+                interaction_count: 5,
+                tool_call_count: 0,
+                first_seen: 1,
+                last_seen: 2,
+                path: "/c".into(),
+            },
+        )]);
+        let projects = build_projects(&src, &pricing_load().table);
+        let order: Vec<&str> = projects.iter().map(|p| p.path.as_str()).collect();
+        assert_eq!(order, ["/b", "/a", "/c"]);
+    }
+
+    fn assembled(model_usage: IndexMap<String, ModelUsage>) -> Value {
+        let mut src = loaded(StatsCache::default());
+        src.claude.usage.model_usage = model_usage;
+        assemble(src, &pricing_load(), limits())
+    }
+
+    #[test]
+    fn estimated_cost_folds_in_insertion_order_before_the_sort() {
+        let stats = assembled(small_small_big());
+        let expected = (SMALL + SMALL) + BIG;
+        let total = stats["summary"]["estimatedCostUSD"].as_f64().unwrap();
+        assert_eq!(total.to_bits(), expected.to_bits());
+        assert_eq!(models_in(&stats), ["claude:c", "claude:a", "claude:b"]);
+    }
+
+    #[test]
+    fn most_used_model_ignores_reasoning_tokens() {
+        let stats = assembled(IndexMap::from([
+            ("plain".to_string(), usage(100)),
+            (
+                "claude:thinker".to_string(),
+                ModelUsage {
+                    input_tokens: 50,
+                    reasoning_output_tokens: Some(1000),
+                    ..Default::default()
+                },
+            ),
+        ]));
+        assert_eq!(stats["insights"]["mostUsedModel"], "claude:plain");
+    }
+
+    #[test]
+    fn pricing_meta_lists_models_in_the_sorted_order() {
+        let stats = assembled(IndexMap::from([
+            ("cheap".to_string(), priced(1.0)),
+            ("dear".to_string(), priced(9.0)),
+        ]));
+        assert_eq!(
+            stats["pricingMeta"]["models"]["fallbackModels"],
+            json!(["claude:dear", "claude:cheap"])
+        );
     }
 
     #[test]

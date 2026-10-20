@@ -26,7 +26,6 @@ pub fn cockpit_home() -> PathBuf {
     let path = override_path("XDG_DATA_HOME")
         .unwrap_or_else(|| home().join(".local/share"))
         .join("q-lab/cockpit");
-    // TS records each target once, allowing XDG overrides to change within a process.
     let mut migrated = MIGRATED_TARGETS
         .lock()
         .unwrap_or_else(|error| error.into_inner());
@@ -120,6 +119,7 @@ pub(crate) mod tests {
         "COCKPIT_PLUGIN_ROOT",
         "COCKPIT_WAIT_TIMEOUT_MS",
         "COCKPIT_STASH_TTL_MS",
+        "COCKPIT_CHANNEL_TTL_MS",
         "TOKEN_ATLAS_PROJECTS_DIR",
         "TOKEN_ATLAS_ROLLUP_DB",
         "TOKEN_ATLAS_NOW_MS",
@@ -127,6 +127,7 @@ pub(crate) mod tests {
 
     pub(crate) struct TestEnv {
         saved: Vec<(&'static str, Option<OsString>)>,
+        path: Option<OsString>,
         pub dir: tempfile::TempDir,
         _lock: MutexGuard<'static, ()>,
     }
@@ -135,6 +136,7 @@ pub(crate) mod tests {
         pub fn new() -> Self {
             let lock = LOCK.lock().unwrap_or_else(|e| e.into_inner());
             let saved = KEYS.iter().map(|&key| (key, env::var_os(key))).collect();
+            let path = env::var_os("PATH");
             let dir = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
             // All environment readers in tests hold LOCK for the entire fixture lifetime.
             unsafe {
@@ -146,9 +148,39 @@ pub(crate) mod tests {
             }
             Self {
                 saved,
+                path,
                 dir,
                 _lock: lock,
             }
+        }
+
+        pub fn fake_git(&self) -> PathBuf {
+            use std::os::unix::fs::PermissionsExt;
+            let bin = self.dir.path().join("fake-git-bin");
+            let log = self.dir.path().join("fake-git.log");
+            fs::create_dir_all(&bin).unwrap();
+            let script = bin.join("git");
+            let real = env::split_paths(&self.path.clone().unwrap_or_default())
+                .map(|dir| dir.join("git"))
+                .find(|candidate| candidate.is_file())
+                .unwrap();
+            fs::write(
+                &script,
+                format!(
+                    "#!/bin/sh\ncase \"$2\" in\n'{dir}'*) echo \"$@\" >> '{log}'; exit 1;;\nesac\nexec '{real}' \"$@\"\n",
+                    dir = self.dir.path().display(),
+                    log = log.display(),
+                    real = real.display(),
+                ),
+            )
+            .unwrap();
+            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+            let mut dirs = vec![bin];
+            dirs.extend(env::split_paths(&self.path.clone().unwrap_or_default()));
+            unsafe {
+                env::set_var("PATH", env::join_paths(dirs).unwrap());
+            }
+            log
         }
 
         pub fn set(key: &str, value: impl AsRef<std::ffi::OsStr>) {
@@ -159,8 +191,8 @@ pub(crate) mod tests {
         }
     }
 
-    impl Drop for TestEnv {
-        fn drop(&mut self) {
+    impl TestEnv {
+        fn restore(&self) {
             unsafe {
                 for (key, value) in &self.saved {
                     match value {
@@ -168,8 +200,33 @@ pub(crate) mod tests {
                         None => env::remove_var(key),
                     }
                 }
+                match &self.path {
+                    Some(path) => env::set_var("PATH", path),
+                    None => env::remove_var("PATH"),
+                }
             }
         }
+    }
+
+    impl Drop for TestEnv {
+        fn drop(&mut self) {
+            self.restore();
+        }
+    }
+
+    #[test]
+    fn restore_resets_saved_keys_and_path() {
+        let env = TestEnv::new();
+        env.fake_git();
+        TestEnv::set("COCKPIT_CHANNEL_TTL_MS", "changed");
+        env.restore();
+        assert_eq!(env::var_os("PATH"), env.path);
+        let (_, saved) = env
+            .saved
+            .iter()
+            .find(|(key, _)| *key == "COCKPIT_CHANNEL_TTL_MS")
+            .unwrap();
+        assert_eq!(env::var_os("COCKPIT_CHANNEL_TTL_MS"), *saved);
     }
 
     #[test]

@@ -59,7 +59,6 @@ fn open_code_timestamp_ms(value: f64) -> i64 {
     }
 }
 
-// A present non-number becomes NaN, as JS Number.isFinite rejects it rather than falling through `??`.
 fn num(value: Option<&Value>) -> Option<f64> {
     value
         .filter(|v| !v.is_null())
@@ -274,7 +273,6 @@ impl Ingest {
     }
 }
 
-// TS reads the DB inside try/catch and keeps whatever counts were set before the throw.
 fn read_db(
     db: &Path,
     ingest: &mut Ingest,
@@ -584,6 +582,28 @@ mod tests {
             (10, 5, 2, 1, Some(3))
         );
         assert_eq!(open_code_usage_from_tokens(&json!({})), empty_model_usage());
+    }
+
+    #[test]
+    fn present_non_numeric_token_field_is_nan_and_counts_as_zero() {
+        assert_eq!(num(None), None);
+        assert_eq!(num(Some(&Value::Null)), None);
+        assert_eq!(num(Some(&json!(5))), Some(5.0));
+        for bad in [json!("5"), json!("x"), json!(true), json!([1]), json!({})] {
+            assert!(num(Some(&bad)).unwrap().is_nan(), "{bad}");
+            assert_eq!(tok(Some(&bad)), 0, "{bad}");
+        }
+        let usage = open_code_usage_from_tokens(
+            &json!({"input": "9", "cache": {"read": "x"}, "output": 4}),
+        );
+        assert_eq!(
+            (
+                usage.input_tokens,
+                usage.cache_read_input_tokens,
+                usage.output_tokens
+            ),
+            (0, 0, 4)
+        );
     }
 
     #[test]

@@ -58,7 +58,6 @@ fn lookup(provider: Provider, project: &Path) -> Result<String, String> {
             .map(|entry| entry.map(|entry| entry.file_name()))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|error| error.to_string())?;
-        // Node readdir returns names in lexical order, which decides equal-mtime ties.
         names.sort();
         let mut newest = None;
         for name in names {
@@ -132,7 +131,6 @@ fn lookup(provider: Provider, project: &Path) -> Result<String, String> {
             project.display()
         )),
         Err(error) => {
-            // Bun prints SQLite's message without rusqlite's SQL/offset suffix.
             let message = match &error {
                 rusqlite::Error::SqliteFailure(_, Some(message))
                 | rusqlite::Error::SqlInputError { msg: message, .. } => message.clone(),
@@ -151,9 +149,12 @@ mod tests {
     use crate::paths::tests::TestEnv;
     use std::ffi::OsString;
 
-    struct SessionEnv(Vec<(&'static str, Option<OsString>)>);
-    impl SessionEnv {
-        fn new() -> Self {
+    struct SessionEnv<'a> {
+        saved: Vec<(&'static str, Option<OsString>)>,
+        _env: &'a TestEnv,
+    }
+    impl<'a> SessionEnv<'a> {
+        fn new(env: &'a TestEnv) -> Self {
             let saved = [
                 "CLAUDE_CODE_SESSION_ID",
                 "OPENCODE_SESSION_ID",
@@ -165,13 +166,12 @@ mod tests {
             for (key, _) in &saved {
                 TestEnv::set(key, "");
             }
-            Self(saved)
+            Self { saved, _env: env }
         }
     }
-    impl Drop for SessionEnv {
+    impl Drop for SessionEnv<'_> {
         fn drop(&mut self) {
-            // The enclosing TestEnv holds the shared environment lock.
-            for (key, value) in &self.0 {
+            for (key, value) in &self.saved {
                 unsafe {
                     match value {
                         Some(value) => env::set_var(key, value),
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn claude_env_scan_and_diagnostics() {
         let fixture = TestEnv::new();
-        let _session_env = SessionEnv::new();
+        let _session_env = SessionEnv::new(&fixture);
         let project = fixture.dir.path().join("project.name");
         TestEnv::set(
             "COCKPIT_CLAUDE_PROJECTS_DIR",
@@ -225,12 +225,21 @@ mod tests {
                 .unwrap();
         }
         assert_eq!(find_session(Provider::Claude, &project), Some("new".into()));
+        for name in ["b", "a"] {
+            let path = dir.join(format!("{name}.jsonl"));
+            fs::write(&path, "").unwrap();
+            fs::File::open(path)
+                .unwrap()
+                .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(9))
+                .unwrap();
+        }
+        assert_eq!(find_session(Provider::Claude, &project), Some("a".into()));
     }
 
     #[test]
     fn codex_newest_filters_and_optional_edges() {
         let fixture = TestEnv::new();
-        let _session_env = SessionEnv::new();
+        let _session_env = SessionEnv::new(&fixture);
         TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
         let project = fixture.dir.path();
         assert_eq!(
@@ -281,7 +290,7 @@ mod tests {
     #[test]
     fn opencode_env_newest_and_filters() {
         let fixture = TestEnv::new();
-        let _session_env = SessionEnv::new();
+        let _session_env = SessionEnv::new(&fixture);
         TestEnv::set("OPENCODE_DATA_DIR", fixture.dir.path());
         let project = fixture.dir.path();
         TestEnv::set("OPENCODE_SESSION_ID", " ses_live ");
@@ -333,7 +342,7 @@ mod tests {
     #[test]
     fn database_errors_and_provider_parsing() {
         let fixture = TestEnv::new();
-        let _session_env = SessionEnv::new();
+        let _session_env = SessionEnv::new(&fixture);
         for (provider, key, label, table) in [
             (
                 Provider::Codex,
