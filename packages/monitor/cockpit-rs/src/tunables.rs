@@ -34,7 +34,7 @@ mod tests {
             ("\u{feff}50", 50),
             ("999999999999999999999999999", 17),
         ] {
-            TestEnv::set("COCKPIT_WAIT_TIMEOUT_MS", raw);
+            _env.set("COCKPIT_WAIT_TIMEOUT_MS", raw);
             assert_eq!(env_int("COCKPIT_WAIT_TIMEOUT_MS", 17), expected, "{raw}");
         }
     }

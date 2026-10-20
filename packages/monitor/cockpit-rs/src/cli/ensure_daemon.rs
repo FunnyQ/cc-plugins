@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn records_validate_fields_and_read_fresh() {
         let fixture = crate::paths::tests::TestEnv::new();
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", fixture.dir.path());
+        fixture.set("COCKPIT_HOME", fixture.dir.path());
         let file = paths::daemon_info_path();
         assert!(read_daemon_coords().is_none());
         for value in [

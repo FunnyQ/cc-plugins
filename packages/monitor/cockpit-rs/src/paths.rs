@@ -138,7 +138,6 @@ pub(crate) mod tests {
             let saved = KEYS.iter().map(|&key| (key, env::var_os(key))).collect();
             let path = env::var_os("PATH");
             let dir = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
-            // All environment readers in tests hold LOCK for the entire fixture lifetime.
             unsafe {
                 for key in KEYS {
                     env::remove_var(key);
@@ -183,8 +182,7 @@ pub(crate) mod tests {
             log
         }
 
-        pub fn set(key: &str, value: impl AsRef<std::ffi::OsStr>) {
-            // Callers hold the shared test lock, including while restoring the environment.
+        pub fn set(&self, key: &str, value: impl AsRef<std::ffi::OsStr>) {
             unsafe {
                 env::set_var(key, value);
             }
@@ -218,7 +216,7 @@ pub(crate) mod tests {
     fn restore_resets_saved_keys_and_path() {
         let env = TestEnv::new();
         env.fake_git();
-        TestEnv::set("COCKPIT_CHANNEL_TTL_MS", "changed");
+        env.set("COCKPIT_CHANNEL_TTL_MS", "changed");
         env.restore();
         assert_eq!(env::var_os("PATH"), env.path);
         let (_, saved) = env
@@ -265,24 +263,24 @@ pub(crate) mod tests {
         for (key, resolve, default) in cases {
             assert_eq!(resolve(), *default);
             let custom = home.join(key);
-            TestEnv::set(key, &custom);
+            env.set(key, &custom);
             assert_eq!(resolve(), custom);
-            TestEnv::set(key, "");
+            env.set(key, "");
             assert_eq!(resolve(), *default);
         }
-        TestEnv::set("COCKPIT_CODEX_DIR", home.join("codex"));
+        env.set("COCKPIT_CODEX_DIR", home.join("codex"));
         assert_eq!(codex_state_db(), home.join("codex/state_5.sqlite"));
         assert_eq!(
             resolve_codex_path("rollout.jsonl"),
             home.join("codex/rollout.jsonl")
         );
         assert_eq!(resolve_codex_path("/absolute"), PathBuf::from("/absolute"));
-        TestEnv::set("OPENCODE_DATA_DIR", home.join("opencode"));
+        env.set("OPENCODE_DATA_DIR", home.join("opencode"));
         assert_eq!(opencode_db(), home.join("opencode/opencode.db"));
-        TestEnv::set("COCKPIT_OPENCODE_DB", home.join("override.db"));
+        env.set("COCKPIT_OPENCODE_DB", home.join("override.db"));
         assert_eq!(opencode_db(), home.join("override.db"));
-        TestEnv::set("OPENCODE_DATA_DIR", "");
-        TestEnv::set("COCKPIT_OPENCODE_DB", "");
+        env.set("OPENCODE_DATA_DIR", "");
+        env.set("COCKPIT_OPENCODE_DB", "");
         assert_eq!(
             opencode_db(),
             home.join(".local/share/opencode/opencode.db")
@@ -293,19 +291,19 @@ pub(crate) mod tests {
     fn xdg_paths_and_config_independence() {
         let env = TestEnv::new();
         let home = env.dir.path();
-        TestEnv::set("XDG_DATA_HOME", home.join("data"));
+        env.set("XDG_DATA_HOME", home.join("data"));
         assert_eq!(cockpit_home(), home.join("data/q-lab/cockpit"));
         assert_eq!(daemon_info_path(), cockpit_home().join("daemon.json"));
         assert_eq!(registry_path(), cockpit_home().join("registry.json"));
-        TestEnv::set("COCKPIT_HOME", home.join("explicit"));
+        env.set("COCKPIT_HOME", home.join("explicit"));
         assert_eq!(config_path(), home.join("config/q-lab/cockpit/config.json"));
-        TestEnv::set("XDG_CONFIG_HOME", "");
+        env.set("XDG_CONFIG_HOME", "");
         assert_eq!(
             config_path(),
             home.join(".config/q-lab/cockpit/config.json")
         );
-        TestEnv::set("COCKPIT_HOME", "");
-        TestEnv::set("XDG_DATA_HOME", "");
+        env.set("COCKPIT_HOME", "");
+        env.set("XDG_DATA_HOME", "");
         assert_eq!(cockpit_home(), home.join(".local/share/q-lab/cockpit"));
     }
 
@@ -316,10 +314,10 @@ pub(crate) mod tests {
         let legacy = home.join(".cockpit");
         fs::create_dir_all(&legacy).unwrap();
         fs::write(legacy.join("daemon.json"), "legacy").unwrap();
-        TestEnv::set("COCKPIT_HOME", home.join("explicit"));
+        env.set("COCKPIT_HOME", home.join("explicit"));
         assert_eq!(cockpit_home(), home.join("explicit"));
         assert!(legacy.exists());
-        TestEnv::set("COCKPIT_HOME", "");
+        env.set("COCKPIT_HOME", "");
         let next = cockpit_home();
         assert!(!legacy.exists());
         assert_eq!(
@@ -330,7 +328,7 @@ pub(crate) mod tests {
         assert_eq!(cockpit_home(), next);
         assert!(legacy.exists());
         assert!(!next.exists());
-        TestEnv::set("XDG_DATA_HOME", home.join("another"));
+        env.set("XDG_DATA_HOME", home.join("another"));
         assert_eq!(cockpit_home(), home.join("another/q-lab/cockpit"));
         assert!(!legacy.exists());
     }
@@ -343,11 +341,11 @@ pub(crate) mod tests {
         fs::create_dir_all(&legacy).unwrap();
         let existing = home.join("data/q-lab/cockpit");
         fs::create_dir_all(&existing).unwrap();
-        TestEnv::set("XDG_DATA_HOME", home.join("data"));
+        env.set("XDG_DATA_HOME", home.join("data"));
         assert_eq!(cockpit_home(), existing);
         assert!(legacy.exists());
         fs::write(home.join("blocked"), "file").unwrap();
-        TestEnv::set("XDG_DATA_HOME", home.join("blocked"));
+        env.set("XDG_DATA_HOME", home.join("blocked"));
         assert_eq!(cockpit_home(), home.join("blocked/q-lab/cockpit"));
         assert!(legacy.exists());
     }
@@ -360,9 +358,9 @@ pub(crate) mod tests {
             .unwrap()
             .to_path_buf();
         assert_eq!(plugin_root(), Ok(expected));
-        TestEnv::set("COCKPIT_PLUGIN_ROOT", env.dir.path().join("plugin"));
+        env.set("COCKPIT_PLUGIN_ROOT", env.dir.path().join("plugin"));
         assert_eq!(plugin_root(), Ok(env.dir.path().join("plugin")));
-        TestEnv::set("COCKPIT_PLUGIN_ROOT", "");
+        env.set("COCKPIT_PLUGIN_ROOT", "");
         assert!(plugin_root().is_ok());
         assert_eq!(
             locate_plugin_root(env.dir.path()),

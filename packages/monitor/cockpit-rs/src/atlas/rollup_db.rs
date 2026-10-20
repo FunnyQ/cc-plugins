@@ -148,7 +148,6 @@ fn backup_before_rust(conn: &Connection, path: &Path) -> anyhow::Result<()> {
     if writer.as_deref() == Some("rust") || dest.exists() {
         return Ok(());
     }
-    // hard_link, never rename: a concurrent opener's finished backup must not be replaced.
     let tmp = sibling(path, &format!(".pre-rust.bak.tmp-{}", std::process::id()));
     let _ = std::fs::remove_file(&tmp);
     let published = vacuum_into(conn, &tmp).and_then(|()| match std::fs::hard_link(&tmp, &dest) {
@@ -651,12 +650,13 @@ mod tests {
     }
 
     #[test]
-    fn failed_pre_rust_backup_refuses_the_open_and_writes_nothing() {
+    fn failed_pre_rust_backup_refuses_the_open_and_writes_nothing_because_hard_link_never_replaces_an_existing_backup()
+     {
         let dir = tempfile::tempdir().unwrap();
         let path = db_in(&dir);
         ts_v3_db(&path);
         let before = dump(&path);
-        // A dangling link reads as absent, and VACUUM INTO cannot create its missing target dir.
+        // A dangling link reads as absent, so the backup is attempted, and hard_link fails EEXIST on it.
         let bak = sibling(&path, ".pre-rust.bak");
         std::os::unix::fs::symlink(dir.path().join("missing/dir/target.db"), &bak).unwrap();
         let err = open_rollup_db(&path).unwrap_err().to_string();

@@ -279,7 +279,7 @@ mod tests {
         let env = TestEnv::new();
         let blocked = env.dir.path().join("blocked");
         fs::write(&blocked, "file").unwrap();
-        TestEnv::set("COCKPIT_HOME", &blocked);
+        env.set("COCKPIT_HOME", &blocked);
         let info = DaemonInfo {
             pid: 1234,
             port: 5858,
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn daemon_file_bytes_and_lenient_fields() {
         let env = TestEnv::new();
-        TestEnv::set("COCKPIT_HOME", env.dir.path().join("cockpit"));
+        env.set("COCKPIT_HOME", env.dir.path().join("cockpit"));
         assert!(read_daemon_info().is_none());
         let info = DaemonInfo {
             pid: 1234,
@@ -372,7 +372,7 @@ mod tests {
     #[test]
     fn daemon_root_keeps_the_version_segment_readable() {
         let _env = TestEnv::new();
-        TestEnv::set("COCKPIT_PLUGIN_ROOT", "/cache/monitor/3.19.0");
+        _env.set("COCKPIT_PLUGIN_ROOT", "/cache/monitor/3.19.0");
         let root = daemon_root().unwrap();
         assert_eq!(root, version("3.19.0"));
         assert_eq!(version_from_root(&root), Some("3.19.0".into()));

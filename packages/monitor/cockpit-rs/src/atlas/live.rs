@@ -452,9 +452,9 @@ mod tests {
     const NOW: i64 = 1_700_000_000_000;
 
     static CLOCK: AtomicI64 = AtomicI64::new(NOW);
-    fn fresh_now() -> i64 {
+    fn fresh_now(env: &TestEnv) -> i64 {
         let now = CLOCK.fetch_add(1_000_000, Ordering::SeqCst) + 1_000_000;
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", now.to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", now.to_string());
         now
     }
 
@@ -797,7 +797,7 @@ mod tests {
     fn write_daemon(env: &TestEnv, body: &str) {
         let dir = env.dir.path().join("cockpit");
         std::fs::create_dir_all(&dir).unwrap();
-        TestEnv::set("COCKPIT_HOME", &dir);
+        env.set("COCKPIT_HOME", &dir);
         std::fs::write(dir.join("daemon.json"), body).unwrap();
     }
 
@@ -830,11 +830,11 @@ mod tests {
             (r#"{"pid":-1,"port":1}"#.into(), None),
         ];
         for (body, expected) in cases {
-            fresh_now();
+            fresh_now(&env);
             write_daemon(&env, &body);
             assert_eq!(cockpit_daemon_port(), expected, "{body}");
         }
-        fresh_now();
+        fresh_now(&env);
         std::fs::remove_file(env.dir.path().join("cockpit/daemon.json")).unwrap();
         assert_eq!(cockpit_daemon_port(), None);
     }
@@ -842,27 +842,27 @@ mod tests {
     #[test]
     fn daemon_port_cache_honours_ttl() {
         let env = TestEnv::new();
-        let t = fresh_now();
+        let t = fresh_now(&env);
         write_daemon(&env, &format!(r#"{{"pid":{},"port":6001}}"#, me()));
         assert_eq!(cockpit_daemon_port(), Some(6001.into()));
         write_daemon(&env, &format!(r#"{{"pid":{},"port":6002}}"#, me()));
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS - 1).to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS - 1).to_string());
         assert_eq!(cockpit_daemon_port(), Some(6001.into()));
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
         assert_eq!(cockpit_daemon_port(), Some(6002.into()));
-        let t = fresh_now();
+        let t = fresh_now(&env);
         std::fs::remove_file(env.dir.path().join("cockpit/daemon.json")).unwrap();
         assert_eq!(cockpit_daemon_port(), None);
         write_daemon(&env, &format!(r#"{{"pid":{},"port":6003}}"#, me()));
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + 1).to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", (t + 1).to_string());
         assert_eq!(cockpit_daemon_port(), None);
     }
 
     #[test]
     fn missing_dbs_and_registry_yield_empty() {
         let env = TestEnv::new();
-        let now = fresh_now();
-        TestEnv::set("COCKPIT_HOME", env.dir.path().join("nope"));
+        let now = fresh_now(&env);
+        env.set("COCKPIT_HOME", env.dir.path().join("nope"));
         assert!(read_codex_thread_rows(now).is_empty());
         assert!(read_opencode_session_rows().is_empty());
         assert!(cockpit_session_keys().is_empty());
@@ -876,10 +876,10 @@ mod tests {
     #[test]
     fn corrupt_registry_yields_empty_and_is_cached() {
         let env = TestEnv::new();
-        let t = fresh_now();
+        let t = fresh_now(&env);
         let dir = env.dir.path().join("cockpit");
         std::fs::create_dir_all(&dir).unwrap();
-        TestEnv::set("COCKPIT_HOME", &dir);
+        env.set("COCKPIT_HOME", &dir);
         std::fs::write(dir.join("registry.json"), "{corrupt").unwrap();
         assert!(cockpit_session_keys().is_empty());
         std::fs::write(
@@ -887,16 +887,16 @@ mod tests {
             r#"{"sessions":[{"sessionId":"x"}]}"#,
         )
         .unwrap();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + 10).to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", (t + 10).to_string());
         assert!(cockpit_session_keys().is_empty());
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
         assert_eq!(*cockpit_session_keys(), keys(&["claude:x"]));
     }
 
     #[test]
     fn reads_codex_and_opencode_rows_filtering_archived_and_missing_rollouts() {
         let env = TestEnv::new();
-        let now = fresh_now();
+        let now = fresh_now(&env);
         let home = env.dir.path();
         std::fs::create_dir_all(home.join(".codex")).unwrap();
         let rollout = home.join("r.jsonl");
@@ -921,7 +921,7 @@ mod tests {
             .unwrap();
         }
         let oc = home.join("oc.db");
-        TestEnv::set("COCKPIT_OPENCODE_DB", &oc);
+        env.set("COCKPIT_OPENCODE_DB", &oc);
         let odb = Connection::open(&oc).unwrap();
         odb.execute_batch(&format!(
             "create table session (id text, directory text, time_created integer, time_updated integer);
@@ -946,7 +946,7 @@ mod tests {
     #[test]
     fn transcript_index_first_stem_wins_and_skips_dot_dirs() {
         let env = TestEnv::new();
-        fresh_now();
+        fresh_now(&env);
         let projects = env.dir.path().join(".claude/projects");
         std::fs::create_dir_all(projects.join("a/sub")).unwrap();
         std::fs::create_dir_all(projects.join(".hidden")).unwrap();

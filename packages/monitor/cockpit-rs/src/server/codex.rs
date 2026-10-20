@@ -366,7 +366,7 @@ for line in sys.stdin:
         std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
         let path = std::env::var_os("PATH").unwrap_or_default();
         let dirs = std::iter::once(bin).chain(std::env::split_paths(&path));
-        crate::paths::tests::TestEnv::set("PATH", std::env::join_paths(dirs).unwrap());
+        env.set("PATH", std::env::join_paths(dirs).unwrap());
         let report = run_probe(Some("thread"), Some("hello")).await;
         assert_eq!(report.turn_id.as_deref(), Some("t"));
         assert!(!marker.exists());

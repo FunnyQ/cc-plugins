@@ -141,6 +141,26 @@ mod tests {
     }
 
     #[test]
+    fn session_measure_mod_payload_is_cached() {
+        let payload = r#"{"rate_limits":{"five_hour":{"used_percentage":42.5,"resets_at":1779670800},"seven_day":{"used_percentage":10}}}"#;
+        let cached: Value = serde_json::from_str(&record(payload).unwrap()).unwrap();
+        assert_eq!(
+            cached["rate_limits"]["five_hour"],
+            json!({"used_percentage": 42.5, "resets_at": 1779670800})
+        );
+        assert_eq!(
+            cached["rate_limits"]["seven_day"],
+            json!({"used_percentage": 10})
+        );
+        assert_eq!(cached["capturedAtEpochMs"], NOW);
+    }
+
+    #[test]
+    fn empty_mod_payload_writes_nothing() {
+        assert_eq!(record("{}"), None);
+    }
+
+    #[test]
     fn iso_string_keeps_milliseconds() {
         let ms = 1_779_712_496_000 + 7;
         assert_eq!(iso_ms(ms).unwrap(), "2026-05-25T12:34:56.007Z");

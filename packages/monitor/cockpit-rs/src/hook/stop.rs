@@ -296,7 +296,7 @@ mod tests {
     fn throttled_turn_never_forks_git_and_windows_stay_fractional() {
         let fixture = TestEnv::new();
         let git_log = fixture.fake_git();
-        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
         let cwd = fixture.dir.path().join("work");
         fs::create_dir_all(&cwd).unwrap();
         let input = stop_input(&cwd);
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn unchanged_signature_gates_after_the_throttle() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
         let cwd = fixture.dir.path().join("work");
         fs::create_dir_all(&cwd).unwrap();
         for args in [

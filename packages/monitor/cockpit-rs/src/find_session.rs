@@ -164,7 +164,7 @@ mod tests {
             .map(|key| (key, env::var_os(key)))
             .collect::<Vec<_>>();
             for (key, _) in &saved {
-                TestEnv::set(key, "");
+                env.set(key, "");
             }
             Self { saved, _env: env }
         }
@@ -187,17 +187,17 @@ mod tests {
         let fixture = TestEnv::new();
         let _session_env = SessionEnv::new(&fixture);
         let project = fixture.dir.path().join("project.name");
-        TestEnv::set(
+        fixture.set(
             "COCKPIT_CLAUDE_PROJECTS_DIR",
             fixture.dir.path().join("transcripts"),
         );
         let id = "abcdef00-1111-2222-3333-444455556666";
-        TestEnv::set("CLAUDE_CODE_SESSION_ID", format!("  {id} "));
+        fixture.set("CLAUDE_CODE_SESSION_ID", format!("  {id} "));
         assert_eq!(find_session(Provider::Claude, &project), Some(id.into()));
         let dir =
             paths::claude_projects_dir().join(project.to_string_lossy().replace(['/', '.'], "-"));
         for invalid in ["", "bad", "ABCDEF00-1111-2222-3333-444455556666"] {
-            TestEnv::set("CLAUDE_CODE_SESSION_ID", invalid);
+            fixture.set("CLAUDE_CODE_SESSION_ID", invalid);
             assert_eq!(
                 lookup(Provider::Claude, &project),
                 Err(format!(
@@ -240,7 +240,7 @@ mod tests {
     fn codex_newest_filters_and_optional_edges() {
         let fixture = TestEnv::new();
         let _session_env = SessionEnv::new(&fixture);
-        TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
+        fixture.set("COCKPIT_CODEX_DIR", fixture.dir.path());
         let project = fixture.dir.path();
         assert_eq!(
             lookup(Provider::Codex, project),
@@ -291,20 +291,20 @@ mod tests {
     fn opencode_env_newest_and_filters() {
         let fixture = TestEnv::new();
         let _session_env = SessionEnv::new(&fixture);
-        TestEnv::set("OPENCODE_DATA_DIR", fixture.dir.path());
+        fixture.set("OPENCODE_DATA_DIR", fixture.dir.path());
         let project = fixture.dir.path();
-        TestEnv::set("OPENCODE_SESSION_ID", " ses_live ");
-        TestEnv::set("OPENCODE_SESSION", " ses_fallback ");
+        fixture.set("OPENCODE_SESSION_ID", " ses_live ");
+        fixture.set("OPENCODE_SESSION", " ses_fallback ");
         assert_eq!(
             find_session(Provider::Opencode, project),
             Some("ses_live".into())
         );
-        TestEnv::set("OPENCODE_SESSION_ID", " ");
+        fixture.set("OPENCODE_SESSION_ID", " ");
         assert_eq!(
             find_session(Provider::Opencode, project),
             Some("ses_fallback".into())
         );
-        TestEnv::set("OPENCODE_SESSION", "");
+        fixture.set("OPENCODE_SESSION", "");
         assert_eq!(
             lookup(Provider::Opencode, project),
             Err(format!(
@@ -358,7 +358,7 @@ mod tests {
             ),
         ] {
             let path = fixture.dir.path().join(key);
-            TestEnv::set(key, &path);
+            fixture.set(key, &path);
             Connection::open(&path).unwrap();
             assert_eq!(
                 lookup(provider, fixture.dir.path()),

@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn scopes_round_trip_clear_and_compact_file() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
         let cwd = fixture.dir.path().join("missing");
         let now = 1_000_000_000_000;
         assert!(nudge_enabled_for(Some("s1"), &cwd, now));
@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn expiry_invalid_entries_and_best_effort_writes() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_HOME", fixture.dir.path());
+        fixture.set("COCKPIT_HOME", fixture.dir.path());
         let cwd = fixture.dir.path().join("missing");
         let now = 1_000_000_000_000;
         fs::write(
@@ -248,7 +248,7 @@ mod tests {
         assert_eq!(read_scopes(Some(""), &cwd, now), (None, None, None));
         let blocked = fixture.dir.path().join("blocked");
         fs::write(&blocked, "").unwrap();
-        TestEnv::set("COCKPIT_HOME", blocked);
+        fixture.set("COCKPIT_HOME", blocked);
         assert_eq!(
             set_scope(NudgeScope::Session, ToggleAction::Off, "s1", &cwd, now),
             Some(NudgeState::Off)
@@ -268,7 +268,7 @@ mod tests {
     fn session_override_skips_the_project_scope() {
         let fixture = TestEnv::new();
         let git_log = fixture.fake_git();
-        TestEnv::set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
         let cwd = fixture.dir.path().join("missing");
         let now = 1_000_000_000_000;
         set_scope(NudgeScope::Session, ToggleAction::Off, "s1", &cwd, now);

@@ -6,7 +6,6 @@ use std::path::Path;
 const DEFAULT_CHUNK: usize = 1 << 20;
 
 pub struct JsonlLinesOptions {
-    /// Must sit on a line boundary.
     pub start: u64,
     pub chunk_size: usize,
     pub emit_partial: bool,
@@ -260,5 +259,25 @@ mod tests {
             collect(&path, chunk(4)),
             (vec!["中".into(), "文中".into()], 10)
         );
+    }
+
+    #[test]
+    fn resume_cursor_always_sits_just_after_a_newline() {
+        let dir = tempfile::tempdir().unwrap();
+        let body = "aaa\n中文\nb\n\nlast line\n".as_bytes();
+        for cut in 0..=body.len() {
+            let path = write(&dir, "cursor.jsonl", &body[..cut]);
+            let (_, cursor) = collect(&path, no_partial());
+            assert!(
+                cursor == 0 || body[cursor as usize - 1] == b'\n',
+                "cut {cut}"
+            );
+            let resumed = JsonlLinesOptions {
+                start: cursor,
+                ..no_partial()
+            };
+            let (_, next) = collect(&path, resumed);
+            assert_eq!(next, cursor, "cut {cut}");
+        }
     }
 }

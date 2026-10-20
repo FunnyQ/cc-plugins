@@ -573,7 +573,7 @@ mod tests {
             ("0", 2000),
             ("junk", 2000),
         ] {
-            crate::paths::tests::TestEnv::set("COCKPIT_CADENCE_TEST", value);
+            _env.set("COCKPIT_CADENCE_TEST", value);
             assert_eq!(
                 cadence("COCKPIT_CADENCE_TEST", 2000),
                 Duration::from_millis(expected),

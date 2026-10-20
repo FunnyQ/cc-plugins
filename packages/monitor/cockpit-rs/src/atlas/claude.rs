@@ -575,7 +575,7 @@ mod tests {
     #[test]
     fn usage_limits_branches() {
         let env = TestEnv::new();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", NOW.to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", NOW.to_string());
         let file = env.dir.path().join(".cache/token-atlas/rate-limits.json");
 
         let missing = read_usage_limits(&ctx());
@@ -643,7 +643,7 @@ mod tests {
             r#"{"version":2,"extra":1}"#,
         );
         write(&home.join("not-a-dir"), "");
-        TestEnv::set("TOKEN_ATLAS_ROLLUP_DB", home.join("not-a-dir/rollup.db"));
+        env.set("TOKEN_ATLAS_ROLLUP_DB", home.join("not-a-dir/rollup.db"));
         let src = load(&ctx()).unwrap();
         assert_eq!(src.transcript_file_count, 2);
         assert!(src.usage.model_usage.is_empty());

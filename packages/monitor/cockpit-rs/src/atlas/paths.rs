@@ -88,19 +88,19 @@ mod tests {
             codex_cache_path(),
             home.join(".local/share/q-lab/token-atlas/codex-sessions.db")
         );
-        TestEnv::set("XDG_DATA_HOME", "/xdg");
+        env.set("XDG_DATA_HOME", "/xdg");
         assert_eq!(
             rollup_db_path(),
             PathBuf::from("/xdg/q-lab/token-atlas/rollup.db")
         );
-        TestEnv::set("TOKEN_ATLAS_ROLLUP_DB", "/tmp/r.db");
+        env.set("TOKEN_ATLAS_ROLLUP_DB", "/tmp/r.db");
         assert_eq!(rollup_db_path(), PathBuf::from("/tmp/r.db"));
         assert_eq!(
             codex_cache_path(),
             PathBuf::from("/xdg/q-lab/token-atlas/codex-sessions.db")
         );
-        TestEnv::set("XDG_DATA_HOME", "");
-        TestEnv::set("TOKEN_ATLAS_ROLLUP_DB", "");
+        env.set("XDG_DATA_HOME", "");
+        env.set("TOKEN_ATLAS_ROLLUP_DB", "");
         assert_eq!(
             rollup_db_path(),
             home.join(".local/share/q-lab/token-atlas/rollup.db")
@@ -112,14 +112,14 @@ mod tests {
         let env = TestEnv::new();
         let home = env.dir.path();
         assert_eq!(projects_dir(), home.join(".claude/projects"));
-        TestEnv::set("TOKEN_ATLAS_PROJECTS_DIR", "/p");
+        env.set("TOKEN_ATLAS_PROJECTS_DIR", "/p");
         assert_eq!(projects_dir(), PathBuf::from("/p"));
         assert_eq!(codex_state_db(), home.join(".codex/state_5.sqlite"));
         assert_eq!(
             rate_limits_cache(),
             home.join(".cache/token-atlas/rate-limits.json")
         );
-        TestEnv::set("COCKPIT_OPENCODE_DB", "/oc/opencode.db");
+        env.set("COCKPIT_OPENCODE_DB", "/oc/opencode.db");
         assert_eq!(opencode_storage_dir(), PathBuf::from("/oc/storage"));
         assert_eq!(opencode_project_dir(), PathBuf::from("/oc/project"));
     }

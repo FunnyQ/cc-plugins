@@ -46,8 +46,8 @@ pub struct DedupUsage {
     pub cache_creation_input_tokens: Option<i64>,
 }
 
-// Claude Code persists several snapshots per API request with identical billing; requestId:messageId
-// names the request, then uuid, then a per-file index so distinct unkeyed lines never collapse.
+// Claude Code persists several snapshots per API request; input and cache fields never differ between them but output_tokens does in 16% of multi-snapshot requests.
+// requestId:messageId names the request, then uuid, then a per-file index so distinct unkeyed lines never collapse.
 pub fn dedup_key(entry: &DedupEntry, file: &str, seen_size: usize) -> String {
     let message_id = entry
         .message

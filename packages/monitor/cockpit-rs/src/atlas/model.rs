@@ -366,10 +366,10 @@ mod tests {
     #[test]
     fn now_ms_pins_only_positive_integers() {
         let _env = TestEnv::new();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", "1700000000000");
+        _env.set("TOKEN_ATLAS_NOW_MS", "1700000000000");
         assert_eq!(now_ms(), 1_700_000_000_000);
         for bad in ["0", "-5", "abc"] {
-            TestEnv::set("TOKEN_ATLAS_NOW_MS", bad);
+            _env.set("TOKEN_ATLAS_NOW_MS", bad);
             assert!(now_ms() > 1_700_000_000_000, "{bad}");
         }
     }

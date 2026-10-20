@@ -357,7 +357,7 @@ mod tests {
 
     fn fixture() -> TestEnv {
         let env = TestEnv::new();
-        TestEnv::set("COCKPIT_HOME", env.dir.path().join("cockpit"));
+        env.set("COCKPIT_HOME", env.dir.path().join("cockpit"));
         env
     }
 

@@ -350,7 +350,7 @@ mod tests {
             .find(|git| git.is_file())
             .unwrap();
         std::os::unix::fs::symlink(git, bin.join("git")).unwrap();
-        TestEnv::set("PATH", &bin);
+        env.set("PATH", &bin);
         assert_eq!(diagram_gate("log", Some("graph TD; A-->B")), Ok(()));
     }
 

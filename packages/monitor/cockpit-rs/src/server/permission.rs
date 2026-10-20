@@ -457,7 +457,7 @@ mod tests {
     #[tokio::test]
     async fn stream_handler_prunes_its_subscriber_once_the_body_drops() {
         let env = crate::paths::tests::TestEnv::new();
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", env.dir.path());
+        env.set("COCKPIT_HOME", env.dir.path());
         std::fs::write(
             env.dir.path().join("daemon.json"),
             r#"{"pid":1,"port":1,"token":"t","root":"r"}"#,

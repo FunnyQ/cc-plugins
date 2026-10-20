@@ -147,7 +147,7 @@ mod tests {
     fn recursive_claude_lookup_and_missing_roots() {
         let fixture = TestEnv::new();
         let root = fixture.dir.path().join("projects");
-        TestEnv::set("COCKPIT_CLAUDE_PROJECTS_DIR", &root);
+        fixture.set("COCKPIT_CLAUDE_PROJECTS_DIR", &root);
         assert_eq!(resolve_claude_transcript_path("session"), None);
         let nested = root.join("project/subagents");
         fs::create_dir_all(&nested).unwrap();
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn codex_read_only_resolution_filters_and_database_errors() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
+        fixture.set("COCKPIT_CODEX_DIR", fixture.dir.path());
         assert_eq!(resolve_codex_rollout_path("missing"), None);
         assert!(!paths::codex_state_db().exists());
         let db = Connection::open(paths::codex_state_db()).unwrap();
@@ -237,11 +237,11 @@ mod tests {
             }
         }
         let _restore = Restore(env::var_os("COCKPIT_CODEX_SESSIONS_DIR"));
-        TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
-        TestEnv::set("COCKPIT_CODEX_SESSIONS_DIR", "");
+        fixture.set("COCKPIT_CODEX_DIR", fixture.dir.path());
+        fixture.set("COCKPIT_CODEX_SESSIONS_DIR", "");
         assert_eq!(codex_sessions_dir(), fixture.dir.path().join("sessions"));
         let custom = fixture.dir.path().join("custom");
-        TestEnv::set("COCKPIT_CODEX_SESSIONS_DIR", &custom);
+        fixture.set("COCKPIT_CODEX_SESSIONS_DIR", &custom);
         assert_eq!(codex_sessions_dir(), custom);
     }
 }

@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn resolves_call_from_registry_and_explicit_override() {
         let env = crate::paths::tests::TestEnv::new();
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", env.dir.path());
+        env.set("COCKPIT_HOME", env.dir.path());
         assert_eq!(resolve_call_id("s", None), None);
         let log = env.dir.path().join("log.jsonl");
         fs::write(

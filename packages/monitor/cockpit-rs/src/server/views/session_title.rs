@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn claude_reads_first_user_text_and_text_blocks_without_loading_history() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_CLAUDE_PROJECTS_DIR", fixture.dir.path());
+        fixture.set("COCKPIT_CLAUDE_PROJECTS_DIR", fixture.dir.path());
         let nested = fixture.dir.path().join("nested/project");
         fs::create_dir_all(&nested).unwrap();
         fs::write(nested.join("plain.jsonl"), "{}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"  hello\\n world  \"}}\ninvalid").unwrap();
@@ -157,8 +157,8 @@ mod tests {
     fn provider_database_titles_are_read_only_normalized_and_parameterized() {
         let fixture = TestEnv::new();
         let path = fixture.dir.path().join("titles.sqlite");
-        TestEnv::set("COCKPIT_CODEX_STATE_DB", &path);
-        TestEnv::set("COCKPIT_OPENCODE_DB", &path);
+        fixture.set("COCKPIT_CODEX_STATE_DB", &path);
+        fixture.set("COCKPIT_OPENCODE_DB", &path);
         assert_eq!(
             resolve_historical_session_title(Provider::Codex, "missing"),
             None

@@ -1737,7 +1737,7 @@ mod tests {
 
     fn limits_env() -> TestEnv {
         let env = TestEnv::new();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", NOW.to_string());
+        env.set("TOKEN_ATLAS_NOW_MS", NOW.to_string());
         env
     }
 

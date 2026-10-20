@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn validates_token_first_and_reads_it_fresh() {
         let fixture = crate::paths::tests::TestEnv::new();
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", fixture.dir.path());
+        fixture.set("COCKPIT_HOME", fixture.dir.path());
         let path = crate::paths::daemon_info_path();
         std::fs::write(&path, r#"{"token":"first"}"#).unwrap();
         assert_eq!(

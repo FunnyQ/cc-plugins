@@ -327,7 +327,7 @@ mod tests {
     fn title_updates_preserve_registry_format_and_unknown_keys() {
         let fixture = crate::paths::tests::TestEnv::new();
         let home = fixture.dir.path().join("cockpit");
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", &home);
+        fixture.set("COCKPIT_HOME", &home);
         fs::create_dir_all(&home).unwrap();
         fs::write(
             paths::registry_path(),
@@ -354,7 +354,7 @@ mod tests {
         let now = 1_790_769_600_000;
         let claude = fixture.dir.path().join("claude");
         fs::create_dir_all(&claude).unwrap();
-        crate::paths::tests::TestEnv::set("COCKPIT_CLAUDE_SESSIONS_DIR", &claude);
+        fixture.set("COCKPIT_CLAUDE_SESSIONS_DIR", &claude);
         fs::write(claude.join("current.json"), serde_json::json!({"sessionId":"claude", "cwd":"/repo", "name":" Name ", "startedAt":now - 800_000, "updatedAt":now, "status":"waiting"}).to_string()).unwrap();
         fs::write(
             claude.join("stale.json"),
@@ -370,7 +370,7 @@ mod tests {
         )
         .unwrap();
         let codex = fixture.dir.path().join("codex.sqlite");
-        crate::paths::tests::TestEnv::set("COCKPIT_CODEX_STATE_DB", &codex);
+        fixture.set("COCKPIT_CODEX_STATE_DB", &codex);
         let db = Connection::open(&codex).unwrap();
         db.execute_batch("create table threads(id text, cwd text, title text, updated_at integer, updated_at_ms integer, archived integer, rollout_path text); create table thread_spawn_edges(parent_thread_id text, child_thread_id text);").unwrap();
         for (id, touched, archived, rollout) in [
@@ -394,7 +394,7 @@ mod tests {
         .unwrap();
         drop(db);
         let opencode = fixture.dir.path().join("opencode.sqlite");
-        crate::paths::tests::TestEnv::set("COCKPIT_OPENCODE_DB", &opencode);
+        fixture.set("COCKPIT_OPENCODE_DB", &opencode);
         let db = Connection::open(&opencode).unwrap();
         db.execute_batch("create table session(id text, directory text, title text, time_created integer, time_updated integer, time_archived integer);").unwrap();
         db.execute(
@@ -464,7 +464,7 @@ mod tests {
         let now = 1_790_769_600_000;
         let claude = fixture.dir.path().join("claude");
         fs::create_dir_all(&claude).unwrap();
-        crate::paths::tests::TestEnv::set("COCKPIT_CLAUDE_SESSIONS_DIR", &claude);
+        fixture.set("COCKPIT_CLAUDE_SESSIONS_DIR", &claude);
         for (file, id, name) in [
             ("a", "dup", "first"),
             ("b", "other", "other"),

@@ -188,7 +188,7 @@ mod tests {
     #[test]
     fn codex_filters_closed_stale_archived_missing_and_completed_children() {
         let fixture = TestEnv::new();
-        TestEnv::set("COCKPIT_CODEX_DIR", fixture.dir.path());
+        fixture.set("COCKPIT_CODEX_DIR", fixture.dir.path());
         let db_path = fixture.dir.path().join("state.sqlite");
         assert_eq!(codex_active_subagents(&db_path, "parent", 1000), 0);
         assert!(!db_path.exists());

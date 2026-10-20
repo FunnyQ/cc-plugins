@@ -119,8 +119,8 @@ mod tests {
         query: &[(&str, &str)],
     ) -> Value {
         let home = env.dir.path();
-        crate::paths::tests::TestEnv::set("COCKPIT_HOME", home);
-        crate::paths::tests::TestEnv::set("COCKPIT_WAIT_TIMEOUT_MS", "50");
+        env.set("COCKPIT_HOME", home);
+        env.set("COCKPIT_WAIT_TIMEOUT_MS", "50");
         std::fs::write(
             home.join("daemon.json"),
             r#"{"pid":1,"port":1,"token":"t","root":"r"}"#,

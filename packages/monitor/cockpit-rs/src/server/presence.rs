@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn channel_ttl_and_parked_presence() {
         let _env = TestEnv::new();
-        TestEnv::set("COCKPIT_CHANNEL_TTL_MS", "100");
+        _env.set("COCKPIT_CHANNEL_TTL_MS", "100");
         let presence = Presence::default();
         assert!(!presence.has_channel("session"));
         presence.mark_channel_seen("session");
@@ -99,7 +99,7 @@ mod tests {
         assert!(presence.has_channel("session"));
         presence.set_channel_parked("session", false);
         assert!(!presence.has_channel("session"));
-        TestEnv::set("COCKPIT_CHANNEL_TTL_MS", "invalid");
+        _env.set("COCKPIT_CHANNEL_TTL_MS", "invalid");
         assert!(presence.has_channel("session"));
     }
 

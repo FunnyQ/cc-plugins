@@ -90,4 +90,47 @@ mod tests {
             assert!(!is_alive(pid), "{pid}");
         }
     }
+
+    fn spawn_ready(script: &str) -> i32 {
+        use std::io::BufRead;
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", script])
+            .stdout(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut line = String::new();
+        std::io::BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line.trim(), "ready");
+        let pid = child.id() as i32;
+        reap_in_background(child);
+        pid
+    }
+
+    #[test]
+    fn terminate_leaves_a_cooperative_process_at_sigterm() {
+        let pid = spawn_ready("echo ready; exec sleep 30");
+        let started = std::time::Instant::now();
+        terminate(pid);
+        assert!(!is_alive(pid));
+        assert!(started.elapsed() < std::time::Duration::from_millis(1000));
+    }
+
+    #[test]
+    fn terminate_escalates_to_sigkill_after_1500ms_when_sigterm_is_ignored() {
+        let pid = spawn_ready("trap '' TERM; echo ready; exec sleep 30");
+        let started = std::time::Instant::now();
+        terminate(pid);
+        let elapsed = started.elapsed();
+        assert!(!is_alive(pid));
+        assert!(
+            elapsed >= std::time::Duration::from_millis(1450),
+            "{elapsed:?}"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_millis(4000),
+            "{elapsed:?}"
+        );
+    }
 }

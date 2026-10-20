@@ -549,7 +549,7 @@ mod tests {
             conn.execute_batch("create table part (id text, message_id text, data text);")
                 .unwrap();
         }
-        TestEnv::set("COCKPIT_OPENCODE_DB", &db);
+        env.set("COCKPIT_OPENCODE_DB", &db);
         db
     }
 
@@ -621,7 +621,7 @@ mod tests {
     #[test]
     fn missing_db_and_storage() {
         let env = TestEnv::new();
-        TestEnv::set(
+        env.set(
             "COCKPIT_OPENCODE_DB",
             env.dir.path().join("none/opencode.db"),
         );

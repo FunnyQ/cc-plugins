@@ -1760,7 +1760,7 @@ mod tests {
     #[test]
     fn payload_key_order_clock_daily_merge_and_insights() {
         let _env = TestEnv::new();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", "1790856000000");
+        _env.set("TOKEN_ATLAS_NOW_MS", "1790856000000");
         let cache = StatsCache {
             daily_activity: Some(vec![day("2026-09-26", 6, 2, 1)]),
             total_sessions: Some(2),
@@ -1879,7 +1879,7 @@ mod tests {
     #[test]
     fn fingerprint_moves_exactly_with_watched_files() {
         let env = TestEnv::new();
-        TestEnv::set("COCKPIT_OPENCODE_DB", env.dir.path().join("oc/opencode.db"));
+        env.set("COCKPIT_OPENCODE_DB", env.dir.path().join("oc/opencode.db"));
         let ctx = Ctx {
             now_ms: 0,
             plugin_root: PathBuf::new(),

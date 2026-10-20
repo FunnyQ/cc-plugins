@@ -343,7 +343,6 @@ fn decide_and_supersede(my_root: &str, no_open: bool) -> ControlFlow<ExitCode> {
                 "superseding stale atlas server (pid {}, root {}) — this install is {my_root}",
                 info.pid, info.root
             );
-            // terminate's SIGTERM, 1.5 s, SIGKILL, 1 s schedule is waitForExit's exactly.
             if let Some(pid) = signal_pid(&info.pid) {
                 process_alive::terminate(pid);
             }
@@ -569,9 +568,9 @@ mod tests {
     fn ctx_rereads_the_clock_on_every_call() {
         let _env = crate::paths::tests::TestEnv::new();
         let app = app(PathBuf::from("/x"));
-        crate::paths::tests::TestEnv::set("TOKEN_ATLAS_NOW_MS", "1000");
+        _env.set("TOKEN_ATLAS_NOW_MS", "1000");
         assert_eq!(app.ctx().now_ms, 1000);
-        crate::paths::tests::TestEnv::set("TOKEN_ATLAS_NOW_MS", "2000");
+        _env.set("TOKEN_ATLAS_NOW_MS", "2000");
         assert_eq!(app.ctx().now_ms, 2000);
     }
 

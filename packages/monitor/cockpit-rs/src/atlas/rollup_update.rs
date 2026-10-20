@@ -870,7 +870,7 @@ mod tests {
     #[test]
     fn updated_at_reads_the_wall_clock_and_cli_json_keeps_key_order() {
         let env = TestEnv::new();
-        TestEnv::set("TOKEN_ATLAS_NOW_MS", "1000");
+        env.set("TOKEN_ATLAS_NOW_MS", "1000");
         let projects = env.dir.path().join("projects");
         std::fs::create_dir_all(projects.join("p")).unwrap();
         std::fs::write(
@@ -878,7 +878,7 @@ mod tests {
             body(&[assistant("S", "r1", "m1", 1, 5, false)]),
         )
         .unwrap();
-        TestEnv::set("TOKEN_ATLAS_PROJECTS_DIR", &projects);
+        env.set("TOKEN_ATLAS_PROJECTS_DIR", &projects);
         let db_path = env.dir.path().join("rollup.db");
 
         let out = run_update(&db_path, true).unwrap();
