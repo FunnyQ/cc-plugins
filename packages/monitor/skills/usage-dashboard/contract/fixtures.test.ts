@@ -227,7 +227,7 @@ describe("atlas engine against the fixture home", () => {
     ]);
     expect(out.transcriptFileCount).toBe(3);
     const opus = out.usage.modelUsage["claude-opus-4-7"];
-    expect(opus.outputTokens).toBe(10 + 3 + 600);
+    expect(opus.outputTokens).toBe(250 + 3 + 600);
     expect(opus.inputTokens).toBe(100 + 7 + 300);
     const hourlyOpusInput = Object.values(
       out.usage.hourlyUsage as Record<

@@ -29,27 +29,69 @@
   "seen_requests": [
     {
       "request_key": "req_A1:msg_A1",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111.jsonl",
+      "input_tokens": 100,
+      "output_tokens": 250,
+      "cache_read": 1000,
+      "cache_creation": 200,
+      "hour_ms": 1790384400000,
+      "project": "/work/proj-a",
+      "model": "claude-opus-4-7"
     },
     {
       "request_key": "req_A2:msg_A2",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111/subagents/agent-a1b2c3.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111/subagents/agent-a1b2c3.jsonl",
+      "input_tokens": 50,
+      "output_tokens": 400,
+      "cache_read": 3000,
+      "cache_creation": 0,
+      "hour_ms": 1790442000000,
+      "project": "/work/proj-a",
+      "model": "claude-sonnet-4-6"
     },
     {
       "request_key": "req_A3:msg_A3",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111.jsonl",
+      "input_tokens": 7,
+      "output_tokens": 3,
+      "cache_read": 0,
+      "cache_creation": 0,
+      "hour_ms": 0,
+      "project": "/work/proj-a",
+      "model": "claude-opus-4-7"
     },
     {
       "request_key": "req_B1:msg_B1",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-b/22222222-2222-4222-8222-222222222222.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-b/22222222-2222-4222-8222-222222222222.jsonl",
+      "input_tokens": 300,
+      "output_tokens": 600,
+      "cache_read": 5000,
+      "cache_creation": 800,
+      "hour_ms": 1790575200000,
+      "project": "/work/proj-b",
+      "model": "claude-opus-4-7"
     },
     {
       "request_key": "req_B2:msg_B2",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-b/22222222-2222-4222-8222-222222222222.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-b/22222222-2222-4222-8222-222222222222.jsonl",
+      "input_tokens": 40,
+      "output_tokens": 80,
+      "cache_read": 2000,
+      "cache_creation": 0,
+      "hour_ms": 1790604000000,
+      "project": "/work/proj-b",
+      "model": "claude-sonnet-4-6"
     },
     {
       "request_key": "req_S1:msg_S1",
-      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111/subagents/agent-a1b2c3.jsonl"
+      "path": "<FIXTURE>/home/.claude/projects/-work-proj-a/11111111-1111-4111-8111-111111111111/subagents/agent-a1b2c3.jsonl",
+      "input_tokens": 20,
+      "output_tokens": 30,
+      "cache_read": 500,
+      "cache_creation": 100,
+      "hour_ms": 1790442000000,
+      "project": "/work/proj-a",
+      "model": "claude-haiku-4-5"
     }
   ],
   "usage_hourly": [
@@ -69,7 +111,7 @@
       "project": "/work/proj-a",
       "model": "claude-opus-4-7",
       "input_tokens": 100,
-      "output_tokens": 10,
+      "output_tokens": 250,
       "cache_read": 1000,
       "cache_creation": 200,
       "reasoning": 0,
@@ -165,7 +207,7 @@
       "session_key": "11111111-1111-4111-8111-111111111111",
       "model": "claude-opus-4-7",
       "input_tokens": 107,
-      "output_tokens": 13,
+      "output_tokens": 253,
       "cache_read": 1000,
       "cache_creation": 200
     },

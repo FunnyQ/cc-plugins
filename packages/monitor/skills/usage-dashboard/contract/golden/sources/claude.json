@@ -17,7 +17,7 @@
       },
       "claude-opus-4-7": {
         "inputTokens": 407,
-        "outputTokens": 613,
+        "outputTokens": 853,
         "cacheReadInputTokens": 6000,
         "cacheCreationInputTokens": 1000,
         "reasoningOutputTokens": 0
@@ -43,7 +43,7 @@
       "2026-09-26": {
         "claude-opus-4-7": {
           "inputTokens": 100,
-          "outputTokens": 10,
+          "outputTokens": 250,
           "cacheReadInputTokens": 1000,
           "cacheCreationInputTokens": 200,
           "reasoningOutputTokens": 0
@@ -91,7 +91,7 @@
         "usageByModel": {
           "claude:claude-opus-4-7": {
             "inputTokens": 100,
-            "outputTokens": 10,
+            "outputTokens": 250,
             "cacheReadInputTokens": 1000,
             "cacheCreationInputTokens": 200,
             "reasoningOutputTokens": 0
@@ -124,7 +124,7 @@
       }
     },
     "projectTokens": {
-      "/work/proj-a": 5420,
+      "/work/proj-a": 5660,
       "/work/proj-b": 8820
     },
     "projectModelUsage": {
@@ -145,7 +145,7 @@
         },
         "claude-opus-4-7": {
           "inputTokens": 107,
-          "outputTokens": 13,
+          "outputTokens": 253,
           "cacheReadInputTokens": 1000,
           "cacheCreationInputTokens": 200,
           "reasoningOutputTokens": 0
@@ -180,7 +180,7 @@
       "model": "mixed",
       "interactions": 3,
       "toolCalls": 3,
-      "tokens": 5420,
+      "tokens": 5660,
       "costBasis": "usage",
       "usageByModel": {
         "claude:claude-sonnet-4-6": {
@@ -199,7 +199,7 @@
         },
         "claude:claude-opus-4-7": {
           "inputTokens": 107,
-          "outputTokens": 13,
+          "outputTokens": 253,
           "cacheReadInputTokens": 1000,
           "cacheCreationInputTokens": 200,
           "reasoningOutputTokens": 0

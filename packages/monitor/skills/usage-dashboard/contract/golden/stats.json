@@ -6,14 +6,14 @@
   "summary": {
     "totalSessions": 5,
     "totalMessages": 14,
-    "totalTokens": 51010,
+    "totalTokens": 51250,
     "totalInputTokens": 14517,
-    "totalOutputTokens": 4213,
+    "totalOutputTokens": 4453,
     "totalCacheReadTokens": 30000,
     "totalCacheCreationTokens": 1400,
     "totalReasoningTokens": 880,
     "totalToolCalls": 8,
-    "estimatedCostUSD": 0.08370000000000002,
+    "estimatedCostUSD": 0.08970000000000002,
     "providers": {
       "claude": {
         "totalSessions": 2,
@@ -47,11 +47,11 @@
       "model": "claude:claude-opus-4-7",
       "provider": "claude",
       "inputTokens": 407,
-      "outputTokens": 613,
+      "outputTokens": 853,
       "cacheReadTokens": 6000,
       "cacheCreationTokens": 1000,
       "reasoningTokens": 0,
-      "costUSD": 0.02661,
+      "costUSD": 0.03261,
       "isExternal": false
     },
     {
@@ -288,11 +288,11 @@
       "usageByModel": {
         "claude:claude-opus-4-7": {
           "inputTokens": 100,
-          "outputTokens": 10,
+          "outputTokens": 250,
           "cacheReadTokens": 1000,
           "cacheCreationTokens": 200,
           "reasoningTokens": 0,
-          "costUSD": 0.0025,
+          "costUSD": 0.0085,
           "provider": "claude",
           "isExternal": false
         },
@@ -307,7 +307,7 @@
           "isExternal": true
         }
       },
-      "costUSD": 0.00875,
+      "costUSD": 0.014750000000000001,
       "providers": {
         "claude": {
           "messages": 6,
@@ -608,8 +608,8 @@
       "model": "mixed",
       "interactions": 3,
       "toolCalls": 3,
-      "tokens": 5420,
-      "costUSD": 0.008629999999999999,
+      "tokens": 5660,
+      "costUSD": 0.014629999999999999,
       "costBasis": "usage",
       "usageByModel": {
         "claude:claude-sonnet-4-6": {
@@ -634,11 +634,11 @@
         },
         "claude:claude-opus-4-7": {
           "inputTokens": 107,
-          "outputTokens": 13,
+          "outputTokens": 253,
           "cacheReadTokens": 1000,
           "cacheCreationTokens": 200,
           "reasoningTokens": 0,
-          "costUSD": 0.0026100000000000003,
+          "costUSD": 0.00861,
           "provider": "claude",
           "isExternal": false
         }
@@ -675,23 +675,23 @@
     {
       "timestampMs": 1790384400000,
       "date": "2026-09-26",
-      "tokens": 1310,
+      "tokens": 1550,
       "tokensByModel": {
-        "claude:claude-opus-4-7": 1310
+        "claude:claude-opus-4-7": 1550
       },
       "usageByModel": {
         "claude:claude-opus-4-7": {
           "inputTokens": 100,
-          "outputTokens": 10,
+          "outputTokens": 250,
           "cacheReadTokens": 1000,
           "cacheCreationTokens": 200,
           "reasoningTokens": 0,
-          "costUSD": 0.0025,
+          "costUSD": 0.0085,
           "provider": "claude",
           "isExternal": false
         }
       },
-      "costUSD": 0.0025
+      "costUSD": 0.0085
     },
     {
       "timestampMs": 1790424000000,
@@ -1196,21 +1196,21 @@
       "openCodeMessages": 0,
       "openCodeSessions": 0,
       "openCodeToolCalls": 0,
-      "claudeTokens": 5420,
+      "claudeTokens": 5660,
       "codexTokens": 17100,
       "openCodeTokens": 0,
-      "tokens": 22520,
-      "claudeCostUSD": 0.008629999999999999,
+      "tokens": 22760,
+      "claudeCostUSD": 0.014629999999999999,
       "codexCostUSD": 0.027375000000000003,
       "openCodeCostUSD": 0,
-      "costUSD": 0.036005,
+      "costUSD": 0.042005,
       "providers": {
         "claude": {
           "messages": 2,
           "sessions": 0,
           "toolCalls": 0,
-          "tokens": 5420,
-          "costUSD": 0.008629999999999999
+          "tokens": 5660,
+          "costUSD": 0.014629999999999999
         },
         "codex": {
           "messages": 1,
@@ -1240,6 +1240,17 @@
           "isExternal": true
         },
         {
+          "model": "claude:claude-opus-4-7",
+          "provider": "claude",
+          "inputTokens": 107,
+          "outputTokens": 253,
+          "cacheReadTokens": 1000,
+          "cacheCreationTokens": 200,
+          "reasoningTokens": 0,
+          "costUSD": 0.00861,
+          "isExternal": false
+        },
+        {
           "model": "claude:claude-sonnet-4-6",
           "provider": "claude",
           "inputTokens": 50,
@@ -1248,17 +1259,6 @@
           "cacheCreationTokens": 0,
           "reasoningTokens": 0,
           "costUSD": 0.0056749999999999995,
-          "isExternal": false
-        },
-        {
-          "model": "claude:claude-opus-4-7",
-          "provider": "claude",
-          "inputTokens": 107,
-          "outputTokens": 13,
-          "cacheReadTokens": 1000,
-          "cacheCreationTokens": 200,
-          "reasoningTokens": 0,
-          "costUSD": 0.0026100000000000003,
           "isExternal": false
         },
         {

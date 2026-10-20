@@ -1,14 +1,44 @@
 // Port of rollup-db.ts: the rollup outlives transcript deletion, so every write here guards
 // history that nothing else can rebuild.
 
+use super::dedup::BilledTokens;
 use anyhow::{Context, anyhow};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 pub const LEDGER_REBUILD_PENDING: &str = "ledger_rebuild_pending";
+
+pub const BILLING_CORRECTION_PENDING: &str = "billing_correction_pending";
+
+// Added by ALTER rather than in SCHEMA_DDL, so a fresh and a migrated DB carry the same schema.
+const BILLED_COLUMNS: [(&str, &str); 7] = [
+    ("input_tokens", "INTEGER"),
+    ("output_tokens", "INTEGER"),
+    ("cache_read", "INTEGER"),
+    ("cache_creation", "INTEGER"),
+    ("hour_ms", "INTEGER"),
+    ("project", "TEXT"),
+    ("model", "TEXT"),
+];
+
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct BilledRequest {
+    pub tokens: BilledTokens,
+    pub hour_ms: i64,
+    pub project: String,
+    pub model: String,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Seen {
+    Unseen,
+    // Billed before v4 recorded amounts: what it billed is unknown, so it stays blocked.
+    Legacy,
+    Billed(BilledRequest),
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HourlyRow {
@@ -185,7 +215,7 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
     conn.execute_batch("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")?;
 
     let stored = get_meta(conn, "schema_version")?;
-    let upgradable = matches!(stored.as_deref(), Some("1" | "2"));
+    let upgradable = matches!(stored.as_deref(), Some("1" | "2" | "3"));
     if let Some(version) = &stored
         && !upgradable
         && *version != SCHEMA_VERSION.to_string()
@@ -195,14 +225,22 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
     if stored.as_deref() == Some("1") && !has_column(conn, "seen_requests", "path") {
         conn.execute_batch("ALTER TABLE seen_requests ADD COLUMN path TEXT NOT NULL DEFAULT ''")?;
     }
-    if upgradable {
-        // The flag is what tells the ingest this is a rebuild; a zeroed cursor alone looks
-        // like a file it has never seen. seen_requests still blocks re-billing usage_hourly.
-        conn.execute_batch("UPDATE ingested_files SET bytes_parsed = 0")?;
-        set_meta(conn, LEDGER_REBUILD_PENDING, "1")?;
-    }
 
     conn.execute_batch(SCHEMA_DDL)?;
+    for (column, kind) in BILLED_COLUMNS {
+        if !has_column(conn, "seen_requests", column) {
+            conn.execute_batch(&format!(
+                "ALTER TABLE seen_requests ADD COLUMN {column} {kind}"
+            ))?;
+        }
+    }
+    if upgradable {
+        // The flag is what tells the ingest this is a rebuild; a zeroed cursor alone looks
+        // like a file it has never seen. seen_requests still blocks re-billing usage_hourly,
+        // and seen_tool_calls must go or the replayed ledger counts no tool call at all.
+        rewind_rollup(conn)?;
+        set_meta(conn, BILLING_CORRECTION_PENDING, "1")?;
+    }
 
     set_meta(conn, "schema_version", &SCHEMA_VERSION.to_string())?;
     set_meta(conn, "writer", "rust")?;
@@ -273,16 +311,69 @@ pub(crate) fn upsert_ingested_file(
     Ok(())
 }
 
-pub(crate) fn has_seen_request(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
-    conn.prepare_cached("SELECT 1 FROM seen_requests WHERE request_key = ?")?
-        .query_row([key], |_| Ok(()))
-        .optional()
-        .map(|row| row.is_some())
+pub(crate) fn seen_request(conn: &Connection, key: &str) -> rusqlite::Result<Seen> {
+    let row = conn
+        .prepare_cached(
+            "SELECT input_tokens, output_tokens, cache_read, cache_creation, hour_ms, project, model
+               FROM seen_requests WHERE request_key = ?",
+        )?
+        .query_row([key], |row| {
+            let Some(input_tokens) = row.get::<_, Option<i64>>(0)? else {
+                return Ok(Seen::Legacy);
+            };
+            Ok(Seen::Billed(BilledRequest {
+                tokens: BilledTokens {
+                    input_tokens,
+                    output_tokens: row.get(1)?,
+                    cache_read: row.get(2)?,
+                    cache_creation: row.get(3)?,
+                },
+                hour_ms: row.get(4)?,
+                project: row.get(5)?,
+                model: row.get(6)?,
+            }))
+        })
+        .optional()?;
+    Ok(row.unwrap_or(Seen::Unseen))
 }
 
-pub(crate) fn mark_seen_request(conn: &Connection, key: &str, path: &str) -> rusqlite::Result<()> {
-    conn.prepare_cached("INSERT OR IGNORE INTO seen_requests (request_key, path) VALUES (?, ?)")?
-        .execute([key, path])?;
+pub(crate) fn legacy_requests(conn: &Connection) -> rusqlite::Result<Vec<(String, String)>> {
+    conn.prepare("SELECT request_key, path FROM seen_requests WHERE input_tokens IS NULL")?
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect()
+}
+
+// The path stays the file that first billed the key: deletion pruning keys on it.
+pub(crate) fn record_billed(
+    conn: &Connection,
+    key: &str,
+    path: &str,
+    billed: &BilledRequest,
+) -> rusqlite::Result<()> {
+    conn.prepare_cached(
+        "INSERT INTO seen_requests
+       (request_key, path, input_tokens, output_tokens, cache_read, cache_creation, hour_ms, project, model)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(request_key) DO UPDATE SET
+       input_tokens   = excluded.input_tokens,
+       output_tokens  = excluded.output_tokens,
+       cache_read     = excluded.cache_read,
+       cache_creation = excluded.cache_creation,
+       hour_ms        = excluded.hour_ms,
+       project        = excluded.project,
+       model          = excluded.model",
+    )?
+    .execute(params![
+        key,
+        path,
+        billed.tokens.input_tokens,
+        billed.tokens.output_tokens,
+        billed.tokens.cache_read,
+        billed.tokens.cache_creation,
+        billed.hour_ms,
+        billed.project,
+        billed.model,
+    ])?;
     Ok(())
 }
 
@@ -372,9 +463,12 @@ pub(crate) fn all_hourly_rows(conn: &Connection) -> rusqlite::Result<Vec<HourlyR
     .collect()
 }
 
+// Raises the replay flag in the caller's transaction, so a run that dies mid-replay leaves the
+// next one a flag to restart from, not cursors that read as already ingested.
 pub(crate) fn rewind_rollup(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("UPDATE ingested_files SET bytes_parsed = 0")?;
-    conn.execute_batch("DELETE FROM seen_tool_calls")
+    conn.execute_batch("DELETE FROM seen_tool_calls")?;
+    set_meta(conn, LEDGER_REBUILD_PENDING, "1")
 }
 
 pub(crate) fn clear_ingested_file(conn: &Connection, path: &str) -> rusqlite::Result<()> {
@@ -572,28 +666,20 @@ mod tests {
         out
     }
 
-    fn without_writer(mut tables: Vec<(String, Vec<String>)>) -> Vec<(String, Vec<String>)> {
-        for (name, rows) in &mut tables {
-            if name == "meta" {
-                rows.retain(|row| !row.contains("Text(\"writer\")"));
-            }
-        }
-        tables
-    }
-
     fn meta(path: &Path, key: &str) -> Option<String> {
         get_meta(&Connection::open(path).unwrap(), key).unwrap()
     }
 
     #[test]
-    fn fresh_db_is_v3_rust_written_with_no_backup() {
+    fn fresh_db_is_v4_rust_written_with_no_backup() {
         let dir = tempfile::tempdir().unwrap();
         let path = db_in(&dir);
         let conn = open_rollup_db(&path).unwrap();
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("3")
+            Some("4")
         );
+        assert_eq!(get_meta(&conn, BILLING_CORRECTION_PENDING).unwrap(), None);
         assert_eq!(get_meta(&conn, "writer").unwrap().as_deref(), Some("rust"));
         let baks: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
@@ -612,9 +698,8 @@ mod tests {
         drop(open_rollup_db(&path).unwrap());
         let bak = sibling(&path, ".pre-rust.bak");
         assert_eq!(dump(&bak), before);
-        assert_eq!(without_writer(dump(&path)), before);
+        assert_eq!(dump(&sibling(&path, ".v3.bak")), before);
         assert_eq!(meta(&path, "writer").as_deref(), Some("rust"));
-        assert!(!sibling(&path, ".v3.bak").exists());
         let names: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -732,13 +817,13 @@ mod tests {
         let conn = open_rollup_db(&path).unwrap();
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("3")
+            Some("4")
         );
         assert!(!sibling(&path, ".v2.bak").exists());
     }
 
     #[test]
-    fn v2_db_migrates_to_v3_and_rewinds_cursors() {
+    fn v2_db_migrates_to_v4_and_rewinds_cursors() {
         let dir = tempfile::tempdir().unwrap();
         let path = db_in(&dir);
         Connection::open(&path)
@@ -751,7 +836,7 @@ mod tests {
         assert_eq!(dump(&sibling(&path, ".v2.bak")), before);
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("3")
+            Some("4")
         );
         assert_eq!(
             get_meta(&conn, LEDGER_REBUILD_PENDING).unwrap().as_deref(),
@@ -765,14 +850,86 @@ mod tests {
             .collect::<rusqlite::Result<_>>()
             .unwrap();
         assert_eq!(cursors, vec![0]);
+        assert_eq!(seen_keys(&conn), [("req:msg".into(), "/t/a.jsonl".into())]);
         drop(conn);
         let after = dump(&path);
-        for table in ["seen_requests", "usage_hourly"] {
-            let find = |tables: &[(String, Vec<String>)]| {
-                tables.iter().find(|(name, _)| name == table).cloned()
-            };
-            assert_eq!(find(&after), find(&before), "{table} changed");
+        let find = |tables: &[(String, Vec<String>)]| {
+            tables
+                .iter()
+                .find(|(name, _)| name == "usage_hourly")
+                .cloned()
+        };
+        assert_eq!(find(&after), find(&before), "usage_hourly changed");
+    }
+
+    fn seen_keys(conn: &Connection) -> Vec<(String, String)> {
+        conn.prepare("SELECT request_key, path FROM seen_requests ORDER BY request_key")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn v3_db_migrates_in_place_to_v4_with_legacy_keys_and_a_pending_correction() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        ts_v3_db(&path);
+        Connection::open(&path)
+            .unwrap()
+            .execute_batch("INSERT INTO meta VALUES ('writer', 'rust')")
+            .unwrap();
+        let before = dump(&path);
+        let conn = open_rollup_db(&path).unwrap();
+        assert_eq!(dump(&sibling(&path, ".v3.bak")), before);
+        assert_eq!(
+            get_meta(&conn, "schema_version").unwrap().as_deref(),
+            Some("4")
+        );
+        for flag in [LEDGER_REBUILD_PENDING, BILLING_CORRECTION_PENDING] {
+            assert_eq!(
+                get_meta(&conn, flag).unwrap().as_deref(),
+                Some("1"),
+                "{flag}"
+            );
         }
+        assert_eq!(seen_request(&conn, "req:msg").unwrap(), Seen::Legacy);
+        assert_eq!(seen_keys(&conn), [("req:msg".into(), "/t/a.jsonl".into())]);
+        assert!(!has_seen_tool_call(&conn, "s1", "tool-1").unwrap());
+        assert_eq!(
+            get_ingested_file(&conn, "/t/a.jsonl")
+                .unwrap()
+                .unwrap()
+                .bytes_parsed,
+            0
+        );
+        drop(conn);
+
+        let migrated = dump(&path);
+        drop(open_rollup_db(&path).unwrap());
+        assert_eq!(dump(&path), migrated, "a second open changed the DB");
+    }
+
+    #[test]
+    fn record_billed_keeps_the_recording_path_and_reads_back_billed() {
+        let conn = open_rollup_db(Path::new(":memory:")).unwrap();
+        let billed = |output: i64| BilledRequest {
+            tokens: BilledTokens {
+                input_tokens: 1,
+                output_tokens: output,
+                cache_read: 3,
+                cache_creation: 4,
+            },
+            hour_ms: 3_600_000,
+            project: "/p".into(),
+            model: "m".into(),
+        };
+        assert_eq!(seen_request(&conn, "k").unwrap(), Seen::Unseen);
+        record_billed(&conn, "k", "/a", &billed(2)).unwrap();
+        record_billed(&conn, "k", "/b", &billed(50)).unwrap();
+        assert_eq!(seen_request(&conn, "k").unwrap(), Seen::Billed(billed(50)));
+        assert_eq!(seen_keys(&conn), [("k".into(), "/a".into())]);
     }
 
     #[test]
@@ -805,7 +962,7 @@ mod tests {
                 ("legacy:2".to_string(), String::new()),
             ]
         );
-        assert!(has_seen_request(&conn, "legacy:1").unwrap());
+        assert_eq!(seen_request(&conn, "legacy:1").unwrap(), Seen::Legacy);
         assert!(sibling(&path, ".v1.bak").exists());
     }
 
@@ -910,7 +1067,7 @@ mod tests {
             mtime_ms: 111,
         };
         upsert_ingested_file(&conn, &file, 222).unwrap();
-        mark_seen_request(&conn, "req:msg", "/t/a.jsonl").unwrap();
+        record_billed(&conn, "req:msg", "/t/a.jsonl", &BilledRequest::default()).unwrap();
         mark_seen_tool_call(&conn, "s1", "tool-1").unwrap();
         rewind_rollup(&conn).unwrap();
         assert_eq!(
@@ -921,7 +1078,7 @@ mod tests {
             })
         );
         assert!(!has_seen_tool_call(&conn, "s1", "tool-1").unwrap());
-        assert!(has_seen_request(&conn, "req:msg").unwrap());
+        assert_ne!(seen_request(&conn, "req:msg").unwrap(), Seen::Unseen);
     }
 
     #[test]
@@ -948,7 +1105,7 @@ mod tests {
         assert_eq!(all_ledger_model_rows(&conn).unwrap()[0].cache_creation, 8);
         mark_seen_tool_call(&conn, "s1", "t").unwrap();
         mark_seen_tool_call(&conn, "s2", "t").unwrap();
-        mark_seen_request(&conn, "r1", "/a").unwrap();
+        record_billed(&conn, "r1", "/a", &BilledRequest::default()).unwrap();
 
         clear_ledger_for_file(&conn, "/a").unwrap();
         clear_seen_requests_for_file(&conn, "/a").unwrap();
@@ -958,7 +1115,7 @@ mod tests {
         assert_eq!(all_ledger_rows(&conn).unwrap(), vec![ledger("/b", "s2")]);
         assert!(!has_seen_tool_call(&conn, "s1", "t").unwrap());
         assert!(has_seen_tool_call(&conn, "s2", "t").unwrap());
-        assert!(!has_seen_request(&conn, "r1").unwrap());
+        assert_eq!(seen_request(&conn, "r1").unwrap(), Seen::Unseen);
 
         upsert_ingested_file(&conn, &IngestedFile::default(), 0).unwrap();
         clear_ingested_file(&conn, "").unwrap();

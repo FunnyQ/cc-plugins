@@ -228,7 +228,7 @@ describe("golden rollup", () => {
       const { after, run, backupExists, schemaVersion } = await migrateV2();
       expect(run.code).toBe(0);
       expect(backupExists).toBe(true);
-      expect(schemaVersion).toBe("3");
+      expect(schemaVersion).toBe("4");
       for (const row of V2_SEED_HOURLY)
         expect(after.usage_hourly).toContainEqual(row);
       expect(after.session_ledger.length).toBeGreaterThan(0);

@@ -4,7 +4,7 @@
     "session_key": "11111111-1111-4111-8111-111111111111",
     "model": "claude-opus-4-7",
     "input_tokens": 107,
-    "output_tokens": 13,
+    "output_tokens": 253,
     "cache_read": 1000,
     "cache_creation": 200
   },

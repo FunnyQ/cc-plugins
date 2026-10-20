@@ -15,7 +15,7 @@
     "project": "/work/proj-a",
     "model": "claude-opus-4-7",
     "input_tokens": 100,
-    "output_tokens": 10,
+    "output_tokens": 250,
     "cache_read": 1000,
     "cache_creation": 200,
     "reasoning": 0,

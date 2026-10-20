@@ -6,14 +6,15 @@ use super::jsonl::{JsonlLinesOptions, read_jsonl_lines};
 use super::model::js_date_parse;
 use super::paths;
 use super::rollup_db::{
-    self, HourlyRow, IngestedFile, LEDGER_REBUILD_PENDING, LedgerFileRow, LedgerModelRow,
+    self, BILLING_CORRECTION_PENDING, BilledRequest, HourlyRow, IngestedFile,
+    LEDGER_REBUILD_PENDING, LedgerFileRow, LedgerModelRow, Seen,
 };
 use crate::server::opencode::js_truthy;
 use indexmap::IndexMap;
-use rusqlite::Connection;
+use rusqlite::{Connection, TransactionBehavior};
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::UNIX_EPOCH;
@@ -32,7 +33,7 @@ pub struct UpdateOptions {
 #[derive(Default)]
 struct ParsedSlice {
     rows: IndexMap<(i64, String, String), HourlyRow>,
-    request_keys: Vec<String>,
+    billed: Vec<(String, BilledRequest)>,
     ledger: IndexMap<String, LedgerFileRow>,
     ledger_models: IndexMap<(String, String), LedgerModelRow>,
     tool_keys: Vec<(String, String)>,
@@ -41,17 +42,104 @@ struct ParsedSlice {
 struct IngestContext {
     now_ms: i64,
     ledger_rebuild: HashSet<String>,
-    ledger_seen: HashSet<String>,
+    ledger_seen: HashMap<String, BilledTokens>,
+    legacy: Option<LegacyFix>,
+}
+
+// v3 billed a request's first snapshot. The fix bills up to each field's largest snapshot on
+// disk across every file, which is what a fresh v4 ingest bills, so no later replay finds more to
+// add. The baseline is the first snapshot in the file seen_requests recorded as the biller; a key
+// whose file is gone stays legacy, because what it billed can no longer be read.
+#[derive(Clone, Default)]
+struct LegacyFix {
+    owners: HashMap<String, String>,
+    first: HashMap<String, BilledRequest>,
+    largest: HashMap<String, BilledTokens>,
+}
+
+struct Request {
+    session_key: String,
+    first_tokens: BilledTokens,
+    snapshot: BilledRequest,
 }
 
 fn str_field<'a>(value: Option<&'a Value>, key: &str) -> Option<&'a str> {
     value?.get(key)?.as_str()
 }
 
-fn billed(usage: &DedupUsage) -> BilledTokens {
-    let mut out = BilledTokens::default();
-    add_billed_tokens(&mut out, usage);
-    out
+fn timestamp_ms(entry: &Value) -> i64 {
+    str_field(Some(entry), "timestamp")
+        .filter(|t| !t.is_empty())
+        .and_then(js_date_parse)
+        .unwrap_or(0)
+}
+
+fn billable(entry: &Value) -> Option<(&str, BilledTokens)> {
+    let message = entry.get("message");
+    let model = str_field(message, "model").filter(|m| !m.is_empty())?;
+    let usage = message?.get("usage")?;
+    if str_field(Some(entry), "type") != Some("assistant") || !js_truthy(usage) {
+        return None;
+    }
+    let usage = DedupUsage {
+        input_tokens: usage.get("input_tokens").and_then(Value::as_i64),
+        output_tokens: usage.get("output_tokens").and_then(Value::as_i64),
+        cache_read_input_tokens: usage.get("cache_read_input_tokens").and_then(Value::as_i64),
+        cache_creation_input_tokens: usage
+            .get("cache_creation_input_tokens")
+            .and_then(Value::as_i64),
+    };
+    if model == "<synthetic>" || usage_token_total(&usage) == 0 {
+        return None;
+    }
+    let mut tokens = BilledTokens::default();
+    add_billed_tokens(&mut tokens, &usage);
+    Some((model, tokens))
+}
+
+fn request_key(entry: &Value, file: &str, seen_size: usize) -> String {
+    let entry = Some(entry);
+    dedup_key(
+        &DedupEntry {
+            request_id: str_field(entry, "requestId").map(str::to_string),
+            uuid: str_field(entry, "uuid").map(str::to_string),
+            message: Some(DedupMessage {
+                id: str_field(entry.and_then(|e| e.get("message")), "id").map(str::to_string),
+            }),
+        },
+        file,
+        seen_size,
+    )
+}
+
+fn max_into(target: &mut BilledTokens, other: &BilledTokens) {
+    target.input_tokens = target.input_tokens.max(other.input_tokens);
+    target.output_tokens = target.output_tokens.max(other.output_tokens);
+    target.cache_read = target.cache_read.max(other.cache_read);
+    target.cache_creation = target.cache_creation.max(other.cache_creation);
+}
+
+fn excess(snapshot: &BilledTokens, billed: &BilledTokens) -> BilledTokens {
+    BilledTokens {
+        input_tokens: (snapshot.input_tokens - billed.input_tokens).max(0),
+        output_tokens: (snapshot.output_tokens - billed.output_tokens).max(0),
+        cache_read: (snapshot.cache_read - billed.cache_read).max(0),
+        cache_creation: (snapshot.cache_creation - billed.cache_creation).max(0),
+    }
+}
+
+fn hourly_row(bucket: &BilledRequest, tokens: &BilledTokens, message_count: i64) -> HourlyRow {
+    HourlyRow {
+        hour_ms: bucket.hour_ms,
+        project: bucket.project.clone(),
+        model: bucket.model.clone(),
+        input_tokens: tokens.input_tokens,
+        output_tokens: tokens.output_tokens,
+        cache_read: tokens.cache_read,
+        cache_creation: tokens.cache_creation,
+        reasoning: 0,
+        message_count,
+    }
 }
 
 fn parse_slice(
@@ -59,10 +147,11 @@ fn parse_slice(
     lines: impl Iterator<Item = String>,
     file: &str,
     ledger_rebuild: bool,
-    ledger_seen: &mut HashSet<String>,
+    ledger_seen: &mut HashMap<String, BilledTokens>,
+    mut legacy: Option<&mut LegacyFix>,
 ) -> rusqlite::Result<ParsedSlice> {
     let mut out = ParsedSlice::default();
-    let mut seen_run: HashSet<String> = HashSet::new();
+    let mut requests: IndexMap<String, Request> = IndexMap::new();
     let mut tool_seen_run: HashSet<String> = HashSet::new();
     let fallback_session = file.rsplit('/').next().unwrap_or(file);
 
@@ -70,19 +159,16 @@ fn parse_slice(
         if line.trim().is_empty() {
             continue;
         }
-        let Ok(entry) = serde_json::from_str::<Value>(&line) else {
+        let Ok(value) = serde_json::from_str::<Value>(&line) else {
             continue;
         };
-        let entry = Some(&entry);
+        let entry = Some(&value);
         let message = entry.and_then(|e| e.get("message"));
 
         let session_key = str_field(entry, "sessionId")
             .unwrap_or(fallback_session)
             .to_string();
-        let timestamp_ms = str_field(entry, "timestamp")
-            .filter(|t| !t.is_empty())
-            .and_then(js_date_parse)
-            .unwrap_or(0);
+        let timestamp_ms = timestamp_ms(&value);
         let cwd = str_field(entry, "cwd");
         let kind = str_field(entry, "type");
         let row = out
@@ -121,86 +207,135 @@ fn parse_slice(
             }
         }
 
-        let Some(model) = str_field(message, "model").filter(|m| !m.is_empty()) else {
+        let Some((model, tokens)) = billable(&value) else {
             continue;
         };
-        let Some(usage) = message.and_then(|m| m.get("usage")) else {
-            continue;
-        };
-        if kind != Some("assistant") || !js_truthy(usage) {
-            continue;
+        let key = request_key(&value, file, requests.len());
+        // A request's snapshots fill in as it streams, so each field's largest is the bill; the
+        // bucket stays on the first snapshot, where the request began.
+        match requests.entry(key) {
+            indexmap::map::Entry::Occupied(mut e) => {
+                max_into(&mut e.get_mut().snapshot.tokens, &tokens);
+            }
+            indexmap::map::Entry::Vacant(e) => {
+                e.insert(Request {
+                    session_key: session_key.clone(),
+                    first_tokens: tokens.clone(),
+                    snapshot: BilledRequest {
+                        tokens,
+                        hour_ms: hour_start_ms(timestamp_ms),
+                        project: cwd.unwrap_or("").to_string(),
+                        model: model.to_string(),
+                    },
+                });
+            }
         }
-        let usage = DedupUsage {
-            input_tokens: usage.get("input_tokens").and_then(Value::as_i64),
-            output_tokens: usage.get("output_tokens").and_then(Value::as_i64),
-            cache_read_input_tokens: usage.get("cache_read_input_tokens").and_then(Value::as_i64),
-            cache_creation_input_tokens: usage
-                .get("cache_creation_input_tokens")
-                .and_then(Value::as_i64),
-        };
-        if model == "<synthetic>" || usage_token_total(&usage) == 0 {
-            continue;
-        }
+    }
 
-        let dedup_entry = DedupEntry {
-            request_id: str_field(entry, "requestId").map(str::to_string),
-            uuid: str_field(entry, "uuid").map(str::to_string),
-            message: Some(DedupMessage {
-                id: str_field(message, "id").map(str::to_string),
-            }),
-        };
-        let key = dedup_key(&dedup_entry, file, seen_run.len());
-        // First snapshot wins, exactly as the TS; the golden files record that choice.
-        if !seen_run.insert(key.clone()) {
-            continue;
-        }
-        let billed_before = rollup_db::has_seen_request(db, &key)?;
-        let tokens = billed(&usage);
-
-        let ledger_duplicate = if ledger_rebuild {
-            !ledger_seen.insert(key.clone())
+    for (key, request) in requests {
+        let seen = rollup_db::seen_request(db, &key)?;
+        let tokens = &request.snapshot.tokens;
+        let ledger_tokens = if ledger_rebuild {
+            let run = ledger_seen.entry(key.clone()).or_default();
+            let unbilled = excess(tokens, run);
+            max_into(run, tokens);
+            unbilled
         } else {
-            billed_before
+            match &seen {
+                Seen::Unseen => tokens.clone(),
+                Seen::Legacy => BilledTokens::default(),
+                Seen::Billed(billed) => excess(tokens, &billed.tokens),
+            }
         };
-        if !ledger_duplicate {
+        if ledger_tokens != BilledTokens::default() {
             let m = out
                 .ledger_models
-                .entry((session_key.clone(), model.to_string()))
+                .entry((request.session_key.clone(), request.snapshot.model.clone()))
                 .or_insert_with(|| LedgerModelRow {
                     path: file.to_string(),
-                    session_key: session_key.clone(),
-                    model: model.to_string(),
+                    session_key: request.session_key.clone(),
+                    model: request.snapshot.model.clone(),
                     ..Default::default()
                 });
-            m.input_tokens += tokens.input_tokens;
-            m.output_tokens += tokens.output_tokens;
-            m.cache_read += tokens.cache_read;
-            m.cache_creation += tokens.cache_creation;
+            m.input_tokens += ledger_tokens.input_tokens;
+            m.output_tokens += ledger_tokens.output_tokens;
+            m.cache_read += ledger_tokens.cache_read;
+            m.cache_creation += ledger_tokens.cache_creation;
         }
 
-        if billed_before {
-            continue;
-        }
-        out.request_keys.push(key);
-
-        let hour_ms = hour_start_ms(timestamp_ms);
-        let project = cwd.unwrap_or("").to_string();
+        let (billed, unbilled, messages) = match seen {
+            Seen::Legacy => {
+                if let Some(fix) = legacy.as_deref_mut()
+                    && let Some(owned) = fix.owners.get(&key).map(|owner| owner == file)
+                {
+                    max_into(fix.largest.entry(key.clone()).or_default(), tokens);
+                    if owned && !fix.first.contains_key(&key) {
+                        fix.first.insert(
+                            key,
+                            BilledRequest {
+                                tokens: request.first_tokens,
+                                ..request.snapshot
+                            },
+                        );
+                    }
+                }
+                continue;
+            }
+            Seen::Unseen => {
+                let unbilled = request.snapshot.tokens.clone();
+                (request.snapshot, unbilled, 1)
+            }
+            Seen::Billed(mut billed) => {
+                let unbilled = excess(&request.snapshot.tokens, &billed.tokens);
+                if unbilled == BilledTokens::default() {
+                    continue;
+                }
+                max_into(&mut billed.tokens, &request.snapshot.tokens);
+                (billed, unbilled, 0)
+            }
+        };
+        let add = hourly_row(&billed, &unbilled, messages);
         let bucket = out
             .rows
-            .entry((hour_ms, project.clone(), model.to_string()))
+            .entry((add.hour_ms, add.project.clone(), add.model.clone()))
             .or_insert_with(|| HourlyRow {
-                hour_ms,
-                project,
-                model: model.to_string(),
+                hour_ms: add.hour_ms,
+                project: add.project.clone(),
+                model: add.model.clone(),
                 ..Default::default()
             });
-        bucket.input_tokens += tokens.input_tokens;
-        bucket.output_tokens += tokens.output_tokens;
-        bucket.cache_read += tokens.cache_read;
-        bucket.cache_creation += tokens.cache_creation;
-        bucket.message_count += 1;
+        bucket.input_tokens += add.input_tokens;
+        bucket.output_tokens += add.output_tokens;
+        bucket.cache_read += add.cache_read;
+        bucket.cache_creation += add.cache_creation;
+        bucket.message_count += add.message_count;
+        out.billed.push((key, billed));
     }
     Ok(out)
+}
+
+// Immediate, so a second process replaying the same pending state waits here, then finds the
+// flag cleared and every key already resolved instead of adding the same delta again.
+fn apply_legacy_fix(db: &mut Connection, fix: LegacyFix) -> anyhow::Result<()> {
+    let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    if rollup_db::get_meta(&tx, BILLING_CORRECTION_PENDING)?.as_deref() != Some("1") {
+        return Ok(());
+    }
+    for (key, mut billed) in fix.first {
+        if rollup_db::seen_request(&tx, &key)? != Seen::Legacy {
+            continue;
+        }
+        let largest = &fix.largest[&key];
+        let unbilled = excess(largest, &billed.tokens);
+        if unbilled != BilledTokens::default() {
+            rollup_db::add_hourly_row(&tx, &hourly_row(&billed, &unbilled, 0))?;
+        }
+        max_into(&mut billed.tokens, largest);
+        rollup_db::record_billed(&tx, &key, &fix.owners[&key], &billed)?;
+    }
+    rollup_db::set_meta(&tx, BILLING_CORRECTION_PENDING, "0")?;
+    tx.commit()?;
+    Ok(())
 }
 
 #[derive(Debug, PartialEq)]
@@ -249,7 +384,14 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
             ..Default::default()
         },
     );
-    let slice = parse_slice(db, &mut lines, file, ledger_rebuild, &mut ctx.ledger_seen)?;
+    let slice = parse_slice(
+        db,
+        &mut lines,
+        file,
+        ledger_rebuild,
+        &mut ctx.ledger_seen,
+        ctx.legacy.as_mut(),
+    )?;
     let boundary = lines.bytes_consumed() as i64;
 
     if boundary <= start {
@@ -270,8 +412,8 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
     for row in slice.rows.values() {
         rollup_db::add_hourly_row(&tx, row)?;
     }
-    for key in &slice.request_keys {
-        rollup_db::mark_seen_request(&tx, key, file)?;
+    for (key, billed) in &slice.billed {
+        rollup_db::record_billed(&tx, key, file, billed)?;
     }
     if ledger_rebuild {
         rollup_db::clear_ledger_for_file(&tx, file)?;
@@ -316,15 +458,25 @@ pub fn update_rollup(
         .map(|p| p.to_string_lossy().into_owned())
         .collect();
 
+    // Read before the prune, which raises the flag for its own survivors' replay.
+    let replay_pending = rollup_db::get_meta(db, LEDGER_REBUILD_PENDING)?.as_deref() == Some("1");
+    let correction_pending =
+        rollup_db::get_meta(db, BILLING_CORRECTION_PENDING)?.as_deref() == Some("1");
     let mut ledger_rebuild = prune_missing_files(db, &files)?;
+    let legacy = if correction_pending {
+        Some(LegacyFix {
+            owners: rollup_db::legacy_requests(db)?.into_iter().collect(),
+            ..Default::default()
+        })
+    } else {
+        None
+    };
 
-    let mut rebuilt = false;
-    if opts.rebuild {
+    // A pending replay may have died after committing some files, so it restarts from byte 0:
+    // resuming would find those files' cursors at their end and drop their ledger rows.
+    let mut rebuilt = opts.rebuild || replay_pending || correction_pending;
+    if rebuilt {
         rewind(db)?;
-        rebuilt = true;
-        ledger_rebuild.extend(files.iter().cloned());
-    } else if rollup_db::get_meta(db, LEDGER_REBUILD_PENDING)?.as_deref() == Some("1") {
-        rebuilt = true;
         ledger_rebuild.extend(files.iter().cloned());
     }
 
@@ -332,7 +484,8 @@ pub fn update_rollup(
     let mut ctx = IngestContext {
         now_ms,
         ledger_rebuild,
-        ledger_seen: HashSet::new(),
+        ledger_seen: HashMap::new(),
+        legacy,
     };
     for file in &files {
         if ingest_file(db, file, &mut ctx)? == Ingest::Ingested {
@@ -342,12 +495,19 @@ pub fn update_rollup(
         rebuilt = true;
         ctx.ledger_rebuild.extend(files.iter().cloned());
         ctx.ledger_seen.clear();
+        if let Some(fix) = &mut ctx.legacy {
+            fix.first.clear();
+            fix.largest.clear();
+        }
         for f in &files {
             ingest_file(db, f, &mut ctx)?;
         }
         break;
     }
 
+    if let Some(fix) = ctx.legacy.take() {
+        apply_legacy_fix(db, fix)?;
+    }
     rollup_db::set_meta(db, LEDGER_REBUILD_PENDING, "0")?;
     Ok(UpdateResult {
         files_scanned: files.len(),
@@ -418,6 +578,9 @@ fn prune_missing_files(db: &mut Connection, files: &[String]) -> anyhow::Result<
             "DELETE FROM seen_tool_calls WHERE session_key = ?",
             [session],
         )?;
+    }
+    if !survivors.is_empty() {
+        rollup_db::set_meta(&tx, LEDGER_REBUILD_PENDING, "1")?;
     }
     for path in &survivors {
         rollup_db::clear_ledger_for_file(&tx, path)?;
@@ -618,6 +781,45 @@ mod tests {
         })
     }
 
+    fn snap(session: &str, req: &str, at: &str, input: i64, output: i64) -> Value {
+        json!({
+            "type": "assistant",
+            "sessionId": session,
+            "requestId": req,
+            "uuid": format!("u_{req}_{at}_{output}"),
+            "timestamp": format!("2026-09-28T{at}:00.000Z"),
+            "cwd": "/work/proj",
+            "message": {
+                "id": format!("m_{req}"),
+                "model": "claude-opus-4-7",
+                "usage": {"input_tokens": input, "output_tokens": output},
+                "content": [{"type": "text", "text": "x"}],
+            },
+        })
+    }
+
+    fn hourly_totals(f: &Fixture) -> [i64; 4] {
+        f.hourly().iter().fold([0; 4], |t, r| {
+            [
+                t[0] + r.input_tokens,
+                t[1] + r.output_tokens,
+                t[2] + r.cache_read,
+                t[3] + r.cache_creation,
+            ]
+        })
+    }
+
+    fn model_totals(f: &Fixture) -> [i64; 4] {
+        f.models().iter().fold([0; 4], |t, r| {
+            [
+                t[0] + r.input_tokens,
+                t[1] + r.output_tokens,
+                t[2] + r.cache_read,
+                t[3] + r.cache_creation,
+            ]
+        })
+    }
+
     fn model_input(f: &Fixture, path: &str) -> i64 {
         f.models()
             .iter()
@@ -647,20 +849,205 @@ mod tests {
     }
 
     #[test]
-    fn repeated_snapshots_bill_the_first_occurrence() {
+    fn repeated_snapshots_bill_the_last_occurrence() {
         let mut f = Fixture::new();
         let path = f.write(
             "p/s.jsonl",
             &[
-                assistant("S", "r1", "m1", 10, 10, false),
-                assistant("S", "r1", "m1", 11, 99, false),
+                snap("S", "r1", "15:10", 10, 2),
+                snap("S", "r1", "15:11", 10, 50),
             ],
         );
         f.update(false);
         let hourly = f.hourly();
         assert_eq!(hourly.len(), 1);
-        assert_eq!((hourly[0].input_tokens, hourly[0].message_count), (10, 1));
+        assert_eq!(
+            (
+                hourly[0].input_tokens,
+                hourly[0].output_tokens,
+                hourly[0].message_count
+            ),
+            (10, 50, 1)
+        );
         assert_eq!(model_input(&f, &path), 10);
+        assert_eq!(model_totals(&f), hourly_totals(&f));
+    }
+
+    #[test]
+    fn snapshot_split_across_runs_bills_only_the_missing_tokens() {
+        let mut f = Fixture::new();
+        let first = snap("S", "r1", "15:10", 10, 2);
+        f.write("p/S.jsonl", std::slice::from_ref(&first));
+        f.update(false);
+        f.write("p/S.jsonl", &[first, snap("S", "r1", "15:11", 10, 50)]);
+        f.update(false);
+        f.update(false);
+        let hourly = f.hourly();
+        assert_eq!(hourly.len(), 1);
+        assert_eq!(
+            (
+                hourly[0].input_tokens,
+                hourly[0].output_tokens,
+                hourly[0].message_count
+            ),
+            (10, 50, 1)
+        );
+        assert_eq!(model_totals(&f), hourly_totals(&f));
+    }
+
+    #[test]
+    fn a_later_smaller_field_bills_no_negative_delta() {
+        let mut f = Fixture::new();
+        let first = snap("S", "r1", "15:10", 10, 50);
+        f.write("p/S.jsonl", std::slice::from_ref(&first));
+        f.update(false);
+        f.write("p/S.jsonl", &[first, snap("S", "r1", "15:11", 30, 5)]);
+        f.update(false);
+        assert_eq!(hourly_totals(&f), [30, 50, 0, 0]);
+        assert_eq!(model_totals(&f), [30, 50, 0, 0]);
+    }
+
+    #[test]
+    fn a_snapshot_past_the_hour_stays_in_the_first_snapshots_hour() {
+        let mut f = Fixture::new();
+        let first = snap("S", "r1", "15:20", 10, 2);
+        f.write(
+            "p/S.jsonl",
+            &[
+                first.clone(),
+                snap("S", "r2", "15:21", 1, 1),
+                snap("S", "r2", "16:21", 1, 9),
+            ],
+        );
+        f.update(false);
+        f.write(
+            "p/S.jsonl",
+            &[
+                first,
+                snap("S", "r2", "15:21", 1, 1),
+                snap("S", "r2", "16:21", 1, 9),
+                snap("S", "r1", "16:20", 10, 50),
+            ],
+        );
+        f.update(false);
+        let hour = hour_start_ms(js_date_parse("2026-09-28T15:20:00.000Z").unwrap());
+        let rows: Vec<(i64, i64, i64)> = f
+            .hourly()
+            .iter()
+            .map(|r| (r.hour_ms, r.output_tokens, r.message_count))
+            .collect();
+        assert_eq!(rows, [(hour, 59, 2)]);
+    }
+
+    #[test]
+    fn ledger_replay_agrees_with_hourly_after_split_and_cross_file_snapshots() {
+        let mut f = Fixture::new();
+        let a1 = snap("S", "rA", "15:10", 5, 2);
+        f.write("p/S.jsonl", std::slice::from_ref(&a1));
+        f.update(false);
+        f.write(
+            "p/S.jsonl",
+            &[
+                a1,
+                snap("S", "rA", "15:11", 5, 40),
+                snap("S", "rB", "15:12", 7, 3),
+            ],
+        );
+        f.write(
+            "p/S/subagents/agent.jsonl",
+            &[
+                snap("S", "rA", "15:13", 5, 90),
+                snap("S", "rB", "15:12", 7, 3),
+            ],
+        );
+        f.update(false);
+        let hourly = f.hourly();
+        assert_eq!(hourly_totals(&f), [12, 93, 0, 0]);
+        assert_eq!(model_totals(&f), hourly_totals(&f));
+
+        let mut fresh = Fixture::new();
+        let projects = f.dir.path().join("projects");
+        update_rollup(&mut fresh.db, &projects, UpdateOptions { rebuild: false }).unwrap();
+        assert_eq!(fresh.hourly(), hourly);
+
+        f.update(true);
+        assert_eq!(f.hourly(), hourly);
+        assert_eq!(model_totals(&f), hourly_totals(&f));
+        assert_eq!(model_totals(&fresh), model_totals(&f));
+    }
+
+    // Writes the v3 shape by hand: seen_requests loses its billed columns and every key is legacy.
+    fn downgrade_to_v3(f: &mut Fixture) {
+        f.db.execute_batch(
+            "UPDATE meta SET value = '3' WHERE key = 'schema_version';
+             CREATE TABLE v3_seen AS SELECT request_key, path FROM seen_requests;
+             DROP TABLE seen_requests;
+             CREATE TABLE seen_requests (request_key TEXT PRIMARY KEY, path TEXT NOT NULL);
+             CREATE INDEX idx_seen_requests_path ON seen_requests (path);
+             INSERT INTO seen_requests SELECT request_key, path FROM v3_seen;
+             DROP TABLE v3_seen;
+             INSERT INTO seen_requests VALUES ('gone:key', '/gone.jsonl');",
+        )
+        .unwrap();
+    }
+
+    fn reopen(f: &mut Fixture) {
+        f.db = Connection::open_in_memory().unwrap();
+        f.db = rollup_db::open_rollup_db(&f.dir.path().join("rollup.db")).unwrap();
+    }
+
+    fn billed_output(f: &Fixture, key: &str) -> Option<i64> {
+        f.db.query_row(
+            "SELECT output_tokens FROM seen_requests WHERE request_key = ?",
+            [key],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn v3_migration_corrects_legacy_keys_to_the_largest_snapshot_on_disk_once() {
+        let mut f = Fixture::new();
+        let mut a1 = snap("S", "rA", "15:10", 5, 2);
+        a1["message"]["content"] = json!([{"type": "tool_use", "id": "tu_A"}]);
+        f.write("p/S/subagents/agent.jsonl", &[user("S", 1), a1.clone()]);
+        f.update(false);
+        downgrade_to_v3(&mut f);
+        f.write(
+            "p/S/subagents/agent.jsonl",
+            &[user("S", 1), a1, snap("S", "rA", "16:11", 5, 40)],
+        );
+        f.write("p/S.jsonl", &[snap("S", "rA", "17:12", 5, 90)]);
+
+        reopen(&mut f);
+        assert!(f.dir.path().join("rollup.db.v3.bak").exists());
+        f.update(false);
+        let hour = hour_start_ms(js_date_parse("2026-09-28T15:10:00.000Z").unwrap());
+        let rows: Vec<(i64, i64, i64)> = f
+            .hourly()
+            .iter()
+            .map(|r| (r.hour_ms, r.output_tokens, r.message_count))
+            .collect();
+        assert_eq!(rows, [(hour, 90, 1)]);
+        assert_eq!(model_totals(&f), hourly_totals(&f));
+        assert_eq!(f.tool_calls("S"), 1);
+        assert_eq!(billed_output(&f, "rA:m_rA"), Some(90));
+        assert_eq!(billed_output(&f, "gone:key"), None);
+        assert_eq!(
+            rollup_db::get_meta(&f.db, rollup_db::BILLING_CORRECTION_PENDING)
+                .unwrap()
+                .as_deref(),
+            Some("0")
+        );
+
+        let (hourly, ledger, models) = (f.hourly(), f.ledger(), f.models());
+        reopen(&mut f);
+        f.update(false);
+        f.update(true);
+        assert_eq!(
+            (f.hourly(), f.ledger(), f.models()),
+            (hourly, ledger, models)
+        );
     }
 
     #[test]
@@ -762,6 +1149,119 @@ mod tests {
         assert!(f.bytes_parsed(&path) > 0);
     }
 
+    fn two_sessions(f: &Fixture) -> (String, String) {
+        let s = f.write(
+            "p/S.jsonl",
+            &[user("S", 1), assistant("S", "rA", "mA", 2, 5, true)],
+        );
+        let t = f.write(
+            "q/T.jsonl",
+            &[user("T", 3), assistant("T", "rB", "mB", 4, 7, true)],
+        );
+        (s, t)
+    }
+
+    #[test]
+    fn a_replay_that_dies_after_one_file_resumes_without_losing_that_files_ledger() {
+        let mut f = Fixture::new();
+        let (s, t) = two_sessions(&f);
+        f.update(false);
+        let before = (f.hourly(), f.ledger(), f.models());
+
+        rollup_db::rewind_rollup(&f.db).unwrap();
+        rollup_db::set_meta(&f.db, LEDGER_REBUILD_PENDING, "1").unwrap();
+        let mut ctx = IngestContext {
+            now_ms: 0,
+            ledger_rebuild: HashSet::from([s.clone(), t]),
+            ledger_seen: HashMap::new(),
+            legacy: None,
+        };
+        ingest_file(&mut f.db, &s, &mut ctx).unwrap();
+        drop(ctx);
+
+        f.update(false);
+        assert_eq!((f.hourly(), f.ledger(), f.models()), before);
+    }
+
+    #[test]
+    fn a_rebuild_that_dies_after_its_rewind_does_not_double_the_next_ledger() {
+        let mut f = Fixture::new();
+        two_sessions(&f);
+        f.update(false);
+        let before = (f.hourly(), f.ledger(), f.models());
+
+        let tx = f.db.transaction().unwrap();
+        rollup_db::rewind_rollup(&tx).unwrap();
+        tx.commit().unwrap();
+
+        f.update(false);
+        assert_eq!((f.hourly(), f.ledger(), f.models()), before);
+    }
+
+    #[test]
+    fn a_correction_applied_twice_from_the_same_pending_state_bills_one_delta() {
+        let mut f = Fixture::new();
+        let path = f.write("p/S.jsonl", &[snap("S", "rA", "15:10", 5, 2)]);
+        f.update(false);
+        downgrade_to_v3(&mut f);
+        reopen(&mut f);
+        let key = "rA:m_rA".to_string();
+        let fix = LegacyFix {
+            owners: HashMap::from([(key.clone(), path)]),
+            first: HashMap::from([(
+                key.clone(),
+                BilledRequest {
+                    tokens: BilledTokens {
+                        input_tokens: 5,
+                        output_tokens: 2,
+                        ..Default::default()
+                    },
+                    hour_ms: hour_start_ms(js_date_parse("2026-09-28T15:10:00.000Z").unwrap()),
+                    project: "/work/proj".into(),
+                    model: "claude-opus-4-7".into(),
+                },
+            )]),
+            largest: HashMap::from([(
+                key,
+                BilledTokens {
+                    input_tokens: 5,
+                    output_tokens: 90,
+                    ..Default::default()
+                },
+            )]),
+        };
+        apply_legacy_fix(&mut f.db, fix.clone()).unwrap();
+        apply_legacy_fix(&mut f.db, fix.clone()).unwrap();
+        assert_eq!(hourly_totals(&f), [5, 90, 0, 0]);
+
+        rollup_db::set_meta(&f.db, BILLING_CORRECTION_PENDING, "1").unwrap();
+        apply_legacy_fix(&mut f.db, fix).unwrap();
+        assert_eq!(hourly_totals(&f), [5, 90, 0, 0]);
+    }
+
+    #[test]
+    fn a_run_that_dies_after_pruning_still_replays_the_survivors_ledger() {
+        let mut f = Fixture::new();
+        let parent = f.write(
+            "p/S.jsonl",
+            &[user("S", 1), assistant("S", "rA", "mA", 2, 5, true)],
+        );
+        let sibling = f.write(
+            "p/S/subagents/agent.jsonl",
+            &[
+                assistant("S", "rA", "mA", 2, 5, true),
+                assistant("S", "rB", "mB", 3, 7, false),
+            ],
+        );
+        f.update(false);
+        std::fs::remove_file(&parent).unwrap();
+        prune_missing_files(&mut f.db, std::slice::from_ref(&sibling)).unwrap();
+
+        f.update(false);
+        assert_eq!(model_input(&f, &sibling), 12);
+        assert_eq!(f.tool_calls("S"), 1);
+    }
+
     #[test]
     fn shrink_below_cursor_rewinds_everything() {
         let mut f = Fixture::new();
@@ -828,14 +1328,17 @@ mod tests {
         assert_eq!(f.hourly(), hourly);
         assert!(f.ledger().iter().all(|r| r.path != parent));
         assert!(f.models().iter().all(|r| r.path != parent));
-        assert!(rollup_db::has_seen_request(&f.db, "rA:mA").unwrap());
+        assert!(rollup_db::seen_request(&f.db, "rA:mA").unwrap() != Seen::Unseen);
         assert_eq!(model_input(&f, &sibling), 12);
         assert_eq!(f.tool_calls("S"), 1);
 
         std::fs::remove_file(&lone).unwrap();
         f.update(false);
         assert_eq!(f.hourly(), hourly);
-        assert!(!rollup_db::has_seen_request(&f.db, "rC:mC").unwrap());
+        assert_eq!(
+            rollup_db::seen_request(&f.db, "rC:mC").unwrap(),
+            Seen::Unseen
+        );
         assert_eq!(f.seen_tool_sessions(), ["S"]);
     }
 
