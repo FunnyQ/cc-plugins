@@ -1,8 +1,3 @@
-// HUD leader line — a horizontal underline beneath the destination text, then a
-// connector from that underline's bottom-right corner to the beacon at center.
-// The destination box width is dynamic, so the line is measured from the live
-// DOM (ResizeObserver) rather than hard-coded, and the SVG uses a pixel-space
-// viewBox so 1 user unit == 1 CSS px.
 
 export function initLead({ svg, viewport, dest, beacon, telemetry }) {
   if (!svg || !viewport || !dest || !beacon) return;
@@ -34,7 +29,6 @@ export function initLead({ svg, viewport, dest, beacon, telemetry }) {
     connector.setAttribute("x2", bx);
     connector.setAttribute("y2", by);
 
-    // Distance the telemetry slides to reach the right edge when the hero
     // collapses — measured (offset* are transform-independent) so the move can
     // animate with translateX instead of flashing from left to right.
     if (telemetry) {
@@ -49,7 +43,6 @@ export function initLead({ svg, viewport, dest, beacon, telemetry }) {
   ro.observe(dest);
   window.addEventListener("resize", update);
   viewport.addEventListener("cockpit:warp-turn", update);
-  // Initial pass once layout settles.
   requestAnimationFrame(update);
 
   return update;

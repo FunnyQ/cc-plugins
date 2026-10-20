@@ -1,4 +1,3 @@
-// Decision-log column — streams a session's decision trail over SSE and renders
 // it as cards. Imperative (not petite-vue reactive) so each record's HTML is
 // built once on receipt and never re-run on store polls — same discipline as
 // the transcript renderer.
@@ -8,7 +7,6 @@ import DOMPurify from "../vendor/purify.es.mjs";
 import { createLatestIndicator } from "./latest-indicator.js";
 import { renderDiagram, openDiagramLightbox } from "./diagram.js";
 
-// new-tab-safe links (matches token-atlas)
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("target", "_blank");
@@ -16,12 +14,8 @@ DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   }
 });
 
-// Grace period before the hero collapses again after the pilot answers a call.
 const HERO_RECOLLAPSE_MS = 60_000;
 
-// Valid decision-trail kinds. Keep in sync with cockpit-rs/src/cli/trail.rs scribe validation /
-// VALID_KINDS (no-build-step SPA can't import the TS source). Module-level so
-// the array isn't re-allocated on every card render.
 const KINDS = ["decision", "rationale", "learning", "caveat"];
 
 const md = (t) =>
@@ -34,10 +28,6 @@ const esc = (t) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
   );
 
-// A small geometric glyph per facet kind, so a chip reads as an instrument tag
-// rather than plain text. Labels are caller-chosen, so map the suggested
-// vocabulary and fall back to a diamond (the waypoint mark) for anything else —
-// every facet still gets a marker, none looks broken.
 const FACET_GLYPHS = {
   PROBLEM: "?",
   CONSTRAINT: "⊏",
@@ -78,7 +68,6 @@ function recordKey(rec) {
   return `${rec.type}|${rec.timestamp || rec.ts || ""}`;
 }
 
-// Daemon token for POST /api/respond — fetched once at runtime, never hardcoded.
 let _tokenPromise = null;
 function getToken() {
   if (!_tokenPromise) {
@@ -104,11 +93,7 @@ export function initDecisionLog(rootEl) {
   let touchStartY = 0;
   let decisionExpanded = false;
   let lastScrollTop = 0;
-  // The hero (viewport) reacts to the pilot's turn: a needs_your_call raises the
-  // barrier, answering lowers it again after a grace period. `live` gates both
-  // so replaying a session's backlog never moves the hero — only real-time
-  // activation/resolution does. It flips true on the backlog-done marker.
-  let live = false;
+  let backlogReplayed = false;
 
   function raiseHeroForCall() {
     if (heroCollapseTimer) {
@@ -271,9 +256,6 @@ export function initDecisionLog(rootEl) {
   });
   window.addEventListener("resize", updateCompactDecisionSize);
 
-  // One delegated listener (cardsEl survives innerHTML resets). Only the latest
-  // open call is answerable; options are selected first, then the Send button
-  // submits the selected option plus any extra instruction text.
   cardsEl.addEventListener("click", (e) => {
     const card = e.target.closest(".decision-card");
     if (!card || card !== lastOpenCall || !sessionActive()) return;
@@ -309,9 +291,6 @@ export function initDecisionLog(rootEl) {
     submitAnswer(card, answer);
   });
 
-  // A live session that cockpit never tracked (tracked === false, the same flag
-  // the manifest pill reads) has no decision log at all. Rather than the bland
-  // "No decisions logged yet.", invite the pilot to bring it onto the cockpit.
   const isUntracked = () => {
     const s = store.sessions.find((x) => x.sessionId === currentSession);
     return !!s && s.tracked === false;
@@ -337,7 +316,7 @@ export function initDecisionLog(rootEl) {
     seen.clear();
     lastOpenCall = null;
     store.awaitingCall = false;
-    live = false;
+    backlogReplayed = false;
     setDecisionExpanded(false);
     instrumentsEl?.style.removeProperty("--decision-row-block-size");
     if (heroCollapseTimer) {
@@ -352,12 +331,7 @@ export function initDecisionLog(rootEl) {
   function decisionCard(rec) {
     const card = document.createElement("article");
     card.className = "decision-card";
-    // Tag the card with its callId so answers route to this exact call and a
-    // streamed response resolves the right card (not just the latest open one).
     if (rec.id) card.dataset.callId = rec.id;
-    // needs_your_call → the warm dark surface; a plain autopilot decision → the
-    // lit readout (light surface, dark cool ink). The cold/warm axis still holds:
-    // a call is the one warm card, and it never gets the lit treatment.
     if (rec.needs_your_call) card.classList.add("is-call", "is-open");
     else card.classList.add("is-lit");
     // Whitelist kind values before passing to classList to prevent
@@ -368,11 +342,6 @@ export function initDecisionLog(rootEl) {
     const files = (rec.files || [])
       .map((f) => `<code class="decision-card__file">${esc(f)}</code>`)
       .join("");
-    // Self-labeled reasoning facets — a second tier *under* WHY, not peers of it.
-    // Each is a run-in row (inline stencil label + inline body) grouped in one
-    // ruled-margin block, so a card can carry whatever dimensions (REJECTED /
-    // CONSTRAINT / ASSUMPTION / …) it involved without flattening into a stack of
-    // equal-weight headings. Bodies are short → inline Markdown, like the decision.
     const facetRows = (rec.facets || [])
       .filter((f) => f && (f.text || f.label))
       .map((f) => {
@@ -388,9 +357,6 @@ export function initDecisionLog(rootEl) {
     const options = (rec.options || [])
       .map((o) => `<li>${esc(o)}</li>`)
       .join("");
-    // A diagram rides as Mermaid source; the SVG is rendered after mount (async,
-    // lazy bundle) into this figure. The <pre> holds the source as a graceful
-    // fallback shown only if rendering fails.
     const diagram = rec.diagram
       ? `<figure class="decision-card__diagram" data-pending>
            <pre class="decision-card__diagram-src">${esc(rec.diagram)}</pre>
@@ -415,10 +381,6 @@ export function initDecisionLog(rootEl) {
     return card;
   }
 
-  // Render the card's Mermaid source into its figure once (the card HTML is built
-  // once and never re-run, same discipline as the rest of this module). On
-  // success the SVG replaces the source <pre>; on failure the <pre> stays and the
-  // figure is flagged so CSS can mark it as an unrendered fallback.
   async function mountDiagram(card, source) {
     const figure = card.querySelector(".decision-card__diagram");
     if (!figure) return;
@@ -426,13 +388,10 @@ export function initDecisionLog(rootEl) {
     if (result.ok) {
       figure.innerHTML = result.svg;
       figure.removeAttribute("data-pending");
-      // Click (or Enter/Space) the rendered figure to blow it up in a lightbox —
-      // dense instrument panels are hard to read at card width.
       figure.classList.add("is-zoomable");
       figure.setAttribute("role", "button");
       figure.setAttribute("tabindex", "0");
       figure.setAttribute("aria-label", "Enlarge diagram");
-      // The card headline seeds the lightbox's download filename.
       const title =
         card.querySelector(".decision-card__decision")?.textContent || "";
       figure.addEventListener("click", () =>
@@ -451,10 +410,6 @@ export function initDecisionLog(rootEl) {
     }
   }
 
-  // Interactive answer surface for an open needs_your_call (active sessions
-  // only). Hidden by default; revealed by showRespond() on the latest open
-  // call. The read-only <ul> stays for ended/history sessions (CSS hides it
-  // when .is-answerable is set, so we never show both).
   function respondForm(rec) {
     const btns = (rec.options || [])
       .map(
@@ -593,10 +548,8 @@ export function initDecisionLog(rootEl) {
   function resolveCallCard(card, answer, detail = "") {
     hideRespond(card); // answered → retire the buttons
 
-    // Split the stored answer into the picked option and any extra free-text.
     // composeAnswer encodes the combined case ("Selected option: …\n\nAdditional
     // instructions:\n…"); an option-only answer is the bare option string;
-    // anything else is a pure free-text answer.
     const opts = card.querySelector(".decision-card__options");
     const lis = opts ? [...opts.querySelectorAll("li")] : [];
     let option = "";
@@ -613,16 +566,11 @@ export function initDecisionLog(rootEl) {
       else instructions = a;
     }
 
-    // The picked option pops in the read-only list with a positive tick — the
-    // warmth retreats once the pilot has acted.
     if (option) {
       const pick = lis.find((li) => li.textContent.trim() === option);
       if (pick) pick.classList.add("is-chosen");
     }
 
-    // The answer box only earns its space when it carries something the
-    // highlighted option can't: extra instructions, a free-text answer, or a
-    // delivery note. A bare option pick is conveyed by the tick alone.
     const slot = card.querySelector(".decision-card__answer");
     if (instructions || detail) {
       slot.hidden = false;
@@ -641,14 +589,10 @@ export function initDecisionLog(rootEl) {
     if (lastOpenCall === card) lastOpenCall = null;
     store.awaitingCall = false; // pilot answered → clear the HUD alert
     requestAnimationFrame(updateCompactDecisionSize);
-    // Pilot answered → lower the barrier again after a grace period (skipped on
-    // backlog replay of an already-answered call).
-    if (live) scheduleHeroCollapse();
+    if (backlogReplayed) scheduleHeroCollapse();
   }
 
   function appendResponse(rec) {
-    // Prefer the card this response names (rec.call); fall back to the latest
-    // open call for legacy responses that carry no callId.
     let card = null;
     if (rec.call) {
       card =
@@ -678,9 +622,7 @@ export function initDecisionLog(rootEl) {
         if (lastOpenCall) hideRespond(lastOpenCall); // older call isn't latest
         lastOpenCall = card;
         refreshCallState();
-        // Live call on the pilot's active session → raise the barrier so the
-        // "your turn" moment can't be missed behind a collapsed hero.
-        if (live && store.awaitingCall) raiseHeroForCall();
+        if (backlogReplayed && store.awaitingCall) raiseHeroForCall();
       }
       latest.notify(pinned);
       return;
@@ -722,9 +664,7 @@ export function initDecisionLog(rootEl) {
         updateCompactDecisionSize();
         setDecisionExpanded(false);
       });
-      // Backlog replayed — from here on, call transitions are real-time.
-      live = true;
-      // A call already open when we tuned in is the pilot's turn now.
+      backlogReplayed = true;
       if (store.awaitingCall) raiseHeroForCall();
     });
     es.onerror = () => {
@@ -732,10 +672,6 @@ export function initDecisionLog(rootEl) {
     };
   }
 
-  // Each card's relative time ("3m ago") is rendered once when the card is
-  // created, so without a ticker it freezes — a live-logged card stays at
-  // "0s ago" forever. Refresh all cards periodically from each <time>'s
-  // datetime attribute (the source-of-truth ISO timestamp).
   setInterval(() => {
     for (const el of cardsEl.querySelectorAll(".decision-card__time[datetime]"))
       el.textContent = relTime(el.getAttribute("datetime"));
@@ -748,6 +684,5 @@ export function initDecisionLog(rootEl) {
   store.subscribeSessions(() => {
     if (!emptyEl.hidden) renderEmptyState();
   });
-  // Open immediately for the current selection (set before this mounts).
   open(store.selectedProject, store.selectedSessionId);
 }

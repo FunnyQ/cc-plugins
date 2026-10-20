@@ -1,5 +1,3 @@
-// Cockpit design-system instrument: renders this plugin's DESIGN.md visual
-// tokens as a native Night Flight panel. No raw markdown view by design.
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -126,8 +124,6 @@ function renderDesignSystem(rootEl, data) {
 
 export function initDesignSystem(rootEl) {
   if (!rootEl) return null;
-  // Cache only positive hits (a project's parsed design doc); a missing doc is
-  // re-probed on each selection so a DESIGN.md added mid-session still surfaces.
   const cache = new Map();
   let renderedProject = null;
 
@@ -146,7 +142,6 @@ export function initDesignSystem(rootEl) {
     return data;
   }
 
-  // Availability probe for the DESIGN toggle — true iff the project has a doc.
   async function probe(project) {
     if (!project) return false;
     return (await fetchFor(project)) !== null;

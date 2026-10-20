@@ -1,4 +1,3 @@
-// Shared "new content" affordance for live scroll panes.
 // When the pilot is reading history, live updates should not yank the viewport;
 // instead each pane gets its own compact jump control.
 

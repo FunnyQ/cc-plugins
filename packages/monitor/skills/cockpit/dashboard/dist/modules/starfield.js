@@ -1,12 +1,4 @@
-// Viewport warp starfield — a slow forward-flight star streak field drawn on a
-// canvas behind the HUD. Stars emanate from the viewport center (the vanishing
-// point) and streak outward as they approach, reading as flying forward through
-// deep space. Deliberately WAY slower than a hyperspace jump: this is cruise,
-// not a launch sequence. No dependencies; pauses when the tab is hidden and
-// renders a single static frame under prefers-reduced-motion.
-
 const COUNT = 560;
-// z units travelled per millisecond — the warp speed. Small = slow cruise.
 const SPEED = 0.00023;
 const TRAIL_LENGTH = 1.65;
 // Canvas can't be trusted to parse oklch() across engines, so the two star
@@ -118,7 +110,6 @@ export function initStarfield(canvas) {
     }
   }
 
-  // Perspective projection: nearer stars (small z) fling far from center.
   const projX = (s) => cx + (s.x / s.z) * scale;
   const projY = (s) => cy + (s.y / s.z) * scale;
 
@@ -211,7 +202,6 @@ export function initStarfield(canvas) {
     resize();
     if (reduce || paused) staticFrame();
   });
-  // Don't burn frames behind a hidden tab.
   document.addEventListener("visibilitychange", () => {
     if (reduce) return;
     if (document.hidden) stop();

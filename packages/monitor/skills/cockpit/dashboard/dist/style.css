@@ -1,10 +1,4 @@
-/* cockpit SPA — "Night Flight" deep-space flight deck.
-   Design system: cockpit/skills/cockpit/DESIGN.md. Dark is the only theme
-   (space is dark). Surface is a tinted deep-space ramp (void → space → hull →
-   hull-2), one cool aurora accent carries navigation, one warm signal is held
-   in reserve for "your turn" (needs_your_call). OKLCH throughout; no #000/#fff. */
 :root {
-  /* Deep-space surface ramp */
   --void: oklch(14% 0.028 278);
   --space: oklch(18% 0.03 278);
   --hull: oklch(22% 0.032 278);
@@ -12,34 +6,29 @@
   --edge: oklch(36% 0.03 278);
   --edge-soft: oklch(30% 0.028 278);
 
-  /* Ink — cool starlight, never pure white */
   --starlight: oklch(95% 0.008 280);
   --ink-muted: oklch(74% 0.018 280);
   --ink-faint: oklch(58% 0.022 280);
 
-  /* Aurora — the cool navigation accent */
   --aurora: oklch(80% 0.13 195);
   --aurora-strong: oklch(72% 0.15 195);
   --aurora-deep: oklch(60% 0.13 198);
 
-  /* Signal — the one warm reserve (needs_your_call / waiting) */
   --signal: oklch(82% 0.14 70);
   --signal-strong: oklch(75% 0.16 65);
 
-  /* Nebula — distant horizon glow, viewport only */
   --nebula-violet: oklch(42% 0.13 300);
   --nebula-indigo: oklch(30% 0.09 285);
 
-  /* Semantic state (LEDs read color + pulse, never hue alone) */
   --engine: var(--aurora);
   --idle: oklch(66% 0.055 200);
   --ended: oklch(46% 0.02 280);
   --positive: oklch(78% 0.13 165);
   --danger: oklch(64% 0.19 25);
 
-  /* Lit readout — the one light surface in the cabin: a plain autopilot decision
-     reads as an illuminated strip. Still hue 278, never #fff; inks run dark
-     enough to clear WCAG AA on --lit. The warm call cards stay dark. */
+  --z-lightbox: 70;
+  --z-perm: 80;
+
   --lit: oklch(85% 0.105 292);
   --lit-fill: oklch(80% 0.115 292);
   --lit-edge: oklch(74% 0.12 292);
@@ -107,7 +96,6 @@ body {
   overflow: hidden;
 }
 
-/* Mono instrument readout + uppercase stencil legend — the cockpit voice. */
 .readout {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -125,9 +113,6 @@ body {
   letter-spacing: 0.06em;
   color: var(--ink-faint);
 }
-/* Provider identity — both held in the cool family (low chroma, off the
-   aurora accent and the warm signal), so a badge tags the harness without
-   reading as navigation or "your turn". */
 .provider-badge--claude {
   --badge: oklch(80% 0.1 195); /* teal, dimmer than the aurora accent */
 }
@@ -162,7 +147,6 @@ body {
   border-radius: 3px;
 }
 
-/* Subtle dark scrollbars so the cabin stays quiet. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--edge) transparent;
@@ -182,9 +166,6 @@ body {
   background-clip: padding-box;
 }
 
-/* ── Viewport — forward window into deep space ──────────────
-   Void base, a slow-drifting starfield behind content, and a single nebula
-   glow at the lower edge. Atmosphere held low; only the heading LED pulses. */
 .viewport {
   position: relative;
   flex-shrink: 0;
@@ -198,7 +179,6 @@ body {
     height 460ms cubic-bezier(0.22, 1, 0.36, 1),
     background-color 460ms ease;
 }
-/* Collapsed — a slim bar with the barrier raised over the warp. */
 .viewport.is-collapsed {
   height: 76px;
   background: var(--space);
@@ -213,7 +193,6 @@ body {
   :is(.viewport__warp, .viewport__nebula, .viewport__lead, .viewport__beacon) {
   opacity: 0;
 }
-/* Stop the warp/beacon/lead motion when collapsed (canvas paused via JS). */
 .viewport.is-collapsed
 :is(
   .lead-underline,
@@ -245,8 +224,6 @@ body {
   );
   opacity: 0.5;
 }
-/* Barrier — a bulkhead/blast-door surface revealed when collapsed: a hull
-   gradient with faint shutter slats + a center seam. Slides in from the top. */
 .viewport__barrier {
   position: absolute;
   inset: 0;
@@ -282,15 +259,10 @@ body {
   opacity: 1;
   translate: 0 0;
 }
-/* Leader line — a thin aurora vector from the heading down to the beacon at
-   center, like a HUD pointing at the waypoint it's tracking. The SVG distorts
-   freely (preserveAspectRatio none); the stroke stays 1px via vector-effect. */
 .viewport__lead {
   width: 100%;
   height: 100%;
 }
-/* Underline (tracing the destination width) + connector (to the beacon) are
-   the same line: a dashed, slowly-flowing aurora vector. */
 .lead-underline,
 .lead-connector {
   stroke: color-mix(in oklch, var(--aurora) 60%, transparent);
@@ -306,7 +278,6 @@ body {
     stroke-dashoffset: -14;
   }
 }
-/* Beacon — the waypoint at center. */
 .viewport__beacon {
   position: absolute;
   inset-block-start: var(--beacon-y, 50%);
@@ -363,9 +334,6 @@ body {
   }
 }
 
-/* ── HUD — heads-up readouts laid over the warp view ───────
-   Heading pinned top-left; telemetry pinned bottom-left.
-   The center belongs to the beacon. No corner brackets, no status badge. */
 .hud {
   position: relative;
   z-index: 1;
@@ -429,8 +397,6 @@ body {
   color: var(--ink-faint);
 }
 
-/* Collapsed hero: tighten padding, single-line destination, telemetry to the
-   right so heading and telemetry share the slim bar. */
 .viewport.is-collapsed .hud {
   padding-block: 12px;
 }
@@ -442,9 +408,6 @@ body {
   transform: translateX(var(--tele-shift, 40vw));
 }
 
-/* Parking alert — the warm "your turn" notification on the HUD, shown when the
-   selected session is parked on an open needs_your_call. Cold cabin, one warm
-   light. Pinned top-right; visible in both expanded and collapsed states. */
 .hud__alert {
   position: absolute;
   z-index: 2;
@@ -480,19 +443,12 @@ body {
     box-shadow: 0 0 0 7px color-mix(in oklch, var(--signal) 0%, transparent);
   }
 }
-/* When awaiting, warm the viewport's lower edge — a cold cabin lit by one warm
-   light. */
 .viewport.is-awaiting {
   border-bottom-color: color-mix(in oklch, var(--signal) 60%, var(--edge));
   box-shadow: inset 0 -40px 60px -40px
     color-mix(in oklch, var(--signal) 30%, transparent);
 }
 
-/* ── Ask-me-here switch — the pilot's declared answering surface ──────────
-   A pill in the Decision Log head, because a needs_your_call card is what
-   lands there. Sized like .status-pill, and pushed to the trailing edge the
-   same way. Aurora, not signal: the switch being on is not the pilot being
-   asked to act, and signal stays reserved for that (see DESIGN.md). */
 .answer-here {
   margin-inline-start: auto;
   display: inline-grid;
@@ -583,9 +539,6 @@ body {
   background: var(--hull-2);
 }
 
-/* ── Status LED — the signature instrument light ───────────
-   8px disc + a 3px ambient ring (the one sanctioned glow). State reads from
-   color AND pulse. Default = idle. */
 .status-led {
   inline-size: 8px;
   block-size: 8px;
@@ -613,23 +566,16 @@ body {
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--signal) 28%, transparent);
   animation: led-wait 2.2s ease-out infinite;
 }
-/* working: the model is generating / running a tool — same live engine glow as
-   the coarse "active". */
 .status-led.working {
   background: var(--engine);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--engine) 26%, transparent);
   animation: led-pulse 1.3s ease-in-out infinite;
 }
-/* your-call: parked on an unanswered needs_your_call — the warm "your turn"
-   violet (--lit), pulsing on the same cadence as the HUD wait beacon so the two
-   read as the same event. */
 .status-led.your-call {
   background: var(--lit-fill);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--lit-fill) 30%, transparent);
   animation: led-wait 2.2s ease-out infinite;
 }
-/* shell: the pilot is in a shell command — a calm nebula violet, no pulse (it's
-   a passive state, not the model working). */
 .status-led.shell {
   background: var(--nebula-violet);
   box-shadow: 0 0 0 3px
@@ -653,9 +599,6 @@ body {
   }
 }
 
-/* ── Manifest — collapsed drawer of flights (projects) + legs (sessions) ──
-   Closed by default to a single bar; the viewport already names the current
-   flight, so the list stays out of the way until opened. */
 .manifest {
   display: flex;
   flex-direction: column;
@@ -664,7 +607,6 @@ body {
   border-bottom: 1px solid var(--edge-soft);
   max-block-size: 32vh;
 }
-/* The bar is a row: prev arrow · toggle (legend/beacon/count) · next arrow. */
 .manifest__bar {
   display: flex;
   flex-direction: row;
@@ -691,15 +633,12 @@ body {
   cursor: inherit;
   text-align: center;
 }
-/* Centered HUD readout: PROJECTS legend over a pulsing waypoint triangle. */
 .manifest__toggle .manifest__legend {
   font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--ink-muted);
   transition: color 200ms ease;
 }
-/* prev/next session arrows — real controls in place of the old decorative
-   aurora brackets; disabled (≤1 active session) renders muted and inert. */
 .manifest__nav {
   border: 0;
   background: transparent;
@@ -866,9 +805,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A live session with no cockpit registry entry: dashed (not anchored) + muted,
-   so it reads as "running, but no decision trail" without competing with the
-   provider badge or the active LED. */
 .leg__tag {
   flex-shrink: 0;
   padding: 1px 5px;
@@ -882,7 +818,6 @@ body {
   color: var(--ink-faint);
 }
 
-/* ── Instruments — the two gauges (comms feed + flight log) ── */
 .instruments {
   display: grid;
   /* minmax(0, 1fr) — a bare 1fr keeps min-width:auto, so a wide <pre> (long
@@ -902,8 +837,6 @@ body {
   background: var(--hull);
   isolation: isolate;
 }
-/* Screen treatment: faint scanlines + an edge vignette so each panel reads as
-   a lit display. Held very low so it never fights the text. */
 .instrument::after {
   content: "";
   position: absolute;
@@ -936,7 +869,6 @@ body {
   background: var(--space);
   border-bottom: 1px solid var(--edge-soft);
 }
-/* a small lit "power" tick beside the screen label */
 .instrument__head::before {
   content: "";
   inline-size: 6px;
@@ -945,8 +877,6 @@ body {
   background: var(--aurora);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--aurora) 22%, transparent);
 }
-/* Status pill — a compact caption in the transcript head echoing the selected
-   session's live status, tinted to the same token as the breathing bar below. */
 .status-pill {
   margin-inline-start: auto;
   padding: 1px 7px;
@@ -961,9 +891,6 @@ body {
   text-transform: uppercase;
   color: var(--bar, var(--idle));
 }
-/* Agent pill — a separate dimension from status (a session can be "working"
-   AND delegating), so it carries its own fixed aurora accent rather than the
-   status hue, and breathes gently to read as live work in flight. */
 .agent-pill {
   padding: 1px 7px;
   border: 1px solid color-mix(in oklch, var(--aurora) 50%, var(--edge));
@@ -992,10 +919,6 @@ body {
   }
 }
 
-/* Status bar — a full-width glow strip under the transcript head that breathes
-   in the selected session's status colour. `--bar` is the single source of the
-   hue (pill + strip + glow all read it); each `.is-*` just reassigns it. Live
-   states breathe; `ended` rests dim and still. */
 .status-bar {
   --bar: var(--ended);
   position: relative;
@@ -1028,7 +951,6 @@ body {
 .status-bar.is-shell {
   --bar: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
 }
-/* Ended: no live signal — hold a faint static line, no breathing. */
 .status-bar.is-ended,
 .status-pill.is-ended {
   --bar: var(--ended);
@@ -1053,8 +975,6 @@ body {
 .status-pill.is-shell {
   --bar: color-mix(in oklch, var(--nebula-violet) 60%, var(--starlight));
 }
-/* Breathing: the strip swells and brightens, then settles — a slow lung, not a
-   blink. your-call gets a tighter, more insistent pulse via animation-duration. */
 .status-bar.is-your-call {
   animation-duration: 2.2s;
 }
@@ -1190,8 +1110,6 @@ body {
   }
 }
 
-/* Channel console — the send box for talking into a live session. Sits at the
-   bottom of the Live Transcript column, so the border reads along its top. */
 .channel-console {
   position: relative;
   z-index: 3;
@@ -1209,8 +1127,7 @@ body {
 }
 .channel-send__input {
   min-width: 0;
-  /* ~4 lines: 4 × line-height (18px) + vertical padding (14px). */
-  min-height: 86px;
+  min-height: calc(4 * 18px + 14px);
   max-height: 160px;
   padding: 7px 10px;
   font: inherit;
@@ -1221,7 +1138,6 @@ body {
   border: 1px solid var(--edge);
   border-radius: var(--radius-sm);
   resize: vertical;
-  /* Cool aurora focus, matching .respond__input's warm signal ring. */
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease;
@@ -1280,7 +1196,6 @@ body {
   font-size: 12px;
   line-height: 1.5;
 }
-/* The command is a full-width button so the whole row is click-to-copy. */
 .channel-relaunch__cmd {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -1316,26 +1231,23 @@ body {
   text-transform: uppercase;
 }
 
-/* ── Decision-log instrument ────────────────────────────── */
 .decision-log {
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
 }
 .decision-log__cards {
+  --rail-x: 11px;
   display: flex;
   flex-direction: column;
   gap: var(--space-sm);
   position: relative;
   padding-left: 24px;
 }
-/* The flight path — one continuous hairline route the decisions are plotted
-   along, fading in and out at the ends so it reads as a continuing course, not a
-   boxed list. left:11px puts its center (11.5) under each card's waypoint. */
 .decision-log__cards:not(:empty)::before {
   content: "";
   position: absolute;
-  left: 11px;
+  left: var(--rail-x);
   translate: -8px 0;
   top: 8px;
   bottom: 8px;
@@ -1348,8 +1260,6 @@ body {
     transparent
   );
 }
-/* Untracked-session invite — replaces the bland empty state when the selected
-   session has no cockpit decision trail; a gentle nudge toward /cockpit. */
 .decision-log__invite {
   display: grid;
   justify-items: center;
@@ -1358,8 +1268,6 @@ body {
   max-width: 42ch;
   padding: 22px 24px;
   text-align: center;
-  /* Tonal lift + a hairline of the aurora navigation accent (the invite points
-     you toward /cockpit). Nebula is reserved for the viewport, so not here. */
   border: 1px solid color-mix(in oklab, var(--aurora) 22%, var(--edge));
   border-radius: var(--radius);
   background: var(--hull-2);
@@ -1408,16 +1316,10 @@ body {
   border-radius: var(--radius-sm);
   padding: 14px;
 }
-/* Waypoint — the decision's node on the flight path. A diamond echoing the
-   viewport beacon, sitting on the rail (the cards container's ::before) with a
-   hull gap punched around it so the route reads as passing behind. Its center
-   (-17.5px + 4 from the card's padding box at container x=25 → x=11.5) matches
-   the rail center (left 11px + 0.5), so they align by construction. Cool =
-   autopilot plotted it. */
 .decision-card::before {
   content: "";
   position: absolute;
-  left: -17.5px;
+  left: calc(var(--rail-x) - 28.5px);
   translate: -8px 0;
   top: 17px;
   z-index: 1;
@@ -1427,16 +1329,13 @@ body {
   transform: rotate(45deg);
   box-shadow: 0 0 0 4px var(--hull);
 }
-/* The Call Alert — the one warm surface: a light flicking on in a cold cabin. */
 .decision-card.is-call {
   background: color-mix(in oklch, var(--signal) 12%, var(--hull));
   border-color: color-mix(in oklch, var(--signal) 45%, var(--edge));
 }
-/* Warm waypoint: the agent has handed you the stick at this point on the route. */
 .decision-card.is-call::before {
   background: var(--signal);
 }
-/* While the call is still open, the waypoint pulses like the waiting LED. */
 .decision-card.is-call.is-open::before {
   box-shadow:
     0 0 0 4px var(--hull),
@@ -1460,14 +1359,10 @@ body {
   background: var(--hull);
   border-color: color-mix(in oklch, var(--positive) 30%, var(--edge));
 }
-/* Answered: the waypoint cools to positive (aurora-green), warmth retreats. */
 .decision-card.is-resolved::before {
   background: var(--positive);
 }
 
-/* Lit readout — a plain autopilot decision reads as an illuminated strip in the
-   dark cabin: a cool-tinted light surface with dark cool ink (still hue 278,
-   never pure #fff/#000). The warm call cards stay dark, so cold/warm holds. */
 .decision-card.is-lit {
   background: var(--lit);
   border-color: var(--lit-edge);
@@ -1522,8 +1417,6 @@ body {
   background: color-mix(in oklch, var(--positive) 10%, transparent);
   opacity: 0.7;
 }
-/* Kind accents — a left-border tint per lens. decision (baseline) is untouched
-   so legacy / default records look exactly as before. */
 .decision-card.is-kind-rationale {
   border-left: 3px solid var(--aurora);
 }
@@ -1533,9 +1426,6 @@ body {
 .decision-card.is-kind-caveat {
   border-left: 3px solid var(--danger);
 }
-/* Scribe source badge — sits next to the needs_your_call badge slot. Uses the
-   same pill shape as .decision-card__badge but dimmed (ink-muted / edge) since
-   it's informational, not actionable. */
 .decision-card__source-badge {
   align-self: flex-start;
   display: inline-flex;
@@ -1573,13 +1463,9 @@ body {
 .decision-card__decision :is(p) {
   margin: 0;
 }
-/* Field-manual section labels — a mono stencil legend above each section so
-   every part (especially the tradeoff) reads as a findable, equal-weight row. */
 .decision-card__decision::before {
   content: "DECISION";
 }
-/* Per-kind label overrides — reuse the existing ::before mechanism so cards
-   never get a double header. decision kind keeps the default "DECISION" label. */
 .decision-card.is-kind-rationale .decision-card__decision::before {
   content: "RATIONALE";
 }
@@ -1601,8 +1487,6 @@ body {
   color: var(--ink-faint);
   margin-bottom: 4px;
 }
-/* Kind label pill — overrides the shared block display above.
-   Only the decision/kind label becomes a pill; WHY/TRADEOFF/FILES stay plain. */
 .decision-card__decision::before {
   display: block;
   width: fit-content;
@@ -1656,10 +1540,6 @@ body {
 .decision-card__tradeoff::before {
   content: "TRADEOFF";
 }
-/* Self-labeled reasoning facets — a second tier under WHY, not peers of the
-   DECISION/WHY/TRADEOFF backbone. The whole set is one ruled-margin block (a 1px
-   hairline, the sanctioned kind — never a >1px accent stripe) so it reads as an
-   indented flight-log, subordinate to the reason above it. */
 .decision-card__facets {
   display: flex;
   flex-direction: column;
@@ -1677,9 +1557,6 @@ body {
   display: inline;
   margin: 0;
 }
-/* Run-in instrument tag: the stencil-legend voice in a small chip, so each facet
-   reads as a labeled gauge on the branch rather than plain prose. Caller-chosen
-   text, uppercased here so any casing reads as a stencil. */
 .decision-card__facet-label {
   display: inline-flex;
   align-items: center;
@@ -1697,17 +1574,11 @@ body {
   border-radius: 999px;
   white-space: nowrap;
 }
-/* The type glyph — a faint aurora tick, tying the facet to the route's waypoints
-   without spending the accent loudly. */
 .decision-card__facet-glyph {
   font-size: 10px;
   line-height: 1;
   color: color-mix(in oklch, var(--aurora) 65%, var(--ink-muted));
 }
-/* A diagram is an instrument screen embedded in the card: it carries its own
-   recessed deep-space backdrop so the Night Flight-themed SVG reads the same on
-   a warm call card and on the lit (light) readout — never inheriting a surface
-   the diagram theme wasn't built against. */
 .decision-card__diagram {
   margin: 0;
   padding: 12px;
@@ -1754,8 +1625,6 @@ svg.pele {
   letter-spacing: 0.12em;
   color: var(--ink-faint);
 }
-/* The Mermaid source as a graceful fallback — hidden once the SVG mounts, shown
-   faintly while it's pending and plainly if rendering failed. */
 .decision-card__diagram-src {
   margin: 0;
   font-family: var(--font-mono);
@@ -1778,8 +1647,6 @@ svg.pele {
   font-size: 11px;
   color: var(--danger);
 }
-/* A rendered diagram is clickable to enlarge — signal it and surface an ⤢ hint
-   on hover/focus in the top-right corner. */
 .decision-card__diagram.is-zoomable {
   position: relative;
   cursor: zoom-in;
@@ -1810,12 +1677,10 @@ svg.pele {
   outline-offset: 2px;
 }
 
-/* Diagram lightbox — the explicit enlarge surface. Sits below the permission
-   modal (z-index 80) so a needs-your-call prompt always wins. */
 .diagram-lightbox {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: var(--z-lightbox);
   display: grid;
   place-items: center;
   padding: clamp(16px, 4vw, 48px);
@@ -1863,7 +1728,6 @@ svg.pele {
   border-color: color-mix(in oklab, var(--aurora) 50%, var(--edge));
   color: var(--aurora);
 }
-/* Download-as-SVG — sits left of the close button; same pill language. */
 .diagram-lightbox__download {
   position: absolute;
   top: clamp(12px, 2.5vw, 28px);
@@ -1915,8 +1779,6 @@ svg.pele {
 .decision-card__options li {
   margin: 2px 0;
 }
-/* Resolved call: the option the pilot picked pops with a positive tick (the
-   warmth retreats once answered), and the options not taken recede. */
 .decision-card.is-resolved .decision-card__options li:not(.is-chosen) {
   color: var(--ink-faint);
 }
@@ -1950,7 +1812,6 @@ svg.pele {
   margin-right: 4px;
 }
 
-/* ── needs_your_call answer surface (the warm respond controls) ── */
 .decision-card.is-answerable .decision-card__options {
   display: none;
 }
@@ -2050,11 +1911,6 @@ svg.pele {
   display: none;
 }
 
-/* ── Live-transcript instrument ─────────────────────────────
-   Renderer shared with token-atlas (live-entry / live-seg / live-code /
-   live-diff / live-task-card); restyled onto the Night Flight tokens. Role
-   accents: user → aurora, assistant → positive, tool → signal, system →
-   nebula violet. */
 .transcript__body {
   display: flex;
   flex-direction: column;
@@ -2311,8 +2167,6 @@ svg.pele {
   font-size: 11px;
   color: var(--ink-muted);
 }
-/* A subagent notification: tint its card with the subagent accent so it reads
-   as a delegated agent, not a neutral block. */
 .live-entry.is-subagent .live-task-card {
   border-color: color-mix(in oklab, var(--entry-accent) 30%, var(--edge));
   background: color-mix(in oklab, var(--entry-accent) 7%, var(--hull-2));
@@ -2321,7 +2175,6 @@ svg.pele {
   color: color-mix(in oklab, var(--entry-accent) 70%, var(--starlight));
 }
 
-/* highlight.js token coloring mapped onto the space palette */
 .hljs-comment,
 .hljs-quote {
   color: var(--ink-faint);
@@ -2349,7 +2202,6 @@ svg.pele {
   color: var(--aurora);
 }
 
-/* ── Cockpit design-system panel ─────────────────────────── */
 .design-panel {
   position: fixed;
   z-index: 55;
@@ -2552,20 +2404,13 @@ svg.pele {
   gap: var(--space-sm);
 }
 
-/* ── Responsive ─────────────────────────────────────────── */
-/* ── Permission modal — reusable overlay ───────────────────
-   A content-agnostic dialog (kicker / title / body slot / actions). Echoes the
-   warm "your turn" signal of the awaiting HUD (it's a pilot-action moment) but
-   owns its own DOM. Driven imperatively by modules/permission-modal.js. */
 .perm-overlay {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: var(--z-perm);
   display: grid;
   place-items: center;
   padding: var(--space-x);
-  /* Idle, the overlay still spans the viewport — let clicks fall through to the
-     UI underneath until a request actually shows it. */
   pointer-events: none;
 }
 .perm-overlay.is-shown {
@@ -2735,9 +2580,6 @@ svg.pele {
   }
 }
 
-/* ── Reduced motion — freeze LED pulses + the caret hint ────
-   (The warp starfield freezes itself in starfield.js by rendering one static
-   frame.) */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

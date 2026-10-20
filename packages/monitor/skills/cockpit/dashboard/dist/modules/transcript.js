@@ -1,16 +1,9 @@
-// Live-transcript column — streams a Claude Code or Codex transcript over SSE and
-// renders it like token-atlas's live view: prose as Markdown, thinking as a
-// muted badge, tool calls/results as highlighted code, file edits as inline
-// diffs, Read results with a line-number gutter. Imperative (not petite-vue
-// reactive): each entry's HTML is built ONCE on receipt (cached on the entry)
-// and never re-run on store polls.
 import { store } from "../app.js";
 import { marked } from "../vendor/marked.esm.js";
 import DOMPurify from "../vendor/purify.es.mjs";
 import hljs from "../vendor/highlight.esm.js";
 import { createLatestIndicator } from "./latest-indicator.js";
 
-// Code/tool-result blocks taller than this collapse into a <details> by default.
 const STREAM_COLLAPSE_LINES = 10;
 
 const fmtNum = (n) => {
@@ -116,13 +109,8 @@ function renderDiffText(text) {
     .join("");
 }
 
-// GFM on; breaks off (soft newlines fold into paragraphs). Content is arbitrary
-// transcript text, so every parse is run through DOMPurify before it reaches the
-// DOM.
 marked.setOptions({ gfm: true, breaks: false });
 
-// Syntax-highlight fenced code blocks with highlight.js. hljs output is escaped
-// span markup; sanitizeHtml() runs over it afterward (DOMPurify keeps classes).
 marked.use({
   renderer: {
     code({ text, lang }) {
@@ -146,7 +134,6 @@ marked.use({
   },
 });
 
-// marked leaves links in-place; force new-tab + safe rel (after attr sanitize).
 DOMPurify.addHook("afterSanitizeAttributes", (node) => {
   if (node.tagName === "A") {
     node.setAttribute("target", "_blank");
@@ -166,8 +153,6 @@ function renderMarkdown(text) {
   }
 }
 
-// Highlight raw code-segment text (tool input/result) when it is confirmed JSON.
-// Returns null otherwise so plain stdout stays plain.
 function highlightCode(text) {
   const trimmed = String(text).trim();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
@@ -175,13 +160,11 @@ function highlightCode(text) {
       JSON.parse(trimmed);
       return hljs.highlight(String(text), { language: "json" }).value;
     } catch {
-      /* not valid JSON — leave plain */
     }
   }
   return null;
 }
 
-// File extension → hljs language. Used to highlight Read results by their path.
 const EXT_TO_LANG = {
   ts: "typescript",
   tsx: "typescript",
@@ -271,8 +254,6 @@ function commandResultOutput(text) {
   return output[1].replace(/\n\^C$/, "");
 }
 
-// Render a line-numbered (cat -n) Read result as a gutter column of numbers
-// beside one highlighted code block. Returns null when not line-numbered.
 function renderFileResult(text, lang) {
   if (!lang || !hljs.getLanguage(lang)) return null;
   const body = commandResultOutput(text);
@@ -316,8 +297,6 @@ function renderFileResult(text, lang) {
   );
 }
 
-// Flatten a tool-result/content value (string, array of blocks, or object) into
-// displayable text for a code block.
 function segText(value) {
   if (value == null) return "";
   if (typeof value === "string") return value;
@@ -337,8 +316,6 @@ function segText(value) {
   return String(value);
 }
 
-// Interleaved line diff: shared leading/trailing lines become context lines,
-// only the changed middle gets -/+.
 function unifiedLineDiff(oldText, newText) {
   const a = String(oldText ?? "").split("\n");
   const b = String(newText ?? "").split("\n");
@@ -360,7 +337,6 @@ function unifiedLineDiff(oldText, newText) {
   return out;
 }
 
-// Edit / MultiEdit / Write → inline color-coded diff segment.
 function claudeFileChangeSegment(part) {
   const name = part?.name;
   const input = part?.input;
@@ -669,13 +645,9 @@ function renderStreamSegment(seg) {
   return `<div class="live-seg">${label}${pre}</div>`;
 }
 
-// Pre-render an entry to HTML once, on receipt. A tool_use renders with its
-// paired result right below it once the result arrives.
 function buildEntryHtml(entry) {
   const results = entry.__toolResults || {};
   const segs = streamEntrySegments(entry);
-  // A task/subagent completion arrives as a "user" message; flag it so the
-  // entry reads as a subagent (its own role + accent) rather than a USER bubble.
   entry.__agentNote = segs.some(
     (seg) =>
       seg.kind === "task-notification" || seg.kind === "subagent-notification",
@@ -695,8 +667,6 @@ function buildEntryHtml(entry) {
   return html;
 }
 
-// The tool_result blocks of a pure tool-result entry (every block is a
-// tool_result). Mixed entries (real user text + a result) are left alone.
 function streamEntryToolResults(entry) {
   if (entry?.payload?.type === "function_call_output") {
     return [
@@ -757,9 +727,6 @@ export function initTranscript(rootEl) {
   const seen = Object.create(null); // dedupe reconnect resends by uuid
   let renderQueued = false;
   let pendingNewCount = 0;
-  // Reverse-scroll history: cursor (byte offset where the loaded window starts),
-  // whether older entries remain, an in-flight guard, and the current selection
-  // (needed to build the history fetch URL).
   let historyStart = 0;
   let hasMore = false;
   let loadingOlder = false;
@@ -790,8 +757,6 @@ export function initTranscript(rootEl) {
     latest.reset();
   }
 
-  // Stamp a stable key + dedupe on uuid (a reconnect resends the same uuids).
-  // Positional fallback keeps id-less lines unique. Build HTML once here.
   function tagEntry(entry) {
     if (!entry || typeof entry !== "object") return null;
     const key = entry.uuid ?? `pos:${keySeq + 1}`;
@@ -802,9 +767,6 @@ export function initTranscript(rootEl) {
     return entry;
   }
 
-  // Merge each pure tool-result entry into the entry holding the matching
-  // tool_use (by tool_use_id) so a call + its output render as one block; the
-  // standalone result entry (a misleading "user" bubble) disappears.
   function reconcileToolResults() {
     const toolUseEntry = {};
     for (const e of entries) {
@@ -837,9 +799,6 @@ export function initTranscript(rootEl) {
     }
   }
 
-  // Rebuild the entry stack from `entries`. Scroll position is managed by the
-  // caller (scheduleRender pins to bottom; loadOlder anchors to keep the
-  // viewport steady while prepending).
   function paint() {
     bodyEl.innerHTML = entries
       .map(
@@ -868,9 +827,6 @@ export function initTranscript(rootEl) {
     });
   }
 
-  // Prepend an older page when the user scrolls near the top. The fetched page
-  // is tagged + reconciled like live entries, then painted with the scroll
-  // anchored on total height delta so the previously-visible content stays put.
   async function loadOlder() {
     if (loadingOlder || !hasMore || !curSession || historyStart <= 0) return;
     loadingOlder = true;
@@ -896,11 +852,8 @@ export function initTranscript(rootEl) {
       entries = [...tagged, ...entries];
       reconcileToolResults();
       paint();
-      // Keep the anchor row in place: the stack grew by (newHeight - prevHeight)
-      // above the old top, so shift scrollTop down by the same delta.
       rootEl.scrollTop = rootEl.scrollHeight - prevHeight + prevTop;
     } catch {
-      // transient (network / rotated file) — the next scroll retries
     } finally {
       // Clear in rAF so the anchor-restore scroll above isn't read back as a
       // fresh user scroll that would immediately trigger another load.

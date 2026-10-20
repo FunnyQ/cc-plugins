@@ -1,9 +1,3 @@
-// cockpit — nested project→session rail (ui/05).
-// Pure layout helpers: group the flat /api/sessions list under their project,
-// order projects (active first, then most-recent activity), and derive the
-// per-project counts. State (expand/collapse, selection) lives in the shared
-// store in app.js; this module only computes.
-
 export function basename(path) {
   if (!path) return "";
   return path.split("/").filter(Boolean).pop() || path;
@@ -18,7 +12,6 @@ function lastActivity(sessions) {
   return max;
 }
 
-// Group sessions by project, attaching active/total counts.
 export function groupSessionsByProject(sessions) {
   const byProject = new Map();
   for (const s of sessions) {
@@ -40,7 +33,6 @@ export function groupSessionsByProject(sessions) {
   return orderProjects(groups);
 }
 
-// Active projects first, then by most-recent activity (desc), then by name.
 export function orderProjects(groups) {
   return groups.sort((a, b) => {
     const aActive = a.activeCount > 0;
@@ -52,8 +44,6 @@ export function orderProjects(groups) {
   });
 }
 
-// Default expansion: keep project groups open so ended-only projects still show
-// their history at a glance. The store overrides this per user toggle.
 export function defaultExpanded() {
   return true;
 }

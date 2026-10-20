@@ -8,7 +8,6 @@
   </head>
   <body>
     <div id="app" v-scope v-cloak>
-      <!-- VIEWPORT — HUD over a forward warp; click to raise the barrier -->
       <header
         class="viewport"
         :class="{ 'is-idle': !selectedSessionId, 'is-collapsed': heroCollapsed, 'is-awaiting': awaitingCall }"
@@ -77,7 +76,6 @@
         <span class="design-toggle__label">Design</span>
       </button>
 
-      <!-- MANIFEST — collapsed by default; the viewport already names the flight -->
       <nav class="manifest" :class="{ 'is-open': manifestOpen }">
         <div class="manifest__bar" @click="toggleManifest()">
           <button
@@ -183,15 +181,12 @@
         </ul>
       </nav>
 
-      <!-- Full-width status strip: breathes in the selected session's live
-           status colour, spanning both instrument columns. -->
       <div
         class="status-bar"
         :class="'is-' + selectedLiveStatus"
         aria-hidden="true"
       ></div>
 
-      <!-- INSTRUMENTS — two display screens: comms feed + flight log -->
       <main class="instruments">
         <section class="instrument" id="col-transcript">
           <header class="instrument__head">
@@ -265,10 +260,6 @@
         <section class="instrument" id="col-decision">
           <header class="instrument__head">
             <span class="instrument__legend">Decision Log</span>
-            <!-- Where the pilot wants to be asked. It lives on this column
-                 because a needs_your_call card is what lands here. Off =
-                 questions go to the terminal; on = they park here (a connected
-                 tab is still required). -->
             <button
               class="answer-here"
               type="button"
@@ -314,9 +305,6 @@
         </div>
       </aside>
 
-      <!-- PERMISSION MODAL — reusable overlay; mounted/driven imperatively by
-           modules/permission-modal.js (content-agnostic shell, permission relay
-           binding). Lives outside the columns so it overlays the whole deck. -->
       <div id="permission-modal"></div>
     </div>
 

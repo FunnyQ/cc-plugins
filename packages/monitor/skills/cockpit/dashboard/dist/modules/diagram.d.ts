@@ -4,3 +4,4 @@ export declare function closeDiagramLightbox(): void;
 export declare function renderDiagram(text: string): Promise<
   { ok: true; svg: string } | { ok: false; error: string }
 >;
+export declare const PELE_VARS: string[];

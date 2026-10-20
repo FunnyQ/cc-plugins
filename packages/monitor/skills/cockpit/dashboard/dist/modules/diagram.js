@@ -1,18 +1,6 @@
-// Mermaid diagram rendering for the cockpit. A decision entry can carry Mermaid
-// text; this module turns it into a themed, sanitized SVG with the vendored pele
-// renderer. Everything heavy (pele, DOMPurify) is loaded lazily on first render,
-// so a session with no diagrams never pays the bundle cost and the module's
-// static surface stays importable under plain Bun for tests.
-
-// Semantic node palette. Flowcharts don't auto-vary node colour — without a
-// class every node reads as the same accent. The author tags nodes with short
-// markers (`Foo:::ok`, `Bar:::bad`), and these classes carry the colour, so hue
-// means something (success / failure / fix path) instead of being decoration.
-// Each entry: stroke is the solid border + text-stays starlight; fill is the
-// same hue at low alpha so the tint reads over the dark card. Concrete hex, not
+// Without a class every flowchart node reads as the same accent. Fill is the
+// stroke's hue at low alpha so the tint reads over the dark card. Concrete hex, not
 // the OKLCH tokens, because this CSS rides inside a downloaded SVG too.
-// Exported: the CLI's diagram lint (scripts/diagram-lint.ts) validates `:::class`
-// markers against these keys, so the palette and the lint can't drift.
 export const SEMANTIC_NODES = {
   start: { stroke: "#777988", fill: "#22253766" }, // neutral entry — --ink-faint
   info: { stroke: "#2ad7d7", fill: "#2ad7d71f" }, // cool note — --aurora
@@ -36,21 +24,12 @@ const SEMANTIC_NODE_CSS = Object.entries(SEMANTIC_NODES)
 const FONT_FAMILY =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
 
-// Deterministic per-render id prefix (no Math.random) so pele's marker ids
-// can't collide across cards.
 let _idSeq = 0;
 function nextDiagramId() {
   return `cockpit-pele-${++_idSeq}-`;
 }
 
-// --- Enlarge: a lightbox that blows a rendered diagram up to near-full-viewport.
-// A Night Flight-themed instrument panel can get dense (see the Rollup DB flow);
-// clicking it opens this overlay so the boxes are readable. DOM-bound, built lazily
-// on first open so the module's static surface stays importable under plain Bun.
 let _lightbox = null;
-// The sanitized SVG currently on display + a title for the download filename.
-// Kept module-level so the download button reuses the exact markup in the
-// card — no re-render, no drift between what you see and what you save.
 let _lightboxSvg = null;
 let _lightboxTitle = "";
 
@@ -69,7 +48,6 @@ function ensureLightbox() {
     <div class="diagram-lightbox__stage" role="dialog" aria-modal="true" aria-label="Enlarged diagram">
       <div class="diagram-lightbox__canvas"></div>
     </div>`;
-  // Backdrop or the close button dismiss; a click on the stage itself does not.
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay || e.target.closest(".diagram-lightbox__close"))
       closeDiagramLightbox();
@@ -81,8 +59,7 @@ function ensureLightbox() {
   return overlay;
 }
 
-// The Night Flight colours reach pele through these variables, set in style.css.
-const PELE_VARS = [
+export const PELE_VARS = [
   "--pele-bg",
   "--pele-fg",
   "--pele-muted",
@@ -134,10 +111,8 @@ function downloadDiagramSvg() {
   URL.revokeObjectURL(url);
 }
 
-// Open the lightbox on a sanitized SVG string (the same markup already in the
 // card — no re-render). The inline width/height/max-width pele bakes in would
 // cap the blow-up, so strip them and let CSS scale the SVG by its viewBox.
-// `title` (optional) seeds the download filename.
 export function openDiagramLightbox(svg, title = "") {
   if (!svg) return;
   const overlay = ensureLightbox();
@@ -168,19 +143,14 @@ export function closeDiagramLightbox() {
 }
 
 // Defense in depth: pele claims to emit no scripts, handlers, or HTML labels.
-// Loaded lazily so the static module surface needs no DOM.
 async function sanitizeSvg(svg) {
   const { default: DOMPurify } = await import("../vendor/purify.es.mjs");
   return DOMPurify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true },
-    // pele shouldn't produce these, but never let one through.
     FORBID_TAGS: ["foreignObject", "script"],
   });
 }
 
-// Render Mermaid text → sanitized SVG string. Never throws: a parse error or a
-// bundle that won't load resolves to { ok:false, error } so the card can show a
-// graceful fallback instead of breaking the column.
 export async function renderDiagram(text) {
   const src = (text || "").trim();
   if (!src) return { ok: false, error: "empty diagram" };
@@ -191,7 +161,6 @@ export async function renderDiagram(text) {
       fontSize: 14,
       idPrefix: nextDiagramId(),
     });
-    // The semantic classes ride inside the SVG so a downloaded file keeps them.
     const styled = svg.replace(
       /^<svg[^>]*>/,
       `$&<style>${SEMANTIC_NODE_CSS}</style>`,

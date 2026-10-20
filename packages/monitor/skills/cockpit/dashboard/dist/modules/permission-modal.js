@@ -1,9 +1,3 @@
-// Permission modal — a reusable, content-agnostic overlay (title / body slot /
-// action buttons / close lifecycle) driven here by the permission relay stream.
-// Imperative (not petite-vue reactive): the overlay DOM is built once and updated
-// directly, matching the discipline of transcript.js / decision-log.js. The shell
-// knows nothing about permission fields — callers pass content in via open({…}),
-// so a later effort can reuse it for needs_your_call without touching this file.
 import { store } from "../app.js";
 import { raiseAttention, clearAttention } from "./attention.js";
 
@@ -13,9 +7,7 @@ import { raiseAttention, clearAttention } from "./attention.js";
 // outside cockpit, and the protocol guarantees no cancel notification (see
 // docs/permission-relay/tasks/_context/protocol.md). 90s default, module const.
 const TTL_MS = 90_000;
-// How long the dimmed "maybe handled elsewhere" state lingers before dismissing.
 const TTL_DIM_MS = 4_000;
-// How long the "已在別處處理" note lingers before the modal closes.
 const RESOLVED_LINGER_MS = 1_800;
 
 const esc = (t) =>
@@ -24,8 +16,6 @@ const esc = (t) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c],
   );
 
-// Daemon token for POST /api/permission-verdict — fetched once, never hardcoded
-// (same shape as decision-log.js).
 let _tokenPromise = null;
 function getToken() {
   if (!_tokenPromise) {
@@ -37,10 +27,6 @@ function getToken() {
   return _tokenPromise;
 }
 
-// ── Reusable overlay shell ────────────────────────────────────────────────
-// Content-agnostic: title (string), bodyHtml (string), actions ([{label, kind,
-// onClick}]), optional note. Owns only its own DOM + close lifecycle. Returns a
-// controller the caller drives.
 export function createOverlay(rootEl) {
   rootEl.classList.add("perm-overlay");
   rootEl.setAttribute("role", "dialog");
@@ -83,8 +69,6 @@ export function createOverlay(rootEl) {
     }
   }
 
-  // Open with fresh content. `actions[].onClick` receives its own button so the
-  // caller can disable it on click (prevent double-submit).
   function open({ kicker, title, bodyHtml, actions } = {}) {
     kickerEl.textContent = kicker || "";
     kickerEl.hidden = !kicker;
@@ -125,7 +109,6 @@ export function createOverlay(rootEl) {
   }
 
   scrimEl.addEventListener("click", () => {
-    // Clicking the scrim is a soft dismiss only — never an implicit verdict.
     if (isOpen) close();
   });
 
@@ -144,9 +127,6 @@ export function createOverlay(rootEl) {
   };
 }
 
-// ── Permission relay binding ──────────────────────────────────────────────
-// Subscribes to /api/permission-stream for the selected session, drives the
-// overlay on `request` frames, and enforces the three-way auto-close lifecycle.
 export function initPermissionModal(rootEl) {
   if (!rootEl) return;
 
@@ -172,16 +152,12 @@ export function initPermissionModal(rootEl) {
 
   function closeModal() {
     clearTimers();
-    // Single close path for every lifecycle case (own-verdict, resolved, TTL,
-    // scrim/escape) — clear attention here so it always unwinds with the modal.
     if (activeRequestId) clearAttention(activeRequestId);
     activeRequestId = null;
     submitting = false;
     overlay.close();
   }
 
-  // TTL fallback (lifecycle case 3): dim, show the "maybe elsewhere" hint, then
-  // auto-dismiss. Guarantees no zombie card when no resolved signal ever comes.
   function armTtl() {
     if (ttlTimer) clearTimeout(ttlTimer);
     ttlTimer = setTimeout(() => {
@@ -201,7 +177,6 @@ export function initPermissionModal(rootEl) {
     const token = await getToken();
     if (!token) {
       overlay.setNote("無法連線 daemon，請稍後再試");
-      // re-enable so the pilot can retry
       submitting = false;
       for (const b of rootEl.querySelectorAll(".perm-btn")) b.disabled = false;
       return;
@@ -229,8 +204,6 @@ export function initPermissionModal(rootEl) {
     }
   }
 
-  // A `request` frame → open the modal with permission-specific content. The
-  // overlay shell stays generic; we assemble the content here.
   function openRequest(frame) {
     clearTimers();
     submitting = false;
@@ -259,9 +232,7 @@ export function initPermissionModal(rootEl) {
     armTtl();
   }
 
-  // A `resolved` frame (lifecycle case 2). Only acts on the request currently
-  // shown. `elsewhere` = the channel forwarded a cancel (terminal/hook answered);
-  // `ui` = another tab answered.
+  /** @param {{request_id: string, source: "elsewhere" | "ui"}} frame */
   function handleResolved(frame) {
     if (!overlay.isOpen || frame.request_id !== activeRequestId) return;
     clearTimers();
@@ -271,7 +242,6 @@ export function initPermissionModal(rootEl) {
       overlay.setNote("已在別處處理");
       dismissTimer = setTimeout(closeModal, RESOLVED_LINGER_MS);
     } else {
-      // another tab answered — close promptly, no lingering note
       closeModal();
     }
   }
@@ -290,9 +260,7 @@ export function initPermissionModal(rootEl) {
     closeModal();
     currentSession = session || null;
     if (!session) return;
-    // token in the query — GET endpoints authenticate via ?token=<t> (shared.md)
     getToken().then((token) => {
-      // a session switch may have raced ahead while the token resolved
       if (currentSession !== session) return;
       const url =
         `/api/permission-stream?session=${encodeURIComponent(session)}` +
@@ -314,8 +282,6 @@ export function initPermissionModal(rootEl) {
     });
   }
 
-  // Re-subscribe on session switch (tied to the selected session like the other
-  // streams). Close any open modal first so a request never leaks across sessions.
   store.subscribe((_project, session) => open(session));
   // subscribe() only fires on LATER changes, and a deep-linked load sets the
   // selection before this module registers (app.js:667-671) — and then
@@ -325,8 +291,6 @@ export function initPermissionModal(rootEl) {
   // presence signal for the broker's wait gate.
   open(store.selectedSessionId);
 
-  // Close the stream when the tab is hidden; reopen on return (mirrors app.js
-  // polling lifecycle so no EventSource leaks while backgrounded).
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       if (es) {
@@ -339,16 +303,12 @@ export function initPermissionModal(rootEl) {
     }
   });
 
-  // Escape dismisses the modal (soft — never an implicit verdict).
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && overlay.isOpen) closeModal();
   });
 
-  // Open immediately for the current selection (set before this mounts).
   open(store.selectedSessionId);
 
-  // Expose the open/close path so the attention task (ui/02) can hook it without
-  // re-deriving the lifecycle. Returns the controller.
   return {
     overlay,
     get activeRequestId() {
