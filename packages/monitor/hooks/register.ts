@@ -134,7 +134,6 @@ async function resolved($: EngineInterface, id: string) {
 export const register: Register = (on) => {
   on("session.measure", async ($, e, next) => {
     const result = await next(e);
-    // `cockpit atlas measure` reads the statusline's stdin shape, so both writers share one cache format.
     const payload: {
       rate_limits?: Record<
         string,

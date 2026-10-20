@@ -23,8 +23,6 @@ function replaceCollector(
   replacement: string,
 ): string {
   return command.replace(re, (m) => {
-    // A quote closed outside the match, or one enclosing a multi-word match,
-    // belongs to the user's command (e.g. `hud statusline 'bun …'`), so keep it.
     const outer = /\s/.test(m.slice(1, -1));
     const first = m[0];
     const last = m[m.length - 1];

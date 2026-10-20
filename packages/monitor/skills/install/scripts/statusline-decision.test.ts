@@ -40,6 +40,28 @@ describe("unwrapCollectorCommand", () => {
     );
   });
 
+  test("a TS collector taken as one quoted argument keeps both of the user's quotes", () => {
+    const HUD = "/opt/hud/sketchybar statusline";
+    expect(unwrapCollectorCommand(`${HUD} '${CLONE_TS}'`)).toBe(
+      `${HUD} '${DEFAULT_INNER}'`,
+    );
+    expect(unwrapCollectorCommand(`${HUD} "/opt/${CLONE_TS}"`)).toBe(
+      `${HUD} "${DEFAULT_INNER}"`,
+    );
+  });
+
+  test("a quote that closes after the match keeps its closer, though it opened before", () => {
+    expect(unwrapCollectorCommand(`sh -c 'echo hi; ${CLONE_TS}'`)).toBe(
+      `sh -c 'echo hi; ${DEFAULT_INNER}'`,
+    );
+  });
+
+  test("quotes that only wrapped the script path are dropped", () => {
+    const script = `${CLONE}/skills/usage-dashboard/scripts/statusline-collector.ts`;
+    expect(unwrapCollectorCommand(`"${script}"`)).toBe(DEFAULT_INNER);
+    expect(unwrapCollectorCommand(`bun '${script}'`)).toBe(DEFAULT_INNER);
+  });
+
   test("the removed monitor TS collector unwraps the same way", () => {
     expect(unwrapCollectorCommand(CLONE_TS)).toBe(DEFAULT_INNER);
     expect(unwrapCollectorCommand(`${WRAP} ${CLONE_TS}`)).toBe(
