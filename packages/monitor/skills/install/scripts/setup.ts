@@ -1,27 +1,14 @@
 #!/usr/bin/env bun
-//
-// monitor:install engine — the single entry that checks every prerequisite for
-// both skills and wires the config a non-dev user otherwise edits by hand:
-//   - permissions.allow entries that pre-approve `bun <q-lab plugin script>.ts`
-//     (so deeply-nested sub-agents — e.g. chronicle:drafter — can run them without
-//     hitting an unanswerable permission prompt that silently denies them).
-//
 // The cockpit channel MCP server is gone: a mod in hooks/register.ts delivers
 // dashboard sends and the permission relay now. This engine only CLEANS UP the
 // leftover hand-wired cockpit-channel entry older versions wrote to
 // ~/.claude.json — it would launch a command that no longer exists.
-//
-// Checks reuse install.ts (dashboard) + the cockpit prerequisites here.
-//
-// The monitor mod's session.measure hook feeds the usage limits now, so a
-// statusLine that still runs the retired collector is unwrapped by --migrate.
 //
 // Modes:
 //   (default) / --check   read-only status report, exit 1 if a required check fails
 //   --dry-run             print exactly what --apply would change, write nothing
 //   --apply               pre-approve scripts + remove any leftover channel entry
 //   --migrate             unwrap the retired collector + remove a leftover channel entry
-//
 import {
   accessSync,
   constants,
@@ -57,7 +44,6 @@ const COCKPIT_SHIM = resolve(
 );
 const CLAUDE_JSON = join(HOME, ".claude.json");
 
-// Pre-approve `bun <q-lab-marketplace plugin script>.ts` in permissions.allow.
 // Without this, an un-allowlisted bun call hits a permission prompt — and a
 // deeply-nested sub-agent (e.g. chronicle:editor → chronicle:drafter, or
 // chronicle:manager → chronicle:analyst) can't surface that prompt to be answered,
@@ -66,11 +52,9 @@ const CLAUDE_JSON = join(HOME, ".claude.json");
 const SCRIPT_PERMISSIONS = [
   "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
   "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
-  // Nested sub-agents cannot answer permission prompts for cockpit log calls.
   "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
 ];
 
-// --- helpers ----------------------------------------------------------------
 function readJson(path: string): { data: any; readable: boolean } {
   if (!existsSync(path)) return { data: {}, readable: true };
   try {
@@ -97,9 +81,6 @@ function claudeVersion(): string | null {
   }
 }
 
-// A leftover cockpit-channel entry in ~/.claude.json from an older version that
-// hand-wired the channel, or null if there's none. The channel no longer exists,
-// so any such entry points at a dead command and should be removed.
 function channelConfiguredPath(): string | null {
   const { data } = readJson(CLAUDE_JSON);
   const entry = data?.mcpServers?.["cockpit-channel"];
@@ -118,7 +99,6 @@ function channelConfiguredPath(): string | null {
   );
 }
 
-// --- cockpit prerequisite checks (the piece this skill owns) ----------------
 function cockpitCliChecks(): Check[] {
   const checks: Check[] = [];
   const add = (
@@ -140,7 +120,6 @@ function cockpitCliChecks(): Check[] {
     accessSync(COCKPIT_SHIM, constants.X_OK);
     executable = true;
   } catch {
-    // A missing or non-executable shim is a partial install: a required failure.
   }
   add(
     "cockpit shim exists and is executable",
@@ -148,7 +127,6 @@ function cockpitCliChecks(): Check[] {
     "required",
     `Expected at ${COCKPIT_SHIM}`,
   );
-  // Older versions hand-wired the channel; the entry is a leftover now.
   add(
     "no leftover cockpit-channel entry in ~/.claude.json",
     channelConfiguredPath() === null,
@@ -158,10 +136,6 @@ function cockpitCliChecks(): Check[] {
   return checks;
 }
 
-// --- cleanup: remove a leftover hand-wired cockpit-channel from ~/.claude.json --
-// Older versions wrote the channel here; the channel is gone, so the entry points
-// at a dead command. "removed" when it deleted one, "none"
-// when there was nothing to do, "error" when the file couldn't be parsed.
 function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   const { data, readable } = readJson(CLAUDE_JSON);
   if (!readable) {
@@ -185,7 +159,6 @@ function unwireChannel(dryRun: boolean): "removed" | "none" | "error" {
   return "removed";
 }
 
-// --- apply: pre-approve q-lab plugin scripts in permissions.allow -----------
 function missingScriptPermissions(): string[] {
   const { data } = readJson(SETTINGS_JSON);
   const allow: unknown = data?.permissions?.allow;
@@ -235,7 +208,6 @@ function scriptPermissionChecks(): Check[] {
   ];
 }
 
-// --- migrate: leftover channel entry + retired statusline collector -----------
 // Unwraps the collector rather than leaving it: the mod feeds the usage limits
 // now, and the collector subcommand goes away in a later release.
 function migrate(): string[] {
@@ -267,11 +239,6 @@ function unwrapStatusline(): boolean {
   return true;
 }
 
-// --- drift watch: read-only, runs every session -----------------------------
-// migrate() is gated on a version change, so wiring that drifts WITHIN a version
-// — a hand-edited settings.json, a restored backup, a reinstall under another
-// cache root — would go unseen until the next upgrade. This half never writes:
-// it only names what no longer matches this install, and the user decides.
 type DriftItem = { key: string; message: string };
 
 function driftReport(): DriftItem[] {
@@ -304,7 +271,6 @@ function driftReport(): DriftItem[] {
 
 // A SessionStart hook reaches the USER only through the systemMessage field of a
 // JSON stdout payload; bare stdout lands in the model's context instead. So the
-// whole hook speaks exactly once, and nothing may print before this.
 function emitHookNotice(lines: string[]): void {
   const systemMessage =
     lines.length === 1
@@ -313,8 +279,6 @@ function emitHookNotice(lines: string[]): void {
   process.stdout.write(`${JSON.stringify({ systemMessage })}\n`);
 }
 
-// migrate() reports through console.log, which would break the single-JSON rule
-// above. Collect its lines instead of letting them out.
 function captureLogs(fn: () => string[]): {
   changed: string[];
   logs: string[];
@@ -331,15 +295,9 @@ function captureLogs(fn: () => string[]): {
   }
 }
 
-// --- session-check: the SessionStart hook entry -----------------------------
-// Two halves with different rules. The repair half is marker-gated: it runs at
-// most once per plugin version, because the drift an upgrade causes is the only
-// drift this script is allowed to fix on its own. The drift watch runs every
-// session, reads only, and reports once per distinct set of problems.
 function sessionCheck(): void {
   const dataDir = process.env.CLAUDE_PLUGIN_DATA;
   const version = pluginVersion();
-  // No data dir or unknown version → can't gate safely; do nothing.
   if (!dataDir || !version) return;
 
   const notices: string[] = [];
@@ -352,10 +310,7 @@ function sessionCheck(): void {
     last = null;
   }
   const markerOrder = last ? compareMonitorVersions(last, version) : null;
-  // The marker is shared across sessions. An older session can keep running after an
-  // upgrade and fire this hook on resume/compact; it must never roll newer config back.
   if (markerOrder === null || markerOrder < 0) {
-    // The version just changed (or this is a first run) — exactly when daemons from the
     // previous version are still running. Before 3.19.0 the channel had no exit path, so
     // those are immortal; retire them now. Only true orphans (PPID 1) are touched.
     const reaped = reapStaleMonitorProcesses(version);
@@ -375,13 +330,9 @@ function sessionCheck(): void {
     try {
       writeFileSync(marker, `${version}\n`);
     } catch {
-      // Best-effort marker; if the data dir isn't writable we just retry next session.
     }
   }
 
-  // Drift watch. Keyed on WHICH pieces are off, not on the version, so the same
-  // complaint isn't repeated every session — and a drift that returns after being
-  // fixed is reported again.
   const drift = driftReport();
   const signature = drift
     .map((d) => d.key)
@@ -401,25 +352,21 @@ function sessionCheck(): void {
     try {
       writeFileSync(sigPath, `${signature}\n`);
     } catch {
-      // Best-effort; an unwritable data dir just means the notice repeats.
     }
   }
 
   if (notices.length) emitHookNotice(notices);
 }
 
-// --- main -------------------------------------------------------------------
 function main() {
   const flags = new Set(process.argv.slice(2));
   const dryRun = flags.has("--dry-run");
 
-  // SessionStart hook entry — quiet, never fresh-wires, notice-only off-version.
   if (flags.has("--session-check")) {
     sessionCheck();
     process.exit(0);
   }
 
-  // Re-point drifted pieces now (no version gate); used manually too.
   if (flags.has("--migrate")) {
     const changed = migrate();
     console.log(
@@ -438,7 +385,6 @@ function main() {
     process.exit(ok ? 0 : 1);
   }
 
-  // default: check — dashboard prerequisites + cockpit
   const { requiredFailed } = printReport([
     ...dashboardChecks(),
     ...cockpitCliChecks(),

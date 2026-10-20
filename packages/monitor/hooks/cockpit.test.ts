@@ -12,8 +12,7 @@ const deferred = <T>(): Deferred<T> => {
 
 const ran = { result: {}, text: "ran" };
 
-// Stands for the cockpit daemon and the engine beneath the mod: the first run of a tool waits on the terminal dialog, a later run waits on `rerun`, and `verdict` is what the dashboard sends. A noun answering a primitive answers `{ value }`.
-function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
+function world(on: On, opts: { isAnsweredBeneath?: boolean; checkBeneath?: "ask" | "deny"; isInboxFailingOnce?: boolean } = {}) {
   const posts: { path: string; body: Record<string, unknown> }[] = [];
   const submitted: string[] = [];
   const verdict = deferred<Record<string, unknown>>();
@@ -23,13 +22,16 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
   const clock = mock.clock(on);
   let coreRuns = 0;
   let inboxCalls = 0;
+  let ensureRuns = 0;
+  const inboxTokens: (string | null)[] = [];
   const inboxSessions: string[] = [];
   let sessionId = "11111111-1111-4111-8111-111111111111";
 
   on(
     "process.run",
-    () =>
-      ({
+    (_$, e) => {
+      if (e.argv.includes("ensure-daemon")) ensureRuns++;
+      return ({
         value: {
           exitCode: 0,
           stdout: '{"port":5858,"token":"t"}\n',
@@ -37,7 +39,8 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
           isStdoutTruncated: false,
           isStderrTruncated: false,
         },
-      }) as never,
+      }) as never;
+    },
   );
   on(
     "session.id",
@@ -54,6 +57,8 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
     let answer: Record<string, unknown> = { ok: true };
     if (path === "/api/inbox") {
       inboxCalls++;
+      inboxTokens.push(new URL(e.url).searchParams.get("token"));
+      if (opts.isInboxFailingOnce && inboxCalls === 1) throw new Error("connection refused");
       inboxSessions.push(new URL(e.url).searchParams.get("session")!);
       if (inboxCalls === 1) answer = { message: "from the dashboard" };
       else {
@@ -77,7 +82,7 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
     } as never;
   });
   on("classic.PermissionRequest", () => (opts.isAnsweredBeneath ? { decision: { behavior: "allow" as const } } : {}));
-  on("tool.check", () => ({ decision: "ask" }));
+  on("tool.check", () => ({ decision: opts.checkBeneath ?? "ask" }));
   on(
     "tool.call",
     () => (++coreRuns === 1 ? terminal.promise : rerun.promise) as never,
@@ -93,6 +98,8 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean } = {}) {
     inboxDone,
     coreRuns: () => coreRuns,
     inboxCalls: () => inboxCalls,
+    ensureRuns: () => ensureRuns,
+    inboxTokens,
     inboxSessions,
     useSession: (id: string) => (sessionId = id),
   };
@@ -192,6 +199,7 @@ test("a dashboard message becomes a prompt", async ($, on) => {
   await $.session.start({ cwd: "/repo", surface: null } as never);
   while (w.inboxCalls() < 2) await tick();
   expect(w.submitted).toEqual(["asUser:from the dashboard"]);
+  expect(w.inboxTokens[0]).toBe("t");
   await $.session.end({ reason: "other" } as never);
   w.inboxDone.resolve();
 });
@@ -212,3 +220,48 @@ for (const reason of ["resume", "clear"] as const) {
     await $.session.end({ reason: "other" } as never);
   });
 }
+
+test("a deny beneath still stands on a dashboard-approved call's second pass", async ($, on) => {
+  const w = world(on, { checkBeneath: "deny" });
+  const call = $.tool.call(bash);
+  while (w.coreRuns() < 1) await tick();
+  await $.classic.PermissionRequest(asked as never);
+  while (!w.posts.length) await tick();
+  const id = w.posts[0]!.body.request_id as string;
+  w.verdict.resolve({ request_id: id, behavior: "allow" });
+  while (w.coreRuns() < 2) await tick();
+  expect(
+    (await $.tool.check({ tool: "Bash", input: asked.tool_input, tool_use_id: id })).decision,
+  ).toBe("deny");
+  w.rerun.resolve(ran);
+  await call;
+});
+
+test("a failed request re-reads the daemon's port and token on the next call", async ($, on) => {
+  const w = world(on, { isInboxFailingOnce: true });
+  await $.session.start({ cwd: "/repo", surface: null } as never);
+  while (w.inboxCalls() < 1) await tick();
+  const before = w.ensureRuns();
+  while (w.inboxCalls() < 2) await w.clock.advance(500);
+  expect(w.ensureRuns()).toBe(before + 1);
+  await $.session.end({ reason: "other" } as never);
+  w.inboxDone.resolve();
+});
+
+test("concurrent callers share one ensure-daemon spawn", async ($, on) => {
+  const w = world(on, { isInboxFailingOnce: true });
+  await $.session.start({ cwd: "/repo", surface: null } as never);
+  while (w.inboxCalls() < 1) await tick();
+  const before = w.ensureRuns();
+  const call = $.tool.call(bash);
+  while (w.coreRuns() < 1) await tick();
+  await $.classic.PermissionRequest(asked as never);
+  while (w.inboxCalls() < 2) await w.clock.advance(500);
+  while (!w.posts.length) await tick();
+  expect(w.ensureRuns()).toBe(before + 1);
+  w.terminal.resolve(ran);
+  await call;
+  w.verdict.resolve({ abandoned: true });
+  await $.session.end({ reason: "other" } as never);
+  w.inboxDone.resolve();
+});

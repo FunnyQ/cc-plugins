@@ -1,15 +1,11 @@
-// Pure rewrite that takes the retired statusline collector back out of a
-// settings.json `statusLine.command`. The monitor mod's session.measure hook
-// feeds the rate-limit cache now, so the collector only stands between Claude
+// The monitor mod's session.measure hook feeds the rate-limit cache now, so the collector only stands between Claude
 // Code and the command it forwarded to.
 
 // New form (the subcommand is removed from the binary): `<path>/skills/cockpit/bin/cockpit atlas statusline`. Quotes
 // around the path are matched too.
 export const SHIM_COLLECTOR_RE =
   /["']?([^\s"']*\/skills\/cockpit\/bin\/cockpit)["']? atlas statusline\b/;
-// Old form: the removed `bun <path>/statusline-collector.ts`. The optional
-// `bun` (bare or absolute, quoted or not) and the quotes around the script are
-// part of the match so a rewrite replaces the whole collector part.
+// Old form: the removed `bun <path>/statusline-collector.ts`.
 const TS_COLLECTOR_RE =
   /(?:(?<!\S)["']?(?:[^\s"']*\/)?bun["']?\s+)?["']?([^\s"']*statusline-collector\.ts)["']?/;
 const TS_COLLECTOR_SUFFIX =
@@ -47,8 +43,6 @@ function replaceCollector(
   });
 }
 
-// The command with the collector replaced by what it forwarded to, or null
-// when it runs no monitor-owned collector.
 export function unwrapCollectorCommand(command: string): string | null {
   const shim = SHIM_COLLECTOR_RE.exec(command);
   const ts = shim ? null : TS_COLLECTOR_RE.exec(command);

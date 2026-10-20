@@ -1,4 +1,3 @@
-// Run: bun test packages/monitor/skills/install/scripts/statusline-decision.test.ts
 import { describe, expect, test } from "bun:test";
 import {
   SHIM_COLLECTOR_RE,

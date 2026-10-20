@@ -11,11 +11,8 @@ type PendingCall = {
 
 // A PermissionRequest carries no tool_use_id, so the dialog finds its call here by tool and input.
 const calls = new Map<string, PendingCall>();
-// Calls the dashboard approved: their second pass through tool.check must not ask again.
 const granted = new Set<string>();
-// The promise, not its value, so concurrent callers share one `ensure-daemon` spawn.
 let coords: Promise<Coords | undefined> | undefined;
-// The loop a session switch retires may still sit in a fetch parked on the old session id.
 let generation = 0;
 
 // `$.http.fetch` aborts at 30s, so a throw this late is the daemon's long-poll outliving it, not a failure.
@@ -54,7 +51,6 @@ async function request(
   const started = Date.now();
   try {
     const res = await $.http.fetch(
-      // Every GET caller already carries a `?session=` query.
       body
         ? `http://127.0.0.1:${c.port}${path}`
         : `http://127.0.0.1:${c.port}${path}&token=${c.token}`,
@@ -70,7 +66,6 @@ async function request(
   } catch {
     if (Date.now() - started >= FETCH_ABORT_MS) return "parked";
   }
-  // A restarted daemon rotates its port and token, so the next call re-reads them.
   coords = undefined;
   return undefined;
 }
@@ -137,7 +132,6 @@ async function resolved($: EngineInterface, id: string) {
 }
 
 export const register: Register = (on) => {
-  // Feeds the usage dashboard's rate-limit cache and rollup nudge without wrapping the person's statusline.
   on("session.measure", async ($, e, next) => {
     const result = await next(e);
     // `cockpit atlas measure` reads the statusline's stdin shape, so both writers share one cache format.
@@ -170,7 +164,6 @@ export const register: Register = (on) => {
     return result;
   });
 
-  // Delivers dashboard messages as prompts; the loop outlives this hook and dies with a reload.
   on("session.start", async ($, e, next) => {
     const result = await next(e);
     void pollInbox($, ++generation);
@@ -187,7 +180,6 @@ export const register: Register = (on) => {
 
   on("classic.PermissionRequest", async ($, e, next) => {
     const result = await next(e);
-    // Only a request no hook beneath answered becomes the terminal dialog the dashboard races.
     if (!result.decision) {
       const input = JSON.stringify(e.tool_input);
       const waiting = [...calls.values()].filter(
@@ -203,7 +195,6 @@ export const register: Register = (on) => {
 
   on("tool.check", async ($, e, next) => {
     const verdict = await next(e);
-    // Lifts only the ask: a deny beneath still stands on the approved call's second pass.
     if (
       e.tool_use_id &&
       granted.has(e.tool_use_id) &&

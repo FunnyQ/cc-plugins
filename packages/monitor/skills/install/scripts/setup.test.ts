@@ -37,9 +37,6 @@ const TS_COLLECTOR = resolve(
 let home: string;
 let dataDir: string;
 
-// Run setup.ts as a subprocess with a controlled HOME (and CLAUDE_PLUGIN_DATA)
-// so reads/writes land in a tmpdir, never the real ~/.claude. This exercises
-// the actual CLI entrypoint.
 function run(args: string[] = []): {
   code: number;
   stdout: string;
@@ -51,7 +48,6 @@ function run(args: string[] = []): {
   return {
     code: proc.exitCode ?? 0,
     stdout: proc.stdout.toString() + proc.stderr.toString(),
-    // stdout alone — the hook payload must parse as JSON on its own.
     out: proc.stdout.toString(),
   };
 }
@@ -72,8 +68,6 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), "monitor-setup-"));
   mkdirSync(join(home, ".claude"), { recursive: true });
   dataDir = mkdtempSync(join(tmpdir(), "monitor-data-"));
-  // Seed the one required HOME-dependent dashboard prerequisite so --check can
-  // pass; vendor/pricing resolve to the real committed repo assets.
   writeFileSync(join(home, ".claude", "stats-cache.json"), "{}");
 });
 
@@ -86,11 +80,9 @@ describe("--check", () => {
   test("covers both skills: dashboard prerequisites + cockpit", () => {
     const { code, stdout } = run();
     expect(code).toBe(0);
-    // dashboard side
     expect(stdout).toContain("✓ bun runtime");
     expect(stdout).toContain("stats-cache.json");
     expect(stdout).not.toContain("statusline");
-    // cockpit side — with no leftover entry it's green
     expect(stdout).toContain("cockpit shim exists and is executable");
     expect(stdout).toContain("✓ no leftover cockpit-channel entry");
     expect(stdout).not.toContain("happy-dom");
@@ -139,7 +131,6 @@ describe("--dry-run", () => {
     );
     const { stdout } = run(["--dry-run"]);
     expect(stdout).toContain("Would remove the leftover cockpit-channel entry");
-    // still present — dry-run wrote nothing
     expect(claudeJson().mcpServers["cockpit-channel"]).toBeDefined();
   });
 });
@@ -149,7 +140,6 @@ describe("--apply", () => {
     const { code, stdout } = run(["--apply"]);
     expect(code).toBe(0);
     expect(stdout).toContain("✓ Pre-approved q-lab plugin scripts");
-    // the channel is gone — apply never writes one into ~/.claude.json
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
     expect(settingsJson().statusLine).toBeUndefined();
   });
@@ -232,7 +222,6 @@ describe("--apply", () => {
     run(["--apply"]);
     const { stdout } = run(["--apply"]);
     expect(stdout).toContain("already pre-approved");
-    // no channel entry was ever written, so nothing to remove on either pass
     expect(stdout).not.toContain("Removed leftover cockpit-channel");
   });
 
@@ -301,7 +290,6 @@ describe("--migrate (channel cleanup + collector unwrap, never fresh-wire)", () 
         f.startsWith("settings.json.bak-"),
       ),
     ).toBe(true);
-    // Channel was never configured — migrate must NOT create it.
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
 
     const after = readFileSync(join(home, ".claude", "settings.json"), "utf-8");
@@ -372,12 +360,9 @@ describe("--session-check (marker-gated)", () => {
   });
 
   test("is a no-op once the marker matches the current version", () => {
-    // First run reconciles and stamps the marker.
     run(["--session-check"]);
     const marker = join(dataDir, ".wired-version");
     expect(existsSync(marker)).toBe(true);
-    // Now plant a leftover channel entry; a second run should NOT remove it, because
-    // the marker already records this version (the gate skips the migrate).
     writeFileSync(
       join(home, ".claude.json"),
       JSON.stringify({
@@ -417,9 +402,7 @@ describe("--session-check (marker-gated)", () => {
   test("nudges the user to run /monitor:install once when nothing is wired", () => {
     const first = run(["--session-check"]);
     expect(first.stdout).toContain("/monitor:install");
-    // Write-free: the nudge must not create any config.
     expect(existsSync(join(home, ".claude.json"))).toBe(false);
-    // Second run is gated by the marker — no repeat nag.
     const second = run(["--session-check"]);
     expect(second.stdout).not.toContain("/monitor:install");
   });
@@ -511,7 +494,6 @@ describe("--session-check drift watch (every session, read-only)", () => {
     );
   }
   const unapproved = () => wire([]);
-  // A current marker closes the migrate gate, so only the drift watch runs.
   const markerCurrent = () =>
     writeFileSync(join(dataDir, ".wired-version"), "999.0.0\n");
 
@@ -547,7 +529,6 @@ describe("--session-check drift watch (every session, read-only)", () => {
   test("notices drift that appears within the same version, and writes nothing", () => {
     wire();
     run(["--session-check"]); // stamps the version marker + a clean drift signature
-    // Same version, so the migrate gate is closed — the drift watch must still see this.
     unapproved();
     const before = readFileSync(
       join(home, ".claude", "settings.json"),
@@ -558,7 +539,6 @@ describe("--session-check drift watch (every session, read-only)", () => {
 
     expect(stdout).toContain("permissions.allow");
     expect(stdout).toContain("/monitor:install");
-    // Notice only — the same-version path never repairs.
     expect(readFileSync(join(home, ".claude", "settings.json"), "utf-8")).toBe(
       before,
     );

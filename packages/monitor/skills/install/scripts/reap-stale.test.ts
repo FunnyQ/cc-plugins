@@ -63,10 +63,6 @@ describe("selectStaleMonitorPids", () => {
     ]);
   });
 
-  // The usage dashboard orphans to PID 1 the same way, but it IS the page the user has
-  // open in a browser, and nothing re-ensures it — the old channel only respawned the cockpit
-  // daemon. Reaping it after an upgrade would kill a live dashboard for good. It never
-  // polled anything, so it was never part of the leak.
   test("never reaps the usage dashboard, orphaned or not", () => {
     const rows = [
       row({ pid: 90091, ppid: 1, command: atlas("3.17.0") }),
@@ -82,9 +78,6 @@ describe("selectStaleMonitorPids", () => {
     expect(select([row({ pid: 90093, ppid: 1, command })])).toEqual([]);
   });
 
-  // The predicate that keeps this sweep from being destructive. A user can have an
-  // older session still open when a newer one starts: its channel has a real parent
-  // and is doing its job. A foreign version root is NOT evidence of orphanhood.
   test("never reaps a live foreign-version channel (it has a real parent)", () => {
     const rows = [
       row({ pid: 27226, ppid: 27198, command: channel("3.18.5") }),
