@@ -814,7 +814,7 @@
   align-items: center;
   gap: var(--s-8);
   margin: var(--s-2) 0 var(--s-10);
-  color: var(--muted);
+  color: var(--text-muted);
   font-size: var(--fs-base);
   font-weight: 760;
   letter-spacing: 0.04em;
