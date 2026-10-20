@@ -71,12 +71,9 @@
   --chart-grid: oklch(88% 0.012 50 / 0.6);
   --chart-axis: oklch(48% 0.015 50);
 
-  /* Retired Nordic tokens — neutralized aliases so legacy rules still resolve */
-  --rune-mark: transparent;
   --ledger-line: oklch(88% 0.012 50 / 0.4);
   --ledger-line-strong: oklch(82% 0.018 50 / 0.6);
   --bifrost-cyan: var(--sunrise-magenta);
-  --bifrost-green: var(--sunrise-amber);
 
   --radius: 10px;
   --radius-sm: 6px;

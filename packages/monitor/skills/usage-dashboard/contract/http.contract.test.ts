@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import {
   FIXTURE_IDS,
@@ -179,7 +179,6 @@ async function liveOf(base: string) {
   return body as { cockpitUp: boolean; cockpitPort: number | null };
 }
 
-// The live module caches daemon.json for 5 s on the pinned clock, so each state gets its own server.
 const writeDaemon = (fx: Fixture, pid: number) =>
   writeFileSync(
     join(fx.env.COCKPIT_HOME, "daemon.json"),
@@ -226,9 +225,7 @@ const REFRESH_KEYS = [
   "writtenCount",
 ];
 
-// Tests run in file order: the OpenRouter 500 and the corrupt override stay forced once set.
-describe("POST /api/pricing/refresh", () => {
-  const ctx = useServer();
+function pricingRefresh(ctx: { fx: Fixture; base: string }) {
   const overrideFile = () =>
     join(ctx.fx.home, ".config", "cc-dashboard", "pricing.json");
   const refresh = (body?: string) =>
@@ -238,6 +235,12 @@ describe("POST /api/pricing/refresh", () => {
         ? {}
         : { body, headers: { "Content-Type": "application/json" } }),
     });
+  return { overrideFile, refresh };
+}
+
+describe("POST /api/pricing/refresh", () => {
+  const ctx = useServer();
+  const { overrideFile, refresh } = pricingRefresh(ctx);
 
   test("models body: resolves, drops non-strings, writes the override", async () => {
     const res = await refresh(
@@ -270,6 +273,12 @@ describe("POST /api/pricing/refresh", () => {
     expect(body.ok).toBe(true);
   });
 
+});
+
+describe("POST /api/pricing/refresh with OpenRouter failing", () => {
+  const ctx = useServer();
+  const { refresh } = pricingRefresh(ctx);
+
   test("OpenRouter 500 is recorded, not thrown", async () => {
     ctx.fx.stub.respondWith(STUB_PATHS.openRouter, 500, "{}");
     const res = await refresh(
@@ -281,7 +290,14 @@ describe("POST /api/pricing/refresh", () => {
     expect(body.openRouterError).toBe("HTTP 500");
   });
 
+});
+
+describe("POST /api/pricing/refresh with a corrupt override", () => {
+  const ctx = useServer();
+  const { overrideFile, refresh } = pricingRefresh(ctx);
+
   test("corrupt override file: 500 Override unreadable", async () => {
+    mkdirSync(dirname(overrideFile()), { recursive: true });
     writeFileSync(overrideFile(), "{not json");
     const res = await refresh(
       JSON.stringify({ models: ["claude:claude-opus-4-7"] }),

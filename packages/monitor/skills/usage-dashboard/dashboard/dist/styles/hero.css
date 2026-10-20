@@ -107,8 +107,6 @@
   font-weight: 700;
 }
 
-/* deltaClass() injects .compare-block which adds a border-top + grid.
-   Reset those inside hero so the delta sits inline under the cost number. */
 .hero-band .compare-block {
   display: inline-flex;
   align-items: baseline;

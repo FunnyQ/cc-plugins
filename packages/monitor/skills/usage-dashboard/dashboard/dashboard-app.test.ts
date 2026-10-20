@@ -71,3 +71,20 @@ test("ring arcs are the clamped percent, since the template's r=15.9155 circle h
   expect(view.usedArc).toBe(100);
   expect(view.elapsedArc).toBe(33.33);
 });
+
+test("deltaClass emits .compare-block plus the one state modifier the stylesheets select on", async () => {
+  const app = App();
+  const css = (
+    await Promise.all(
+      [...new Bun.Glob("styles/*.css").scanSync(`${import.meta.dir}/dist`)].map((f) => Bun.file(`${import.meta.dir}/dist/${f}`).text()),
+    )
+  ).join("\n");
+  expect(css).toContain(".hero-band .compare-block");
+  for (const state of ["increase", "decrease", "neutral", "unavailable"]) {
+    const on = Object.entries(app.deltaClass.call({ summaryDeltas: { cost: { state } } }, "cost"))
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    expect(on).toEqual(["compare-block", `compare-block--${state}`]);
+    expect(css).toContain(`.compare-block--${state}`);
+  }
+});
