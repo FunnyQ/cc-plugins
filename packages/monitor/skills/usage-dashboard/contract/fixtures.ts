@@ -1,6 +1,3 @@
-// Deterministic fixture HOME for the atlas contract suite. Every item below is
-// named for the engine rule it exercises; shapes follow how the engine parses them
-// (cockpit-rs/src/atlas/), not a published schema.
 import { Database } from "bun:sqlite";
 import {
   mkdirSync,
@@ -23,7 +20,6 @@ export type StubRequest = {
 export type StubServer = {
   url: string;
   requests: StubRequest[];
-  // Overrides every later response on `path` until called again; lets tests force 500s.
   respondWith(path: string, status: number, body: string): void;
   stop(): void;
 };
@@ -34,11 +30,8 @@ const local = (iso: string) => Date.parse(`${iso}+08:00`);
 const utc = (ms: number) => new Date(ms).toISOString();
 const seconds = (ms: number) => Math.floor(ms / 1000);
 
-// Newest usage entry is 2026-09-28 22:40 local; "now" is past local midnight, so
-// "today" differs from the newest entry's date in local time but not in UTC.
 export const FIXTURE_NEWEST_MS = local("2026-09-28T22:40:00");
 export const FIXTURE_NOW_MS = local("2026-09-29T02:00:00");
-// Every fixture file and dir gets this atime/mtime, so fingerprints and cache keys repeat.
 const FIXTURE_MTIME_S = seconds(local("2026-09-29T00:00:00"));
 
 export const STUB_PATHS = {
@@ -81,8 +74,6 @@ export async function freePort(): Promise<number> {
   return port === 5938 ? freePort() : port;
 }
 
-// OpenRouter prices per token as strings; one model omits cache prices so the
-// 0.1x / 1.25x fallback runs, and one model is used by nothing.
 const OPENROUTER_MODELS = {
   data: [
     {
@@ -117,7 +108,6 @@ const OPENROUTER_MODELS = {
   ],
 };
 
-// Primary is a 5-hour window, secondary a weekly one (buildCodexUsageLimits slots by length).
 const CODEX_USAGE = {
   plan_type: "plus",
   rate_limit: {
@@ -166,7 +156,6 @@ function startStub(): StubServer {
         case STUB_PATHS.openRouter:
           return json(200, OPENROUTER_MODELS);
         case STUB_PATHS.codexUsage:
-          // 401 to the stale token is what drives the TS into its refresh path.
           return req.headers.get("authorization") ===
             `Bearer ${FIXTURE_IDS.freshCodexAccessToken}`
             ? json(200, CODEX_USAGE)
@@ -283,7 +272,6 @@ function writeClaude(home: string): void {
     join(dirA, `${A}.jsonl`),
     jsonl([
       claudeUser(A, a, local("2026-09-26T09:14:00"), "Plan the fixture"),
-      // Repeated usage snapshots of one request: the ingest bills the first only.
       claudeAssistant(
         A,
         a,
@@ -307,11 +295,9 @@ function writeClaude(home: string): void {
       claudeUser(A, a, local("2026-09-26T09:15:10"), [
         { type: "tool_result", tool_use_id: "toolu_A1", content: "ok" },
       ]),
-      // isMeta user lines are not interactions.
       claudeUser(A, a, local("2026-09-26T09:16:00"), "<meta>", {
         isMeta: true,
       }),
-      // 01:30 local is the previous UTC day: a UTC date bucket lands on 09-26.
       claudeAssistant(
         A,
         a,
@@ -322,7 +308,6 @@ function writeClaude(home: string): void {
         reqA2,
         [{ type: "text", text: "done" }],
       ),
-      // No timestamp: billed into usage_hourly hour_ms = 0.
       claudeAssistant(
         A,
         a,
@@ -336,8 +321,6 @@ function writeClaude(home: string): void {
     ]),
   );
 
-  // Subagent transcript carries its parent's sessionId, and repeats req_A2,
-  // which must be billed once across the two files.
   writeText(
     join(dirA, A, "subagents", `${FIXTURE_IDS.claudeSubagent}.jsonl`),
     jsonl([
@@ -397,8 +380,6 @@ function writeClaude(home: string): void {
     ]),
   );
 
-  // Shape read by parseStatsCache; lastComputedDate precedes 09-28 so history
-  // supplements that day (mergeDailyActivity).
   writeText(
     join(home, ".claude", "stats-cache.json"),
     JSON.stringify(
@@ -455,7 +436,6 @@ function writeClaude(home: string): void {
     ),
   );
 
-  // parseHistory: timestamps in ms; one entry lacks a sessionId.
   writeText(
     join(home, ".claude", "history.jsonl"),
     jsonl([
@@ -496,7 +476,6 @@ function writeClaude(home: string): void {
     ]),
   );
 
-  // session-files.ts: one live (updated 2 min before now), one stale.
   const sessions = join(home, ".claude", "sessions");
   writeText(
     join(sessions, `${FIXTURE_IDS.claudePidLive}.json`),
@@ -552,8 +531,6 @@ const codexTotals = (
   total_tokens: input + output,
 });
 
-// readCodexSession: first timestamp, session_meta/turn_context for cwd+model,
-// user messages, function_call tool calls, cumulative token_count events.
 function codexRollout(
   id: string,
   cwd: string,
@@ -661,7 +638,6 @@ function writeCodex(home: string): void {
     ),
   );
 
-  // Every column either query selects (api.ts parseCodexUsage, live.ts readCodexThreadRows).
   const db = new Database(join(codex, "state_5.sqlite"), { create: true });
   db.exec(`create table threads (
     id text primary key, rollout_path text not null default '',
@@ -687,9 +663,6 @@ function writeCodex(home: string): void {
     17100,
     0,
   );
-  // model null → the engine falls back to the rollout's turn_context model.
-  // updated_at_ms sits 30 s before now so the live panel sees it; the engine reads
-  // only the seconds columns, which stay at the rollout's own times.
   insert.run(
     ids.codexThreadModelFromRollout,
     t2Path,
@@ -703,7 +676,6 @@ function writeCodex(home: string): void {
     4500,
     0,
   );
-  // tokens_used > 0 with no rollout: billed from the thread row alone.
   insert.run(
     ids.codexThreadNoRollout,
     "",
@@ -744,7 +716,6 @@ function writeOpenCode(home: string): void {
   const ses = FIXTURE_IDS.openCodeSession;
   const cwd = FIXTURE_PROJECTS.c;
 
-  // Rows parseOpenCodeUsage reads: session, message (JSON data), part (tool count).
   const db = new Database(join(dir, "opencode.db"), { create: true });
   db.exec(`create table session (
       id text primary key, directory text not null, title text,
@@ -758,7 +729,6 @@ function writeOpenCode(home: string): void {
       id text primary key, message_id text not null, session_id text not null,
       time_created integer not null, data text not null
     );`);
-  // time_updated near now keeps the session live; engine times come from message rows.
   db.query("insert into session values (?, ?, ?, ?, ?)").run(
     ses,
     cwd,
@@ -828,7 +798,6 @@ function writeOpenCode(home: string): void {
     u2,
     JSON.stringify({ role: "user", time: { created: u2 } }),
   );
-  // A positive stored cost wins over computed pricing (usageCost).
   const a2 = local("2026-09-28T11:00:05");
   const a2Done = local("2026-09-28T11:02:00");
   message.run(
@@ -853,8 +822,6 @@ function writeOpenCode(home: string): void {
   );
   db.close();
 
-  // Legacy JSON storage next to the DB. With DB rows present the engine only
-  // counts these (dataHealth) and fingerprints them; it parses them when the DB is empty.
   const legacy = FIXTURE_IDS.openCodeLegacySession;
   const created = local("2026-09-27T15:00:00");
   writeText(
@@ -886,7 +853,6 @@ function writeOpenCode(home: string): void {
 }
 
 function writeConfigAndCache(home: string): void {
-  // User override replaces one model's price (last in pricing resolution order).
   writeText(
     join(home, ".config", "cc-dashboard", "pricing.json"),
     `${JSON.stringify({ models: { "claude-sonnet-4-6": { input: 2.5, output: 12, cacheRead: 0.25, cacheWrite: 3 } } }, null, 2)}\n`,
@@ -895,8 +861,6 @@ function writeConfigAndCache(home: string): void {
     join(home, ".config", "cc-dashboard", "budget.json"),
     JSON.stringify({ monthlyBudgetUSD: 200 }, null, 2),
   );
-  // buildRateLimitsRecord's shape, written the way `cockpit atlas measure` writes
-  // it; captured a minute before now, so readUsageLimits reports it fresh.
   const captured = FIXTURE_NOW_MS - 60_000;
   writeText(
     join(home, ".cache", "token-atlas", "rate-limits.json"),
@@ -921,7 +885,6 @@ function writeConfigAndCache(home: string): void {
   );
 }
 
-// Post-order, so creating a child never bumps a dir's mtime after it was pinned.
 function pinTimes(path: string): void {
   for (const entry of readdirSync(path, { withFileTypes: true })) {
     const child = join(path, entry.name);
@@ -953,8 +916,6 @@ export async function makeFixtureHome(): Promise<{
   pinTimes(home);
 
   const stub = startStub();
-  // The whole child environment: spreading process.env could let an outer
-  // TOKEN_ATLAS_ROLLUP_DB or COCKPIT_OPENCODE_DB point a test at real data.
   const env: Record<string, string> = {
     PATH: process.env.PATH ?? "",
     HOME: home,

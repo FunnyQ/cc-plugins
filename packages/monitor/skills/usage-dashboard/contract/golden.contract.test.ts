@@ -28,19 +28,18 @@ import {
   rollupDbPath,
   rollupUpdate,
   stripVolatile,
+  transcriptPaths,
   transcriptDeleted,
   withFixture,
   type Dump,
   type Row,
 } from "./golden";
 
-// One line per volatile-keys.json entry: why it differs between two recordings.
 const VOLATILE_REASONS: Record<string, string> = {
   "dataHealth.sources.6.modifiedAt":
     "the Codex usage cache is written by the run itself, so its mtime is the wall clock",
 };
 
-// Each run spawns a process against a fresh fixture home.
 const SPAWN_TIMEOUT_MS = 60_000;
 
 const scenarioGolden = (name: keyof typeof SCENARIOS) =>
@@ -49,6 +48,15 @@ const scenarioGolden = (name: keyof typeof SCENARIOS) =>
 const rowKey = (r: Row) => JSON.stringify([r.hour_ms, r.project, r.model]);
 
 describe("golden helpers", () => {
+  test("SCENARIO_MTIME_MS is whole seconds, so mtime_ms is exact, and later than the fixture's own mtime", async () => {
+    expect(SCENARIO_MTIME_MS % 1000).toBe(0);
+    await withFixture(async (f) => {
+      expect(statSync(transcriptPaths(f).b).mtimeMs).toBeLessThan(
+        SCENARIO_MTIME_MS,
+      );
+    });
+  });
+
   test("normalizeFixturePaths rewrites nested values and path keys", () => {
     const root = "/tmp/atlas-fixture-abc";
     const input: Record<string, unknown> = {
@@ -146,7 +154,6 @@ describe("golden rollup", () => {
         bytes_parsed: size,
         mtime_ms: SCENARIO_MTIME_MS,
       });
-      // The repeated req_B1 snapshot bills nothing: only req_B3's bucket is new.
       const old = new Set(before.usage_hourly.map(rowKey));
       expect(before.usage_hourly).toEqual(
         after.usage_hourly.filter((r) => old.has(rowKey(r))),
@@ -175,7 +182,6 @@ describe("golden rollup", () => {
     async () => {
       const { before, after, path } = await transcriptDeleted();
       expect(before.session_ledger.some((r) => r.path === path)).toBe(true);
-      // Token history outlives the transcript; the ledger prunes with it.
       expect(after.usage_hourly).toEqual(before.usage_hourly);
       for (const table of [
         "session_ledger",
@@ -190,7 +196,6 @@ describe("golden rollup", () => {
       expect(
         after.seen_tool_calls.filter((r) => !liveSessions.has(r.session_key)),
       ).toEqual([]);
-      // msg_A1's tool call lived only in the deleted file.
       expect(after.seen_tool_calls.map((r) => r.tool_key)).not.toContain(
         "msg_A1",
       );
@@ -224,7 +229,6 @@ describe("golden rollup", () => {
       expect(run.code).toBe(0);
       expect(backupExists).toBe(true);
       expect(schemaVersion).toBe("3");
-      // Survive unchanged: the legacy row has no transcript, and seen_requests blocks re-billing B's.
       for (const row of V2_SEED_HOURLY)
         expect(after.usage_hourly).toContainEqual(row);
       expect(after.session_ledger.length).toBeGreaterThan(0);
@@ -240,7 +244,6 @@ describe("golden rollup", () => {
       expect(run.code).not.toBe(0);
       expect(run.err).toContain("Unsupported rollup schema version: 99");
       expect(after).toEqual(before);
-      // The TS takes its version backup before the version check.
       expect(backupExists).toBe(true);
       expect(after).toEqual(await scenarioGolden("refuse newer"));
     },

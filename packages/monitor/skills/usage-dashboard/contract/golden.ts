@@ -19,7 +19,6 @@ import { atlasCommand, type AtlasSub } from "./launcher";
 
 export const GOLDEN_DIR = join(import.meta.dir, "golden");
 
-// contracts.md §6, in payload order.
 export const STATS_KEYS = [
   "period",
   "summary",
@@ -45,7 +44,9 @@ export const STATS_KEYS = [
 export const SOURCES = ["claude", "codex", "opencode", "pricing"] as const;
 export type SourceName = (typeof SOURCES)[number];
 
-// Each table's primary key, which is also its dump order.
+const INGEST_WALL_CLOCK_COLUMN = "updated_at";
+const RUST_ONLY_META_KEY = "writer";
+
 const TABLE_KEYS = {
   meta: "key",
   ingested_files: "path",
@@ -122,7 +123,6 @@ export async function withFixture<T>(
   }
 }
 
-// makeFixtureHome puts home, data, config and cockpit dirs under one mkdtemp root.
 export const fixtureRoot = (f: Fixture) => dirname(f.home);
 
 // Every fixture root is a fresh mkdtemp, so no two runs compare equal until it is
@@ -142,8 +142,6 @@ export function normalizeFixturePaths<T>(value: T, root: string): T {
   return walk(value) as T;
 }
 
-// Deletes each dotted path in place; `*` matches any one key or array index, and a
-// path that matches nothing is ignored.
 export function stripVolatile<T>(value: T, paths: string[]): T {
   const strip = (node: unknown, segments: string[]): void => {
     if (!node || typeof node !== "object") return;
@@ -170,12 +168,11 @@ export function dumpRollup(dbPath: string, root: string): Dump {
       let rows = db
         .query(`SELECT * FROM ${table} ORDER BY ${TABLE_KEYS[table]}`)
         .all() as Row[];
-      // updated_at is the ingest's own Date.now(), not derived from any input.
       if (table === "ingested_files") {
-        rows = rows.map(({ updated_at: _, ...rest }) => rest);
+        rows = rows.map(({ [INGEST_WALL_CLOCK_COLUMN]: _, ...rest }) => rest);
       }
-      // The Rust writer marks the DB it owns; TS never writes it, and the two must compare equal.
-      if (table === "meta") rows = rows.filter((r) => r.key !== "writer");
+      if (table === "meta")
+        rows = rows.filter((r) => r.key !== RUST_ONLY_META_KEY);
       dump[table] = normalizeFixturePaths(rows, root);
     }
     return dump;
@@ -253,7 +250,6 @@ export const transcriptPaths = (f: Fixture) => {
   };
 };
 
-// Later than the fixture's own mtime, and whole seconds, so mtime_ms is exact.
 export const SCENARIO_MTIME_MS = FIXTURE_NOW_MS;
 
 // The one way a scenario edits a transcript: the utimes keeps ingested_files.mtime_ms deterministic.
@@ -266,8 +262,6 @@ export function appendTranscript(path: string, rows: unknown[]): void {
 const localIso = (iso: string) =>
   new Date(Date.parse(`${iso}+08:00`)).toISOString();
 
-// Appended to session B: a new user turn, a repeat of the already-billed
-// req_B1:msg_B1, and one new sonnet request that also makes a tool call.
 export const APPENDED_LINES = (() => {
   const sessionId = FIXTURE_IDS.claudeSessionB;
   const cwd = FIXTURE_PROJECTS.b;
@@ -386,7 +380,6 @@ export const rebuild = () =>
     return { before, after: dumpRollup(db, root) };
   });
 
-// rollup-db.ts at schema v2: v3 minus seen_tool_calls, session_ledger, session_model_usage.
 const V2_DDL = `
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
   CREATE TABLE ingested_files (
@@ -422,8 +415,6 @@ const hourRow = (
   message_count: 1,
 });
 
-// A v2 DB that already billed session B's transcript, plus history for a
-// project whose transcripts are long gone. Same column order as the v3 dump.
 export const V2_SEED_HOURLY: Row[] = [
   hourRow(
     "2026-08-01T10:00:00",
@@ -514,7 +505,6 @@ export const refuseNewer = () =>
     };
   });
 
-// The dump each scenario's golden file holds.
 export async function recordScenario(name: Scenario): Promise<Dump> {
   switch (name) {
     case "incremental append":

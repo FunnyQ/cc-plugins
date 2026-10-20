@@ -33,7 +33,6 @@ describe("atlas launcher", () => {
   });
 
   test("a missing default binary throws the exact message at import", () => {
-    // A copy of the launcher where ../../../cockpit-rs/target/release/cockpit does not exist.
     const dir = mkdtempSync(join(tmpdir(), "atlas-launcher-"));
     try {
       const copy = join(dir, "a/b/c/launcher.ts");

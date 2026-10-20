@@ -41,16 +41,14 @@ export async function extendLiveFixture(home: string): Promise<void> {
       kind: "interactive",
       entrypoint: "cli",
     });
-  // The base fixture already has a busy session (2 min) and one stale for days.
   claude(90003, LIVE_IDS.claudeIdle, "idle", now - 180_000);
   claude(90004, LIVE_IDS.claudeWaiting, "waiting", now - 45_000);
   claude(90005, LIVE_IDS.claudeStale, "busy", now - 600_001);
 
-  // Rollouts live outside ~/.codex/sessions so the usage engine never ingests them.
-  const rollouts = join(home, "live-rollouts");
+  const rolloutsOutsideSessions = join(home, "live-rollouts");
   const rollout = (id: string) => {
-    const path = join(rollouts, `rollout-${id}.jsonl`);
-    mkdirSync(rollouts, { recursive: true });
+    const path = join(rolloutsOutsideSessions, `rollout-${id}.jsonl`);
+    mkdirSync(rolloutsOutsideSessions, { recursive: true });
     writeFileSync(path, "");
     return path;
   };
@@ -78,7 +76,6 @@ export async function extendLiveFixture(home: string): Promise<void> {
       0,
       archived,
     );
-  // The base fixture's model-from-rollout thread sits at 30 s: active-inferred.
   thread(LIVE_IDS.codexRecent, rollout(LIVE_IDS.codexRecent), now - 240_000, 0);
   thread(LIVE_IDS.codexOld, rollout(LIVE_IDS.codexOld), now - 900_000, 0);
   thread(
@@ -89,7 +86,7 @@ export async function extendLiveFixture(home: string): Promise<void> {
   );
   thread(
     LIVE_IDS.codexMissingRollout,
-    join(rollouts, "missing.jsonl"),
+    join(rolloutsOutsideSessions, "missing.jsonl"),
     now - 20_000,
     0,
   );

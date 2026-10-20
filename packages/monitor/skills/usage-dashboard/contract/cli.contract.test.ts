@@ -1,5 +1,3 @@
-// Black-box contract for the atlas CLI subcommands (contracts.md §4). Launcher-driven:
-// runs COCKPIT_BIN, or the locally built release binary.
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   existsSync,
@@ -12,6 +10,8 @@ import {
 import { join } from "node:path";
 import { atlasCommand, type AtlasSub } from "./launcher";
 import { freePort, makeFixtureHome, STUB_PATHS } from "./fixtures";
+
+const COLD_DETACHED_ROLLUP_ON_LOADED_CI_MS = 15_000;
 
 type Fixture = Awaited<ReturnType<typeof makeFixtureHome>>;
 
@@ -102,7 +102,6 @@ describe("measure", () => {
   ] as const) {
     test(`${name} stdin creates no cache file in a fresh home`, async () => {
       const f = await fixture();
-      // The fixture may pre-seed the cache; start from a fresh one for this case.
       const path = rateLimitsPath(f);
       if (existsSync(path)) await Bun.file(path).delete();
       const r = await run(f, "measure", { stdin });
@@ -127,8 +126,12 @@ describe("measure", () => {
     const marker = join(cacheDir(f), ".rollup-nudge");
     await run(f, "measure", { stdin: "{}" });
     expect(existsSync(marker)).toBe(true);
-    // 15 s: a cold detached rollup-update over the fixture corpus, with slack for a loaded CI box.
-    expect(await waitFor(() => existsSync(defaultDb(f)), 15_000)).toBe(true);
+    expect(
+      await waitFor(
+        () => existsSync(defaultDb(f)),
+        COLD_DETACHED_ROLLUP_ON_LOADED_CI_MS,
+      ),
+    ).toBe(true);
     const mtime = statSync(marker).mtimeMs;
     await run(f, "measure", { stdin: "{}" });
     expect(statSync(marker).mtimeMs).toBe(mtime);

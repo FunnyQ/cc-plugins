@@ -162,7 +162,6 @@ describe("atlas engine against the fixture home", () => {
     expect(first.code).toBe(0);
     const payload = JSON.parse(first.out);
     const providers = payload.summary.providers;
-    // summary.providers carries sessions and messages; token totals live in byModel.
     for (const provider of ["claude", "codex", "opencode"] as const) {
       expect(providers[provider].totalSessions).toBeGreaterThan(0);
       const tokens = payload.byModel
@@ -228,9 +227,7 @@ describe("atlas engine against the fixture home", () => {
     ]);
     expect(out.transcriptFileCount).toBe(3);
     const opus = out.usage.modelUsage["claude-opus-4-7"];
-    // First snapshot billed: output 10, not the later snapshot's 250.
     expect(opus.outputTokens).toBe(10 + 3 + 600);
-    // The timeless entry counts in totals but in no hourly bucket.
     expect(opus.inputTokens).toBe(100 + 7 + 300);
     const hourlyOpusInput = Object.values(
       out.usage.hourlyUsage as Record<
@@ -244,7 +241,6 @@ describe("atlas engine against the fixture home", () => {
     );
     expect(hourlyOpusInput).toBe(400);
     expect(out.usage.hourlyUsage["0"]).toBeUndefined();
-    // req_A2 appears in the parent and the subagent transcript; billed once.
     expect(out.usage.modelUsage["claude-sonnet-4-6"].inputTokens).toBe(50 + 40);
     const hours = Object.keys(out.usage.hourlyUsage);
     expect(hours.length).toBeGreaterThanOrEqual(4);
@@ -253,7 +249,6 @@ describe("atlas engine against the fixture home", () => {
       "2026-09-27",
       "2026-09-28",
     ]);
-    // The subagent file folds into its parent's session row.
     const parent = out.ledger.find(
       (row: { id: string }) => row.id === `claude:${A}`,
     );
@@ -262,7 +257,6 @@ describe("atlas engine against the fixture home", () => {
       interactions: 3,
       toolCalls: 3,
     });
-    // Set → sorted array through the source replacer.
     expect(out.history.dailyHistory["2026-09-28"].sessionIds).toEqual([
       FIXTURE_IDS.claudeSessionB,
     ]);
@@ -275,7 +269,6 @@ describe("atlas engine against the fixture home", () => {
     const out = JSON.parse(run.out);
     expect(Object.keys(out)).toEqual(["usage", "usageLimits"]);
     expect(Object.keys(out.usage.modelUsage).length).toBeGreaterThan(0);
-    // Model comes from the rollout when the thread row has none.
     expect(out.usage.modelUsage["codex:gpt-5.1-codex-mini"]).toBeDefined();
     expect(out.usage.ledger.map((row: { id: string }) => row.id)).toContain(
       `codex:${FIXTURE_IDS.codexThreadNoRollout}`,

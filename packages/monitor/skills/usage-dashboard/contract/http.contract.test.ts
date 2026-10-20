@@ -1,5 +1,3 @@
-// Black-box HTTP surface of `atlas serve` (contracts.md §2), run against whichever
-// server atlasCommand() selects.
 import {
   afterAll,
   afterEach,
@@ -53,7 +51,6 @@ const STATS_KEYS = [
 const STATS_ETAG = /^W\/"[^-"]+-\d+:\d+(\.\d+)?"$/;
 const JSON_TYPE = "application/json; charset=utf-8";
 
-// One fixture home plus one server; torn down by the describe's afterAll.
 function useServer(prepare?: (fx: Fixture) => void | Promise<void>) {
   const ctx = {} as { fx: Fixture; atlas: AtlasProc; base: string };
   beforeAll(async () => {
@@ -373,7 +370,6 @@ describe("concurrency", () => {
     if (tmp) rmSync(tmp, { recursive: true, force: true });
   });
 
-  // Skipped for TS: it builds stats synchronously on its one event loop, so /api/live blocks behind it.
   test("live answers during a stats build", async () => {
     fx = await makeFixtureHome();
     tmp = mkdtempSync(join(tmpdir(), "atlas-barrier-"));

@@ -28,7 +28,6 @@ test("Rust atlas live deep-equals golden/live.json", async () => {
   }>("live.json");
   expect(normalizeFixturePaths(JSON.parse(out), fixtureRoot(f))).toEqual(golden);
 
-  // Guard the fixture itself: every status and a cockpit tag per provider must appear.
   const statuses = new Set(golden.sessions.map((s) => s.status));
   for (const s of ["busy", "idle", "waiting", "active-inferred", "recent"]) {
     expect(statuses.has(s)).toBe(true);
