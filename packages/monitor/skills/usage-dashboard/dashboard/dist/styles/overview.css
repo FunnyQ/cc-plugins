@@ -1,10 +1,10 @@
-/* Overview */
+:root {
+  --shell-rise-delay: 420ms;
+}
+
 .main-shell {
   display: block;
-  /* Wait for the overlay's blur phase (~400ms) before settling in, so the
-     dashboard arrives during the opacity fade — not while the overlay is
-     still opaque-and-blurring. */
-  animation: shell-rise 700ms 420ms var(--ease-out) both;
+  animation: shell-rise 700ms var(--shell-rise-delay) var(--ease-out) both;
 }
 
 .main-shell--corner-signal {
@@ -29,13 +29,6 @@
   border-radius: var(--radius);
   background: var(--surface-2);
   padding: var(--s-22) var(--s-24) var(--s-20);
-}
-
-/* Retired: rune corner ticks + bifrost rainbow stripe. Keep selectors
-   so legacy hover rules below are inert without producing visual artifacts. */
-.card::before,
-.panel::after {
-  content: none;
 }
 
 .card:hover {
@@ -83,9 +76,6 @@
   letter-spacing: 0;
 }
 
-/* Tiny daily cost spark — sits beneath the Daily burn metric.
-   Strokes in sunrise-coral so it reads as part of the cost lineage,
-   not as a generic line chart. */
 .cost-spark {
   display: block;
   width: 100%;
@@ -559,8 +549,6 @@
   stroke: color-mix(in oklch, var(--text-faint) 12%, var(--bg-rail));
 }
 
-/* Time elapsed in the window, drawn behind the usage arc; the fill arc reaching
-   past it means quota is burning faster than the window's clock. */
 .usage-ring-elapsed {
   stroke: color-mix(in oklch, var(--text) 12%, transparent);
   stroke-linecap: round;
@@ -588,8 +576,6 @@
   stroke: var(--sunrise-magenta);
 }
 
-/* Marker for projected usage at reset if the current pace holds, riding the ring
-   at its projected angle. */
 .usage-ring-projection {
   stroke: var(--surface-2);
   stroke-width: 1;

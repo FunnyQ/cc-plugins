@@ -114,17 +114,12 @@
   justify-self: start;
 }
 
-/* cockpit tag + status + ago share one centred grid column, so they line up
-   on the row's vertical centre regardless of how tall live-main (project +
-   path) is. */
 .live-status-cluster {
   display: flex;
   align-items: center;
   gap: var(--s-10);
 }
 
-/* This live session is also a cockpit session — solid accent pill (the inverse
-   of cockpit's dashed "untracked" tag): it has a decision trail worth opening. */
 .live-cockpit-tag {
   border: 1px solid color-mix(in oklch, var(--accent) 42%, var(--edge-soft));
   border-radius: var(--radius-pill);
@@ -180,7 +175,6 @@
   font-size: var(--fs-sm);
 }
 
-/* Cockpit daemon down — its rows open transcripts there, so flag it. */
 .live-notice {
   margin: 0;
   border: 1px solid color-mix(in oklch, var(--warn) 38%, var(--edge-soft));
@@ -207,7 +201,6 @@
   white-space: nowrap;
 }
 
-/* Without cockpit, a row click can't open anything — soften the affordance. */
 .live-panel.is-cockpit-down .live-row {
   cursor: default;
   opacity: 0.7;
@@ -266,7 +259,6 @@
     gap: var(--s-8) var(--s-10);
   }
 
-  /* stack: project/path on line 1, the status cluster on line 2 (left-aligned) */
   .live-main {
     grid-column: 2;
   }

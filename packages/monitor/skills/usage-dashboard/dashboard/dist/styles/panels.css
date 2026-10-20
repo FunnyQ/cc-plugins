@@ -1,4 +1,3 @@
-/* Panels */
 .panel {
   position: relative;
   isolation: isolate;
@@ -11,11 +10,7 @@
   margin-bottom: var(--s-14);
 }
 
-/* Sunrise Bloom — warm light from behind the surface. JS continuously lerps
-   --bloom-x/--bloom-y toward the cursor each frame, so the light trails with
-   exponential ease-out (the closer it gets, the smaller the step).
-   `.budget-panel`, `.usage-limits-panel`, and `.data-health-panel` opt in without the base `.panel`
-   class, so they need the same isolated stacking context. */
+/* These opt into the bloom without the base `.panel` class, so they need its isolated stacking context. */
 .budget-panel,
 .usage-limits-panel,
 .live-panel,
@@ -115,7 +110,6 @@
   letter-spacing: 0;
 }
 
-/* Retired: Nordic rune diamond marker before panel headings */
 .panel-head h2::before {
   content: none;
 }

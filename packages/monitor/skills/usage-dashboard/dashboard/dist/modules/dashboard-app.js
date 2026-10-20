@@ -38,6 +38,8 @@ const STATS_REFRESH_TIMEOUT_MS = 20_000;
 const LIVE_REFRESH_TIMEOUT_MS = 8_000;
 const ROLLING_24H_MS = 24 * 60 * 60 * 1000;
 const RANGE_KEY_PULSE_HOLD_MS = 1_840;
+const LOADER_EXIT_MS = 800;
+const MIN_ELAPSED_PCT_FOR_PROJECTION = 5;
 
 async function fetchJsonWithTimeout(path, timeoutMs) {
   const ctrl = new AbortController();
@@ -191,7 +193,6 @@ export function App() {
         this.liveSessions = data.sessions ?? [];
         // Missing field (older server) → assume up so we never nag wrongly.
         this.cockpitUp = data.cockpitUp !== false;
-        // Cockpit can bind a custom port; open the one daemon.json reported.
         this.cockpitPort = data.cockpitPort || 5858;
         this.liveError = null;
       } catch (err) {
@@ -213,8 +214,6 @@ export function App() {
     startLiveClock() {
       if (this.liveTickTimer) window.clearInterval(this.liveTickTimer);
       this.liveTickTimer = window.setInterval(() => {
-        // Only churn the relative-time bindings when the panel is actually
-        // visible with rows — otherwise this is a 1Hz no-op re-render forever.
         if (document.hidden || !this.liveSessions.length) return;
         this.nowTick = Date.now();
       }, 1_000);
@@ -243,11 +242,9 @@ export function App() {
         this.renderDonut();
         if (this.loaderVisible && !this.loaderFading) {
           this.loaderFading = true;
-          // Match the staggered exit: 400ms blur + 350ms opacity fade = 750ms,
-          // plus a small tail before unmounting.
           window.setTimeout(() => {
             this.loaderVisible = false;
-          }, 800);
+          }, LOADER_EXIT_MS);
         }
       } catch (err) {
         if (quiet) {
@@ -261,10 +258,6 @@ export function App() {
       }
     },
 
-    // Fetch latest pricing from OpenRouter, persist it to the user override
-    // file (model-keyed, harness-agnostic), then reload stats so the panel
-    // reflects the freshly written prices.
-    // Show a transient status note that auto-dismisses after 5s.
     flashPricingNote(note, isError) {
       this.pricingRefreshNote = note;
       this.pricingRefreshError = isError;
@@ -298,7 +291,6 @@ export function App() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        // Reload stats so Live/Override/Fallback counts reflect the new file.
         await this.refresh({ quiet: true });
         const priced =
           data.writtenCount === 1
@@ -311,10 +303,11 @@ export function App() {
         const orTail = data.openRouterError
           ? ` · OpenRouter: ${data.openRouterError}`
           : "";
-        // Surface a hard failure only when nothing landed and OpenRouter erred.
+        const nothingLanded =
+          Boolean(data.openRouterError) && data.writtenCount === 0;
         this.flashPricingNote(
           `Saved to ${data.overridePath} — ${priced}${missTail}${orTail}`,
-          Boolean(data.openRouterError) && data.writtenCount === 0,
+          nothingLanded,
         );
       } catch (err) {
         this.flashPricingNote(
@@ -328,7 +321,6 @@ export function App() {
     },
 
     onRangeChange() {
-      // Overview, trend, distribution, and per-model table are windowed.
       this.rangeOffset = 0;
       this.ledgerVisibleCount = LEDGER_INITIAL_VISIBLE;
       this.savePrefs();
@@ -462,8 +454,6 @@ export function App() {
         "text/csv;charset=utf-8",
       );
     },
-
-    // ---------- Computed ----------
 
     get allModels() {
       if (!this.stats) return [];
@@ -604,9 +594,6 @@ export function App() {
       return this.filtered.summary.cost / days;
     },
 
-    /* Sparkline series for daily cost — used in the Daily burn card.
-       Returns SVG polyline points string sized for a 100×24 viewBox,
-       so the consumer can drop it straight into a <polyline points="..."/>. */
     get costSparkSeries() {
       const series = this.filteredDaily.map((d) => d.costUSD || 0);
       if (!series.length) return { points: "", max: 0, hasData: false };
@@ -814,8 +801,6 @@ export function App() {
         tokens += d.tokens || 0;
         cost += d.costUSD || 0;
       }
-      // Older API payloads did not include daily costs; keep a fallback so the
-      // dashboard still renders if a stale server is open.
       if (cost === 0 && this.stats) {
         let dailyTotal = 0;
         for (const d of this.stats.daily) dailyTotal += d.tokens || 0;
@@ -1666,8 +1651,6 @@ export function App() {
       return { cells, monthLabels, weekCount: week - 1 };
     },
 
-    // ---------- Methods ----------
-
     fmtNum,
     fmtTokens,
     fmtUSD,
@@ -1758,10 +1741,6 @@ export function App() {
     },
 
     openInCockpit(session) {
-      // The Live now panel is a launcher into cockpit, which renders the full
-      // transcript; cockpit runs its own daemon (default port 5858). If that
-      // daemon is down, opening would land on a dead tab — the panel already
-      // shows a notice telling the user to start it, so bail quietly here.
       if (!this.cockpitUp) return;
       const params = new URLSearchParams({
         session: session.id,
@@ -2310,8 +2289,6 @@ export function App() {
             )}%`;
       const elapsedLabel =
         elapsedClamped === null ? "n/a" : `${elapsedClamped.toFixed(1)}%`;
-      // Color encodes how close the window is to its cap, matching the budget
-      // meter's sunrise ramp, not which window this is.
       const severity =
         usedClamped === null || usedClamped < 50
           ? "low"
@@ -2321,21 +2298,17 @@ export function App() {
               ? "high"
               : "critical";
 
-      // Projected end-of-window usage if the current burn rate holds. Hold off
-      // until enough of the window has elapsed that used/elapsed isn't dominated
-      // by early noise (5% of the window: ~15min for 5hr, ~8h for weekly).
       let projectedAngle = null;
       let projectedLevel = null;
       let projectedAria = null;
       if (
         usedClamped !== null &&
         elapsedClamped !== null &&
-        elapsedClamped >= 5
+        elapsedClamped >= MIN_ELAPSED_PCT_FOR_PROJECTION
       ) {
         const projected = (usedClamped / elapsedClamped) * 100;
         projectedLevel =
           projected >= 100 ? "over" : projected >= 80 ? "warn" : "safe";
-        // Marker angle around the ring: 0% sits at 12 o'clock, sweeping clockwise.
         projectedAngle = Math.min(100, projected) * 3.6;
         projectedAria =
           projectedLevel === "over"
@@ -2349,8 +2322,6 @@ export function App() {
         usedLabel,
         usedValueNow: usedClamped === null ? null : Math.round(usedClamped),
         severity,
-        // Arc lengths feed stroke-dasharray on a circle whose circumference is
-        // normalized to 100, so the clamped percent maps straight to the dash.
         usedArc: usedClamped === null ? 0 : Number(usedClamped.toFixed(2)),
         elapsedArc:
           elapsedClamped === null ? 0 : Number(elapsedClamped.toFixed(2)),
@@ -2390,7 +2361,6 @@ export function App() {
 
     // Names a window by its length, never by the slot it arrived in: Codex's
     // sole remaining window reports 7 days through the field that used to carry
-    // the 5-hour one. The two canonical lengths keep their established wording.
     usageLimitWindowLabel(durationMs) {
       if (
         typeof durationMs !== "number" ||
@@ -2464,7 +2434,6 @@ export function App() {
       if (v === 0) return "var(--bg-rail)";
       const ratio = Math.pow(v / max, 0.5);
       const alpha = 0.15 + ratio * 0.85;
-      // Violet-magenta — pulls from sunrise's cool end, contrasts the calendar's coral
       return `oklch(60% 0.20 318 / ${alpha.toFixed(3)})`;
     },
 
@@ -2473,7 +2442,6 @@ export function App() {
       if (v === 0) return "var(--bg-rail)";
       const ratio = Math.pow(v / max, 0.5);
       const alpha = 0.14 + ratio * 0.82;
-      // Coral-orange — distinct from heatmap's amber, same sunrise lineage
       return `oklch(68% 0.18 32 / ${alpha.toFixed(3)})`;
     },
 

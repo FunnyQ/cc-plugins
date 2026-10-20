@@ -1,7 +1,3 @@
-/* ============================================================
-   Hero band — sunrise wave + brand + controls + cost metric
-   ============================================================ */
-
 .hero-band {
   position: relative;
   margin: -22px calc(50% - 50dvw) 28px;
@@ -31,11 +27,8 @@
   -webkit-mask-position-x: 0%;
   overflow: hidden;
   isolation: isolate;
-  /* 420ms delay matches main-shell so hero and dashboard arrive together
-     during the overlay's opacity fade phase. hero-wave-drift slides the
-     mask one wavelength every 22s for slow, ambient drift. */
   animation:
-    hero-rise 700ms 420ms var(--ease-out-expo) both,
+    hero-rise 700ms var(--shell-rise-delay) var(--ease-out-expo) both,
     hero-wave-drift 22s linear infinite;
 }
 
@@ -50,7 +43,6 @@
   }
 }
 
-/* Layered SVG waves are positioned absolutely inside .hero-band */
 .hero-wave {
   position: absolute;
   inset: 0;
@@ -67,7 +59,6 @@
   gap: var(--s-18);
 }
 
-/* Topbar lives inside .hero-band now — transparent, no sticky */
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -77,7 +68,6 @@
   overflow: visible;
 }
 
-/* Hero metric block */
 .hero-metric {
   display: grid;
   gap: var(--s-4);
@@ -144,19 +134,12 @@
   }
 }
 
-/* Theme toggle cross-fade via View Transitions API.
-   toggleTheme() wraps the apply() call in document.startViewTransition,
-   which snapshots the page before/after and cross-fades between them. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 280ms;
   animation-timing-function: var(--ease-out);
 }
 
-/* Organic horizon drift — each layer has its own character (axis, amplitude,
-   keyframe asymmetry, easing) so the three waves never synchronize into a
-   single up-down beat. Back layer breathes wide and slow; mid layer rolls
-   with a faint skew; front layer ripples with quicker lateral travel. */
 @keyframes wave-breathe-back {
   0% {
     transform: translate(0, 0);
@@ -214,7 +197,6 @@
   }
 }
 
-/* Different easings per layer break the synchronized "metronome" feel. */
 .hero-wave > path {
   transform-box: fill-box;
   transform-origin: 50% 50%;
@@ -292,7 +274,6 @@
   align-self: start;
 }
 
-/* Controls sit on bright wave — use translucent dark chrome for legibility */
 .hero-band select,
 .hero-band .btn {
   background: oklch(22% 0.012 60 / 0.32);
@@ -332,7 +313,6 @@
   color: oklch(99% 0.005 60);
 }
 
-/* Export menu panel pops below hero — switch back to surface tokens */
 .hero-band .export-menu-panel {
   background: var(--surface);
   border-color: var(--border);

@@ -16,10 +16,6 @@ function loadChartJs() {
   return chartLoadPromise;
 }
 
-// ---------- Color palette ----------
-
-// Sunrise spectrum — Claude pulls warm dawn hues, Codex pulls cool dusk hues.
-// Both readable on warm-light surface and dusk-dark surface.
 const CLAUDE_PALETTE = [
   "oklch(66% 0.20 25)",
   "oklch(72% 0.18 50)",
@@ -98,8 +94,6 @@ function hashString(value) {
   }
   return hash;
 }
-
-// ---------- Formatters ----------
 
 function fmtNum(n) {
   if (n == null) return "n/a";
@@ -201,10 +195,6 @@ const MONTHS = [
   "Dec",
 ];
 
-// Chart instances stay outside reactive scope because petite-vue 0.4 deep-reactivates
-// any object property, but Chart.js stores Maps internally which crashes its
-// reactive Proxy creation (`new Proxy(map, null)`).
-const charts = { trend: null, donut: null };
 const AUTO_REFRESH_MS = 60_000;
 const LIVE_POLL_MS = 3_000;
 const ANOMALY_MULTIPLIER = 2;
