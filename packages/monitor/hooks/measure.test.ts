@@ -8,10 +8,13 @@ const runs = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
   on("process.run", (_$, e) => {
     calls.push({ argv: e.argv, stdin: e.init?.stdin });
     return {
-      exitCode: 0,
-      stdout: "",
-      stderr: "",
-      isStdoutTruncated: false,
+      value: {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
     } as never;
   });
   return calls;
