@@ -94,9 +94,7 @@ describe("cli: trail", () => {
     expect(json(registry()).sessions).toHaveLength(1);
     expect(Date.parse(json(registry()).sessions[0].lastHeartbeat)).toBeGreaterThan(Date.parse(entry.lastHeartbeat));
     success(["scribe", "--session", sid, "--type", "learning", "--text", "Body", "--title", "Lesson", "--file", "a.ts"], `cockpit: scribed learning for ${sid}\n`);
-    // pins TS quirk: scribe uses the decision record type, with source and kind identifying it.
     expect(readJsonl(trail())[2]).toEqual({ id: expect.any(String), type: "decision", kind: "learning", source: "scribe", decision: "Lesson", reason: "Body", tradeoff: "", facets: [], needs_your_call: false, options: [], files: ["a.ts"], timestamp: expect.any(String) });
-    // pins TS quirk: prep does not print the seeded trail.
     success(["prep", "--session", sid], `Session id:\n${sid}\n\nDecision-log language:\nEnglish\n`);
   });
   test("recent lists scribe records in timestamp order and prep includes git context", () => {
@@ -242,7 +240,6 @@ describe("cli: wait", () => {
     seed(); const d = await daemon(); success(["config", "--answer-here", "on"], "cockpit: answer_here = on\n");
     await watch(d); const p = await park();
     expect(cli(["log", "--session", f.claudeSessionId, "--needs-call", "--decision", "New", "--reason", "Changed"]).exitCode).toBe(0);
-    // pins TS quirk: supersession is detected on the next hop, not when the trail changes.
     expect(await p.result).toEqual({ exitCode: 3, stdout: "", stderr: "cockpit wait: call is no longer open (superseded)\n" });
   });
   test("max wait ends with no answer", async () => {
@@ -285,7 +282,6 @@ describe("cli: send", () => {
   test("missing args and daemon non-2xx fail", async () => {
     expect(cli(["send"])).toEqual({ exitCode: 1, stdout: "", stderr: "cockpit send: <sessionId> <answer> is required\n" });
     seed(); const d = await daemon(); const before = readFileSync(trail(), "utf8");
-    // pins TS quirk: changing daemon.json.token changes the daemon's own token too.
     const rejecting = Bun.serve({ hostname: "127.0.0.1", port: await freePort(), fetch() {
       return Response.json({ error: "unauthorized" }, { status: 401 });
     } });

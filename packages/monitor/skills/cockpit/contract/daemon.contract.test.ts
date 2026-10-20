@@ -18,8 +18,7 @@ const tunables = {
 const call = (id = crypto.randomUUID()) => ({ ...DECISION_RECORD, id, needs_your_call: true });
 const transcriptPath = (f: ProviderFixtures) => join(f.claudeProjectsDir, f.projectDir.replace(/[/.]/g, "-"), `${f.claudeSessionId}.jsonl`);
 
-// Register hooks in each describe so filtered port groups have isolated lifecycles.
-function group(extra?: (h: Homes, f: ProviderFixtures) => Env) {
+function daemonPerDescribe(extra?: (h: Homes, f: ProviderFixtures) => Env) {
   const c = {} as { h: Homes; f: ProviderFixtures; env: Env; d: Daemon; trail: string; entries: RegistryEntry[] };
   beforeAll(async () => {
     c.h = makeHomes();
@@ -77,9 +76,8 @@ function responseRecord(path: string, id: string, answer: string) {
   expect(rec).toEqual({ type: "response", call: id, answer, id: expect.any(String), ts: expect.any(String) });
 }
 
-// Startup exercises replacement sequentially, while keeping at most one daemon alive.
 describe("server: startup", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("writes the exact daemon record and reuses its live PID", async () => {
     const raw = readFileSync(join(c.h.cockpitHome, "daemon.json"), "utf8");
     expect(raw).toBe(JSON.stringify(c.d.info, null, 2) + "\n");
@@ -153,7 +151,7 @@ describe("server: startup", () => {
 });
 
 describe("server: meta", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("returns exactly the public token envelope", async () => {
     expect(await get(c.d, "/api/token", { token: "wrong" })).toEqual({ token: c.d.token });
   });
@@ -171,7 +169,7 @@ describe("server: meta", () => {
 });
 
 describe("server: static", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("serves index and extension MIME types with no-cache", async () => {
     for (const [path, mime, file] of [["/", "text/html; charset=utf-8", "index.html"],
       ["/app.js", "application/javascript; charset=utf-8", "app.js"], ["/style.css", "text/css; charset=utf-8", "style.css"]]) {
@@ -237,7 +235,7 @@ describe("server: static", () => {
 });
 
 describe("server: views", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("shapes registry projects, live sessions, ended sessions and one subagent", async () => {
     const stale = crypto.randomUUID();
     const trail = seedTrail(c.f.projectDir, stale, []);
@@ -376,7 +374,6 @@ describe("server: views", () => {
     }
   });
   test("pins the public views' missing and bad token behavior", async () => {
-    // pins TS quirk: none of the four view handlers authenticates a token.
     for (const path of ["/api/projects", "/api/sessions", "/api/project-info", "/api/design-system"]) {
       const expected = await get(c.d, path, { project: c.f.projectDir });
       for (const token of ["", "bad"]) {
@@ -388,7 +385,7 @@ describe("server: views", () => {
 
 describe("server: log-stream", () => {
   const { renameSync } = require("node:fs") as typeof import("node:fs");
-  const c = group();
+  const c = daemonPerDescribe();
   test("replays backlog and streams an append within two seconds", async () => {
     const s = await stream(url(c.d, "/api/log/stream", { project: c.f.projectDir, session: c.f.claudeSessionId }));
     try {
@@ -448,7 +445,7 @@ describe("server: log-stream", () => {
 });
 
 describe("server: log-stream watcher", () => {
-  const c = group(() => ({ COCKPIT_TAIL_POLL_MS: "2000" }));
+  const c = daemonPerDescribe(() => ({ COCKPIT_TAIL_POLL_MS: "2000" }));
   test("delivers watched appends before the two-second fallback poll", async () => {
     const session = crypto.randomUUID();
     const path = seedTrail(c.f.projectDir, session, []);
@@ -463,7 +460,7 @@ describe("server: log-stream watcher", () => {
 });
 
 describe("server: transcript", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   function registerCodex(session: string, path: string) {
     const db = new Database(c.f.codexStateDb);
     try {
@@ -633,7 +630,6 @@ describe("server: transcript", () => {
   });
   test("pins OpenCode empty history and database backlog/live messages", async () => {
     const query = { session: c.f.opencodeSessionId, provider: "opencode" };
-    // pins TS quirk: OpenCode history always returns an empty page.
     expect(await get(c.d, "/api/transcript/history", { ...query, before: "999999" })).toEqual({ entries: [], historyStart: 0, hasMore: false });
     const s = await stream(url(c.d, "/api/transcript/stream", query));
     try {
@@ -647,7 +643,7 @@ describe("server: transcript", () => {
 });
 
 describe("server: broker", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("replaces one park without cross-delivering another session", async () => {
     const session = crypto.randomUUID(), other = crypto.randomUUID();
     const first = get(c.d, "/api/wait", { session });
@@ -742,7 +738,7 @@ describe("server: broker", () => {
 });
 
 describe("server: presence", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("parks with a live subscriber and times out", async () => {
     await post(c.d, "/api/answer-here", { on: true });
     const s = await subscribe(c.d, c.f.claudeSessionId);
@@ -795,7 +791,7 @@ describe("server: presence", () => {
 });
 
 describe("server: inbox", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("replaces polls and isolates sessions while preserving untrimmed text", async () => {
     const session = crypto.randomUUID(), other = crypto.randomUUID();
     const first = get(c.d, "/api/inbox", { session });
@@ -831,7 +827,6 @@ describe("server: inbox", () => {
   });
   test("reports no channel as delivered:false and drains the stash", async () => {
     const session = crypto.randomUUID();
-    // pins TS quirk: no-channel sends return delivered:false, without an error.
     expect(await post(c.d, "/api/send-message", { session, text: "Stashed message" })).toEqual({ delivered: false });
     expect(await get(c.d, "/api/inbox", { session })).toEqual({ message: "Stashed message" });
   });
@@ -843,7 +838,7 @@ describe("server: inbox", () => {
 });
 
 describe("server: permission", () => {
-  const c = group();
+  const c = daemonPerDescribe();
   test("pushes requests and resolves a parked pull with a UI verdict", async () => {
     const session = c.f.claudeSessionId;
     const s = await subscribe(c.d, session);
@@ -961,7 +956,7 @@ function isolatedPath(h: Homes) {
 }
 
 describe("server: codex", () => {
-  const c = group((h) => ({ PATH: isolatedPath(h) }));
+  const c = daemonPerDescribe((h) => ({ PATH: isolatedPath(h) }));
   test("validates JSON, token, session and text before probing", async () => {
     expect(await json(await fetch(c.d.base + "/api/send-codex-message", { method: "POST", body: "{" }), 400)).toEqual({ error: "invalid json" });
     for (const token of ["", "bad"]) {
@@ -988,7 +983,6 @@ describe("server: codex", () => {
   test("reports unavailable control and failed sends without a Codex binary/socket", async () => {
     expect(await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId, token: "bad" }, 401)).toEqual({ error: "unauthorized" });
     expect(await post(c.d, "/api/send-codex-message", { session: c.f.codexThreadId, token: "bad", text: "Hello" }, 401)).toEqual({ error: "unauthorized" });
-    // Rust reports spawn failures instead of inheriting TS's unhandled ENOENT crash.
     const status = await get(c.d, "/api/codex-control/status", { session: c.f.codexThreadId });
     expect(status).toEqual({
       ready: false,
@@ -1011,7 +1005,6 @@ describe("server: opencode", () => {
   let appendBody: unknown = true;
   let submitBody: unknown = true;
   const seen: Array<{ method: string; path: string; directory: string | null; body: unknown }> = [];
-  // One isolated daemon sees only this candidate; health false excludes it initially.
   beforeAll(() => {
     bridge = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req) {
       expect(req.headers.has("authorization")).toBe(false);
@@ -1025,7 +1018,7 @@ describe("server: opencode", () => {
       return new Response("Not found", { status: 404 });
     } });
   });
-  const c = group((h) => ({ PATH: isolatedPath(h), OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${bridge.port}` }));
+  const c = daemonPerDescribe((h) => ({ PATH: isolatedPath(h), OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${bridge.port}` }));
   afterAll(() => { bridge?.stop(true); });
   test("reports unavailable when discovery has no healthy candidate", async () => {
     const error = "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
@@ -1090,7 +1083,7 @@ describe("server: opencode", () => {
 describe("server: opencode closed candidate", () => {
   let closedPort: number;
   beforeAll(async () => { closedPort = await freePort(); });
-  const c = group((h) => ({ PATH: isolatedPath(h), OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${closedPort}` }));
+  const c = daemonPerDescribe((h) => ({ PATH: isolatedPath(h), OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${closedPort}` }));
   test("returns unavailable status and 502 within two seconds per request", async () => {
     const error = "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
     let started = performance.now();
@@ -1122,7 +1115,7 @@ describe("server: opencode candidate timeouts and auth", () => {
       } }));
     }
   });
-  const c = group((h) => {
+  const c = daemonPerDescribe((h) => {
     const path = isolatedPath(h);
     writeFileSync(join(path, "ps"), `#!/bin/sh
 printf '%s\n' 'COMMAND' 'opencode --port ${bridges[1].port}' '/usr/local/bin/opencode -p ${bridges[2].port} --hostname 127.0.0.1'

@@ -7,7 +7,6 @@ let h: ReturnType<typeof makeHomes>;
 let pid: number | undefined;
 beforeEach(() => { h = makeHomes(); pid = undefined; });
 afterEach(() => {
-  // The daemon is detached from the CLI, so the record is the only handle on it.
   if (pid) { try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ } }
   cleanup(h.root);
 });
@@ -27,7 +26,6 @@ describe("cockpit ensure-daemon", () => {
     expect(typeof token).toBe("string");
     pid = JSON.parse(readFileSync(join(h.cockpitHome, "daemon.json"), "utf8")).pid;
 
-    // Mirrors startDaemon's readiness probe: the token route answers once the listener is up.
     const res = await fetch(`http://127.0.0.1:${port}/api/token`);
     expect(res.ok).toBe(true);
     expect((await res.json()).token).toBe(token);

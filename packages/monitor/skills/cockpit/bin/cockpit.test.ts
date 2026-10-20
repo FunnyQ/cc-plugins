@@ -98,7 +98,6 @@ test("Download + verify + install", async () => {
   expect(existsSync(dirname(dirname(f.installed)))).toBe(false);
   success(await f.run(), f.plugin);
   expect(statSync(f.installed).mode & 0o111).not.toBe(0);
-  // The binary migrates a legacy ~/.cockpit only while the XDG cockpit home is absent.
   expect(existsSync(join(f.root, "data/q-lab/cockpit"))).toBe(false);
   const requests = f.requests();
   expect(requests).toBe(2);
@@ -222,7 +221,6 @@ test.skipIf(!hasCargo)("release version entries preserve Cargo.lock for --locked
       expect(entry.kind).toBe("toml");
       writeFileSync(path, before.replace(/^version = "[^"]+"/m, `version = "${nextVersion}"`));
     } else {
-      // A name anchor prevents bumping dependency versions in Cargo.lock.
       expect(entry.kind).toBeUndefined();
       const pattern = new RegExp(entry.pattern);
       const match = before.match(pattern);

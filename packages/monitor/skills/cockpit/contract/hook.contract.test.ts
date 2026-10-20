@@ -33,7 +33,6 @@ beforeEach(() => {
   bin = join(homes.root, "bin");
   mkdirSync(bin);
   symlinkSync(process.execPath, join(bin, "bun"));
-  // Keep git probes deterministic without writing a commit or touching the worktree's index.
   writeFileSync(
     join(bin, "git"),
     `#!/bin/sh
@@ -288,14 +287,12 @@ describe("hook: session-start", () => {
   });
 
   test("keeps guidance enabled with session nudges off", () => {
-    // Seeded as `cockpit nudge off --scope session` writes it, so this group needs no nudge CLI.
     writeFileSync(
       join(homes.cockpitHome, "scribe-nudge-toggle.json"),
       JSON.stringify({
         [fixtures.claudeSessionId]: { state: "off", ts: Date.now() },
       }),
     );
-    // pins TS quirk: SessionStart never reads the Stop-hook nudge toggle.
     expect(hook("session-start")).toEqual({
       exitCode: 0,
       stdout: guidance(fixtures.claudeSessionId),
@@ -399,7 +396,6 @@ describe("hook: stop", () => {
 
   test("prints the exact Claude JSON without a trailing newline", () => {
     seedTrail();
-    // pins TS quirk: without claude on PATH Stop emits context instead of spawning a detached scribe.
     const expected = {
       hookSpecificOutput: {
         hookEventName: "Stop",

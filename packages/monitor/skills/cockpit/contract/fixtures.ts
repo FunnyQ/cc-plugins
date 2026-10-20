@@ -104,7 +104,6 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
       id text primary key, message_id text, time_created integer, data text
     );`);
     opencode.query("insert into session values (?, ?, ?, ?, ?, ?)").run(f.opencodeSessionId, f.projectDir, "Fixture session", now, now, null);
-    // The transcript reader accepts message content when the joined part table is empty.
     opencode.query("insert into message values (?, ?, ?, ?, ?)").run("msg_fixture", f.opencodeSessionId, now, now, JSON.stringify({ role: "user", content: "Fixture request" }));
   } finally {
     opencode.close();
@@ -149,7 +148,6 @@ export async function startDaemon(env: Env, opts: { port?: number } = {}): Promi
           await response.body?.cancel();
         }
       } catch {
-        // A partially written daemon record or refused connection is retried.
       }
       await Bun.sleep(50);
     }

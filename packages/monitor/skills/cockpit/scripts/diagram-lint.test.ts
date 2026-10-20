@@ -1,9 +1,3 @@
-// Tests for the --diagram write-time lint. The lint runs the vendored pele
-// parser — the dashboard's own renderer — so these tests are the renderer's
-// verdict, not an approximation of it. The lint must stay conservative —
-// legitimate syntax (sequence async arrows, cylinder shapes, quoted labels,
-// frontmatter, `<br>` in a label) must pass.
-// Run: bun test packages/monitor/skills/cockpit/scripts/diagram-lint.test.ts
 import { describe, expect, test } from "bun:test";
 import { lintDiagram } from "./diagram-lint";
 import { SEMANTIC_NODES } from "../dashboard/dist/modules/diagram.js";
@@ -40,10 +34,6 @@ stateDiagram-v2
     expect(await lintDiagram(src)).toEqual([]);
   });
 
-  // The regression that motivated the real parser: a `.` inside a `-.text.->`
-  // dotted-arrow label closes the arrow at `-.context.` and the lexer chokes.
-  // No heuristic saw it — bracketProblem strips quoted labels and never looks
-  // at edge labels at all — so it passed lint and rendered as raw source.
   test("a dot inside a dotted-arrow label is caught by the real parser", async () => {
     const src = `flowchart TB
   A["a"]
@@ -55,8 +45,6 @@ stateDiagram-v2
     expect(problems[0]).toContain("line 4"); // the parser carries the location
   });
 
-  // Counter-case: `<br>` in a quoted label is legal mermaid. The parser says so;
-  // no rule may be added that would flag it.
   test("a <br> inside a quoted label passes", async () => {
     const src = `flowchart TB
   A["one<br>two"]
@@ -112,7 +100,6 @@ stateDiagram-v2
       "flowchart TD\n  A[cache miss (L2)] --> B",
     );
     expect(problems.some((p) => p.includes("mermaid parse error"))).toBe(true);
-    // The parser says where; the heuristic still says how to fix.
     expect(problems.some((p) => p.includes('["cache miss (L2)"]'))).toBe(true);
   });
 
@@ -164,6 +151,20 @@ stateDiagram-v2
     expect(await lintDiagram(src)).toEqual([]);
   });
 
+  test("a frontmatter mindmap that fails to parse still skips the bracket rule", async () => {
+    const problems = await lintDiagram(
+      "---\ntitle: x\n---\nmindmap\n  root\n    a)cloud(\n    b))bang((\n  x -.a.b.-> y",
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("mermaid parse error");
+  });
+
+  test("a cylinder shape in a failing flowchart gets no paren hint", async () => {
+    const problems = await lintDiagram("flowchart TD\n  A[(db)] -.a.b.-> B");
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("mermaid parse error");
+  });
+
   test("stateDiagram [*] markers pass", async () => {
     const src = `stateDiagram-v2
   [*] --> Running
@@ -171,8 +172,6 @@ stateDiagram-v2
     expect(await lintDiagram(src)).toEqual([]);
   });
 
-  // The reference is what agents copy from, so a broken example there teaches
-  // every agent to write a diagram the CLI then rejects.
   test("every example in references/diagram.md passes", async () => {
     const doc = await Bun.file(
       `${import.meta.dir}/../references/diagram.md`,
@@ -203,9 +202,6 @@ stateDiagram-v2
     }
   });
 
-  // A bad first line short-circuits (mermaid can't identify the language, so
-  // every downstream rule would be guessing). Once the type is valid, the class
-  // rule and the parser both report.
   test("multiple problems are all reported", async () => {
     const problems = await lintDiagram(
       "flowchart TD\n  A[bad (label)]:::nope --> B[unclosed",
