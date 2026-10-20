@@ -307,8 +307,6 @@ export function initPermissionModal(rootEl) {
     if (e.key === "Escape" && overlay.isOpen) closeModal();
   });
 
-  open(store.selectedSessionId);
-
   return {
     overlay,
     get activeRequestId() {
