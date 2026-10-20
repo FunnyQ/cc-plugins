@@ -88,3 +88,21 @@ test("deltaClass emits .compare-block plus the one state modifier the stylesheet
     expect(css).toContain(`.compare-block--${state}`);
   }
 });
+
+test("the data-health panel shows the newer-rollup alert only when the payload carries rollupSchemaNewer", async () => {
+  const app = App();
+  app.stats = { dataHealth: { sources: [], counts: {} } };
+  expect(app.dataHealthAlert).toBeNull();
+
+  app.stats = { dataHealth: { sources: [], counts: {}, rollupSchemaNewer: { database: 5, build: 4 } } };
+  expect(app.dataHealthAlert).toBe(
+    "Rollup database is newer than this monitor build — update monitor and restart the dashboard.",
+  );
+
+  const partial = await Bun.file(`${import.meta.dir}/dist/partials/dashboard/data-health.html`).text();
+  const details = partial.indexOf("<details");
+  const alert = partial.indexOf('v-if="dataHealthAlert"');
+  expect(alert).toBeGreaterThan(-1);
+  expect(alert).toBeLessThan(details);
+  expect(partial).toContain("{{ dataHealthAlert }}");
+});

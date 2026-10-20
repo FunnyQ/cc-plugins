@@ -1420,6 +1420,12 @@ export function App() {
       return this.stats?.dataHealth ?? null;
     },
 
+    get dataHealthAlert() {
+      return this.dataHealth?.rollupSchemaNewer
+        ? "Rollup database is newer than this monitor build — update monitor and restart the dashboard."
+        : null;
+    },
+
     get dataHealthSources() {
       return this.dataHealth?.sources ?? [];
     },

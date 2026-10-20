@@ -1,4 +1,4 @@
-use super::claude::{ClaudeSource, HistoryDay, StatsCacheDailyActivity};
+use super::claude::{ClaudeSource, HistoryDay, NewerRollupSchema, StatsCacheDailyActivity};
 use super::codex::CodexSource;
 use super::model::{
     Ctx, HourlyUsageBucket, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, UsageLimits,
@@ -73,15 +73,18 @@ fn load_sources(ctx: &Ctx) -> anyhow::Result<Loaded> {
     let usage_limits = claude::read_usage_limits(ctx);
     let codex = codex::load(ctx)?;
     let opencode = opencode::load(ctx)?;
-    let data_health = build_data_health(DataHealthCounts {
-        claude_transcript_files: claude.transcript_file_count,
-        codex_session_files: codex.codex_session_file_count,
-        codex_thread_rows: codex.codex_thread_row_count,
-        open_code_session_files: opencode.open_code_session_file_count,
-        open_code_message_files: opencode.open_code_message_file_count,
-        open_code_session_rows: opencode.open_code_session_row_count,
-        open_code_message_rows: opencode.open_code_message_row_count,
-    });
+    let data_health = build_data_health(
+        DataHealthCounts {
+            claude_transcript_files: claude.transcript_file_count,
+            codex_session_files: codex.codex_session_file_count,
+            codex_thread_rows: codex.codex_thread_row_count,
+            open_code_session_files: opencode.open_code_session_file_count,
+            open_code_message_files: opencode.open_code_message_file_count,
+            open_code_session_rows: opencode.open_code_session_row_count,
+            open_code_message_rows: opencode.open_code_message_row_count,
+        },
+        claude.rollup_schema_newer.clone(),
+    );
     Ok(Loaded {
         claude,
         codex,
@@ -128,6 +131,8 @@ struct DataHealthCounts {
 struct DataHealth {
     sources: Vec<DataHealthSource>,
     counts: DataHealthCounts,
+    #[serde(rename = "rollupSchemaNewer", skip_serializing_if = "Option::is_none")]
+    rollup_schema_newer: Option<NewerRollupSchema>,
 }
 
 fn mtime_ms(meta: &std::fs::Metadata) -> Option<f64> {
@@ -201,7 +206,10 @@ fn source_health(name: &str, path: &Path, note: &str) -> DataHealthSource {
     source
 }
 
-fn build_data_health(counts: DataHealthCounts) -> DataHealth {
+fn build_data_health(
+    counts: DataHealthCounts,
+    rollup_schema_newer: Option<NewerRollupSchema>,
+) -> DataHealth {
     let sources = [
         ("Claude stats cache", paths::stats_cache(), "required"),
         (
@@ -262,6 +270,7 @@ fn build_data_health(counts: DataHealthCounts) -> DataHealth {
             .map(|(name, path, note)| source_health(name, path, note))
             .collect(),
         counts,
+        rollup_schema_newer,
     }
 }
 
@@ -1363,6 +1372,7 @@ mod tests {
                 transcript_file_count: 0,
                 stats_cache,
                 history: History::default(),
+                rollup_schema_newer: None,
             },
             codex: CodexSource {
                 usage: ProviderUsage::default(),
@@ -1403,6 +1413,7 @@ mod tests {
             data_health: DataHealth {
                 sources: Vec::new(),
                 counts: counts(),
+                rollup_schema_newer: None,
             },
         }
     }
@@ -1655,7 +1666,7 @@ mod tests {
         std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o000);
         std::fs::set_permissions(&locked, perms).unwrap();
 
-        let health = build_data_health(counts());
+        let health = build_data_health(counts(), None);
         let source = |name: &str| {
             health
                 .sources
@@ -1693,6 +1704,21 @@ mod tests {
         let json = serde_json::to_value(&health).unwrap();
         assert_eq!(json["counts"]["openCodeMessageRows"], json!(0));
         assert_eq!(json["sources"][11]["modifiedAt"], Value::Null);
+        assert!(json.get("rollupSchemaNewer").is_none());
+    }
+
+    #[test]
+    fn data_health_names_a_rollup_newer_than_this_build() {
+        let _env = TestEnv::new();
+        let newer = NewerRollupSchema {
+            database: 9,
+            build: 4,
+        };
+        let json = serde_json::to_value(build_data_health(counts(), Some(newer))).unwrap();
+        assert_eq!(
+            json["rollupSchemaNewer"],
+            json!({"database": 9, "build": 4})
+        );
     }
 
     #[test]

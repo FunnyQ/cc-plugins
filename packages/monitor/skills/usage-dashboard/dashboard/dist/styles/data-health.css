@@ -19,6 +19,17 @@
   background: var(--surface-2);
 }
 
+.data-health-alert {
+  margin: 0;
+  border: 1px solid color-mix(in oklch, var(--danger) 24%, var(--edge));
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: color-mix(in oklch, var(--danger) 10%, var(--status-surface));
+  color: color-mix(in oklch, var(--danger) 58%, var(--text));
+  font-size: var(--fs-base);
+  font-weight: 680;
+  padding: var(--s-10) var(--s-14);
+}
+
 .data-health-panel details {
   padding: 0;
 }

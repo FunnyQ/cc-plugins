@@ -97,6 +97,13 @@ pub struct ClaudeSource {
     pub transcript_file_count: usize,
     pub stats_cache: StatsCache,
     pub history: History,
+    pub rollup_schema_newer: Option<NewerRollupSchema>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct NewerRollupSchema {
+    pub database: i64,
+    pub build: i64,
 }
 
 fn parse_stats_cache() -> anyhow::Result<StatsCache> {
@@ -306,21 +313,42 @@ fn read_rollup(projects_dir: &Path) -> anyhow::Result<RollupRead> {
 
 pub fn load(ctx: &Ctx) -> anyhow::Result<ClaudeSource> {
     let projects_dir = paths::projects_dir();
-    let rollup = read_rollup(&projects_dir).unwrap_or_else(|_| {
-        let mut files: Vec<PathBuf> = Vec::new();
-        dedup::walk_files(&projects_dir, ".jsonl", &mut files);
-        RollupRead {
-            usage: ProviderUsage::default(),
-            ledger: Vec::new(),
-            transcript_file_count: files.len(),
+    let (rollup, rollup_schema_newer) = match read_rollup(&projects_dir) {
+        Ok(rollup) => (rollup, None),
+        Err(_) => {
+            let mut files: Vec<PathBuf> = Vec::new();
+            dedup::walk_files(&projects_dir, ".jsonl", &mut files);
+            let fallback = RollupRead {
+                usage: ProviderUsage::default(),
+                ledger: Vec::new(),
+                transcript_file_count: files.len(),
+            };
+            (fallback, newer_rollup_schema(&paths::rollup_db_path()))
         }
-    });
+    };
     Ok(ClaudeSource {
         usage: rollup.usage,
         ledger: rollup.ledger,
         transcript_file_count: rollup.transcript_file_count,
         stats_cache: parse_stats_cache()?,
         history: parse_history(ctx.now_ms),
+        rollup_schema_newer,
+    })
+}
+
+fn newer_rollup_schema(path: &Path) -> Option<NewerRollupSchema> {
+    let db = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    let stored: String = db
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'schema_version'",
+            [],
+            |row| row.get(0),
+        )
+        .ok()?;
+    let database = stored.parse::<i64>().ok()?;
+    (database > rollup_db::SCHEMA_VERSION).then_some(NewerRollupSchema {
+        database,
+        build: rollup_db::SCHEMA_VERSION,
     })
 }
 
@@ -652,6 +680,54 @@ mod tests {
         assert_eq!(json["statsCache"], json!({"version": 2, "extra": 1}));
         assert_eq!(json["transcriptFileCount"], json!(2));
         assert_eq!(json["usageLimits"]["error"], json!("missing"));
+        assert_eq!(src.rollup_schema_newer, None);
+    }
+
+    fn stamp_schema(path: &Path, version: &str) {
+        let db = Connection::open(path).unwrap();
+        db.execute_batch("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT)")
+            .unwrap();
+        db.execute(
+            "INSERT INTO meta (key, value) VALUES ('schema_version', ?)",
+            [version],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn load_names_a_rollup_newer_than_this_build() {
+        let env = TestEnv::new();
+        let home = env.dir.path();
+        write(&home.join(".claude/stats-cache.json"), r#"{"version":2}"#);
+        write(&home.join(".claude/projects/p/a.jsonl"), "");
+        let db = home.join("rollup.db");
+        env.set("TOKEN_ATLAS_ROLLUP_DB", &db);
+        let newer = rollup_db::SCHEMA_VERSION + 1;
+        stamp_schema(&db, &newer.to_string());
+
+        let src = load(&ctx()).unwrap();
+        assert_eq!(
+            src.rollup_schema_newer,
+            Some(NewerRollupSchema {
+                database: newer,
+                build: rollup_db::SCHEMA_VERSION,
+            })
+        );
+        assert_eq!(src.transcript_file_count, 1);
+        assert!(src.usage.model_usage.is_empty());
+    }
+
+    #[test]
+    fn load_keeps_the_plain_fallback_for_a_schema_that_is_not_newer() {
+        let env = TestEnv::new();
+        let home = env.dir.path();
+        write(&home.join(".claude/stats-cache.json"), r#"{"version":2}"#);
+        let db = home.join("rollup.db");
+        env.set("TOKEN_ATLAS_ROLLUP_DB", &db);
+        stamp_schema(&db, "garbage");
+
+        let src = load(&ctx()).unwrap();
+        assert_eq!(src.rollup_schema_newer, None);
     }
 
     #[test]

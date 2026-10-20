@@ -1,5 +1,5 @@
 use super::model::{Ctx, now_ms};
-use super::{live, pricing, stats};
+use super::{live, pricing, rollup_db, stats};
 use crate::server::{json_error, json_response, static_files};
 use crate::{paths, process_alive};
 use axum::Router;
@@ -275,7 +275,12 @@ async fn models_or_cached(
 
 fn write_atlas_info(home: &Path, port: u16, root: &str) -> std::io::Result<()> {
     std::fs::create_dir_all(home)?;
-    let info = json!({ "pid": std::process::id(), "port": port, "root": root });
+    let info = json!({
+        "pid": std::process::id(),
+        "port": port,
+        "root": root,
+        "rollupSchema": rollup_db::SCHEMA_VERSION,
+    });
     let text = serde_json::to_string_pretty(&info).map_err(std::io::Error::other)?;
     std::fs::write(home.join("atlas.json"), format!("{text}\n"))
 }
@@ -628,9 +633,11 @@ mod tests {
         write_atlas_info(&home, 6001, "/x/skills/usage-dashboard/scripts").unwrap();
         let text = std::fs::read_to_string(home.join("atlas.json")).unwrap();
         let expected = format!(
-            "{{\n  \"pid\": {},\n  \"port\": 6001,\n  \"root\": \"/x/skills/usage-dashboard/scripts\"\n}}\n",
-            std::process::id()
+            "{{\n  \"pid\": {},\n  \"port\": 6001,\n  \"root\": \"/x/skills/usage-dashboard/scripts\",\n  \"rollupSchema\": {}\n}}\n",
+            std::process::id(),
+            rollup_db::SCHEMA_VERSION
         );
         assert_eq!(text, expected);
+        assert!(parse_atlas_info(&text).is_some());
     }
 }

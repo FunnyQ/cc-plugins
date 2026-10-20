@@ -3,6 +3,9 @@
           class="data-health-panel"
           aria-label="Data health diagnostics"
         >
+          <p v-if="dataHealthAlert" class="data-health-alert" role="alert">
+            {{ dataHealthAlert }}
+          </p>
           <details>
             <summary>
               <span>Data health</span>

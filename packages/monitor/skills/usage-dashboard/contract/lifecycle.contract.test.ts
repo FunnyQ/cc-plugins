@@ -45,11 +45,15 @@ describe("atlas.json", () => {
   test("exact text after start", async () => {
     const atlas = await start(await freePort());
     const text = readFileSync(atlasJson(), "utf8");
-    const { root } = JSON.parse(text);
+    const { root, rollupSchema } = JSON.parse(text);
     expect(root.endsWith("/skills/usage-dashboard/scripts")).toBe(true);
+    expect(Number.isInteger(rollupSchema) && rollupSchema > 0).toBe(true);
     expect(text).toBe(
-      JSON.stringify({ pid: atlas.proc.pid, port: atlas.port, root }, null, 2) +
-        "\n",
+      JSON.stringify(
+        { pid: atlas.proc.pid, port: atlas.port, root, rollupSchema },
+        null,
+        2,
+      ) + "\n",
     );
   });
 

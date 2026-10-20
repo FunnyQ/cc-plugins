@@ -17,6 +17,7 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
+import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -269,6 +270,81 @@ function driftReport(): DriftItem[] {
   return items;
 }
 
+function cockpitHome(): string {
+  const override = process.env.COCKPIT_HOME;
+  if (override) return override;
+  return join(
+    process.env.XDG_DATA_HOME || join(HOME, ".local", "share"),
+    "q-lab",
+    "cockpit",
+  );
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+function rollupSchemaVersion(): number | null {
+  const path =
+    process.env.TOKEN_ATLAS_ROLLUP_DB ||
+    join(
+      process.env.XDG_DATA_HOME || join(HOME, ".local", "share"),
+      "q-lab",
+      "token-atlas",
+      "rollup.db",
+    );
+  if (!existsSync(path)) return null;
+  try {
+    const db = new Database(path, { readonly: true });
+    try {
+      const row = db
+        .query("SELECT value FROM meta WHERE key = 'schema_version'")
+        .get() as { value: string } | null;
+      const version = Number(row?.value);
+      return Number.isInteger(version) ? version : null;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+function staleDashboardReport(version: string): DriftItem[] {
+  const { data } = readJson(join(cockpitHome(), "atlas.json"));
+  const pid = data?.pid;
+  const root = data?.root;
+  if (!Number.isInteger(pid) || typeof root !== "string" || !isAlive(pid)) {
+    return [];
+  }
+  const served = data.rollupSchema;
+  if (Number.isInteger(served)) {
+    const stored = rollupSchemaVersion();
+    if (stored === null || stored <= served) return [];
+    return [
+      {
+        key: `stale-dashboard-schema:${stored}>${served}`,
+        message: `the usage dashboard on port ${data.port} reads rollup schema ${served}, but the rollup database is at ${stored}, so it shows no Claude usage. Run the /monitor:usage-dashboard skill to restart it onto this install.`,
+      },
+    ];
+  }
+  const theirs = root.match(
+    /[/\\]monitor[/\\](\d+\.\d+\.\d+)[/\\]skills[/\\]/,
+  )?.[1];
+  if (!theirs || (compareMonitorVersions(theirs, version) ?? 0) >= 0) return [];
+  return [
+    {
+      key: `stale-dashboard:${theirs}`,
+      message: `the usage dashboard on port ${data.port} still runs monitor ${theirs}, older than this install (${version}), so it can refuse a newer rollup database and show no Claude usage. Run the /monitor:usage-dashboard skill to restart it onto this version.`,
+    },
+  ];
+}
+
 // A SessionStart hook reaches the USER only through the systemMessage field of a
 // JSON stdout payload; bare stdout lands in the model's context instead. So the
 function emitHookNotice(lines: string[]): void {
@@ -333,7 +409,7 @@ function sessionCheck(): void {
     }
   }
 
-  const drift = driftReport();
+  const drift = [...driftReport(), ...staleDashboardReport(version)];
   const signature = drift
     .map((d) => d.key)
     .sort()

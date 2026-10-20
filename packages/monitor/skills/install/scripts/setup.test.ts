@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import {
   existsSync,
   mkdirSync,
@@ -43,7 +44,14 @@ function run(args: string[] = []): {
   out: string;
 } {
   const proc = Bun.spawnSync(["bun", SCRIPT, ...args], {
-    env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir },
+    env: {
+      ...process.env,
+      HOME: home,
+      CLAUDE_PLUGIN_DATA: dataDir,
+      COCKPIT_HOME: "",
+      XDG_DATA_HOME: "",
+      TOKEN_ATLAS_ROLLUP_DB: "",
+    },
   });
   return {
     code: proc.exitCode ?? 0,
@@ -585,5 +593,119 @@ describe("--session-check drift watch (every session, read-only)", () => {
     writeFileSync(join(home, ".claude", "settings.json"), "{ not json");
     const { stdout } = run(["--session-check"]);
     expect(stdout).toContain("not valid JSON");
+  });
+});
+
+describe("--session-check stale usage dashboard (every session, read-only)", () => {
+  const atlasJson = () => join(home, ".local", "share", "q-lab", "cockpit", "atlas.json");
+  const rootOf = (version: string) =>
+    `/cache/q-lab-marketplace/monitor/${version}/skills/usage-dashboard/scripts`;
+  function dashboard(root: string, pid = process.pid, rollupSchema?: number) {
+    mkdirSync(join(home, ".local", "share", "q-lab", "cockpit"), { recursive: true });
+    writeFileSync(atlasJson(), JSON.stringify({ pid, port: 5938, root, rollupSchema }));
+  }
+  function rollupAt(version: number, path = join(home, ".local", "share", "q-lab", "token-atlas", "rollup.db")) {
+    mkdirSync(join(path, ".."), { recursive: true });
+    const db = new Database(path);
+    db.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)");
+    db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)", [String(version)]);
+    db.close();
+  }
+  function quiet() {
+    writeFileSync(
+      join(home, ".claude", "settings.json"),
+      JSON.stringify({
+        permissions: {
+          allow: [
+            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)",
+            "Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts *)",
+            "Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)",
+          ],
+        },
+      }),
+    );
+    writeFileSync(join(dataDir, ".wired-version"), "999.0.0\n");
+  }
+  beforeEach(quiet);
+
+  test("names a live dashboard from an older monitor in one JSON line, and tells how to restart it", () => {
+    dashboard(rootOf("0.0.1"));
+    const { out } = run(["--session-check"]);
+    expect(out.trim().split("\n")).toHaveLength(1);
+    const message = JSON.parse(out.trim()).systemMessage as string;
+    expect(message).toContain("0.0.1");
+    expect(message).toContain("/monitor:usage-dashboard");
+  });
+
+  test("never signals the dashboard and leaves its record byte-identical", () => {
+    dashboard(rootOf("0.0.1"));
+    const before = readFileSync(atlasJson(), "utf-8");
+    run(["--session-check"]);
+    expect(readFileSync(atlasJson(), "utf-8")).toBe(before);
+  });
+
+  test("says nothing about a dead dashboard, a newer one, or one from an unversioned checkout", () => {
+    dashboard(rootOf("0.0.1"), Bun.spawnSync(["true"]).pid);
+    expect(run(["--session-check"]).out.trim()).toBe("");
+    dashboard(rootOf("999.0.0"));
+    expect(run(["--session-check"]).out.trim()).toBe("");
+    dashboard("/Users/q/src/cc-plugins/packages/monitor/skills/usage-dashboard/scripts");
+    expect(run(["--session-check"]).out.trim()).toBe("");
+  });
+
+  test("reports once per stale version, and again when it returns", () => {
+    dashboard(rootOf("0.0.1"));
+    expect(run(["--session-check"]).out).toContain("0.0.1");
+    expect(run(["--session-check"]).out.trim()).toBe("");
+
+    dashboard(rootOf("0.0.2"));
+    expect(run(["--session-check"]).out).toContain("0.0.2");
+
+    rmSync(atlasJson());
+    expect(run(["--session-check"]).out.trim()).toBe("");
+    dashboard(rootOf("0.0.2"));
+    expect(run(["--session-check"]).out).toContain("0.0.2");
+  });
+
+  test("a dashboard that names its rollup schema stays silent while the database matches it, whatever its version", () => {
+    dashboard(rootOf("0.0.1"), process.pid, 3);
+    expect(run(["--session-check"]).out.trim()).toBe("");
+    rollupAt(3);
+    expect(run(["--session-check"]).out.trim()).toBe("");
+  });
+
+  test("a dashboard whose rollup schema is behind the database gets one notice per schema pair", () => {
+    dashboard(rootOf("999.0.0"), process.pid, 3);
+    rollupAt(4);
+    const message = JSON.parse(run(["--session-check"]).out.trim()).systemMessage as string;
+    expect(message).toContain("/monitor:usage-dashboard");
+    expect(message).toContain("4");
+    expect(run(["--session-check"]).out.trim()).toBe("");
+
+    rollupAt(5);
+    expect(run(["--session-check"]).out).toContain("5");
+  });
+
+  test("the rollup database path honours TOKEN_ATLAS_ROLLUP_DB", () => {
+    dashboard(rootOf("999.0.0"), process.pid, 3);
+    const db = join(home, "custom", "rollup.db");
+    rollupAt(4, db);
+    const proc = Bun.spawnSync(["bun", SCRIPT, "--session-check"], {
+      env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir, COCKPIT_HOME: "", XDG_DATA_HOME: "", TOKEN_ATLAS_ROLLUP_DB: db },
+    });
+    expect(proc.stdout.toString()).toContain("/monitor:usage-dashboard");
+  });
+
+  test("reads the record from COCKPIT_HOME when it is set", () => {
+    const cockpitHome = join(home, "elsewhere");
+    mkdirSync(cockpitHome);
+    writeFileSync(
+      join(cockpitHome, "atlas.json"),
+      JSON.stringify({ pid: process.pid, port: 5938, root: rootOf("0.0.1") }),
+    );
+    const proc = Bun.spawnSync(["bun", SCRIPT, "--session-check"], {
+      env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir, COCKPIT_HOME: cockpitHome },
+    });
+    expect(proc.stdout.toString()).toContain("0.0.1");
   });
 });
