@@ -23,7 +23,6 @@ use std::time::Duration;
 const CODEX_USAGE_URL: &str = "https://chatgpt.com/backend-api/codex/usage";
 const CODEX_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
-// Anything longer than a day is a weekly Codex window; see build_codex_usage_limits.
 const CODEX_WEEKLY_MIN_MS: i64 = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT: Duration = Duration::from_secs(4);
 const USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36";
@@ -67,9 +66,6 @@ pub struct CodexSource {
     pub codex_thread_row_count: usize,
 }
 
-// ---------- Rollout summaries (readCodexSession) ----------
-
-// Snake_case on purpose: the TS caches the rollout's own total_token_usage object verbatim.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 struct CodexTokenUsage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,7 +87,6 @@ struct CodexTokenEvent {
     usage: CodexTokenUsage,
 }
 
-// Stored as JSON in codex-sessions.db, which a TS dashboard shares: keep JSON.stringify's shape.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CodexSessionSummary {
@@ -109,7 +104,6 @@ fn json_i64(value: &Value) -> Option<i64> {
     value.as_i64().or_else(|| value.as_f64().map(|n| n as i64))
 }
 
-// A truthy non-object reads as every field undefined, which the TS arithmetic treats as 0.
 fn token_usage_from(value: &Value) -> CodexTokenUsage {
     let field = |name: &str| value.get(name).and_then(json_i64);
     CodexTokenUsage {
@@ -122,7 +116,6 @@ fn token_usage_from(value: &Value) -> CodexTokenUsage {
 }
 
 fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
-    // Only a missing file is null; any other read error yields zero lines.
     if !file.exists() {
         return None;
     }
@@ -261,8 +254,6 @@ fn codex_usage_from_thread(tokens_used: i64, session: Option<&CodexSessionSummar
     }
 }
 
-// ---------- Summary cache (codex-cache.ts) ----------
-
 fn open_codex_cache(path: &Path) -> anyhow::Result<Connection> {
     let conn = open_sqlite_file(path)?;
     conn.execute_batch(
@@ -304,7 +295,6 @@ fn summarise_sessions(
             continue;
         };
         let size = meta.len() as i64;
-        // Math.floor(mtimeMs): nsec is never negative, so integer division floors.
         let mtime_ms = meta.mtime() * 1000 + meta.mtime_nsec() / 1_000_000;
 
         if let Some((row_size, row_mtime, summary)) = cached.get(file)
@@ -316,7 +306,6 @@ fn summarise_sessions(
             continue;
         }
 
-        // A null summary is cached too; re-reading an unreadable file every load is the cost avoided.
         let summary = compute(Path::new(file));
         let text = serde_json::to_string(&summary)?;
         out.insert(file.clone(), summary);
@@ -345,7 +334,6 @@ fn summarise_sessions(
     Ok(out)
 }
 
-// Prunes by this run's file set, not by existence: a rollout that left the set goes even if on disk.
 fn prune_cache(db: &mut Connection, present: &Summaries) -> anyhow::Result<()> {
     let known: Vec<String> = db
         .prepare("SELECT path FROM session_summary")?
@@ -368,8 +356,6 @@ fn prune_cache(db: &mut Connection, present: &Summaries) -> anyhow::Result<()> {
     tx.commit()?;
     Ok(())
 }
-
-// ---------- Aggregation (parseCodexUsage) ----------
 
 struct CodexThreadRow {
     id: Option<String>,
@@ -398,7 +384,6 @@ fn query_thread_rows(path: &Path) -> rusqlite::Result<Vec<CodexThreadRow>> {
     rows.collect()
 }
 
-// Any open or query failure is zero rows, as the TS `catch { rows = [] }`.
 fn read_thread_rows() -> Vec<CodexThreadRow> {
     let path = paths::codex_state_db();
     if !path.exists() {
@@ -411,12 +396,10 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
     value.filter(|text| !text.is_empty())
 }
 
-// JS `x || y` on numbers: 0 falls through.
 fn or_nonzero(value: i64, fallback: impl FnOnce() -> i64) -> i64 {
     if value != 0 { value } else { fallback() }
 }
 
-// [getDay()][getHours()] in local time.
 fn local_day_hour(ms: i64) -> Option<(usize, usize)> {
     let zoned = Timestamp::from_millisecond(ms)
         .ok()?
@@ -429,7 +412,6 @@ fn local_day_hour(ms: i64) -> Option<(usize, usize)> {
 
 pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
     let rows = read_thread_rows();
-    // A JS Map built from the rows: a repeated rollout_path keeps the last row.
     let mut row_by_rollout: IndexMap<&str, &CodexThreadRow> = IndexMap::new();
     for row in &rows {
         if let Some(path) = row.rollout_path.as_deref() {
@@ -448,8 +430,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
             .map(|path| path.to_string_lossy().into_owned()),
     );
 
-    // Summaries come from the cache where the rollout is unchanged; without it every build
-    // re-read every rollout in full. Any cache failure computes every summary directly.
     let summaries = open_codex_cache(&paths::codex_cache_path())
         .and_then(|mut cache| summarise_sessions(&mut cache, &session_files, read_codex_session))
         .unwrap_or_else(|_| {
@@ -587,7 +567,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         });
     }
 
-    // Threads with no rollout bill from the row alone and touch no activity counter or total.
     for row in &rows {
         if non_empty(row.rollout_path.as_deref()).is_some() {
             continue;
@@ -618,7 +597,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
             add_nested_model_usage(&mut usage.project_model_usage, cwd, &key, &thread_usage);
         }
         ledger.push(InternalLedgerRow {
-            // Template-literal interpolation of a null id.
             id: format!("codex:{}", row.id.as_deref().unwrap_or("null")),
             provider: Provider::Codex,
             timestamp_ms,
@@ -652,8 +630,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         codex_thread_row_count: rows.len(),
     })
 }
-
-// ---------- Usage limits ----------
 
 enum JsonRead {
     Missing,
@@ -693,7 +669,6 @@ fn json_parse_message(text: &str) -> String {
     format!("JSON Parse error: {detail}")
 }
 
-// Private copy of api.ts readJSONWithError: model.rs, the shared home, is outside this task.
 fn read_json_with_error(path: &Path) -> JsonRead {
     if !path.exists() {
         return JsonRead::Missing;
@@ -884,7 +859,6 @@ async fn fetch_codex_usage(usage_url: &str, token_url: &str) -> Result<Value, St
         .map_err(|error| error.to_string())?;
 
     match fetch_codex_usage_with_token(&client, usage_url, access_token, account_id).await {
-        // Refresh only when the usage call was refused for auth; every other failure surfaces as-is.
         Err(message) if message.contains("http-401") || message.contains("http-403") => {
             // Never written back to auth.json: the TS never does, and the file is the Codex CLI's.
             let refreshed = refresh_codex_access_token(&client, token_url, &auth).await?;
@@ -904,7 +878,6 @@ fn read_codex_usage_cache() -> UsageLimits {
         JsonRead::Data(cache) => cache,
     };
     let captured_at = cache.get("capturedAt");
-    // `capturedAtEpochMs ?? Date.parse(capturedAt)`; a non-number fails Number.isFinite as NaN does.
     let captured_at_ms = match cache.get("capturedAtEpochMs").filter(|ms| !ms.is_null()) {
         Some(ms) => ms.as_f64().unwrap_or(f64::NAN),
         None => captured_at
@@ -988,7 +961,6 @@ async fn read_codex_usage_limits_from(usage_url: &str, token_url: &str) -> Usage
     }
 }
 
-/// The full `--source codex` shape: `{usage, usageLimits}`.
 pub fn source_json(src: &CodexSource, limits: &UsageLimits) -> serde_json::Value {
     json!({
         "usage": {
@@ -1047,7 +1019,6 @@ mod tests {
             codex_token_usage_delta(&second, Some(&first)),
             totals(7000, 6000, 1200, 400)
         );
-        // A counter that went backwards clamps to 0; a missing field counts as 0.
         let shrunk = CodexTokenUsage {
             input_tokens: Some(100),
             cached_input_tokens: None,
@@ -1177,7 +1148,6 @@ mod tests {
             json!({"type": "event_msg", "payload": {"type": "user_message"}}),
             json!({"type": "response_item", "payload": {"type": "message", "role": "user"}}),
             json!({"type": "response_item", "payload": {"type": "function_call"}}),
-            // No timestamp: sets latest but pushes no token event.
             json!({"type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 5}}}}),
             json!({"timestamp": "2026-09-27T10:05:00.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": {"total_token_usage": {"input_tokens": 9, "output_tokens": 2}}}}),
             json!({"timestamp": "2026-09-27T10:06:00.000Z", "type": "event_msg", "payload": {"type": "token_count", "info": null}}),
@@ -1190,7 +1160,6 @@ mod tests {
 
         let parsed = read_codex_session(&path).unwrap();
         assert_eq!(parsed.id.as_deref(), Some("s1"));
-        // session_meta's payload timestamp stands in until an entry timestamp parses.
         assert_eq!(parsed.timestamp_ms, 1_790_503_200_000);
         assert_eq!(parsed.cwd, "/w/turn");
         assert_eq!(parsed.model.as_deref(), Some("turn-model"));
@@ -1230,8 +1199,6 @@ mod tests {
         assert_eq!(null, None);
         assert_eq!(serde_json::to_string(&null).unwrap(), "null");
     }
-
-    // ---------- summary cache ----------
 
     struct CacheFixture {
         dir: tempfile::TempDir,
@@ -1316,7 +1283,6 @@ mod tests {
         f.run(&[&a]);
         assert_eq!(f.take_calls(), 1);
 
-        // Same size, new mtime.
         let file = std::fs::File::options().write(true).open(&a).unwrap();
         file.set_modified(std::time::SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000))
             .unwrap();
@@ -1381,13 +1347,10 @@ mod tests {
             "an unstatable file is computed, never cached"
         );
 
-        // a still exists on disk, but it left the set, so its row goes.
         f.run(&[&b]);
         assert_eq!(f.row(&a), None);
         assert!(f.row(&b).is_some());
     }
-
-    // ---------- aggregation ----------
 
     fn create_threads(path: &Path) -> Connection {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -1455,7 +1418,6 @@ mod tests {
         let db = create_threads(&home.join(".codex/state_5.sqlite"));
         let t1_path = t1.to_string_lossy().into_owned();
         let missing_path = missing.to_string_lossy().into_owned();
-        // Earliest row, yet it bills after every rollout-backed row.
         insert_thread(&db, ("no-rollout", "", 1_790_300_000, 0, "/w/b", None, 700));
         insert_thread(
             &db,
@@ -1497,11 +1459,9 @@ mod tests {
         );
         assert_eq!(src.total_threads, 3);
         assert_eq!(src.codex_session_file_count, 2);
-        // "empty" has neither tokens nor a rollout, so the query drops it.
         assert_eq!(src.codex_thread_row_count, 3);
 
         let t1_row = &src.ledger[0];
-        // An empty row model falls through to the rollout's turn_context model.
         assert_eq!(t1_row.model, "codex:gpt-rollout");
         assert_eq!(t1_row.tokens, 500);
         assert_eq!(t1_row.project_path, "/w/a");
@@ -1549,7 +1509,6 @@ mod tests {
         assert_eq!(src.usage.project_tokens["/w/a"], 500);
         assert_eq!(src.usage.project_tokens["/w/b"], 700);
 
-        // Hourly usage is the per-event delta; totals are the last cumulative snapshot.
         let rollout_key = "codex:gpt-rollout";
         assert_eq!(src.usage.model_usage[rollout_key].input_tokens, 4000);
         let hourly_input: i64 = src
@@ -1562,7 +1521,6 @@ mod tests {
         assert_eq!(hourly_input, 3000 + 1000);
         assert_eq!(src.usage.model_usage["codex:unknown"].input_tokens, 700);
 
-        // The second load reads every summary from the cache and agrees.
         assert!(paths::codex_cache_path().exists());
         let again = load(&ctx()).unwrap();
         assert_eq!(again.ledger, src.ledger);
@@ -1597,14 +1555,97 @@ mod tests {
     }
 
     #[test]
+    fn token_usage_from_a_non_object_reads_every_field_as_none() {
+        assert_eq!(token_usage_from(&json!(5)), CodexTokenUsage::default());
+    }
+
+    #[test]
+    fn cache_floors_a_fractional_second_mtime_to_whole_ms() {
+        let mut f = CacheFixture::new();
+        let a = f.file("a.jsonl", ROLLOUT_LINE);
+        let file = std::fs::File::options().write(true).open(&a).unwrap();
+        file.set_modified(std::time::SystemTime::UNIX_EPOCH + Duration::from_nanos(1_999_500_000))
+            .unwrap();
+        f.run(&[&a]);
+        let mtime: i64 =
+            f.db.query_row("SELECT mtime_ms FROM session_summary", [], |row| row.get(0))
+                .unwrap();
+        assert_eq!(mtime, 1999);
+    }
+
+    #[test]
+    fn load_keeps_the_last_row_for_a_repeated_rollout_path() {
+        let env = TestEnv::new();
+        let home = env.dir.path();
+        let t1 = home.join(".codex/sessions/2026/09/rollout-t1.jsonl");
+        write_lines(
+            &t1,
+            &rollout(
+                "t1",
+                "/w/a",
+                "gpt-rollout",
+                "2026-09-27T10:00:00.000Z",
+                &[("2026-09-27T10:05:00.000Z", json!(totals(10, 0, 1, 0)))],
+            ),
+        );
+        let t1_path = t1.to_string_lossy().into_owned();
+        let db = create_threads(&home.join(".codex/state_5.sqlite"));
+        insert_thread(
+            &db,
+            (
+                "first",
+                &t1_path,
+                1_790_503_200,
+                1_790_508_000,
+                "",
+                Some("gpt-first"),
+                100,
+            ),
+        );
+        insert_thread(
+            &db,
+            (
+                "last",
+                &t1_path,
+                1_790_503_200,
+                1_790_508_000,
+                "",
+                Some("gpt-last"),
+                200,
+            ),
+        );
+        drop(db);
+
+        let src = load(&ctx()).unwrap();
+        assert_eq!(src.ledger.len(), 1);
+        assert_eq!(src.ledger[0].id, "codex:last");
+        assert_eq!(src.ledger[0].model, "codex:gpt-last");
+        assert_eq!(src.ledger[0].tokens, 200);
+    }
+
+    #[test]
+    fn load_interpolates_a_null_thread_id_as_the_string_null() {
+        let env = TestEnv::new();
+        let db = create_threads(&env.dir.path().join(".codex/state_5.sqlite"));
+        db.execute(
+            "insert into threads values (NULL, '', 1790300000, 0, '/w/b', 't', NULL, 700)",
+            [],
+        )
+        .unwrap();
+        drop(db);
+
+        let src = load(&ctx()).unwrap();
+        let ids: Vec<&str> = src.ledger.iter().map(|row| row.id.as_str()).collect();
+        assert_eq!(ids, ["codex:null"]);
+    }
+
+    #[test]
     fn load_without_state_db_reads_walked_rollouts_only() {
         let _env = TestEnv::new();
         let src = load(&ctx()).unwrap();
         assert!(src.ledger.is_empty());
         assert_eq!((src.total_threads, src.codex_thread_row_count), (0, 0));
     }
-
-    // ---------- usage limits ----------
 
     #[test]
     fn limits_slot_by_window_length_not_field() {
@@ -1616,7 +1657,6 @@ mod tests {
         assert_eq!(limits.plan, Some(Some("pro".to_owned())));
         assert!(!limits.stale);
 
-        // No limit_window_seconds: primary falls back to 5 h, secondary to 7 d.
         let fallback = json!({"rate_limit": {"primary_window": {"used_percent": 1}, "secondary_window": {"used_percent": 2}}});
         let limits = build_codex_usage_limits(Some(&fallback), None, f64::NAN, None, NOW);
         assert_eq!(limits.five_hour.unwrap().duration_ms, FIVE_HOUR_MS);
@@ -1649,7 +1689,6 @@ mod tests {
         })
     }
 
-    // Answers the fresh token with usage and anything else with `usage_status`, as the golden stub does.
     fn fetch_limits(usage_status: u16, token_status: u16) -> (UsageLimits, Vec<Seen>) {
         use axum::http::{HeaderMap, Method, StatusCode, Uri};
         let runtime = tokio::runtime::Builder::new_current_thread()

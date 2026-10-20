@@ -1,4 +1,3 @@
-// `cockpit atlas serve [--port N] [--no-open]`.
 use super::model::{Ctx, now_ms};
 use super::{live, pricing, stats};
 use crate::server::{json_error, json_response, static_files};
@@ -17,8 +16,6 @@ use std::time::Duration;
 use tokio::sync::OnceCell;
 
 const DEFAULT_PORT: u16 = 5938;
-
-// ---------- argv ----------
 
 fn parse_port(args: &[String]) -> u16 {
     args.iter()
@@ -50,8 +47,6 @@ fn open_browser(url: &str, no_open: bool) {
     }
 }
 
-// ---------- startup decision ----------
-
 #[derive(Debug, PartialEq)]
 struct AtlasInfo {
     pid: Number,
@@ -66,7 +61,6 @@ enum Startup {
     Start,
 }
 
-// readAtlasInfo checks only `typeof === "number"`, so a fractional port survives to the reuse message.
 fn parse_atlas_info(raw: &str) -> Option<AtlasInfo> {
     let value: Value = serde_json::from_str(raw).ok()?;
     match (value.get("pid"), value.get("port"), value.get("root")) {
@@ -81,7 +75,6 @@ fn parse_atlas_info(raw: &str) -> Option<AtlasInfo> {
     }
 }
 
-// Bun's process.kill throws on a non-integer pid, which isAlive reads as dead.
 fn signal_pid(pid: &Number) -> Option<i32> {
     let pid = pid.as_f64()?;
     (pid.fract() == 0.0 && pid > 0.0 && pid <= f64::from(i32::MAX)).then_some(pid as i32)
@@ -125,9 +118,7 @@ impl StatsBody {
     }
 }
 
-// tokio's OnceCell rather than a Shared future (`futures` is not a dependency): concurrent callers
-// await one build, and a failed or cancelled init leaves the cell empty so the next caller rebuilds,
-// which is TS's "never cache a rejection" without a separate clear step.
+// tokio's OnceCell rather than a Shared future: `futures` is not a dependency.
 type StatsSlot = Mutex<Option<(String, Arc<OnceCell<Arc<StatsBody>>>)>>;
 
 async fn cached_stats<F, Fut>(
@@ -158,8 +149,6 @@ where
         .await?;
     Ok(value.clone())
 }
-
-// ---------- handlers ----------
 
 struct App {
     plugin_root: PathBuf,
@@ -230,7 +219,6 @@ async fn handle_stats(app: &App, request_headers: &HeaderMap) -> anyhow::Result<
     Ok((headers, body).into_response())
 }
 
-// Deliberate TS deviation: TS's one event loop stalled here during a build; this never waits on the stats slot.
 async fn handle_live(app: &App) -> anyhow::Result<Response> {
     let ctx = app.ctx();
     let (sessions, cockpit_port) = tokio::task::spawn_blocking(move || {
@@ -248,7 +236,6 @@ async fn handle_live(app: &App) -> anyhow::Result<Response> {
 }
 
 async fn handle_pricing_refresh(app: &App, req: Request) -> anyhow::Result<Response> {
-    // A missing or invalid body falls back to deriving the model list, as TS's swallowed req.json().
     let body = axum::body::to_bytes(req.into_body(), usize::MAX)
         .await
         .ok()
@@ -276,8 +263,6 @@ async fn handle_pricing_refresh(app: &App, req: Request) -> anyhow::Result<Respo
     let result = pricing::refresh_pricing_override(&ctx, models).await?;
     Ok(json_response(StatusCode::OK, serde_json::to_value(result)?))
 }
-
-// ---------- lifecycle ----------
 
 fn write_atlas_info(home: &Path, port: u16, root: &str) -> std::io::Result<()> {
     std::fs::create_dir_all(home)?;
@@ -451,6 +436,15 @@ mod tests {
             panic!("expected reuse");
         };
         assert_eq!(info.port.to_string(), "5999.5");
+    }
+
+    #[test]
+    fn signal_pid_accepts_only_positive_i32_integers() {
+        for pid in ["1.5", "0", "-1", "2147483648"] {
+            let pid: Number = serde_json::from_str(pid).unwrap();
+            assert_eq!(signal_pid(&pid), None, "{pid}");
+        }
+        assert_eq!(signal_pid(&Number::from(1234)), Some(1234));
     }
 
     #[test]

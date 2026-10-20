@@ -1,4 +1,3 @@
-// Port of api.ts `// ---------- Pricing ----------`.
 use super::model::{Ctx, ModelUsage, display_path, raw_model_from_key};
 use super::paths;
 use indexmap::IndexMap;
@@ -10,7 +9,6 @@ use std::time::Duration;
 
 const OPENROUTER_FALLBACK_URL: &str = "https://openrouter.ai/api/v1/models";
 
-// JSON.stringify writes an integral number without ".0" and NaN as null; the override file must match.
 fn js_number<S: Serializer>(value: &f64, s: S) -> Result<S::Ok, S::Error> {
     if !value.is_finite() {
         s.serialize_none()
@@ -155,7 +153,6 @@ fn read_defaults(ctx: &Ctx) -> anyhow::Result<PricingTable> {
         .ok_or_else(|| anyhow::anyhow!("Missing pricing defaults: {}", path.display()))
 }
 
-// readJSONWithError: Ok(None) when absent. The Err text is serde's, not Bun's JSON.parse message.
 fn read_override(path: &Path) -> Result<Option<OverrideFile>, String> {
     if !path.exists() {
         return Ok(None);
@@ -171,7 +168,6 @@ struct OpenRouterPricing {
     error: Option<String>,
 }
 
-// parseFloat on OpenRouter's decimal strings; junk becomes NaN as in JS.
 fn parse_js_float(value: &str) -> f64 {
     value.trim().parse::<f64>().unwrap_or(f64::NAN)
 }
@@ -226,7 +222,6 @@ async fn fetch_open_router_pricing(timeout: Duration) -> OpenRouterPricing {
     OpenRouterPricing { models, error }
 }
 
-// Outer Err is the JS error name TS records: AbortSignal.timeout → "TimeoutError", Bun network/parse failure → "TypeError"/"SyntaxError".
 async fn fetch_json(
     url: &str,
     timeout: Duration,
@@ -503,7 +498,6 @@ pub async fn refresh_pricing_override(
     })
 }
 
-/// The full `--source pricing` shape (loadPricingWithMeta's value).
 pub fn source_json(load: &PricingLoad) -> serde_json::Value {
     serde_json::to_value(load).unwrap_or_default()
 }
@@ -511,6 +505,16 @@ pub fn source_json(load: &PricingLoad) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn js_number_writes_integers_bare_and_nan_as_null() {
+        #[derive(Serialize)]
+        struct N(#[serde(serialize_with = "js_number")] f64);
+        let out = |v| serde_json::to_string(&N(v)).unwrap();
+        assert_eq!(out(5.0), "5");
+        assert_eq!(out(2.5), "2.5");
+        assert_eq!(out(f64::NAN), "null");
+    }
     use crate::paths::tests::TestEnv;
 
     fn price(input: f64, output: f64, read: Option<f64>, write: Option<f64>) -> ModelPrice {
@@ -702,7 +706,6 @@ mod tests {
         }
     }
 
-    // Serves one canned HTTP response per connection until the test ends.
     async fn stub(body: &'static str, status: &'static str) -> String {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -849,7 +852,6 @@ mod tests {
             r#"{"models":{"hand-set":{"input":1,"output":2}}}"#,
         )
         .unwrap();
-        // A cached load must be dropped by the refresh.
         let _ = load_pricing_with_meta(&ctx).await.unwrap();
         let result = refresh_pricing_override(
             &ctx,

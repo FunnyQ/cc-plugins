@@ -32,7 +32,6 @@ pub fn run(_args: &[String]) -> ExitCode {
 async fn push(ctx: &Ctx, url: &str) {
     let claude = claude::read_usage_limits(ctx);
     let codex = codex::read_codex_usage_limits(ctx).await;
-    // Real clock: push-usage.ts stamps Date.now(), not the TOKEN_ATLAS_NOW_MS seam.
     let captured_at = jiff::Timestamp::now().as_millisecond();
     let payload = json!({ "capturedAt": captured_at, "claude": claude, "codex": codex });
     let Ok(body) = serde_json::to_string(&payload) else {

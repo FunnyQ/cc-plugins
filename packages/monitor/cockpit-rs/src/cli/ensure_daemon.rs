@@ -8,9 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-// Give the detached server the same startup grace period the Bun channel had.
 const STARTUP_BUDGET: Duration = Duration::from_secs(3);
-// Discover a just-written daemon record without busy polling.
 const STARTUP_POLL: Duration = Duration::from_millis(100);
 
 fn should_spawn(

@@ -85,7 +85,6 @@ pub fn build_headless_scribe(
     resume_id: &str,
     scribe_session: &str,
 ) -> Vec<String> {
-    // The Rust port uses the shim instead of the retired Bun cockpit.ts CLI.
     let cli = format!("{skill_dir}/bin/cockpit");
     let refs = format!("{skill_dir}/references");
     let prompt = format!(

@@ -104,7 +104,6 @@ fn part_content(part: &Value) -> Vec<Value> {
 }
 
 fn entries(rows: &[Row]) -> Vec<Value> {
-    // A vector preserves JS Map first-seen order; preserve_order keeps TS field insertion order.
     let mut groups: Vec<(&Row, Vec<Value>)> = Vec::new();
     for row in rows {
         // read_rows orders by (message created, message id), so a message's rows are contiguous.
@@ -129,7 +128,6 @@ fn entries(rows: &[Row]) -> Vec<Value> {
             "assistant"
         };
         let content = if parts.is_empty() {
-            // JS ?? preserves false, zero and empty strings; summary uses JS truthiness.
             nonnull([&data["content"], &data["text"]])
                 .cloned()
                 .unwrap_or_else(|| {
@@ -302,10 +300,45 @@ mod tests {
             "{\"type\":\"user\",\"uuid\":\"one\",\"timestamp\":\"2023-11-14T22:13:20.001Z\",\"message\":{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"hello\"},{\"type\":\"thinking\",\"thinking\":\"think\"}]},\"provider\":\"opencode\"}"
         );
         assert!(mapped[1].get("timestamp").is_none());
+        assert_eq!(
+            mapped
+                .iter()
+                .map(|entry| entry["uuid"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["one", "false"]
+        );
         let mut cursor = 0;
         let mut seen = HashSet::new();
         assert!(!emit_rows(&rows, &mut cursor, &mut seen).is_empty());
         assert_eq!(cursor, 1_700_000_000_001);
         assert!(emit_rows(&rows, &mut cursor, &mut seen).is_empty());
+    }
+
+    #[test]
+    fn content_falls_back_by_js_nullish_and_summary_by_truthiness() {
+        let row = |data: &str| Row {
+            id: "m".into(),
+            created: 0,
+            updated: 0,
+            data: data.into(),
+            part: None,
+        };
+        let content = |data: &str| {
+            entries(&[row(data)])
+                .first()
+                .map(|entry| entry["message"]["content"].clone())
+        };
+        assert_eq!(
+            content("{\"content\":false,\"text\":\"x\"}"),
+            Some(json!(false))
+        );
+        assert_eq!(content("{\"content\":0,\"text\":\"x\"}"), Some(json!(0)));
+        assert_eq!(content("{\"content\":\"\",\"text\":\"x\"}"), None);
+        assert_eq!(content("{\"summary\":0}"), None);
+        assert_eq!(content("{\"summary\":\"\"}"), None);
+        assert_eq!(
+            content("{\"summary\":{\"a\":1}}"),
+            Some(json!("{\n  \"a\": 1\n}"))
+        );
     }
 }

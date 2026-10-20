@@ -35,7 +35,6 @@ async fn restart(rest: &[String]) -> Result<(), String> {
         process_alive::terminate(pid);
     }
     for attempt in 1..=4 {
-        // Rust spawns its own exe instead of bun cockpit-server.ts; this is the sole intended behavioral difference.
         let mut args = Vec::new();
         if let Some(port) = flag_value(rest, "port") {
             args.extend(["--port", port]);

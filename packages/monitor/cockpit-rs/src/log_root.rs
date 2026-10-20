@@ -47,7 +47,6 @@ fn is_inside(root: &Path, target: &Path) -> bool {
     let Ok(relative) = target.strip_prefix(root) else {
         return false;
     };
-    // TS rejects every relative path starting with "..", including names such as "..hidden".
     !relative.as_os_str().is_empty()
         && !relative.as_os_str().to_string_lossy().starts_with("..")
         && !relative.is_absolute()
@@ -252,7 +251,6 @@ mod tests {
         }
         let worktree = mkdir(&temp.path().join("worktree"));
         let metadata = mkdir(&repo.join(".git/worktrees/fixture"));
-        // Build git's linked-worktree metadata without commits or worktree mutations.
         fs::write(
             worktree.join(".git"),
             format!("gitdir: {}\n", metadata.display()),
@@ -267,5 +265,11 @@ mod tests {
         .unwrap();
         assert_eq!(git_root_of(&worktree), Some(worktree.clone()));
         assert_eq!(log_root(&worktree, git_root_of), worktree);
+    }
+
+    #[test]
+    fn is_inside_rejects_every_dotdot_prefixed_name() {
+        assert!(!is_inside(Path::new("/r"), Path::new("/r/..hidden")));
+        assert!(is_inside(Path::new("/r"), Path::new("/r/.hidden")));
     }
 }

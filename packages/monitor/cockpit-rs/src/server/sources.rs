@@ -115,7 +115,6 @@ impl Iterator for JsonlLines {
                 if bytes.last() == Some(&b'\r') {
                     bytes.pop();
                 }
-                // Decode after splitting bytes so multibyte characters crossing chunks survive.
                 Some(Ok(String::from_utf8_lossy(&bytes).into_owned()))
             }
             Err(error) => {
@@ -130,6 +129,19 @@ impl Iterator for JsonlLines {
 mod tests {
     use super::*;
     use crate::paths::tests::TestEnv;
+
+    #[test]
+    fn multibyte_character_split_across_buffer_chunks_decodes_intact() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("split.jsonl");
+        let head = "a".repeat(64 * 1024 - 1);
+        fs::write(&path, format!("{head}é\r\nx")).unwrap();
+        let lines: Vec<String> = read_jsonl_lines(&path)
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(lines, vec![format!("{head}é"), "x".to_owned()]);
+    }
 
     #[test]
     fn recursive_claude_lookup_and_missing_roots() {
@@ -216,7 +228,6 @@ mod tests {
         struct Restore(Option<std::ffi::OsString>);
         impl Drop for Restore {
             fn drop(&mut self) {
-                // The enclosing TestEnv holds the environment lock through restoration.
                 unsafe {
                     match &self.0 {
                         Some(value) => env::set_var("COCKPIT_CODEX_SESSIONS_DIR", value),

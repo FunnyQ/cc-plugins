@@ -33,7 +33,6 @@ pub struct AppState {
     pub plugin_root: Arc<Path>,
 }
 
-// JavaScript parseInt: optional leading whitespace and sign, then the leading digits.
 pub(crate) fn parse_port(value: &str) -> Option<u16> {
     let value = value.trim_start();
     let digits = value.strip_prefix('+').unwrap_or(value);
@@ -187,6 +186,8 @@ mod tests {
     fn port_matches_javascript_parse_int_and_valid_range() {
         for (input, expected) in [
             ("42extra", Some(42)),
+            (" +80x", Some(80)),
+            ("99999999999", None),
             (" +123", Some(123)),
             ("0", None),
             ("65536", None),

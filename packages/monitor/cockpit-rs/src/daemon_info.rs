@@ -68,7 +68,6 @@ pub fn read_daemon_info() -> Option<PartialDaemonInfo> {
     })
 }
 
-// A record without a pid or port counts as no daemon.
 pub fn read_process_info() -> Option<PartialDaemonInfo> {
     read_daemon_info().filter(|info| info.pid.is_some() && info.port.is_some())
 }
@@ -111,7 +110,6 @@ pub fn version_from_root(root: &str) -> Option<String> {
         if window[1] != "monitor" {
             continue;
         }
-        // The regex requires a separator after the version as well as before monitor.
         if index + 3 >= segments.len() {
             continue;
         }
@@ -365,5 +363,10 @@ mod tests {
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         );
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn version_needs_a_separator_after_it() {
+        assert_eq!(version_from_root("/cache/q-lab/monitor/3.18.5"), None);
     }
 }

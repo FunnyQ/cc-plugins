@@ -16,9 +16,8 @@ fn wait_for_exit(pid: i32, timeout: std::time::Duration) {
     }
 }
 
-/// SIGTERM, then SIGKILL after 1.5 s; returns once the pid is gone or 1 s after the kill.
 pub fn terminate(pid: i32) {
-    // Only a pid read from the daemon record reaches here; a failed signal means it already exited.
+    debug_assert!(pid > 1);
     if unsafe { libc::kill(pid, libc::SIGTERM) } != 0 {
         return;
     }
@@ -31,7 +30,6 @@ pub fn terminate(pid: i32) {
     }
 }
 
-/// setsid detaches a spawned child from the caller's terminal and process group.
 pub fn detach(command: &mut std::process::Command) -> &mut std::process::Command {
     use std::os::unix::process::CommandExt;
     unsafe {

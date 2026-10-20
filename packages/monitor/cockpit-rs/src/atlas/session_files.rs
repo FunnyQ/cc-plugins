@@ -8,7 +8,6 @@ fn present<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Value>, D::Error> {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-// Only sessionId, cwd and startedAt are validated by the TS; the rest pass through untyped.
 pub struct ClaudeSessionFile {
     #[serde(
         default,
@@ -49,7 +48,6 @@ pub struct ClaudeSessionFile {
         skip_serializing_if = "Option::is_none"
     )]
     pub entrypoint: Option<Value>,
-    // Every other key passes through whole, as readSessionFiles pushes the parsed object.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
 }
@@ -63,7 +61,6 @@ pub fn read_session_files() -> Vec<ClaudeSessionFile> {
         if !entry.file_name().to_string_lossy().ends_with(".json") {
             continue;
         }
-        // A malformed or partially written file is skipped, as readSessionFiles does.
         let Ok(text) = std::fs::read_to_string(entry.path()) else {
             continue;
         };
@@ -131,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn passes_unknown_keys_through() {
+    fn passes_unknown_keys_and_explicit_nulls_through() {
         let src = serde_json::json!({
             "sessionId": "s", "cwd": "/r", "startedAt": 5, "pid": 7,
             "name": "n", "peerFeatures": {"a": [1, {"b": true}]},

@@ -9,7 +9,6 @@ pub struct JsonlLinesOptions {
     /// Must sit on a line boundary.
     pub start: u64,
     pub chunk_size: usize,
-    /// The rollup ingest passes `false` so a half-written line waits for the next run.
     pub emit_partial: bool,
 }
 
@@ -34,13 +33,11 @@ pub struct JsonlLines {
 }
 
 impl JsonlLines {
-    /// Byte offset consumed through the last complete line (`LineCursor.bytesConsumed`).
     pub fn bytes_consumed(&self) -> u64 {
         self.consumed
     }
 }
 
-/// A missing or unreadable file yields nothing.
 pub fn read_jsonl_lines(path: &Path, opts: JsonlLinesOptions) -> JsonlLines {
     let file = File::open(path)
         .ok()

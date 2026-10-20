@@ -161,7 +161,6 @@ pub(crate) mod tests {
 
     impl Drop for TestEnv {
         fn drop(&mut self) {
-            // The fixture still holds LOCK until every variable is restored.
             unsafe {
                 for (key, value) in &self.saved {
                     match value {

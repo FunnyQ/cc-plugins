@@ -69,7 +69,6 @@ impl TranscriptSource {
             return sources::resolve_codex_rollout_path(&self.session);
         }
         sources::resolve_claude_transcript_path(&self.session).or_else(|| {
-            // The shared lookup omits symlinks; discover them before enforcing confinement.
             fn find(dir: &Path, name: &str, visited: &mut HashSet<PathBuf>) -> Option<PathBuf> {
                 if !visited.insert(fs::canonicalize(dir).ok()?) {
                     return None;
@@ -159,7 +158,6 @@ async fn stream(Query(params): Query<Params>) -> Response {
 }
 
 fn js_number(value: Option<&str>) -> f64 {
-    // JS Number(null) and Number(whitespace) are zero; radix literals are unsigned.
     let text = value
         .unwrap_or("")
         .trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
@@ -227,7 +225,6 @@ async fn history(Query(params): Query<Params>) -> Response {
     let result = || -> io::Result<Value> {
         let end = before.min(fs::metadata(&path)?.len() as f64) as u64;
         let limit = js_number(params.limit.as_deref());
-        // JS limit || 50 replaces both zero and NaN; slice(-cap) truncates fractions.
         let limit = if limit == 0.0 || limit.is_nan() {
             BACKLOG_LINES as f64
         } else {
@@ -235,7 +232,6 @@ async fn history(Query(params): Query<Params>) -> Response {
         };
         let cap = limit.clamp(1.0, MAX_HISTORY_LIMIT as f64);
         let (lines, _, start) = read_lines_with_cap(&path, end, cap)?;
-        // preserve_order keeps the TS response's entries/cursor/flag field order.
         Ok(
             json!({"entries":parse_entries(lines.iter().map(String::as_str)),"historyStart":start,"hasMore":start > 0}),
         )
@@ -428,8 +424,11 @@ mod tests {
 
     #[test]
     fn number_coercion_and_display_filter() {
+        assert_eq!(js_number(None), 0.0);
         for (text, expected) in [
             ("", 0.0),
+            ("\t\n\u{feff}", 0.0),
+            ("0x10", 16.0),
             ("  ", 0.0),
             ("0x20", 32.0),
             ("0b11", 3.0),
@@ -438,7 +437,7 @@ mod tests {
         ] {
             assert_eq!(js_number(Some(text)), expected);
         }
-        for text in ["garbage", "inf", "+0x20"] {
+        for text in ["garbage", "inf", "+0x20", "-0x1", "0x"] {
             assert!(js_number(Some(text)).is_nan());
         }
         assert_eq!(
@@ -450,5 +449,71 @@ mod tests {
             ]),
             vec![json!({"type":"assistant"})]
         );
+    }
+
+    const SESSION: &str = "11111111-2222-3333-4444-555555555555";
+
+    #[test]
+    fn symlinked_transcript_is_found_then_confined_to_projects() {
+        let fixture = crate::paths::tests::TestEnv::new();
+        let projects = crate::paths::claude_projects_dir();
+        let nested = projects.join("p/subagents");
+        fs::create_dir_all(&nested).unwrap();
+        let outside = fixture.dir.path().join("outside.jsonl");
+        fs::write(&outside, "{}\n").unwrap();
+        std::os::unix::fs::symlink(&outside, nested.join(format!("{SESSION}.jsonl"))).unwrap();
+        let source = TranscriptSource {
+            provider: Provider::Claude,
+            session: SESSION.into(),
+        };
+        assert!(source.path().is_some());
+        assert!(matches!(
+            source.resolve(),
+            Resolve::Fail { status: 403, .. }
+        ));
+    }
+
+    async fn history_body(limit: &str) -> String {
+        let response = history(Query(Params {
+            session: SESSION.into(),
+            provider: Some("claude".into()),
+            before: Some("1e9".into()),
+            limit: Some(limit.into()),
+        }))
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        String::from_utf8(body.to_vec()).unwrap()
+    }
+
+    #[test]
+    fn history_limit_follows_js_or_default_and_truncates_fractions() {
+        let _fixture = crate::paths::tests::TestEnv::new();
+        let dir = crate::paths::claude_projects_dir().join("p");
+        fs::create_dir_all(&dir).unwrap();
+        let lines: String = (0..120)
+            .map(|i| format!("{{\"type\":\"assistant\",\"n\":{i}}}\n"))
+            .collect();
+        fs::write(dir.join(format!("{SESSION}.jsonl")), lines).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            for (limit, count) in [("0", 50), ("NaN", 50), ("2.7", 2)] {
+                let body: Value = serde_json::from_str(&history_body(limit).await).unwrap();
+                assert_eq!(
+                    body["entries"].as_array().unwrap().len(),
+                    count,
+                    "limit {limit}"
+                );
+            }
+            let body = history_body("1").await;
+            let keys: Vec<_> = ["\"entries\"", "\"historyStart\"", "\"hasMore\""]
+                .map(|key| body.find(key).unwrap())
+                .into();
+            assert!(keys.is_sorted(), "{body}");
+        });
     }
 }

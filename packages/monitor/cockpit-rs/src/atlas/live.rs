@@ -1,4 +1,3 @@
-// Ports live.ts (I/O + caches) and live-sessions.ts (pure shaping) for the "Live now" panel.
 use super::model::{Ctx, iso_ms, now_ms, project_name};
 use super::session_files::{ClaudeSessionFile, read_session_files};
 use rusqlite::{Connection, OpenFlags};
@@ -58,8 +57,6 @@ pub struct OpenCodeRow {
     pub time_updated: Option<f64>,
 }
 
-// ---------- pure helpers (live-sessions.ts) ----------
-
 pub fn status_rank(status: &str) -> u8 {
     match status {
         "busy" | "active-inferred" => 0,
@@ -70,7 +67,6 @@ pub fn status_rank(status: &str) -> u8 {
     }
 }
 
-// JS `||` chain: 0 and NULL both fall through.
 pub fn codex_updated_at_ms(row: &CodexRow) -> f64 {
     let truthy = |v: Option<f64>| v.filter(|x| *x != 0.0 && !x.is_nan());
     truthy(row.updated_at_ms)
@@ -113,7 +109,6 @@ fn opencode_timestamp_ms(value: Option<f64>) -> f64 {
     }
 }
 
-// `new Date(ms).toISOString()`: Date truncates the ms toward zero.
 fn iso(ms: f64) -> String {
     iso_ms(ms.trunc() as i64).unwrap_or_default()
 }
@@ -139,7 +134,6 @@ pub fn build_claude_live_sessions(
         .iter()
         .map(|session| {
             let started = session.started_at.as_f64().unwrap_or(0.0);
-            // `updatedAt ?? startedAt`: only null/undefined fall through.
             let updated_at_ms = session
                 .updated_at
                 .as_ref()
@@ -258,8 +252,6 @@ pub fn sort_live_sessions(mut sessions: Vec<LiveSession>) -> Vec<LiveSession> {
     sessions
 }
 
-// ---------- I/O (live.ts) ----------
-
 fn open_read_only(path: &Path) -> Option<Connection> {
     if !path.exists() {
         return None;
@@ -323,8 +315,6 @@ fn read_opencode_session_rows() -> Vec<OpenCodeRow> {
 
 type Cache<T> = Mutex<Option<(i64, Arc<T>)>>;
 
-// One 5 s TTL slot keyed on now_ms(), shared by the three caches live.ts keeps. An Arc, so a hit
-// on every 3 s poll does not deep-copy the transcript index.
 fn cached<T>(slot: &Cache<T>, load: impl FnOnce() -> T) -> Arc<T> {
     let now = now_ms();
     let mut guard = slot.lock().unwrap_or_else(|e| e.into_inner());
@@ -342,7 +332,6 @@ static TRANSCRIPT_INDEX: Cache<HashMap<String, String>> = Mutex::new(None);
 static COCKPIT_KEYS: Cache<HashSet<String>> = Mutex::new(None);
 static DAEMON_PORT: Cache<Option<serde_json::Number>> = Mutex::new(None);
 
-// Bun's Glob skips dot entries by default, so this walk does too.
 fn walk_jsonl(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
@@ -368,7 +357,6 @@ fn transcript_index() -> Arc<HashMap<String, String>> {
     cached(&TRANSCRIPT_INDEX, || {
         let mut paths = Vec::new();
         walk_jsonl(&super::paths::projects_dir(), &mut paths);
-        // Sorted so "first stem wins" is deterministic; Bun's scan order is unspecified.
         paths.sort();
         let mut index = HashMap::new();
         for path in paths {
@@ -397,7 +385,6 @@ pub fn cockpit_daemon_port() -> Option<serde_json::Number> {
         let raw = std::fs::read_to_string(crate::paths::daemon_info_path()).ok()?;
         let info: Value = serde_json::from_str(&raw).ok()?;
         let pid = info.get("pid")?.as_f64()?;
-        // process.kill rejects a fractional pid; pid <= 0 is dead here, where kill(0) would not be.
         let alive = pid.fract() == 0.0
             && pid.abs() <= i32::MAX as f64
             && crate::process_alive::is_alive(pid as i32);
@@ -471,7 +458,6 @@ mod tests {
 
     const NOW: i64 = 1_700_000_000_000;
 
-    // Each test pins a fresh clock far past the last one, so no cache from another test survives.
     static CLOCK: AtomicI64 = AtomicI64::new(NOW);
     fn fresh_now() -> i64 {
         let now = CLOCK.fetch_add(1_000_000, Ordering::SeqCst) + 1_000_000;
@@ -535,7 +521,6 @@ mod tests {
             r.created_at = Some(3.0);
         });
         assert_eq!(created, 3000.0);
-        // 0 in the ms column is falsy and falls through, unlike SQL coalesce.
         let zero_ms = with(|r| {
             r.updated_at_ms = Some(0.0);
             r.updated_at = Some(0.0);
@@ -785,6 +770,9 @@ mod tests {
             (r#"{"pid":999999999,"port":1}"#.into(), None),
             (format!(r#"{{"pid":"{}","port":1}}"#, me()), None),
             ("{corrupt".into(), None),
+            (format!(r#"{{"pid":{}.5,"port":1}}"#, me()), None),
+            (r#"{"pid":0,"port":1}"#.into(), None),
+            (r#"{"pid":-1,"port":1}"#.into(), None),
         ];
         for (body, expected) in cases {
             fresh_now();
@@ -807,7 +795,6 @@ mod tests {
         assert_eq!(cockpit_daemon_port(), Some(6001.into()));
         TestEnv::set("TOKEN_ATLAS_NOW_MS", (t + CACHE_TTL_MS).to_string());
         assert_eq!(cockpit_daemon_port(), Some(6002.into()));
-        // A cached None is reused too.
         let t = fresh_now();
         std::fs::remove_file(env.dir.path().join("cockpit/daemon.json")).unwrap();
         assert_eq!(cockpit_daemon_port(), None);

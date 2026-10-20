@@ -58,7 +58,6 @@ impl futures_core::Stream for SseBody {
     }
 }
 
-/// Streams the preformatted SSE chunks `produce` sends; the body ends when it returns.
 pub fn sse_response<F>(produce: impl FnOnce(mpsc::Sender<String>) -> F) -> axum::response::Response
 where
     F: std::future::Future<Output = ()> + Send + 'static,

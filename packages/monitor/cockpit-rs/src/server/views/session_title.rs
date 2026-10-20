@@ -28,7 +28,6 @@ fn transcript_title(path: &Path) -> Option<String> {
         if line.trim().is_empty() {
             continue;
         }
-        // A malformed entry aborts this transcript just as the TS reader's catch does.
         let entry: Value = serde_json::from_str(&line).ok()?;
         if entry["type"] != "user" || entry["message"]["role"] != "user" {
             continue;
@@ -132,6 +131,15 @@ mod tests {
         .unwrap();
         assert_eq!(
             resolve_historical_session_title(Provider::Claude, "bad"),
+            None
+        );
+        fs::write(
+            nested.join("late.jsonl"),
+            "{}\ninvalid\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"ignored\"}}",
+        )
+        .unwrap();
+        assert_eq!(
+            resolve_historical_session_title(Provider::Claude, "late"),
             None
         );
         fs::write(nested.join("empty.jsonl"), "{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"  \"}}\n{\"type\":\"user\",\"message\":{\"role\":\"user\",\"content\":\"ignored\"}}").unwrap();

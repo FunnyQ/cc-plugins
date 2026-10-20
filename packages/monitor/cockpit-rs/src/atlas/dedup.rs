@@ -121,7 +121,6 @@ fn hour_start_ms_in(ts_ms: i64, tz: &TimeZone) -> i64 {
     else {
         return ts_ms;
     };
-    // A repeated fall-back hour resolves to its earlier instant, as JS Date's setMinutes does.
     tz.to_ambiguous_timestamp(hour)
         .compatible()
         .map_or(ts_ms, |ts| ts.as_millisecond())
@@ -138,7 +137,6 @@ mod tests {
         let new_york = TimeZone::get("America/New_York").unwrap();
         let taipei = TimeZone::get("Asia/Taipei").unwrap();
         let cases: &[(i64, i64, i64)] = &[
-            // (ts, New York, Taipei)
             (1793511000000, 1793509200000, 1793509200000), // 2026-11-01T05:30Z, 01:30 EDT
             (1793514600000, 1793509200000, 1793512800000), // 06:30Z, 01:30 EST — repeated hour
             (1793516399999, 1793509200000, 1793512800000),

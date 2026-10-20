@@ -179,7 +179,6 @@ fn persist(entries: Vec<RegistryEntry>) {
     }
 }
 
-// Routes surface a failed write as a 500; the hooks and CLI keep aborting through persist.
 fn try_persist(entries: Vec<RegistryEntry>) -> Result<(), String> {
     #[derive(Serialize)]
     struct Registry {
@@ -247,7 +246,6 @@ fn system_ms(time: SystemTime) -> i64 {
     }
 }
 
-/// The 36-character lowercase UUID shape every Claude and Codex session id takes.
 pub fn is_session_id(value: &str) -> bool {
     value.len() == 36
         && value
@@ -662,5 +660,12 @@ mod tests {
         ] {
             assert_eq!(parse_timestamp(text), None);
         }
+    }
+
+    #[test]
+    fn session_id_is_36_lowercase_uuid_chars() {
+        assert!(is_session_id("0123abcd-0123-4567-89ab-0123456789ab"));
+        assert!(!is_session_id("0123ABCD-0123-4567-89AB-0123456789AB"));
+        assert!(!is_session_id("0123abcd-0123-4567-89ab-0123456789a"));
     }
 }

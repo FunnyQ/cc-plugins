@@ -1,5 +1,3 @@
-// Port of api.ts's Claude source: stats-cache, history, the rollup aggregates and ledger,
-// and the statusline rate-limit windows.
 use super::model::{
     Ctx, FIVE_HOUR_MS, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage,
     RATE_LIMITS_STALE_AFTER_MS, SEVEN_DAY_MS, UsageLimits, add_hourly_usage, add_model_usage,
@@ -15,8 +13,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-
-// ---------- Types ----------
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,7 +62,6 @@ pub struct StatsCache {
     pub longest_session: Option<StatsCacheLongestSession>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_session_date: Option<String>,
-    // Keys Claude Code adds later (e.g. dailyModelTokensVersion) pass through, as the TS spread the parsed file.
     #[serde(flatten)]
     pub extra: serde_json::Map<String, Value>,
 }
@@ -84,7 +79,6 @@ pub struct HistoryProject {
 #[serde(rename_all = "camelCase")]
 pub struct HistoryDay {
     pub message_count: i64,
-    // BTreeSet serializes sorted, as sourceReplacer's `[...set].sort()`.
     pub session_ids: BTreeSet<String>,
 }
 
@@ -104,8 +98,6 @@ pub struct ClaudeSource {
     pub stats_cache: StatsCache,
     pub history: History,
 }
-
-// ---------- Parsers ----------
 
 fn parse_stats_cache() -> anyhow::Result<StatsCache> {
     let path = paths::stats_cache();
@@ -185,7 +177,6 @@ fn parse_history(now: i64) -> History {
     history
 }
 
-// hour_ms = 0 rows are timeless: counted in model/project totals, never in hourly/daily maps.
 fn read_rollup_aggregates(db: &Connection) -> rusqlite::Result<ProviderUsage> {
     let mut out = ProviderUsage::default();
     for r in rollup_db::all_hourly_rows(db)? {
@@ -197,7 +188,6 @@ fn read_rollup_aggregates(db: &Connection) -> rusqlite::Result<ProviderUsage> {
             reasoning_output_tokens: Some(r.reasoning),
             ..Default::default()
         };
-        // Keyed by raw model; stats assembly applies model_key.
         add_model_usage(
             out.model_usage
                 .entry(r.model.clone())
@@ -228,7 +218,6 @@ fn read_rollup_aggregates(db: &Connection) -> rusqlite::Result<ProviderUsage> {
 
 fn read_rollup_ledger(db: &Connection) -> rusqlite::Result<Vec<InternalLedgerRow>> {
     let mut by_session: IndexMap<String, InternalLedgerRow> = IndexMap::new();
-    // Rows arrive ordered by (project_ts_ms, path), so the first project is the origin cwd.
     for r in rollup_db::all_ledger_rows(db)? {
         let row = by_session
             .entry(r.session_key.clone())
@@ -295,42 +284,46 @@ fn read_rollup_ledger(db: &Connection) -> rusqlite::Result<Vec<InternalLedgerRow
         .collect())
 }
 
-// Also returns the ingest's own `.jsonl` count, so a build walks the projects tree once, not twice.
-fn read_rollup(
-    projects_dir: &Path,
-) -> anyhow::Result<(ProviderUsage, Vec<InternalLedgerRow>, usize)> {
+struct RollupRead {
+    usage: ProviderUsage,
+    ledger: Vec<InternalLedgerRow>,
+    transcript_file_count: usize,
+}
+
+fn read_rollup(projects_dir: &Path) -> anyhow::Result<RollupRead> {
     let mut db = rollup_db::open_rollup_db(&paths::rollup_db_path())?;
     let update = rollup_update::update_rollup(
         &mut db,
         projects_dir,
         rollup_update::UpdateOptions { rebuild: false },
     )?;
-    Ok((
-        read_rollup_aggregates(&db)?,
-        read_rollup_ledger(&db)?,
-        update.files_scanned,
-    ))
+    Ok(RollupRead {
+        usage: read_rollup_aggregates(&db)?,
+        ledger: read_rollup_ledger(&db)?,
+        transcript_file_count: update.files_scanned,
+    })
 }
 
 pub fn load(ctx: &Ctx) -> anyhow::Result<ClaudeSource> {
     // Transcript bytes are read solely by update_rollup.
     let projects_dir = paths::projects_dir();
-    // An unopenable rollup empties Claude's usage rather than failing the payload, as TS does.
-    let (usage, ledger, transcript_file_count) = read_rollup(&projects_dir).unwrap_or_else(|_| {
+    let rollup = read_rollup(&projects_dir).unwrap_or_else(|_| {
         let mut files: Vec<PathBuf> = Vec::new();
         dedup::walk_files(&projects_dir, ".jsonl", &mut files);
-        (ProviderUsage::default(), Vec::new(), files.len())
+        RollupRead {
+            usage: ProviderUsage::default(),
+            ledger: Vec::new(),
+            transcript_file_count: files.len(),
+        }
     });
     Ok(ClaudeSource {
-        usage,
-        ledger,
-        transcript_file_count,
+        usage: rollup.usage,
+        ledger: rollup.ledger,
+        transcript_file_count: rollup.transcript_file_count,
         stats_cache: parse_stats_cache()?,
         history: parse_history(ctx.now_ms),
     })
 }
-
-// ---------- Usage limits ----------
 
 pub fn read_usage_limits(_ctx: &Ctx) -> UsageLimits {
     let path = paths::rate_limits_cache();
@@ -348,7 +341,6 @@ pub fn read_usage_limits(_ctx: &Ctx) -> UsageLimits {
         limits.error = Some("missing".into());
         return limits;
     }
-    // The message is serde's or the OS's, not JS's SyntaxError text; the fixture never hits it.
     let data = match std::fs::read_to_string(&path)
         .map_err(|e| e.to_string())
         .and_then(|text| serde_json::from_str::<Value>(&text).map_err(|e| e.to_string()))
@@ -387,7 +379,6 @@ pub fn read_usage_limits(_ctx: &Ctx) -> UsageLimits {
     limits
 }
 
-/// The full `--source claude` shape, usageLimits included.
 pub fn source_json(ctx: &Ctx, src: &ClaudeSource) -> serde_json::Value {
     json!({
         "usage": {
@@ -432,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    fn timeless_rows_count_in_totals_only() {
+    fn timeless_rows_count_in_raw_model_totals_only() {
         let (_dir, db) = temp_db();
         let base = HourlyRow {
             project: "/p".into(),
@@ -472,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn multi_file_session_sums_into_one_row_with_origin_cwd() {
+    fn multi_file_session_sums_into_one_row_with_earliest_project_as_origin_cwd() {
         let (_dir, db) = temp_db();
         let ledger = |path: &str, key: &str, project: &str, project_ts_ms: i64, last_ts_ms: i64| {
             LedgerFileRow {
@@ -485,7 +476,6 @@ mod tests {
                 tool_calls: 3,
             }
         };
-        // The file that sorts first by path carries the later project_ts_ms.
         rollup_db::add_ledger_row(&db, &ledger("/a.jsonl", "s1", "/repo/sub", 200, NOW)).unwrap();
         rollup_db::add_ledger_row(&db, &ledger("/b.jsonl", "s1", "/repo", 100, NOW - 5)).unwrap();
         rollup_db::add_ledger_row(&db, &ledger("/c.jsonl", "bare", "", 0, NOW)).unwrap();
@@ -532,7 +522,7 @@ mod tests {
     }
 
     #[test]
-    fn history_skips_blank_and_malformed_lines() {
+    fn history_skips_blank_and_malformed_lines_and_sorts_session_ids() {
         let env = TestEnv::new();
         let ts = 1_790_858_096_789_i64;
         let lines = [
@@ -613,7 +603,6 @@ mod tests {
         assert_eq!(no_limits.captured_at.as_deref(), Some("x"));
         assert!(!no_limits.stale);
 
-        // Stale through the ISO fallback: 5 min + 1 ms old.
         let old = Timestamp::from_millisecond(NOW - 300_001).unwrap();
         write(
             &file,
@@ -632,7 +621,6 @@ mod tests {
         assert_eq!(stale.weekly, None);
         assert!(serde_json::to_value(&stale).unwrap().get("plan").is_none());
 
-        // Exactly 5 min old is fresh; no timestamp at all is stale.
         write(
             &file,
             &format!(r#"{{"capturedAtEpochMs":{}}}"#, NOW - 300_000),
@@ -662,7 +650,6 @@ mod tests {
         assert!(src.usage.model_usage.is_empty());
         assert!(src.ledger.is_empty());
         let json = source_json(&ctx(), &src);
-        // safeReadJSON returned the whole parsed file, unknown keys included.
         assert_eq!(json["statsCache"], json!({"version": 2, "extra": 1}));
         assert_eq!(json["transcriptFileCount"], json!(2));
         assert_eq!(json["usageLimits"]["error"], json!("missing"));

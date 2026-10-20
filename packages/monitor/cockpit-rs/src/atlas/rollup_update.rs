@@ -1,6 +1,3 @@
-// `cockpit atlas rollup-update`: tail-parses only the bytes appended to each transcript since the last
-// run, dedups billing through seen_requests, and adds token totals into usage_hourly. A truncation
-// replays every transcript with the existing dedup keys, so already-billed history survives.
 
 use super::dedup::{
     self, BilledTokens, DedupEntry, DedupMessage, DedupUsage, add_billed_tokens,
@@ -44,9 +41,7 @@ struct ParsedSlice {
 
 struct IngestContext {
     now_ms: i64,
-    /// Files whose ledger rows are being re-derived from scratch this run.
     ledger_rebuild: HashSet<String>,
-    /// Cross-file dedup, valid only across the files in `ledger_rebuild`.
     ledger_seen: HashSet<String>,
 }
 
@@ -85,7 +80,6 @@ fn parse_slice(
         let entry = Some(&entry);
         let message = entry.and_then(|e| e.get("message"));
 
-        // Every line feeds the ledger, not just billed assistant turns.
         let session_key = str_field(entry, "sessionId")
             .unwrap_or(fallback_session)
             .to_string();
@@ -106,7 +100,6 @@ fn parse_slice(
         if timestamp_ms > row.last_ts_ms {
             row.last_ts_ms = timestamp_ms;
         }
-        // Earliest cwd wins within this file; add_ledger_row's upsert applies it across files.
         if let Some(cwd) = cwd.filter(|c| !c.is_empty())
             && (row.project.is_empty()
                 || (timestamp_ms > 0
@@ -124,7 +117,6 @@ fn parse_slice(
             let tool_key = str_field(message, "id")
                 .or_else(|| str_field(entry, "uuid"))
                 .map_or_else(|| format!("{file}:{timestamp_ms}"), str::to_string);
-            // In-run set first — the table is only written at the end of the slice.
             let seen = !tool_seen_run.insert(format!("{session_key}\0{tool_key}"))
                 || rollup_db::has_seen_tool_call(db, &session_key, &tool_key)?;
             if !seen {
@@ -169,8 +161,6 @@ fn parse_slice(
         let billed_before = rollup_db::has_seen_request(db, &key)?;
         let tokens = billed(&usage);
 
-        // One request can sit in both a parent transcript and its subagent's, so a rebuild dedups
-        // across files against its own set, not seen_requests.
         let ledger_duplicate = if ledger_rebuild {
             !ledger_seen.insert(key.clone())
         } else {
@@ -238,8 +228,6 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
     // Not the same question as `start == 0`: a brand-new file also starts at zero, but its
     // requests may already sit in a sibling's ledger rows, so it stays gated on seen_requests.
     let ledger_rebuild = ctx.ledger_rebuild.contains(file);
-    // Every exit drops the stale rows, not just the one that rewrites them — a transcript
-    // truncated to empty never reaches the apply below.
     let drop_stale_ledger = |db: &mut Connection| -> rusqlite::Result<()> {
         if ledger_rebuild {
             let tx = db.transaction()?;
@@ -254,7 +242,6 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
         return Ok(true);
     }
 
-    // Streamed from `start`, never read whole: on a cold start the tail is the entire file.
     let mut lines = read_jsonl_lines(
         Path::new(file),
         JsonlLinesOptions {
@@ -267,7 +254,6 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
     let boundary = lines.bytes_consumed() as i64;
 
     if boundary <= start {
-        // Grew, but no new complete line yet; an unreadable file lands here too.
         drop_stale_ledger(db)?;
         rollup_db::upsert_ingested_file(
             db,
@@ -288,7 +274,6 @@ fn ingest_file(db: &mut Connection, file: &str, ctx: &mut IngestContext) -> anyh
     for key in &slice.request_keys {
         rollup_db::mark_seen_request(&tx, key, file)?;
     }
-    // Without the clear, a rebuild would double interactions and tool_calls.
     if ledger_rebuild {
         rollup_db::clear_ledger_for_file(&tx, file)?;
     }
@@ -332,8 +317,6 @@ pub fn update_rollup(
         .map(|p| p.to_string_lossy().into_owned())
         .collect();
 
-    // Prune before ingesting: a departing file can take counts its session's surviving files
-    // still provide, and those survivors must be re-derived in this same run.
     let mut ledger_rebuild = prune_missing_files(db, &files)?;
 
     let mut rebuilt = false;
@@ -342,12 +325,10 @@ pub fn update_rollup(
         rebuilt = true;
         ledger_rebuild.extend(files.iter().cloned());
     } else if rollup_db::get_meta(db, LEDGER_REBUILD_PENDING)?.as_deref() == Some("1") {
-        // A migration already rewound the cursors; it could not mark the files.
         rebuilt = true;
         ledger_rebuild.extend(files.iter().cloned());
     }
 
-    // Real clock: the TS stamps updated_at with Date.now(), which TOKEN_ATLAS_NOW_MS never pins.
     let now_ms = jiff::Timestamp::now().as_millisecond();
     let mut ctx = IngestContext {
         now_ms,
@@ -375,8 +356,6 @@ pub fn update_rollup(
     })
 }
 
-// Survivors are re-derived because cross-file dedup credited shared counts to whichever file was
-// read first, and a survivor's unmoved cursor would never re-add them.
 fn prune_missing_files(db: &mut Connection, files: &[String]) -> anyhow::Result<HashSet<String>> {
     let present: HashSet<&str> = files.iter().map(String::as_str).collect();
     let known: Vec<String> = db
@@ -430,8 +409,6 @@ fn prune_missing_files(db: &mut Connection, files: &[String]) -> anyhow::Result<
     }
 
     let tx = db.transaction()?;
-    // A departing file's billing keys go only once nothing else holds them: dropping them while a
-    // sibling still carries the request would let the rewind bill usage_hourly a second time.
     for (path, sessions) in missing.iter().zip(&sessions_by_path) {
         if !sessions.iter().any(|k| living.contains(k)) {
             rollup_db::clear_seen_requests_for_file(&tx, path)?;
@@ -452,7 +429,6 @@ fn prune_missing_files(db: &mut Connection, files: &[String]) -> anyhow::Result<
     }
     tx.commit()?;
 
-    // After the ledger rows go, so a fully-deleted session drops its tool keys too.
     rollup_db::prune_seen_tool_calls(db)?;
     Ok(survivors)
 }
@@ -499,7 +475,6 @@ fn run_update(db_path: &Path, rebuild: bool) -> anyhow::Result<String> {
 
 pub fn run(args: &[String]) -> ExitCode {
     let rebuild = args.iter().any(|a| a == "--rebuild");
-    // A trailing `--db` with no value falls back to the default, as `args[i + 1]` does in TS.
     let db_path = args
         .iter()
         .position(|a| a == "--db")
@@ -710,7 +685,6 @@ mod tests {
         f.update(false);
         let (hourly, ledger, models) = (f.hourly(), f.ledger(), f.models());
 
-        // A fresh DB over the same transcripts, so paths match row for row.
         let mut fresh = Fixture::new();
         let projects = f.dir.path().join("projects");
         update_rollup(&mut fresh.db, &projects, UpdateOptions { rebuild: false }).unwrap();
@@ -819,7 +793,6 @@ mod tests {
         assert!(f.ledger().iter().all(|r| r.path != parent));
         assert!(f.models().iter().all(|r| r.path != parent));
         assert!(rollup_db::has_seen_request(&f.db, "rA:mA").unwrap());
-        // The survivor now carries the shared request its departed sibling had been credited with.
         assert_eq!(model_input(&f, &sibling), 12);
         assert_eq!(f.tool_calls("S"), 1);
 

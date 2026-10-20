@@ -1,4 +1,3 @@
-// Mirrors usage-dashboard/scripts/paths.ts; functions, not statics, so tests can move HOME.
 use std::path::PathBuf;
 
 fn non_empty_var(name: &str) -> Option<PathBuf> {
@@ -68,7 +67,6 @@ fn rollup_dir() -> PathBuf {
 pub fn rollup_db_path() -> PathBuf {
     non_empty_var("TOKEN_ATLAS_ROLLUP_DB").unwrap_or_else(|| rollup_dir().join("rollup.db"))
 }
-// Beside the default rollup dir even when TOKEN_ATLAS_ROLLUP_DB moves the rollup, as codex-cache.ts does.
 pub fn codex_cache_path() -> PathBuf {
     rollup_dir().join("codex-sessions.db")
 }

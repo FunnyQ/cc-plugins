@@ -109,7 +109,6 @@ async fn command(sub: &str, rest: &[String]) -> Result<u8, String> {
         }
         return Ok(0);
     }
-    // COCKPIT_WAIT_MAX_MS is the TS-honored total wait override, defaulting to six hours.
     let max = Duration::from_millis(tunables::env_int("COCKPIT_WAIT_MAX_MS", 21_600_000));
     let mut query = vec![
         ("session", session.to_owned()),

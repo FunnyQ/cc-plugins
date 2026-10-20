@@ -3,7 +3,6 @@ pub fn env_int(name: &str, fallback: u64) -> u64 {
     let raw = raw.trim_start_matches(|c: char| c.is_whitespace() || c == '\u{feff}');
     let raw = raw.strip_prefix('+').unwrap_or(raw);
     let end = raw.bytes().take_while(u8::is_ascii_digit).count();
-    // Values outside u64 cannot be represented by this interface.
     raw[..end]
         .parse::<u64>()
         .ok()

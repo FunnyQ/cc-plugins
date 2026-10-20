@@ -117,7 +117,6 @@ pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> R
         header::ETAG,
         HeaderValue::from_str(&etag).expect("generated ETag is ASCII"),
     );
-    // Keep encoding headers on 304 too, as required by the server foundation contract.
     if gzip {
         headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("gzip"));
         headers.insert(header::VARY, HeaderValue::from_static("Accept-Encoding"));
@@ -133,14 +132,19 @@ pub async fn serve_dir(root: &Path, uri: &Uri, request_headers: &HeaderMap) -> R
         return not_found();
     };
     if gzip {
-        // Off the single runtime thread: gzipping the ~1 MB vendor bundles would stall every open stream.
-        let compressed = tokio::task::spawn_blocking(move || gzip6(&body)).await;
-        let Ok(Ok(compressed)) = compressed else {
+        let Some(compressed) = gzip_off_runtime_thread(body).await else {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         };
         body = compressed;
     }
     (headers, body).into_response()
+}
+
+async fn gzip_off_runtime_thread(body: Vec<u8>) -> Option<Vec<u8>> {
+    tokio::task::spawn_blocking(move || gzip6(&body))
+        .await
+        .ok()?
+        .ok()
 }
 
 pub(crate) fn accepts_gzip(request_headers: &HeaderMap) -> bool {
@@ -227,6 +231,29 @@ mod tests {
                     }
                 }
             }
+        });
+    }
+
+    #[test]
+    fn not_modified_keeps_encoding_headers_for_gzip_files() {
+        let fixture = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
+        let root = fixture.path().join("skills/cockpit/dashboard/dist");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("app.js"), "x").unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let uri: Uri = "/app.js".parse().unwrap();
+            let mut headers = HeaderMap::new();
+            headers.insert(header::ACCEPT_ENCODING, HeaderValue::from_static("gzip"));
+            let first = serve_dir(&root, &uri, &headers).await;
+            headers.insert(header::IF_NONE_MATCH, first.headers()[header::ETAG].clone());
+            let response = serve_dir(&root, &uri, &headers).await;
+            assert_eq!(response.status(), StatusCode::NOT_MODIFIED);
+            assert_eq!(response.headers()[header::CONTENT_ENCODING], "gzip");
+            assert_eq!(response.headers()[header::VARY], "Accept-Encoding");
         });
     }
 

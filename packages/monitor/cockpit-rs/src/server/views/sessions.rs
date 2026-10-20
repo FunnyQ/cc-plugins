@@ -54,7 +54,6 @@ fn parsed_date(value: &str) -> Option<jiff::Timestamp> {
 }
 
 fn date_order(a: &str, b: &str) -> Ordering {
-    // Invalid dates compare equally, matching a JavaScript NaN comparator.
     match (parsed_date(a), parsed_date(b)) {
         (Some(a), Some(b)) => b.cmp(&a),
         _ => Ordering::Equal,

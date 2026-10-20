@@ -1,4 +1,3 @@
-// Port of api.ts parseOpenCodeUsage: OpenCode's SQLite store, with legacy JSON storage as fallback.
 use super::dedup::walk_files;
 use super::model::{
     Ctx, InternalLedgerRow, LedgerCostBasis, ModelUsage, Provider, ProviderUsage, add_hourly_usage,
@@ -49,7 +48,6 @@ pub struct OpenCodeDailyActivity {
     pub tool_call_count: i64,
 }
 
-// Kept local rather than in model.rs: only this source reads OpenCode's mixed seconds/ms clocks.
 fn open_code_timestamp_ms(value: f64) -> i64 {
     if !value.is_finite() || value <= 0.0 {
         return 0;
@@ -110,7 +108,6 @@ pub(super) fn open_code_storage_roots() -> Vec<PathBuf> {
     roots
 }
 
-// JS `a ?? b` over JSON: only null or absent falls through.
 fn non_null(value: Option<&Value>) -> Option<&Value> {
     value.filter(|v| !v.is_null())
 }
@@ -135,7 +132,6 @@ struct Ingest {
 }
 
 impl Ingest {
-    // api.ts ingestOpenCodeMessage; `session` is the stored session object, DB row or legacy file.
     fn message(
         &mut self,
         info: &Value,
@@ -327,7 +323,6 @@ fn read_db(
         let Ok(parsed) = serde_json::from_str::<Value>(&data) else {
             continue;
         };
-        // `if (!info) continue` skips falsy JSON; any other non-object spreads to no fields.
         if matches!(parsed, Value::Null | Value::Bool(false)) || parsed == 0 || parsed == "" {
             continue;
         }
@@ -398,7 +393,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<OpenCodeSource> {
             let Some(session) = read_json(file) else {
                 continue;
             };
-            // TS `if (session?.id)`: any truthy id, keyed by its string form.
             let id = session
                 .get("id")
                 .filter(|id| !matches!(id, Value::Null | Value::Bool(false)) && *id != "")
@@ -507,7 +501,6 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<OpenCodeSource> {
     })
 }
 
-/// The full `--source opencode` shape: `{usage}`.
 pub fn source_json(src: &OpenCodeSource) -> serde_json::Value {
     let u = &src.usage;
     json!({

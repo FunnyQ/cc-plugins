@@ -22,7 +22,6 @@ pub fn router() -> Router<AppState> {
         .route("/api/design-system", any(design_system))
 }
 
-// Off the single runtime thread: a build reads every decision log and several SQLite files, stalling open streams.
 async fn blocking<T: Send + 'static>(
     work: impl FnOnce() -> Result<T, String> + Send + 'static,
 ) -> Result<T, String> {

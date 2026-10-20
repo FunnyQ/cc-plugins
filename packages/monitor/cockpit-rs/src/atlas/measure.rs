@@ -12,7 +12,6 @@ use super::paths;
 const ROLLUP_NUDGE_THROTTLE_MS: i64 = 5 * 60 * 1000;
 const PUSH_NUDGE_THROTTLE_MS: i64 = 2 * 60 * 1000;
 
-// The monitor mod's session.measure hook: caches the rate limits and nudges the rollup.
 pub fn run_measure(_args: &[String]) -> ExitCode {
     let mut payload = Vec::new();
     let _ = std::io::stdin().read_to_end(&mut payload);
@@ -38,7 +37,6 @@ fn ingest(payload: &[u8]) {
     }
 }
 
-// The TS stamps rate-limits.json and throttles nudges off the real clock, not the TOKEN_ATLAS_NOW_MS seam.
 fn real_now_ms() -> i64 {
     jiff::Timestamp::now().as_millisecond()
 }

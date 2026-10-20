@@ -27,7 +27,6 @@ fn trimmed_env(key: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// Returns the session id; on None the TS diagnostic has been printed to stderr.
 pub fn find_session(provider: Provider, project: &Path) -> Option<String> {
     match lookup(provider, project) {
         Ok(id) => Some(id),

@@ -1,4 +1,3 @@
-// api.ts types and helpers that more than one provider source needs.
 use crate::server::opencode::js_truthy;
 use indexmap::IndexMap;
 use jiff::{Timestamp, tz::TimeZone};
@@ -81,7 +80,6 @@ pub enum LedgerCostBasis {
     Unavailable,
 }
 
-// api.ts LedgerRow minus costUSD, with usageByModel still unserialized.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalLedgerRow {
@@ -99,7 +97,6 @@ pub struct InternalLedgerRow {
     pub usage_by_model: IndexMap<String, ModelUsage>,
 }
 
-/// The five aggregates every provider source returns (api.ts `ClaudeAggregates`).
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct ProviderUsage {
     pub model_usage: IndexMap<String, ModelUsage>,
@@ -128,7 +125,6 @@ pub struct UsageLimits {
     pub captured_at: Option<String>,
     pub stale: bool,
     pub error: Option<String>,
-    // Optional and nullable in TS: None omits the key, Some(None) prints null.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub plan: Option<Option<String>>,
     pub five_hour: Option<UsageLimitWindow>,
@@ -226,7 +222,6 @@ pub fn project_name(path: &str) -> String {
         .to_owned()
 }
 
-// A ledger row with no cwd reads "n/a", as both the Codex and OpenCode ledgers do.
 pub fn ledger_project_name(cwd: &str) -> String {
     if cwd.is_empty() {
         "n/a".to_owned()
@@ -235,7 +230,6 @@ pub fn ledger_project_name(cwd: &str) -> String {
     }
 }
 
-// String.replace semantics: the first occurrence of HOME anywhere, not only as a prefix.
 pub fn display_path(path: &Path) -> String {
     let path = path.to_string_lossy();
     let home = super::paths::home();
@@ -269,7 +263,6 @@ pub fn js_date_parse(text: &str) -> Option<i64> {
         .map(|ts| ts.as_millisecond())
 }
 
-// `new Date(ms).toISOString()`; None where Date would be Invalid.
 pub fn iso_ms(ms: i64) -> Option<String> {
     Timestamp::from_millisecond(ms)
         .ok()
@@ -290,7 +283,6 @@ pub fn fmt_date(ms: i64) -> String {
         .to_string()
 }
 
-// JS Number(): whitespace-only is 0, radix prefixes parse, anything non-finite is rejected.
 fn js_number(text: &str) -> Option<f64> {
     let text = text.trim();
     if text.is_empty() {
@@ -311,7 +303,6 @@ fn js_number(text: &str) -> Option<f64> {
                 .map(|value| value as f64);
         }
     }
-    // Rust also accepts "inf" and "nan", which JS Number() does not.
     if !text
         .bytes()
         .all(|b| b.is_ascii_digit() || matches!(b, b'+' | b'-' | b'.' | b'e' | b'E'))
@@ -329,7 +320,6 @@ pub fn coerce_number(value: &Value) -> Option<f64> {
     }
 }
 
-// Shared by the Claude statusline cache and the Codex usage limits.
 pub const RATE_LIMITS_STALE_AFTER_MS: f64 = 5.0 * 60.0 * 1000.0;
 pub const FIVE_HOUR_MS: i64 = 5 * 60 * 60 * 1000;
 pub const SEVEN_DAY_MS: i64 = 7 * 24 * 60 * 60 * 1000;
@@ -351,7 +341,6 @@ pub fn build_usage_limit_window(
         });
     };
     let reset_at_ms = reset_at_seconds * 1000.0;
-    // new Date(x) truncates to whole milliseconds before toISOString.
     let reset_at = iso_ms(reset_at_ms.trunc() as i64);
     let duration = duration_ms as f64;
     let start_at_ms = reset_at_ms - duration;
@@ -414,6 +403,24 @@ mod tests {
         assert_eq!(coerce_number(&json!("inf")), None);
         assert_eq!(coerce_number(&json!("0x10")), Some(16.0));
         assert_eq!(coerce_number(&json!(true)), None);
+    }
+
+    #[test]
+    fn usage_limits_plan_omits_none_and_prints_null_for_some_none() {
+        let limits = |plan| UsageLimits {
+            source: "s".into(),
+            path: "p".into(),
+            captured_at: None,
+            stale: false,
+            error: None,
+            plan,
+            five_hour: None,
+            weekly: None,
+        };
+        let none = serde_json::to_value(limits(None)).unwrap();
+        assert!(none.get("plan").is_none());
+        let null = serde_json::to_value(limits(Some(None))).unwrap();
+        assert_eq!(null.get("plan"), Some(&serde_json::Value::Null));
     }
 
     #[test]

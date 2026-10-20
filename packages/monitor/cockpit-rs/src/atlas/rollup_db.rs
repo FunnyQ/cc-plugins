@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 
 pub const SCHEMA_VERSION: i64 = 3;
 
-// Set when a migration rewinds the cursors, cleared once the ledger is refilled.
 pub const LEDGER_REBUILD_PENDING: &str = "ledger_rebuild_pending";
 
 // `hour_ms` is the LOCAL hour start (dedup::hour_start_ms), so daily and heatmap maps rebuild
@@ -33,7 +32,6 @@ pub struct IngestedFile {
     pub mtime_ms: i64,
 }
 
-// Keyed per (file, session): a session spans files, so per-file rows can prune with the file.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct LedgerFileRow {
     pub path: String,
@@ -108,7 +106,6 @@ const SCHEMA_DDL: &str = "
     );
   ";
 
-// Shared with codex-sessions.db, so the WAL and timeout settings cannot drift apart.
 pub fn open_sqlite_file(path: &Path) -> anyhow::Result<Connection> {
     if path != Path::new(":memory:")
         && let Some(dir) = path.parent().filter(|dir| !dir.as_os_str().is_empty())
@@ -149,10 +146,7 @@ fn sibling(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-// The only undo for a Rust ingest bug in authoritative history, so unlike the TS upgrade
-// backup a failure here refuses the open: `writer` stays unset and the next open retries.
 fn backup_before_rust(conn: &Connection, path: &Path) -> anyhow::Result<()> {
-    // No readable meta means a brand-new file: nothing to lose.
     let Ok(writer) = get_meta(conn, "writer") else {
         return Ok(());
     };
@@ -173,8 +167,6 @@ fn backup_before_rust(conn: &Connection, path: &Path) -> anyhow::Result<()> {
     published.map_err(|cause| anyhow!("pre-rust backup failed: {cause}"))
 }
 
-// One snapshot per source version, taken before the version check as the TS does, so even a
-// refused newer DB gets its `.v<N>.bak`.
 fn backup_before_upgrade(conn: &Connection, path: &Path) {
     let Ok(stored) = get_meta(conn, "schema_version") else {
         return;
@@ -212,7 +204,6 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
         return Err(anyhow!("Unsupported rollup schema version: {version}"));
     }
     if stored.as_deref() == Some("1") && !has_column(conn, "seen_requests", "path") {
-        // Legacy keys have no recoverable path; retain them to prevent replay billing.
         conn.execute_batch("ALTER TABLE seen_requests ADD COLUMN path TEXT NOT NULL DEFAULT ''")?;
     }
     if upgradable {
@@ -307,7 +298,6 @@ pub(crate) fn mark_seen_request(conn: &Connection, key: &str, path: &str) -> rus
     Ok(())
 }
 
-// Only for a transcript pruned as deleted; this is what keeps seen_requests bounded.
 pub(crate) fn clear_seen_requests_for_file(conn: &Connection, path: &str) -> rusqlite::Result<()> {
     conn.execute("DELETE FROM seen_requests WHERE path = ?", [path])?;
     Ok(())
@@ -345,7 +335,6 @@ pub(crate) fn prune_seen_tool_calls(conn: &Connection) -> rusqlite::Result<()> {
     )
 }
 
-// Additive, never an overwrite: each run adds its newly parsed bytes onto the bucket.
 pub(crate) fn add_hourly_row(conn: &Connection, row: &HourlyRow) -> rusqlite::Result<()> {
     conn.prepare_cached(
         "INSERT INTO usage_hourly
@@ -395,11 +384,8 @@ pub(crate) fn all_hourly_rows(conn: &Connection) -> rusqlite::Result<Vec<HourlyR
     .collect()
 }
 
-// Keeps usage_hourly and seen_requests: deleted transcripts cannot be replayed to refill them.
 pub(crate) fn rewind_rollup(conn: &Connection) -> rusqlite::Result<()> {
     conn.execute_batch("UPDATE ingested_files SET bytes_parsed = 0")?;
-    // Cleared, unlike seen_requests: the replay rebuilds ledger rows from scratch, so a
-    // surviving key would suppress every re-add and zero tool_calls.
     conn.execute_batch("DELETE FROM seen_tool_calls")
 }
 
@@ -408,7 +394,6 @@ pub(crate) fn clear_ingested_file(conn: &Connection, path: &str) -> rusqlite::Re
     Ok(())
 }
 
-// Ledger rows have no seen_requests-style gate, so a byte-0 replay clears them first.
 pub(crate) fn clear_ledger_for_file(conn: &Connection, path: &str) -> rusqlite::Result<()> {
     conn.execute("DELETE FROM session_ledger WHERE path = ?", [path])?;
     conn.execute("DELETE FROM session_model_usage WHERE path = ?", [path])?;
@@ -549,7 +534,6 @@ mod tests {
         dir.path().join("rollup.db")
     }
 
-    // A v3 file as the TS leaves it: every table populated, no `writer` key.
     fn ts_v3_db(path: &Path) {
         let conn = Connection::open(path).unwrap();
         conn.execute_batch("PRAGMA journal_mode = WAL").unwrap();
@@ -568,7 +552,6 @@ mod tests {
         .unwrap();
     }
 
-    // Every row of every table present, as sorted debug strings, so two files compare by value.
     fn dump(path: &Path) -> Vec<(String, Vec<String>)> {
         let conn = Connection::open(path).unwrap();
         let mut out = Vec::new();
@@ -769,7 +752,7 @@ mod tests {
     }
 
     #[test]
-    fn newer_version_is_refused_untouched() {
+    fn newer_version_is_refused_untouched_after_its_backup() {
         let dir = tempfile::tempdir().unwrap();
         let path = db_in(&dir);
         ts_v3_db(&path);

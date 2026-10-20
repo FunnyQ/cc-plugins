@@ -1,4 +1,3 @@
-// Port of api.ts buildStats + statsFingerprint, with project-cost.ts and daily-activity.ts.
 use super::claude::{ClaudeSource, HistoryDay, StatsCacheDailyActivity};
 use super::codex::CodexSource;
 use super::model::{
@@ -27,8 +26,6 @@ fn budget_config_path() -> PathBuf {
     paths::home().join(".config/cc-dashboard/budget.json")
 }
 
-// ---------- build ----------
-
 pub async fn build(ctx: &Ctx) -> anyhow::Result<Value> {
     let (pricing_load, codex_usage_limits) = tokio::join!(
         pricing::load_pricing_with_meta(ctx),
@@ -36,7 +33,6 @@ pub async fn build(ctx: &Ctx) -> anyhow::Result<Value> {
     );
     let pricing_load = pricing_load?;
     let ctx = ctx.clone();
-    // Every parse runs off the runtime thread: a blocking build on current_thread stalls /api/live.
     tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
         wait_for_test_barrier();
         let loaded = load_sources(&ctx)?;
@@ -45,7 +41,6 @@ pub async fn build(ctx: &Ctx) -> anyhow::Result<Value> {
     .await?
 }
 
-// Test seam (contracts.md §1): proves a build in progress never blocks /api/live.
 fn wait_for_test_barrier() {
     let Some(barrier) =
         std::env::var_os("TOKEN_ATLAS_TEST_BUILD_BARRIER").filter(|value| !value.is_empty())
@@ -97,8 +92,6 @@ fn load_sources(ctx: &Ctx) -> anyhow::Result<Loaded> {
         data_health,
     })
 }
-
-// ---------- Data health ----------
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -199,7 +192,6 @@ fn source_health(name: &str, path: &Path, note: &str) -> DataHealthSource {
             } else {
                 SourceStatus::Ok
             };
-            // Date#toISOString drops the sub-millisecond part.
             source.modified_at = mtime_ms(&meta).and_then(|ms| iso_ms(ms.floor() as i64));
         }
         Err(message) => {
@@ -274,8 +266,6 @@ fn build_data_health(counts: DataHealthCounts) -> DataHealth {
     }
 }
 
-// ---------- Budget ----------
-
 #[derive(Clone, Debug, PartialEq, Serialize)]
 struct BudgetMeta {
     #[serde(rename = "monthlyBudgetUSD")]
@@ -296,7 +286,6 @@ fn load_budget_config() -> BudgetMeta {
     if !path.exists() {
         return meta;
     }
-    // The parse message is serde's, not JSC's SyntaxError text.
     let data = match std::fs::read_to_string(&path)
         .map_err(|e| e.to_string())
         .and_then(|text| serde_json::from_str::<Value>(&text).map_err(|e| e.to_string()))
@@ -317,8 +306,6 @@ fn load_budget_config() -> BudgetMeta {
     meta
 }
 
-// ---------- Serializers ----------
-
 fn is_anthropic_model(model: &str) -> bool {
     model.starts_with("claude-") || model.starts_with("anthropic/claude-")
 }
@@ -334,7 +321,6 @@ fn usage_cost(usage: &ModelUsage, model: &str, table: &PricingTable) -> f64 {
     }
 }
 
-// JS `(a, b) => b.costUSD - a.costUSD`: a NaN difference counts as a tie.
 fn by_cost_desc(a: f64, b: f64) -> Ordering {
     b.partial_cmp(&a).unwrap_or(Ordering::Equal)
 }
@@ -376,7 +362,6 @@ fn serialize_usage_by_model(
         .collect()
 }
 
-// One shape for both byModel and a project's models list.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ModelRow {
@@ -433,7 +418,6 @@ fn serialize_project_model_usage(
     let mut rows: Vec<ModelRow> = by_model
         .iter()
         .map(|(model, usage)| {
-            // Claude transcript keys are bare model names; the other providers' are already namespaced.
             let (name, raw) = if provider == Provider::Claude {
                 (model_key(Provider::Claude, model), model.as_str())
             } else {
@@ -541,8 +525,6 @@ fn serialize_hourly_usage(
     rows
 }
 
-// ---------- project-cost.ts / daily-activity.ts ----------
-
 #[derive(Debug, Default)]
 struct ProjectCosts {
     project_cost: IndexMap<String, f64>,
@@ -550,7 +532,6 @@ struct ProjectCosts {
     codex_project_cost: IndexMap<String, f64>,
 }
 
-// The two cost fns differ because codex keys are namespaced and must be stripped before pricing.
 fn aggregate_project_costs(
     claude_usage: &ProjectModelUsage,
     codex_usage: &ProjectModelUsage,
@@ -582,7 +563,6 @@ struct DayActivity {
     tool_call_count: i64,
 }
 
-// The cache is authoritative for its days; history only supplements days strictly after the last one.
 fn merge_daily_activity(
     daily_activity: &[StatsCacheDailyActivity],
     daily_history: &IndexMap<String, HistoryDay>,
@@ -619,8 +599,6 @@ fn merge_daily_activity(
     }
     (activity_by_date, supplemental)
 }
-
-// ---------- Assembly ----------
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -728,7 +706,6 @@ fn build_daily(
             .collect();
         tokens_by_date.insert(date.clone(), tokens);
     }
-    // Codex and OpenCode keys are already namespaced, so both merge the same way.
     for source in [
         &codex.usage.daily_model_usage,
         &opencode.usage.daily_model_usage,
@@ -947,7 +924,6 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
     let codex = &loaded.codex;
     let opencode = &loaded.opencode;
 
-    // The rollup wins; stats-cache totals stand in only while the rollup holds no Claude rows.
     let claude_model_usage = if loaded.claude.usage.model_usage.is_empty() {
         cache.model_usage.clone().unwrap_or_default()
     } else {
@@ -1186,15 +1162,10 @@ fn assemble(loaded: Loaded, pricing_load: &PricingLoad, codex_usage_limits: Usag
     })
 }
 
-// ---------- fingerprint ----------
-
-// "<count>:<newest mtime ms>" as statsFingerprint; the float prints Rust's way, which is fine
-// because the string only has to be stable within one process.
 pub fn fingerprint(_ctx: &Ctx) -> String {
     let mut count = 0usize;
     let mut newest = 0f64;
     let mut note = |path: &Path| {
-        // An absent source counts nothing, so its disappearance still moves `count`.
         if let Ok(meta) = std::fs::metadata(path) {
             newest = newest.max(mtime_ms(&meta).unwrap_or(0.0));
             count += 1;
@@ -1224,7 +1195,6 @@ pub fn fingerprint(_ctx: &Ctx) -> String {
         paths::opencode_db(),
         paths::rate_limits_cache(),
         paths::codex_usage_cache(),
-        // Not transcripts, but a pricing refresh or a budget edit changes the numbers.
         pricing::override_path(),
         budget_config_path(),
     ] {
@@ -1233,7 +1203,6 @@ pub fn fingerprint(_ctx: &Ctx) -> String {
     format!("{count}:{newest}")
 }
 
-// refreshPricingOverride's fallback list when the request names no models.
 pub fn models_in(stats: &Value) -> Vec<String> {
     stats
         .get("byModel")
@@ -1243,8 +1212,6 @@ pub fn models_in(stats: &Value) -> Vec<String> {
         .filter_map(|row| row.get("model").and_then(Value::as_str).map(str::to_owned))
         .collect()
 }
-
-// ---------- CLI ----------
 
 #[derive(Clone, Copy)]
 enum Source {
@@ -1268,7 +1235,6 @@ fn parse_args(args: &[String]) -> Option<Option<Source>> {
     }
 }
 
-// Each module's source_json owns the whole `--source` shape; this only prints it.
 async fn produce(ctx: &Ctx, source: Option<Source>) -> anyhow::Result<serde_json::Value> {
     Ok(match source {
         None => build(ctx).await?,
@@ -1297,7 +1263,6 @@ pub fn run_cli(args: &[String]) -> ExitCode {
         });
     match result {
         Ok(value) => {
-            // JSON.stringify(data, null, 2) with no trailing newline, as api.ts prints it.
             print!(
                 "{}",
                 serde_json::to_string_pretty(&value).expect("a Value always serializes")
@@ -1482,7 +1447,6 @@ mod tests {
         }
     }
 
-    // project-cost.test.ts: claude costs 1 per model, codex 10, so each sum shows which fn applied.
     #[test]
     fn project_costs_sum_per_model_per_provider() {
         let claude_cost = |_: &str, _: &ModelUsage| 1.0;
@@ -1511,7 +1475,6 @@ mod tests {
         assert!(costs.project_cost.is_empty());
     }
 
-    // daily-activity.test.ts
     #[test]
     fn daily_merge_keeps_cache_and_supplements_only_later_history() {
         let cached = [day("2026-05-20", 5, 1, 2)];
@@ -1740,7 +1703,6 @@ mod tests {
             stats["meta"],
             json!({"generatedAt": "2026-10-01T12:00:00.000Z", "cacheVersion": 2, "lastComputedDate": null})
         );
-        // History before the cache's last day is dropped; after it, supplemented.
         let dates: Vec<&str> = stats["daily"]
             .as_array()
             .unwrap()

@@ -17,11 +17,8 @@ fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|s| !s.is_empty())
 }
 
-// Match opencode-send.ts isOpenCodeServer's AbortSignal.timeout(1_000).
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(1);
-// Match opencode-send.ts checkOpenCodeSession's AbortSignal.timeout(2_000).
 const SESSION_TIMEOUT: Duration = Duration::from_secs(2);
-// Match opencode-send.ts sendOpenCodePrompt's append/submit AbortSignal.timeout(5_000).
 const PROMPT_TIMEOUT: Duration = Duration::from_secs(5);
 
 fn authenticated(request: RequestBuilder, timeout: Duration) -> RequestBuilder {
@@ -174,7 +171,6 @@ async fn send(client: &Client, report: &mut Report, text: &str) {
             Ok(response) => {
                 let status = response.status();
                 let body = response.json::<Value>().await.unwrap_or(Value::Null);
-                // opencode-send.ts requires both 2xx and a JSON body strictly equal to true.
                 if !status.is_success() || body != Value::Bool(true) {
                     let message = [
                         body.pointer("/data/message"),
@@ -344,7 +340,6 @@ mod tests {
             .into_iter()
             .map(|key| (key, std::env::var_os(key)))
             .collect();
-        // TestEnv holds the shared environment lock for these request-building checks.
         unsafe {
             std::env::remove_var("OPENCODE_SERVER_PASSWORD");
             std::env::remove_var("OPENCODE_SERVER_USERNAME");
@@ -428,7 +423,6 @@ mod tests {
                         axum::serve(listener, router).await.unwrap();
                     });
                     let client = Client::new();
-                    // TestEnv serializes this environment override with the other crate tests.
                     unsafe {
                         std::env::set_var("OPENCODE_TUI_SERVER_URL", &url);
                     }
@@ -462,6 +456,58 @@ mod tests {
                         assert_eq!(calls[3].1, calls[2].1);
                         assert_eq!(calls[3].2, Value::Null);
                     }
+                    task.abort();
+                }
+            });
+        unsafe {
+            match saved {
+                Some(value) => std::env::set_var("OPENCODE_TUI_SERVER_URL", value),
+                None => std::env::remove_var("OPENCODE_TUI_SERVER_URL"),
+            }
+        }
+    }
+
+    async fn truthy_but_not_true(
+        State(body): State<Value>,
+        request: Request<Body>,
+    ) -> axum::response::Response {
+        match request.uri().path() {
+            "/global/health" => json_response(StatusCode::OK, json!({"healthy": true})),
+            "/session/ses_12345678" => json_response(StatusCode::OK, json!({"directory": ""})),
+            _ => json_response(StatusCode::OK, body),
+        }
+    }
+
+    #[test]
+    fn delivery_needs_a_2xx_json_body_strictly_equal_to_true() {
+        let _env = crate::paths::tests::TestEnv::new();
+        let saved = std::env::var_os("OPENCODE_TUI_SERVER_URL");
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                for (body, delivered) in [
+                    (json!({}), false),
+                    (json!("true"), false),
+                    (json!(true), true),
+                ] {
+                    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                    let url = format!("http://{}", listener.local_addr().unwrap());
+                    let router = Router::new()
+                        .fallback(truthy_but_not_true)
+                        .with_state(body.clone());
+                    let task = tokio::spawn(async move {
+                        axum::serve(listener, router).await.unwrap();
+                    });
+                    let client = Client::new();
+                    unsafe {
+                        std::env::set_var("OPENCODE_TUI_SERVER_URL", &url);
+                    }
+                    let mut report = check(&client, candidates().await, "ses_12345678").await;
+                    assert!(report.ready);
+                    send(&client, &mut report, "Hello").await;
+                    assert_eq!(report.delivered, delivered, "body {body}");
                     task.abort();
                 }
             });
