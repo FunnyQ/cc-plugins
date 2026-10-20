@@ -193,9 +193,6 @@ export function initPermissionModal(rootEl) {
         }),
       });
       if (!r.ok) throw new Error(`verdict failed: ${r.status}`);
-      // Lifecycle case 1: own verdict succeeded → close (the matching `resolved`
-      // frame may also arrive; whichever lands first wins, and closeModal clears
-      // activeRequestId so the later one is ignored).
       closeModal();
     } catch (e) {
       overlay.setNote((e && e.message) || "送出失敗，請再試一次");
@@ -232,7 +229,6 @@ export function initPermissionModal(rootEl) {
     armTtl();
   }
 
-  /** @param {{request_id: string, source: "elsewhere" | "ui"}} frame */
   function handleResolved(frame) {
     if (!overlay.isOpen || frame.request_id !== activeRequestId) return;
     clearTimers();
@@ -283,12 +279,6 @@ export function initPermissionModal(rootEl) {
   }
 
   store.subscribe((_project, session) => open(session));
-  // subscribe() only fires on LATER changes, and a deep-linked load sets the
-  // selection before this module registers (app.js:667-671) — and then
-  // fetchSessions skips its default-select, so no notify ever comes. Adopt the
-  // current selection explicitly, exactly like transcript.js:970. Without this
-  // a deep-linked tab never opens the stream: no permission card, and no
-  // presence signal for the broker's wait gate.
   open(store.selectedSessionId);
 
   document.addEventListener("visibilitychange", () => {

@@ -38,19 +38,6 @@
   --lit-ink-faint: oklch(39% 0.06 292);
   --lit-glyph: oklch(50% 0.13 198);
 
-  /* Legacy aliases — module-injected markup historically referenced these.
-     Mapped onto the Night Flight palette so nothing renders off-system. */
-  --color-bg: var(--space);
-  --color-surface: var(--hull);
-  --color-surface-2: var(--hull-2);
-  --color-fg: var(--starlight);
-  --color-muted: var(--ink-muted);
-  --color-border: var(--edge);
-  --accent: var(--aurora);
-  --accent-soft: color-mix(in oklch, var(--aurora) 16%, transparent);
-  --status-active: var(--engine);
-  --status-ended: var(--ended);
-
   --font-sans:
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;

@@ -266,8 +266,6 @@ export const store = reactive({
     const available = this._probeDesignSystem
       ? await this._probeDesignSystem(project)
       : false;
-    // The probe is async — bail if the selection moved on while it was in
-    // flight, so a slow probe for a stale project can't clobber current state.
     if (project !== this.selectedProject) return;
     this.designDocAvailable = available;
     if (!available) {
@@ -630,10 +628,6 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-// transcript. Pre-setting the selection makes fetchSessions skip its
-// default-select-top, and the transcript column streams by id — so even a
-// session cockpit never tracked shows its transcript (its decision log just
-// stays on the empty state, since no log file exists for it).
 const deepLink = new URLSearchParams(location.search);
 const deepLinkSession = deepLink.get("session");
 const rawDeepLinkProvider = deepLink.get("provider") || "claude";
@@ -660,8 +654,6 @@ startPolling();
 
 store._starfield = initStarfield(document.querySelector(".viewport__warp"));
 window.setTimeout(() => {
-  // Don't lower the barrier over an open needs_your_call — the pilot's turn
-  // keeps the viewport raised until they answer (see decision-log hero hooks).
   if (!store.heroCollapsed && !store.awaitingCall) store.setHeroCollapsed(true);
 }, HERO_AUTO_COLLAPSE_MS);
 
@@ -680,9 +672,6 @@ const designSystem = initDesignSystem(
 );
 store._loadDesignSystem = designSystem && designSystem.load;
 store._probeDesignSystem = designSystem && designSystem.probe;
-// The DESIGN toggle tracks the selected project's design doc. Subscribe fires on
-// later selection changes; the explicit call covers the initial selection
-// (deep-link or default-select), which is set before this subscriber registers.
 store.subscribe(() => store.refreshDesignAvailability());
 store.refreshDesignAvailability();
 

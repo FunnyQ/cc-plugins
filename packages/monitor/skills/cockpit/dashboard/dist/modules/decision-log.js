@@ -79,6 +79,43 @@ function getToken() {
   return _tokenPromise;
 }
 
+export function formatAnswer(selected, comment) {
+  if (selected && comment) {
+    return `Selected option: ${selected}\n\nAdditional instructions:\n${comment}`;
+  }
+  return selected || comment;
+}
+
+export function splitAnswer(answer) {
+  const combined = (answer || "").match(
+    /^Selected option:\s*([\s\S]*?)\n\nAdditional instructions:\n([\s\S]*)$/,
+  );
+  return combined
+    ? { option: combined[1].trim(), instructions: combined[2].trim() }
+    : null;
+}
+
+export function createHeroCollapse(store, delayMs = HERO_RECOLLAPSE_MS) {
+  let timer = null;
+  const cancel = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+  return {
+    raise() {
+      cancel();
+      store.setHeroCollapsed(false);
+    },
+    schedule() {
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        if (!store.awaitingCall) store.setHeroCollapsed(true);
+      }, delayMs);
+    },
+  };
+}
+
 export function initDecisionLog(rootEl) {
   if (!rootEl) return;
 
@@ -86,7 +123,6 @@ export function initDecisionLog(rootEl) {
   const seen = new Set(); // dedupe reconnect resends by stable record key
   let lastOpenCall = null; // most recent unresolved needs_your_call card
   let currentSession = null;
-  let heroCollapseTimer = null;
   const instrumentsEl = rootEl.closest(".instruments");
   const decisionInstrumentEl = rootEl.closest(".instrument");
   const mobileLayout = window.matchMedia("(max-width: 1100px)");
@@ -95,22 +131,9 @@ export function initDecisionLog(rootEl) {
   let lastScrollTop = 0;
   let backlogReplayed = false;
 
-  function raiseHeroForCall() {
-    if (heroCollapseTimer) {
-      clearTimeout(heroCollapseTimer);
-      heroCollapseTimer = null;
-    }
-    store.setHeroCollapsed(false);
-  }
-
-  function scheduleHeroCollapse() {
-    if (heroCollapseTimer) clearTimeout(heroCollapseTimer);
-    heroCollapseTimer = setTimeout(() => {
-      heroCollapseTimer = null;
-      // a newer call may have arrived while we waited — keep it raised then
-      if (!store.awaitingCall) store.setHeroCollapsed(true);
-    }, HERO_RECOLLAPSE_MS);
-  }
+  const hero = createHeroCollapse(store);
+  const raiseHeroForCall = hero.raise;
+  const scheduleHeroCollapse = hero.schedule;
 
   // Only the selected session's *active* status makes a call answerable —
   // an ended/idle session has no live `cockpit wait` to wake.
@@ -482,10 +505,7 @@ export function initDecisionLog(rootEl) {
     const selected = (card.dataset.selectedAnswer || "").trim();
     const input = card.querySelector(".respond__input");
     const comment = input ? input.value.trim() : "";
-    if (selected && comment) {
-      return `Selected option: ${selected}\n\nAdditional instructions:\n${comment}`;
-    }
-    return selected || comment;
+    return formatAnswer(selected, comment);
   }
 
   function updateSendState(card) {
@@ -548,18 +568,14 @@ export function initDecisionLog(rootEl) {
   function resolveCallCard(card, answer, detail = "") {
     hideRespond(card); // answered → retire the buttons
 
-    // composeAnswer encodes the combined case ("Selected option: …\n\nAdditional
-    // instructions:\n…"); an option-only answer is the bare option string;
     const opts = card.querySelector(".decision-card__options");
     const lis = opts ? [...opts.querySelectorAll("li")] : [];
     let option = "";
     let instructions = "";
-    const combined = (answer || "").match(
-      /^Selected option:\s*([\s\S]*?)\n\nAdditional instructions:\n([\s\S]*)$/,
-    );
+    const combined = splitAnswer(answer);
     if (combined) {
-      option = combined[1].trim();
-      instructions = combined[2].trim();
+      option = combined.option;
+      instructions = combined.instructions;
     } else {
       const a = (answer || "").trim();
       if (lis.some((li) => li.textContent.trim() === a)) option = a;

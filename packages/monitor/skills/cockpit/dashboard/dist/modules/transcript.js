@@ -855,8 +855,6 @@ export function initTranscript(rootEl) {
       rootEl.scrollTop = rootEl.scrollHeight - prevHeight + prevTop;
     } catch {
     } finally {
-      // Clear in rAF so the anchor-restore scroll above isn't read back as a
-      // fresh user scroll that would immediately trigger another load.
       requestAnimationFrame(() => {
         loadingOlder = false;
       });
