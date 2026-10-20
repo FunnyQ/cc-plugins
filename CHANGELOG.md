@@ -1,5 +1,17 @@
 # Changelog
 
+## [monitor 8.3.0] - 2026-10-21
+
+_tracks tag `monitor-v8.3.0`_
+
+### Added
+- A dashboard that cannot read the newer usage database now warns you, once at session start and in the data-health panel, instead of silently showing zero Claude usage.
+
+### Fixed
+- Claude output tokens are no longer undercounted by about 15.6%: usage is now billed from the largest snapshot of each request, and the rollup database upgrades to schema v4 (older monitor builds refuse a v4 database).
+- Opening a deep-linked session no longer leaks a second permission stream connection.
+- The usage trend reference label now uses a defined text colour instead of silently inheriting one.
+
 ## [dispatch 5.7.5] - 2026-10-20
 
 _tracks tag `dispatch-v5.7.5`_
