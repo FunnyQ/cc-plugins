@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.8.9] - 2026-10-21
+
+_tracks tag `guard-v0.8.9`_
+
+### Fixed
+- Finished comments-reaper runs no longer look stuck in Flightdeck: shards with open MUST KILL items are now marked done (with the open count in the message) instead of blocked, and the open items still appear in the final report.
+
 ## [guard 0.8.8] - 2026-10-21
 
 _tracks tag `guard-v0.8.8`_
