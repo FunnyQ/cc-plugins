@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.8.7] - 2026-10-21
+
+_tracks tag `guard-v0.8.7`_
+
+### Added
+- A wide comments-reaper scan no longer stops to ask permission: it runs in ordered waves, and on Claude Code reviews and applies each shard through a Workflow with a flightdeck progress view.
+
 ## [guard 0.8.6] - 2026-10-21
 
 _tracks tag `guard-v0.8.6`_
