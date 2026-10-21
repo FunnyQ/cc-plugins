@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.8.8] - 2026-10-21
+
+_tracks tag `guard-v0.8.8`_
+
+### Fixed
+- The comments-reaper workflow run starts again on Claude Code, because the workflow script is now passed inline instead of by a path the Workflow tool refuses outside the working directory.
+
 ## [monitor 8.3.1] - 2026-10-21
 
 _tracks tag `monitor-v8.3.1`_
