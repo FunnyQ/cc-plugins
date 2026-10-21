@@ -52,7 +52,7 @@ The scan prints `shards <N> in <dir>` and `deck <path>` (or `deck none`). A work
    ```
 
    Without dispatch or a deck, skip this step and pass `flightlog` and `deck` as `null` below.
-2. Call Workflow with `scriptPath: "{SKILL_DIR}/scripts/reap.workflow.js"` and these `args`, every path absolute:
+2. Read `{SKILL_DIR}/scripts/reap.workflow.js` and call Workflow with its full text as `script`, not as `scriptPath`, which refuses a file outside the working directory. Pass these `args`, every path absolute:
 
    ```json
    { "root": "<repository root>", "dir": "<dir>", "shards": <N>, "skillDir": "{SKILL_DIR}",
