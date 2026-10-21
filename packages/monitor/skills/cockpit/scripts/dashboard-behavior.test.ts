@@ -37,9 +37,8 @@ const { initPermissionModal } = await import(
   `${dist}/modules/permission-modal.js`
 );
 const { initTranscript } = await import(`${dist}/modules/transcript.js`);
-const { createHeroCollapse, formatAnswer, splitAnswer } = await import(
-  `${dist}/modules/decision-log.js`
-);
+const { createHeroCollapse, formatAnswer, initDecisionLog, splitAnswer } =
+  await import(`${dist}/modules/decision-log.js`);
 
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -118,6 +117,8 @@ const GLOBALS = [
   "clearTimeout",
   "fetch",
   "document",
+  "window",
+  "setInterval",
 ];
 const saved = new Map(GLOBALS.map((k) => [k, g[k]]));
 afterEach(() => {
@@ -272,6 +273,24 @@ describe("transcript.js", () => {
 });
 
 describe("decision-log.js", () => {
+  test("booting with a selected session opens its decision stream", () => {
+    store.selectedProject = "/repo";
+    store.selectedSessionId = "s1";
+    store.sessions = [];
+    store.subscribeSessions = () => {};
+    g.window = {
+      matchMedia: () => ({ matches: false, addEventListener() {} }),
+      addEventListener() {},
+    };
+    g.setInterval = () => 0;
+    const root = fakeRoot();
+    root.closest = () => null;
+    initDecisionLog(root);
+    expect(eventSources.map((es) => es.url)).toContain(
+      "/api/log/stream?project=%2Frepo&session=s1",
+    );
+  });
+
   test("a call arriving during the grace period keeps the hero raised", () => {
     const hero = createHeroCollapse(store, 60_000);
     hero.schedule();

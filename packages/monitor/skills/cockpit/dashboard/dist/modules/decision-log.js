@@ -102,6 +102,7 @@ export function createHeroCollapse(store, delayMs = HERO_RECOLLAPSE_MS) {
     timer = null;
   };
   return {
+    cancel,
     raise() {
       cancel();
       store.setHeroCollapsed(false);
@@ -342,10 +343,7 @@ export function initDecisionLog(rootEl) {
     backlogReplayed = false;
     setDecisionExpanded(false);
     instrumentsEl?.style.removeProperty("--decision-row-block-size");
-    if (heroCollapseTimer) {
-      clearTimeout(heroCollapseTimer);
-      heroCollapseTimer = null;
-    }
+    hero.cancel();
     cardsEl.innerHTML = "";
     emptyEl.hidden = false;
     latest.reset();
