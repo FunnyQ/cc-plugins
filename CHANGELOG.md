@@ -1,5 +1,12 @@
 # Changelog
 
+## [guard 0.8.6] - 2026-10-21
+
+_tracks tag `guard-v0.8.6`_
+
+### Fixed
+- comments-reaper applies more MUST KILL verdicts on its own: a test, type, lint rule, or assertion is written even in a test file the scan did not list, and a rename or extract is applied when every caller sits in the scanned files. Fixes that change runtime behaviour still wait for you, and on OpenCode a second round reviews the comments the fixes added.
+
 ## [monitor 8.3.0] - 2026-10-21
 
 _tracks tag `monitor-v8.3.0`_
