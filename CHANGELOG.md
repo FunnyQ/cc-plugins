@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 8.3.1] - 2026-10-21
+
+_tracks tag `monitor-v8.3.1`_
+
+### Fixed
+- The cockpit decision log now shows each session's decisions instead of "No decisions logged yet.", after selecting a session threw an error.
+
 ## [guard 0.8.7] - 2026-10-21
 
 _tracks tag `guard-v0.8.7`_
