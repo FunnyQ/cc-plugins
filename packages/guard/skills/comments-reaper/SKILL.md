@@ -31,8 +31,11 @@ Spawn reviewers that did not write the comments. Act on the verdicts they return
 
    Audit each verdict against the code before acting on it. Reject a verdict that misreads the code or names a line outside its report. Reject a `DELETE` of history or a rejected alternative a reader would otherwise retry.
    - Delete the accepted `DELETE` lines. A `DELETE` justified by a test must leave the comment's why in that test's title; rename the test first when it does not.
-   - For a `MUST KILL`, write the named test, type, lint rule, assertion or rename when it stays inside the scanned files, then delete the comment. Break the rule and watch a new test fail before you restore it. When a verdict shows the comment is false, make it true or delete it. Otherwise, list it for the user and leave the code.
+   - For a `MUST KILL` naming a `test`, `type`, `lint` or `assert`, write it in the report's files or their tests, then delete the comment. A test file counts even when the scan did not list it. Break the rule and watch the new check fail before you restore it; when it cannot fail, list the verdict as open.
+   - For a `MUST KILL` naming a `rename` or `extract`, grep every caller first. Apply it and delete the comment when every caller sits in the report's files; otherwise list it as open.
+   - List as open, and leave the code, a `MUST KILL` whose fix changes runtime behaviour: a comment shown false that only a code change would make true, or a removed suppression that surfaces a real type or lint error. Delete a comment shown false when the code is right.
    - Leave `KEEP` lines alone.
    - On `CLEAN`, change nothing.
 4. Run the tests and the typecheck for the files you changed.
-5. Report the counts of deleted, fixed, rejected, and open lines in one line, then list each open `MUST KILL`.
+5. On OpenCode, run steps 1 to 4 once more over the files step 3 changed, then list every `MUST KILL` of that round as open. Skip this on Claude Code, where guard's turn-end reviewer already judges the comments this run added.
+6. Report the counts of deleted, fixed, rejected, and open lines in one line, then list each open `MUST KILL`.
