@@ -65,6 +65,17 @@ test("each prompt carries the flightdeck join key and the run id at a boundary",
   expect(fix.opts).toMatchObject({ model: "opus", effort: "low" });
 });
 
+test("an applier marks its shard done even with open MUST KILLs, since the result lists them", async () => {
+  const { calls } = await run(ARGS, (c) =>
+    String(c.opts.label).startsWith("verify")
+      ? { delete: 0, mustKill: 1 }
+      : { deleted: 0, fixed: 0, rejected: 0, open: ["x"] },
+  );
+  const fix = calls.find((c) => c.opts.label === "fix:shard/01#1")!;
+  expect(fix.prompt).toContain("--state done");
+  expect(fix.prompt).not.toContain("--state blocked");
+});
+
 test("a shard with nothing to delete or kill spawns no applier", async () => {
   const { calls, result } = await run(ARGS, () => ({ delete: 0, mustKill: 0 }));
   expect(calls.map((c) => c.opts.label)).toEqual([

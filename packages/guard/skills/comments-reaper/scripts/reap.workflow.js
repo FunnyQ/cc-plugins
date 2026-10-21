@@ -58,7 +58,7 @@ const apply = (counts, n) => {
       `report ${dir}/report-${n}.txt, verdicts ${dir}/verdicts-${n}.txt. ` +
       `Edit only the files the report names and their tests. Never stash or commit. ` +
       `Return each open MUST KILL as its verdict line.` +
-      t.close((state) => `Then run ${state('done')} when nothing is open, or ${state('blocked')} --message "<n> open MUST KILL" when something is.`),
+      t.close((state) => `Then run ${state('done')} --message "<n> open MUST KILL", or with no --message when nothing is open.`),
     { label: t.label, phase: 'Reap', model: 'opus', effort: 'low', schema: RESULT },
   )
 }
