@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_BLOCKS, SHARD_BLOCKS, scan } from "./scan.ts";
+import { SHARD_BLOCKS, WAVE_SHARDS, scan, writeDeck } from "./scan.ts";
 
 let repo: string;
 
@@ -101,11 +107,68 @@ describe("scan with paths", () => {
     expect(out.reports).toHaveLength(2);
   });
 
-  test("past MAX_BLOCKS refuses instead of reporting", () => {
-    put("huge.ts", "// c\nconst x = 1;\n".repeat(MAX_BLOCKS + 1));
-    const out = scan(repo, ["huge.ts"]);
-    expect(out.reports).toEqual([]);
-    expect(out.refused).toContain(`${MAX_BLOCKS + 1} comment blocks`);
+  test("past WAVE_SHARDS reports the CLI schedules waves instead of refusing", () => {
+    for (let i = 0; i < SHARD_BLOCKS * WAVE_SHARDS + 1; i++)
+      put(`many/f${i}.ts`, "// c\nconst x = 1;\n");
+    const cli = join(import.meta.dir, "scan.ts");
+    const run = Bun.spawnSync(["bun", cli, "many"], {
+      cwd: repo,
+      stdout: "pipe",
+    });
+    expect(run.exitCode).toBe(0);
+    const lines = run.stdout.toString().split("\n");
+    const waves: number[] = [];
+    for (const line of lines) {
+      if (line.startsWith("wave ")) waves.push(0);
+      else if (line.startsWith("report ")) waves[waves.length - 1]++;
+    }
+    expect(waves).toEqual([WAVE_SHARDS, 1]);
+    expect(lines).toContain("wave 1 of 2");
+  });
+});
+
+describe("writeDeck", () => {
+  test("declares one flightdeck node per shard, with a run id, under the XDG data home", () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), "reaper-deck-")));
+    const dir = writeDeck(home, repo, "scan-abc123", 3);
+    expect(dir).toBe(
+      join(home, "q-lab/flightdeck/comments-reaper-scan-abc123"),
+    );
+    const graph = JSON.parse(readFileSync(join(dir!, "graph.json"), "utf8"));
+    expect(graph.version).toBe(1);
+    expect(graph.repoRoot).toBe(repo);
+    expect(graph.lanes).toEqual(["shards"]);
+    expect(graph.nodes.map((n: { ref: string }) => n.ref)).toEqual([
+      "shard/01",
+      "shard/02",
+      "shard/03",
+    ]);
+    expect(readFileSync(join(dir!, "run.id"), "utf8").trim()).toBe(
+      "scan-abc123",
+    );
+  });
+
+  test("--workflow prints the shard count and the deck instead of one line per report", () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), "reaper-deck-")));
+    const cli = join(import.meta.dir, "scan.ts");
+    const lines = Bun.spawnSync(["bun", cli, "--workflow", "src"], {
+      cwd: repo,
+      stdout: "pipe",
+      env: { ...process.env, XDG_DATA_HOME: home },
+    })
+      .stdout.toString()
+      .trim()
+      .split("\n");
+    expect(lines[1]).toMatch(/^shards 1 in \/\S+\/scan-\w+$/);
+    expect(lines[2]).toStartWith(
+      `deck ${home}/q-lab/flightdeck/comments-reaper-scan-`,
+    );
+    expect(lines.some((l) => l.startsWith("report "))).toBe(false);
+  });
+
+  test("past 99 shards writes no deck, since a flightdeck ref holds two digits", () => {
+    const home = realpathSync(mkdtempSync(join(tmpdir(), "reaper-deck-")));
+    expect(writeDeck(home, repo, "scan-big", 100)).toBeNull();
   });
 });
 

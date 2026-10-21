@@ -20,10 +20,11 @@ Spawn reviewers that did not write the comments. Act on the verdicts they return
    bun "{SKILL_DIR}/scripts/scan.ts" [path ...]
    ```
 
-   Pass the user's paths through unchanged. With no paths, the scan covers the changes since HEAD.
+   Pass the user's paths through unchanged. With no paths, the scan covers the changes since HEAD. When the Workflow tool is available, add `--workflow` and follow [Workflow run](#workflow-run) instead of steps 2 to 5.
    - On `no comments`, say so and stop.
    - On `refused`, relay the line and stop. Never split the scope yourself; `scan.ts` alone splits it.
    - Otherwise, the scan prints a summary and one `report <path> verdicts <path>` line per shard. A file and its test always share a shard.
+   - When `wave N of M` lines group the reports, run steps 2 to 4 for one wave, then the next, without asking. Waves never share a file, so an earlier wave's edits never shift a later report's line numbers.
 2. Spawn one agent per report, all in one message, with `subagent_type: "guard:comments-reaper"`. Give each its two paths, never the report text: `Read the report at <report> and judge every line marked +. Write your verdicts to <verdicts>. Paths in the report are relative to the repository root, <root>.`
    - If that agent type is missing, spawn generic agents instead. Tell each to read `{SKILL_DIR}/../../agents/comments-reaper.md` and obey everything below its frontmatter, then give it the same task.
    - A reviewer that fails or writes no verdicts file gets one respawn with the same task. Never retype its verdicts yourself.
@@ -39,3 +40,22 @@ Spawn reviewers that did not write the comments. Act on the verdicts they return
 4. Run the tests and the typecheck for the files you changed.
 5. On OpenCode, run steps 1 to 4 once more over the files step 3 changed, then list every `MUST KILL` of that round as open. Skip this on Claude Code, where guard's turn-end reviewer already judges the comments this run added.
 6. Report the counts of deleted, fixed, rejected, and open lines in one line, then list each open `MUST KILL`.
+
+## Workflow run
+
+The scan prints `shards <N> in <dir>` and `deck <path>` (or `deck none`). A workflow then reviews and applies every shard, so no report or verdict reaches this conversation.
+
+1. Read `installPath` of `dispatch@q-lab-marketplace` from `~/.claude/plugins/installed_plugins.json`. With it and a `deck <path>` line, open flightdeck:
+
+   ```bash
+   bun "<installPath>/skills/autopilot/scripts/flightdeck.ts" --plan "<deck path>"
+   ```
+
+   Without dispatch or a deck, skip this step and pass `flightlog` and `deck` as `null` below.
+2. Call Workflow with `scriptPath: "{SKILL_DIR}/scripts/reap.workflow.js"` and these `args`, every path absolute:
+
+   ```json
+   { "root": "<repository root>", "dir": "<dir>", "shards": <N>, "skillDir": "{SKILL_DIR}",
+     "flightlog": "<installPath>/skills/flightplan/scripts/flightlog.ts", "deck": "<deck path>" }
+   ```
+3. Report as in step 6 from the returned counts and `open` list. Name the count of `failed` shards when it is not 0.
