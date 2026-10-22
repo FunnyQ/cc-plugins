@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DeckSnapshot } from "../../../hooks/flightdeck/types.ts";
-import { buildDeckSnapshot, freshUsage, latestPlan, layerByDepth } from "./deck-snapshot";
+import { buildDeckSnapshot, latestPlan, layerByDepth, tokenUsage } from "./deck-snapshot";
 import type { FleetRow, TaskView } from "./fleet";
 import type { TreePayload } from "./tree-api";
 
@@ -383,28 +383,28 @@ describe("buildDeckSnapshot", () => {
 
   test("tokens ride only done tasks, and only when usage was read", () => {
     const tasks = [view("a/01", "done"), view("a/02", "in-progress")];
-    const usage = new Map([["a/01", 1234], ["a/02", 99]]);
+    const usage = new Map([["a/01", { fresh: 1234, billed: 9000 }], ["a/02", { fresh: 99, billed: 990 }]]);
     const read = buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage });
-    expect(read.tasks["a/01"].tokens).toBe(1234);
+    expect(read.tasks["a/01"].tokens).toEqual({ fresh: 1234, billed: 9000 });
     expect(read.tasks["a/02"].tokens).toBeNull();
     expect(snapshot(tasks).tasks["a/01"].tokens).toBeNull();
-    expect(buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage, runTokens: 5000 }).tokens).toBe(5000);
+    expect(buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage, runTokens: { fresh: 5000, billed: 50_000 } }).tokens).toEqual({ fresh: 5000, billed: 50_000 });
     expect(read.tokens).toBeNull();
   });
 });
 
-describe("freshUsage", () => {
-  test("counts fresh tokens only, the figure the web fleet prints", () => {
+describe("tokenUsage", () => {
+  test("sums fresh tokens, the figure the web fleet prints, beside the billed total", () => {
     const counts = { input: 10, output: 2_000, cacheRead: 900_000, cacheWrite: 44_920 };
-    const { usage, runTokens } = freshUsage([
+    const { usage, runTokens } = tokenUsage([
       row({ ref: "a/01", usage: counts }),
       row({ ref: "a/01", usage: { ...counts, cacheWrite: 80 } }),
       row({ usage: { ...counts, cacheWrite: 1_000 } }),
       row({ ref: "a/02" }),
     ]);
-    expect(usage.get("a/01")).toBe(45_000);
+    expect(usage.get("a/01")).toEqual({ fresh: 45_000, billed: 1_849_020 });
     expect(usage.has("a/02")).toBe(false);
-    expect(runTokens).toBe(46_000);
+    expect(runTokens).toEqual({ fresh: 46_000, billed: 2_752_030 });
   });
 
   test("the run's wall time spans every row, the way the web header counts it", () => {

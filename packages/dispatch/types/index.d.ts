@@ -3,6 +3,7 @@ export type FlightdeckDeck = {
   snapshot: object | null;
   stale: boolean;
   message: string | null;
+  tokenMode: "fresh" | "billed";
 };
 
 declare module "claude-code" {

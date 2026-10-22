@@ -184,7 +184,7 @@ describe("waveCards", () => {
         task("b", "in-progress", 2),
       ]),
     });
-    const [g] = waveCards(s, 80, 0).groups;
+    const [g] = waveCards(s, 80, 0, "fresh").groups;
     expect(g.label).toBe("W1 ");
     expect(g.cards.map((c) => [c.head, c.sub])).toEqual([
       ["✓ a", "title a       4.6"],
@@ -199,11 +199,11 @@ describe("waveCards", () => {
       waves: [["api/very-long-ref-01"]],
       tasks: tasksOf([task("api/very-long-ref-01", "ready")]),
     });
-    expect(waveCards(wide, 80, 0).inner).toBe(
+    expect(waveCards(wide, 80, 0, "fresh").inner).toBe(
       "api/very-long-ref-01".length + 6,
     );
     const s = snap({ waves: [six.map((t) => t.ref)], tasks: tasksOf(six) });
-    const { inner, groups } = waveCards(s, 80, 0);
+    const { inner, groups } = waveCards(s, 80, 0, "fresh");
     expect(inner).toBe(17);
     for (const c of groups[0].cards) {
       expect(c.head.length).toBeLessThanOrEqual(inner);
@@ -222,7 +222,7 @@ describe("waveCards", () => {
         },
       ]),
     });
-    expect(waveCards(s, 80, 0).groups[0].cards[0].sub).toStartWith(
+    expect(waveCards(s, 80, 0, "fresh").groups[0].cards[0].sub).toStartWith(
       "Final review ",
     );
   });
@@ -233,7 +233,7 @@ describe("waveCards", () => {
       waves: [[long]],
       tasks: tasksOf([{ ...task(long, "blocked"), title: "y".repeat(80) }]),
     });
-    const { inner, groups } = waveCards(s, 24, 0);
+    const { inner, groups } = waveCards(s, 24, 0, "fresh");
     expect(inner).toBe(24 - 3 - 2);
     expect(groups[0].cards[0].head).toBe(`· ${"x".repeat(inner - 3)}…`);
     expect(groups[0].cards[0].sub).toBe(`${"y".repeat(inner - 1)}…`);
@@ -251,7 +251,7 @@ describe("waveCards", () => {
             startedAt: "2026-01-01T00:00:00Z",
             endedAt: "2026-01-01T00:03:12Z",
           },
-          tokens: 1_234_567,
+          tokens: { fresh: 1_234_567, billed: 30_000_000 },
         },
         {
           ...task("b", "in-progress"),
@@ -260,7 +260,7 @@ describe("waveCards", () => {
         task("c", "ready"),
       ]),
     });
-    const { inner, groups } = waveCards(s, 80, now);
+    const { inner, groups } = waveCards(s, 80, now, "fresh");
     const [a, b, c] = groups[0].cards;
     expect([a.head, a.time, a.tokens]).toEqual([
       "✓ a",
@@ -269,6 +269,7 @@ describe("waveCards", () => {
     ]);
     expect([b.time, b.tokens]).toEqual(["45s", null]);
     expect([c.time, c.tokens]).toEqual([null, null]);
+    expect(waveCards(s, 80, now, "billed").groups[0].cards[0].tokens).toBe("30.0M tok".padStart(inner));
   });
 
   test("W? group holds exactly the unschedulable refs, none when empty", () => {
@@ -282,7 +283,7 @@ describe("waveCards", () => {
       ]),
     });
     const refs = (x: DeckSnapshot) =>
-      waveCards(x, 80, 0).groups.map((g) => [
+      waveCards(x, 80, 0, "fresh").groups.map((g) => [
         g.label,
         g.cards.map((c) => c.ref),
       ]);
@@ -299,7 +300,7 @@ describe("waveCards", () => {
       waves: refs.map((r) => [r]),
       tasks: tasksOf(refs.map((r) => task(r, "ready"))),
     });
-    const groups = waveCards(s, 80, 0).groups;
+    const groups = waveCards(s, 80, 0, "fresh").groups;
     expect(groups[0].label).toBe("W1  ");
     expect(groups[9].label).toBe("W10 ");
   });
@@ -407,20 +408,21 @@ describe("summary / compactSummary / endState", () => {
       currentWave: 2,
       time: { startedAt: "2026-01-01T00:00:00Z", endedAt: null },
     });
-    expect(runTotals(s, now)).toEqual({ time: "4m12s", tokens: null });
+    expect(runTotals(s, now, "fresh")).toEqual({ time: "4m12s", tokens: null });
     const ended = {
       ...s,
       time: {
         startedAt: "2026-01-01T00:00:00Z",
         endedAt: "2026-01-01T00:01:05Z",
       },
-      tokens: 12_345_678,
+      tokens: { fresh: 12_345_678, billed: 400_000_000 },
     };
-    expect(runTotals(ended, now)).toEqual({
+    expect(runTotals(ended, now, "fresh")).toEqual({
       time: "1m05s",
       tokens: "12.3M tok",
     });
-    expect(runTotals({ ...s, time: null }, now)).toBeNull();
+    expect(runTotals(ended, now, "billed")?.tokens).toBe("400.0M tok");
+    expect(runTotals({ ...s, time: null }, now, "fresh")).toBeNull();
   });
 
   test("red invalid pair only when invalid > 0", () => {
@@ -478,7 +480,7 @@ describe("formatElapsed / agent rows", () => {
   test("an agent on a task rides that task's card, one line each", () => {
     const now = Date.parse("2026-01-01T00:03:12Z");
     const s = big();
-    const { inner, groups } = waveCards(s, 80, now);
+    const { inner, groups } = waveCards(s, 80, now, "fresh");
     const host = groups[0].cards.find((c) => c.ref === s.agents[0].ref)!;
     expect(host.agents).toEqual([`${"dev #2".padEnd(inner - 6)} 3m12s`]);
     expect(groups[0].cards.filter((c) => c.agents.length > 0)).toHaveLength(1);
@@ -526,7 +528,7 @@ describe("docked", () => {
   test("no text line exceeds width at 24/40/80", () => {
     const s = big();
     for (const w of [24, 40, 80]) {
-      const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true);
+      const d = docked(s, w, Date.parse("2026-01-01T01:00:00Z"), true, "fresh");
       for (const line of [d.wave, ...d.bars, d.states, ...d.crew])
         expect(cols(line)).toBeLessThanOrEqual(w);
       expect(
@@ -537,7 +539,7 @@ describe("docked", () => {
 
   test("the title is the bare slug; the wave and state lines are separate; crew only when present", () => {
     const s = big();
-    const d = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false);
+    const d = docked(s, 80, Date.parse("2026-01-01T00:00:00Z"), false, "fresh");
     expect(d.title).toBe("demo");
     expect(text(d.wave)).toBe("wave 2/4");
     expect(d.bars).toHaveLength(3);
@@ -556,7 +558,7 @@ describe("docked", () => {
         },
       ],
     };
-    expect(docked(withCrew, 80, 0, false).crew).toHaveLength(1);
+    expect(docked(withCrew, 80, 0, false, "fresh").crew).toHaveLength(1);
   });
 });
 

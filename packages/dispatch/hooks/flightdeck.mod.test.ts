@@ -489,8 +489,8 @@ test("a done task's tokens are read once, with --usage, and kept on later ticks"
       },
     });
     if (argv.includes("--usage")) {
-      s.tasks["api/01"]!.tokens = 1_234_567;
-      s.tokens = 2_000_000;
+      s.tasks["api/01"]!.tokens = { fresh: 1_234_567, billed: 30_000_000 };
+      s.tokens = { fresh: 2_000_000, billed: 50_000_000 };
     }
     return { exitCode: 0, stdout: JSON.stringify(s) };
   });
@@ -506,6 +506,20 @@ test("a done task's tokens are read once, with --usage, and kept on later ticks"
   const ui = await mountPane($);
   expect(await ui.find({ key: "totals" })).toBeDefined();
   await ui.unmount();
+  const press = async () => {
+    const pane = await mountPane($);
+    await pane.press({ key: "token-mode" });
+    await pane.unmount();
+  };
+  await press();
+  const billed = await drawnText($);
+  expect(billed).toContain("Total Cost · billed");
+  expect(billed).toContain("30.0M tok");
+  expect(billed).toContain("50.0M tok");
+  expect(billed).not.toContain("1.2M tok");
+  await press();
+  expect(await drawnText($)).toContain("1.2M tok");
+  expect(w.runs.filter((argv) => argv.includes("--usage"))).toHaveLength(1);
 });
 
 test("the inline seat draws two lines: the summary and the current wave's cards", async ($, on) => {

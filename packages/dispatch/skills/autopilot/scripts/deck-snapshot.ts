@@ -5,6 +5,7 @@ import type {
   DeckCrew,
   DeckSnapshot,
   DeckTask,
+  DeckTokens,
 } from "../../../hooks/flightdeck/types.ts";
 import { runLogPath } from "../../flightplan/scripts/lib/flightlog";
 import { readRunId } from "./events-api";
@@ -60,8 +61,8 @@ export function buildDeckSnapshot(input: {
   plan: string;
   payload: TreePayload;
   fleet: FleetRow[];
-  usage?: Map<string, number>; // billed tokens per ref, read only on a --usage run
-  runTokens?: number; // the run's billed total, every attributed row included
+  usage?: Map<string, DeckTokens>; // per ref, read only on a --usage run
+  runTokens?: DeckTokens; // every attributed row included
 }): DeckSnapshot {
   const { payload } = input;
   const rowsByRef = Map.groupBy(
@@ -172,21 +173,26 @@ function readClaudeUsage(
   plan: string,
   deckSource: "tasks" | "graph",
   fleet: FleetRow[],
-): { usage: Map<string, number>; runTokens: number } {
+): { usage: Map<string, DeckTokens>; runTokens: DeckTokens } {
   const runId = deckSource === "graph" ? readRunId(plan) : undefined;
   const agents = createTranscriptSource(plan, undefined, repoRootOf(plan) ?? undefined).read(runId);
-  return freshUsage(attributeUsage(fleet, agents).rows);
+  return tokenUsage(attributeUsage(fleet, agents).rows);
 }
 
-// the web fleet's freshTokens(): cache writes alone, matching Claude Code's own panel
-export function freshUsage(rows: FleetRow[]): { usage: Map<string, number>; runTokens: number } {
-  const usage = new Map<string, number>();
-  let runTokens = 0;
+// fresh is the web fleet's freshTokens(): cache writes alone, matching Claude Code's own panel
+export function tokenUsage(rows: FleetRow[]): { usage: Map<string, DeckTokens>; runTokens: DeckTokens } {
+  const usage = new Map<string, DeckTokens>();
+  const runTokens = { fresh: 0, billed: 0 };
   for (const row of rows) {
     if (!row.usage) continue;
-    const n = row.usage.cacheWrite;
-    runTokens += n;
-    if (row.ref) usage.set(row.ref, (usage.get(row.ref) ?? 0) + n);
+    const u = row.usage;
+    const fresh = u.cacheWrite;
+    const billed = u.input + u.output + u.cacheRead + u.cacheWrite;
+    runTokens.fresh += fresh;
+    runTokens.billed += billed;
+    if (!row.ref) continue;
+    const t = usage.get(row.ref) ?? { fresh: 0, billed: 0 };
+    usage.set(row.ref, { fresh: t.fresh + fresh, billed: t.billed + billed });
   }
   return { usage, runTokens };
 }

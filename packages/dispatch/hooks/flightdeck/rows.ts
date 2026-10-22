@@ -1,4 +1,4 @@
-import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask } from "./types.ts";
+import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask, DeckTokens } from "./types.ts";
 
 export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
 export type Line = Seg[];
@@ -67,12 +67,14 @@ function bar(done: number, total: number, cells: number): Line {
   return line;
 }
 
-export function runTotals(s: DeckSnapshot, now: number): { time: string; tokens: string | null } | null {
+export type TokenMode = keyof DeckTokens;
+
+export function runTotals(s: DeckSnapshot, now: number, mode: TokenMode): { time: string; tokens: string | null } | null {
   if (!s.time) return null;
   const end = s.time.endedAt === null ? now : Date.parse(s.time.endedAt);
   return {
     time: formatElapsed(end - Date.parse(s.time.startedAt)),
-    tokens: s.tokens === null ? null : `${formatTokens(s.tokens)} tok`,
+    tokens: s.tokens === null ? null : `${formatTokens(s.tokens[mode])} tok`,
   };
 }
 
@@ -139,7 +141,7 @@ export type CardModel = {
   head: string; // glyph + ref
   sub: string; // title, then attempts/score right-aligned, padded to the inner width
   time: string | null; // time spent, right of the head; null before any agent started
-  tokens: string | null; // fresh tokens right-aligned to the inner width, done tasks only
+  tokens: string | null; // right-aligned to the inner width, done tasks only
   agents: string[]; // one line per in-flight agent on this task: role, attempt, elapsed
   color?: string;
   dim?: boolean;
@@ -173,7 +175,7 @@ function timeOf(t: DeckTask, now: number): string | null {
   return formatElapsed(end - Date.parse(t.time.startedAt));
 }
 
-export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
+export function waveCards(s: DeckSnapshot, w: number, now: number, mode: TokenMode): WaveCards {
   const groups = s.waves.map((refs, i) => ({ label: `W${i + 1}`, refs }));
   if (s.unschedulable.length > 0)
     groups.push({ label: "W?", refs: s.unschedulable });
@@ -194,7 +196,7 @@ export function waveCards(s: DeckSnapshot, w: number, now: number): WaveCards {
       ref: t.ref,
       head: fit(`${GLYPH[t.state]} ${t.ref}`, time ? inner - time.length - 1 : inner),
       time,
-      tokens: t.tokens === null ? null : `${formatTokens(t.tokens)} tok`.padStart(inner),
+      tokens: t.tokens === null ? null : `${formatTokens(t.tokens[mode])} tok`.padStart(inner),
       sub: meta ? spread(t.title, meta, inner) : fit(t.title, inner).padEnd(inner),
       agents: s.agents
         .filter((a) => a.ref === t.ref)
@@ -259,6 +261,7 @@ export function docked(
   w: number,
   now: number,
   stale: boolean,
+  mode: TokenMode,
 ): {
   title: string;
   totals: ReturnType<typeof runTotals>;
@@ -272,10 +275,10 @@ export function docked(
   return {
     title: s.slug,
     wave: clip(wave, w),
-    totals: runTotals(s, now),
+    totals: runTotals(s, now, mode),
     bars: bucketBars(s, w).map((l) => clip(l, w)),
     states: clip(states, w),
-    cards: waveCards(s, w, now),
+    cards: waveCards(s, w, now, mode),
     crew: crewLines(s, now).map((l) => clip(l, w - 2)),
   };
 }
