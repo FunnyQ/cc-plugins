@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 5.7.6] - 2026-10-22
+
+_tracks tag `dispatch-v5.7.6`_
+
+### Added
+- Press the Total Cost heading in the flightdeck pane to switch between fresh and billed tokens, without re-reading transcripts.
+
+### Fixed
+- The flightdeck pane now shows fresh tokens instead of counting cache reads, so its total matches the web dashboard and Claude Code's Execute panel.
+- flightplan, preflight, and waypoints no longer use plan mode, so choosing "clear context and implement" can no longer make the agent build the plan as code instead of writing its files; approval is now an Approve / Revise question.
+
 ## [guard 0.8.9] - 2026-10-21
 
 _tracks tag `guard-v0.8.9`_
