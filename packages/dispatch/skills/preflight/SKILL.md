@@ -50,9 +50,11 @@ PLAN.md already has `Overview`, `Goals`, `Non-goals`, `Context`, and `Open quest
 
 Follow `references/intent-template.md`. Its capture rules are the contract, not advice.
 
-### Step 1 — Enter plan mode, agree the slug
+### Step 1 — Agree the slug
 
-Call `EnterPlanMode` before any text output. Then agree a kebab-case topic slug and check it:
+Never use plan mode: its exit dialog offers "clear context and implement", which drops these instructions and leaves an agent building what preflight refuses to decide. When the session is already in plan mode, ask the user to switch it off with Shift+Tab, because plan mode blocks the Step 4 write. Write no file before Step 4.
+
+Agree a kebab-case topic slug and check it:
 
 ```bash
 bun "$SCRIPTS"/scaffold.ts --check <slug>
@@ -66,9 +68,9 @@ bun "$SCRIPTS"/scaffold.ts --check <slug>
 
 Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today. Anything about *how* goes into `Open questions` (capture rule 1). Recommend an answer to every question you *do* ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
 
-### Step 3 — Draft INTENT.md inside plan mode
+### Step 3 — Draft INTENT.md in the conversation
 
-Show it in full so the user can read what you understood, then call `ExitPlanMode`. Ship it with `Open questions` still open (capture rule 2).
+Show it in full so the user can read what you understood, then call `AskUserQuestion` with **Approve (Recommended)** and **Revise**. Ship it with `Open questions` still open (capture rule 2). On Revise, apply the change, show the full draft again, and ask again.
 
 ### Step 4 — On approval, write exactly one file
 

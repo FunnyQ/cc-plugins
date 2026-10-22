@@ -29,7 +29,7 @@ The output is three layers:
 2. **`docs/<topic>/tasks/_context/*.md`** — shared context every task references.
 3. **`docs/<topic>/tasks/<bucket>/NN-<slug>.md`** — one file per executable unit, self-contained. `_context/` plus the task file is everything an executor needs.
 
-**Two non-negotiables**, because the whole artifact depends on them: enter plan mode before any output, and ask every interview question through `AskUserQuestion` — structured options stay reviewable, plain text gets lost.
+**Two non-negotiables**, because the whole artifact depends on them: write no file until the user approves the drafted PLAN.md, and ask every interview question through `AskUserQuestion` — structured options stay reviewable, plain text gets lost.
 
 ## Setup
 
@@ -41,13 +41,13 @@ The output is three layers:
 
 ## Process
 
-### Step 1 — Enter plan mode
+### Step 1 — Check the session is out of plan mode
 
-Call `EnterPlanMode` immediately, before any text output or question. Skip if already in plan mode.
+When the session is in plan mode, ask the user to switch it off with Shift+Tab before the interview starts. Plan mode blocks every write Step 6 makes, and its exit dialog offers "clear context and implement", which drops these instructions and leaves an agent implementing the plan instead of writing the tree. The Step 5 `AskUserQuestion` is the approval gate.
 
 ### Step 2 — Confirm the run options
 
-Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended, except an impeccable design phase or a review that ends without converging.
+Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended, except the compact suggestion, an impeccable design phase, or a review that ends without converging.
 
 **Review engine** — who critiques the written tree in Step 7. All three share one source of criteria; only the reviewer changes.
 
@@ -103,19 +103,19 @@ Carry INTENT.md's Open questions into PLAN.md's — each is either resolved duri
 
 **For writing topics**, translate: Architecture → outline/section structure, Tech constraints → style decisions, Failure modes → revision and review strategy. Drop what doesn't apply.
 
-### Step 4 — Draft PLAN.md inside plan mode
+### Step 4 — Draft PLAN.md in the conversation
 
-Follow `references/plan-template.md`. PLAN.md carries all decisions, requirements, constraints, bucketing rationale, and the task index. Show its full content via the plan so the user can review it.
+Follow `references/plan-template.md`. PLAN.md carries all decisions, requirements, constraints, bucketing rationale, and the task index. Show its full content in your reply so the user can review it. Write it to no file yet.
 
-### Step 5 — Exit plan mode
+### Step 5 — Ask for approval
 
-Call `ExitPlanMode` once PLAN.md is drafted. Always exit, even with open questions — record those in PLAN.md's "Open Questions".
+Once PLAN.md is drafted, call `AskUserQuestion` with **Approve (Recommended)** and **Revise**. Ask even with open questions — record those in PLAN.md's "Open Questions". On Revise, apply the change, show the full draft again, and ask again.
 
-Restate the Step 2 options — engine and depth tier — in one line as part of the plan, right beside the task index. The tier was picked before the task count existed, so this is where a wrong guess gets caught. When the interview chose impeccable, state the design phase in the same line. This is the last decision point: Steps 6–8 ask nothing, except the impeccable design phase, which runs its own questions, and a non-converged review (Step 7).
+Restate the Step 2 options — engine and depth tier — in one line in the draft, right beside the task index. The tier was picked before the task count existed, so this is where a wrong guess gets caught. When the interview chose impeccable, state the design phase in the same line. This is the last decision point: Steps 6–8 ask nothing, except the compact suggestion, the impeccable design phase, which runs its own questions, and a non-converged review (Step 7).
 
 ### Step 6 — On approval, write the files
 
-**Approval** is explicit acceptance: clicks approve, types "yes/approved/go ahead", or equivalent. Silence, "looks ok-ish", and "but can you also…" are **not** approval — keep revising, and write no files until the user accepts.
+**Approval** is explicit acceptance: picks Approve, types "yes/approved/go ahead", or equivalent. Silence, "looks ok-ish", and "but can you also…" are **not** approval — keep revising, and write no files until the user accepts.
 
 **Atomicity**: the sequence isn't transactional. Once `scaffold.ts` runs, the tree exists. Two failure classes, two responses:
 
@@ -134,6 +134,12 @@ Either way, never leave a half-written tree.
 
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
+   **Then write the contract to disk and suggest a compact.** The interview fills the context, and every fork inherits all of it. Write PLAN.md and every `_context/*.md` except `design.md` now, per step 2. Put every decision the interview made into those files, including each task's files, signatures, schemas, and verification commands, because they are all that survives the compact. Then tell the user to run, and wait for their reply:
+   ```
+   /compact flightplan docs/<slug> is approved; PLAN.md and _context/ are on disk. Resume dispatch:flightplan Step 6 right after its compact suggestion: re-read the skill, PLAN.md, and _context/ before writing anything.
+   ```
+   The user may skip it and say go. After a compact, take every fork's interview substance from PLAN.md and `_context/`, never from the summary.
+
    **When the interview chose impeccable, run the design phase now** — after scaffold, because scaffold refuses a root that already holds files, and before step 2, because `_context/design.md` is derived from its result.
    - Pre-warm the engine before invoking the skill: run `<impeccable skill dir>/scripts/impeccable context` once at the maximum Bash timeout, because its first run downloads the engine and the skill's own Setup runs it under the default timeout. When the skill directory is unknown until the skill loads, make this the first Setup command, at the same timeout. When that run fails or times out, take impeccable's own "Launcher unavailable" path and continue from its reference docs. Never re-run it in a loop.
    - Invoke the `impeccable` skill with `shape <feature>`, followed by the interview's summary: goal, users, states, constraints, and the existing visual world. Shape then needs a compact confirmation, not a second discovery round. Let it run whichever path it picks, and answer its questions with the user.
@@ -144,7 +150,7 @@ Either way, never leave a half-written tree.
    - Render each page in a browser (`herdr-browser` when Herdr runs) and inspect the screenshot before showing it. Open the page for the user, not just its path. Re-render and re-check after every revision, until the user approves the mock.
    - Reconcile PLAN.md with the approved mock: a design edit that changes a plan decision changes PLAN.md too. When the mock needs work the approved task index lacks, ask before adding tasks, and name each added task in the Step 8 recap. A grown tree is evidence for Step 7's one tier re-cut.
 
-2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription, plus any design-phase reconciliation). Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
+2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription, plus any design-phase reconciliation). Step 1 already wrote all but `_context/design.md`; finish that one here after a design phase. Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
 
 3. **Fan the task files out to forked subagents** — one `Agent` per task file, all in a single message so they run concurrently. Use `subagent_type: "fork"` and only that; omitting it starts a fresh, context-less agent that never saw the interview and will invent the decisions.
 

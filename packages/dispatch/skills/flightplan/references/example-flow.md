@@ -7,8 +7,7 @@ flow has more rounds, with variations per topic.
 ```
 User: /flightplan want to add a course player to the site, will hand off to sub-agents
 
-Claude: [calls EnterPlanMode]
-        [calls AskUserQuestion: run options — which review engine for the
+Claude: [calls AskUserQuestion: run options — which review engine for the
          written tree (Codex (Recommended) / OpenCode / Opus), and which
          review depth (Light / Standard (Recommended) / Deep)?]
 
@@ -28,13 +27,20 @@ Claude: [3–6 more rounds walking the design tree — bucketing, acceptance cri
          conventions, dependencies, failure modes]
 
 Claude: [drafts PLAN.md content: overview, goals, non-goals, requirements,
-         tech decisions, bucket layout, task index, open questions]
-        [calls ExitPlanMode]
+         tech decisions, bucket layout, task index, open questions — shown
+         in full, written to no file]
+        [calls AskUserQuestion: Approve (Recommended) / Revise]
 
-User: [approves explicitly — "yes, ship it"]
+User: [picks Approve]
 
 Claude: [bun scaffold.ts course-player ui,backend,api,review]
         [writes docs/course-player/PLAN.md and every tasks/_context/*.md itself]
+        "Contract is on disk. Run /compact flightplan docs/course-player is
+         approved; … then reply go."
+
+User: [runs /compact, replies "go"]
+
+Claude: [re-reads the skill, PLAN.md, and _context/]
         [forks one agent per task file in one message; joins and checks every path]
         [bun lint-task.ts docs/course-player/tasks; bun build-readme.ts docs/course-player/tasks]
         [review loop with codex until a P1-clean pass at or past the floor]

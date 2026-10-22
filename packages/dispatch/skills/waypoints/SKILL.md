@@ -30,7 +30,7 @@ If a `docs/<slug>/tasks/` tree already exists and the user wants execution, use 
 
 ## Two non-negotiables
 
-1. **Plan mode.** Enter plan mode before any output. Draft the roadmap there. Then exit plan mode so the user can approve it before `WAYPOINTS.md` is written. The roadmap is the project's source of truth, so it deserves the approval gate.
+1. **An approval gate before `WAYPOINTS.md` is written.** Draft the roadmap in the conversation and show it in full. Then call `AskUserQuestion` with **Approve (Recommended)** and **Revise**, and write no file until the user picks Approve. The roadmap is the project's source of truth, so it deserves the gate. Never use plan mode: its exit dialog offers "clear context and implement", which drops these instructions and leaves an agent building leg 1 instead of writing the roadmap. When the session is already in plan mode, ask the user to switch it off with Shift+Tab, because plan mode blocks the write.
 2. **`AskUserQuestion` for every interview question.** Structured options keep the milestone interview reviewable. Plain text gets lost.
 
 ## Process
