@@ -139,7 +139,7 @@ export type CardModel = {
   head: string; // glyph + ref
   sub: string; // title, then attempts/score right-aligned, padded to the inner width
   time: string | null; // time spent, right of the head; null before any agent started
-  tokens: string | null; // billed tokens right-aligned to the inner width, done tasks only
+  tokens: string | null; // fresh tokens right-aligned to the inner width, done tasks only
   agents: string[]; // one line per in-flight agent on this task: role, attempt, elapsed
   color?: string;
   dim?: boolean;

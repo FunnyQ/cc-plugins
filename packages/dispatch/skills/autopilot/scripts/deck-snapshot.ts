@@ -175,12 +175,16 @@ function readClaudeUsage(
 ): { usage: Map<string, number>; runTokens: number } {
   const runId = deckSource === "graph" ? readRunId(plan) : undefined;
   const agents = createTranscriptSource(plan, undefined, repoRootOf(plan) ?? undefined).read(runId);
+  return freshUsage(attributeUsage(fleet, agents).rows);
+}
+
+// the web fleet's freshTokens(): cache writes alone, matching Claude Code's own panel
+export function freshUsage(rows: FleetRow[]): { usage: Map<string, number>; runTokens: number } {
   const usage = new Map<string, number>();
   let runTokens = 0;
-  for (const row of attributeUsage(fleet, agents).rows) {
+  for (const row of rows) {
     if (!row.usage) continue;
-    const u = row.usage;
-    const n = u.input + u.output + u.cacheRead + u.cacheWrite;
+    const n = row.usage.cacheWrite;
     runTokens += n;
     if (row.ref) usage.set(row.ref, (usage.get(row.ref) ?? 0) + n);
   }

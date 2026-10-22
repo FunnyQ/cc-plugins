@@ -12,7 +12,7 @@ export type DeckTask = {
   attempts: number;
   score: { weighted: number; threshold: number; passed: boolean } | null;
   time: { startedAt: string; endedAt: string | null } | null; // first agent start to last finish; endedAt null while one runs
-  tokens: number | null; // billed total, done tasks only, and only from a --usage run
+  tokens: number | null; // fresh tokens, done tasks only, and only from a --usage run
 };
 
 export type DeckAgent = {
@@ -53,6 +53,6 @@ export type DeckSnapshot = {
   agents: DeckAgent[]; // FleetRow.status === "in-flight" only, startedAt ascending
   crew: DeckCrew[];
   time: DeckTask["time"]; // the whole run: first agent start to last finish, open while one runs
-  tokens: number | null; // the whole run's billed tokens, crew included, only from a --usage run // the latest 3 taskless fleet rows of any status, newest first
+  tokens: number | null; // the whole run's fresh tokens, crew included, only from a --usage run // the latest 3 taskless fleet rows of any status, newest first
   errors: number; // TreePayload.errors.length
 };

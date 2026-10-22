@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DeckSnapshot } from "../../../hooks/flightdeck/types.ts";
-import { buildDeckSnapshot, latestPlan, layerByDepth } from "./deck-snapshot";
+import { buildDeckSnapshot, freshUsage, latestPlan, layerByDepth } from "./deck-snapshot";
 import type { FleetRow, TaskView } from "./fleet";
 import type { TreePayload } from "./tree-api";
 
@@ -390,6 +390,21 @@ describe("buildDeckSnapshot", () => {
     expect(snapshot(tasks).tasks["a/01"].tokens).toBeNull();
     expect(buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage, runTokens: 5000 }).tokens).toBe(5000);
     expect(read.tokens).toBeNull();
+  });
+});
+
+describe("freshUsage", () => {
+  test("counts fresh tokens only, the figure the web fleet prints", () => {
+    const counts = { input: 10, output: 2_000, cacheRead: 900_000, cacheWrite: 44_920 };
+    const { usage, runTokens } = freshUsage([
+      row({ ref: "a/01", usage: counts }),
+      row({ ref: "a/01", usage: { ...counts, cacheWrite: 80 } }),
+      row({ usage: { ...counts, cacheWrite: 1_000 } }),
+      row({ ref: "a/02" }),
+    ]);
+    expect(usage.get("a/01")).toBe(45_000);
+    expect(usage.has("a/02")).toBe(false);
+    expect(runTokens).toBe(46_000);
   });
 
   test("the run's wall time spans every row, the way the web header counts it", () => {
