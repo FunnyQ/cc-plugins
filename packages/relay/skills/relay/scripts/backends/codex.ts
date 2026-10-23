@@ -126,7 +126,9 @@ export const codexBackend: Backend = {
 
   invokeLive(mode: Mode, opts: InvokeOpts): LiveSpec | null {
     if (mode === "image") return null;
-    const argv: string[] = [];
+    // The TUI's startup update prompt blocks the pane before the bootstrap
+    // lands, and picking "Update now" exits codex instead of continuing.
+    const argv = ["-c", "check_for_update_on_startup=false"];
     if (opts.model) argv.push("-m", opts.model);
     // Non-dangerous drops the sandbox but KEEPS approvals: the TUI's own
     // prompts stay visible in the pane, which is the point of live mode.

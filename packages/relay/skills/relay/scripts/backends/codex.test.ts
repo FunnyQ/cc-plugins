@@ -26,6 +26,8 @@ describe("codexBackend", () => {
 
       expect(spec.agentBin).toBe("codex");
       expect(spec.argv).toEqual([
+        "-c",
+        "check_for_update_on_startup=false",
         "-m",
         "gpt-6-codex",
         "--dangerously-bypass-approvals-and-sandbox",
@@ -37,7 +39,12 @@ describe("codexBackend", () => {
     it("drops the sandbox but keeps approvals when not dangerous", () => {
       const spec = codexBackend.invokeLive!("review", {})!;
 
-      expect(spec.argv).toEqual(["-s", "danger-full-access"]);
+      expect(spec.argv).toEqual([
+        "-c",
+        "check_for_update_on_startup=false",
+        "-s",
+        "danger-full-access",
+      ]);
       expect(spec.argv).not.toContain(
         "--dangerously-bypass-approvals-and-sandbox",
       );
