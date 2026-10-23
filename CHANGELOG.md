@@ -1,5 +1,12 @@
 # Changelog
 
+## [relay 0.9.3] - 2026-10-24
+
+_tracks tag `relay-v0.9.3`_
+
+### Fixed
+- Delegating to codex in a live herdr pane no longer stalls on codex's startup "Update available" prompt, which had blocked the pane before the task arrived.
+
 ## [dispatch 5.7.6] - 2026-10-22
 
 _tracks tag `dispatch-v5.7.6`_
