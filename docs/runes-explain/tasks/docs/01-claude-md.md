@@ -8,7 +8,7 @@
 >
 > **Depends on**: ui/01, ui/02
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -57,19 +57,19 @@ Name only files that exist after the earlier tasks landed; check with `ls packag
 
 ## Acceptance criteria
 
-- [ ] The runes bullet in `CLAUDE.md` holds a paragraph led by `**Explain** —` after the Fold paragraph, on the same line.
-- [ ] The paragraph states each of the six facts above: the button and default on; the fork as router and writer; why not Jev; the XDG path and the CSP; the checker's allow-list and hand-back deny; per-session history.
-- [ ] The architecture tree has a `explain/` line under `packages/runes/hooks/` whose file list matches `ls packages/runes/hooks/explain/` (tests summarised as `*.test.ts`).
-- [ ] No other line of `CLAUDE.md` changed, and no other file changed.
+- [x] The runes bullet in `CLAUDE.md` holds a paragraph led by `**Explain** —` after the Fold paragraph, on the same line.
+- [x] The paragraph states each of the six facts above: the button and default on; the fork as router and writer; why not Jev; the XDG path and the CSP; the checker's allow-list and hand-back deny; per-session history.
+- [x] The architecture tree has a `explain/` line under `packages/runes/hooks/` whose file list matches `ls packages/runes/hooks/explain/` (tests summarised as `*.test.ts`).
+- [x] No other line of `CLAUDE.md` changed, and no other file changed.
 
 ## Verification
 
-- [ ] `grep -c '\*\*Explain\*\* —' CLAUDE.md` prints `1`
-- [ ] `grep -n '^- \*\*runes\*\*' CLAUDE.md | grep -q '\*\*Explain\*\* —'` exits 0 (the paragraph is on the runes bullet's line)
-- [ ] `grep -q "default-src 'none'; style-src 'unsafe-inline'; img-src data:" CLAUDE.md` exits 0
-- [ ] `grep -q 'runes:explain-checker' CLAUDE.md && grep -q 'SubagentHandback' CLAUDE.md && grep -q '.local/share/q-lab/runes/explain/' CLAUDE.md` exits 0
-- [ ] `grep -nE '└── explain/ +# ' CLAUDE.md` prints one line
-- [ ] `git diff -U0 -- CLAUDE.md | grep -c '^-[^-]'` prints `2` at most: the runes bullet's line (rewritten with the Explain paragraph appended) and the `clawd/` tree connector line; every other changed line is an addition
+- [x] `grep -c '\*\*Explain\*\* —' CLAUDE.md` prints `1`
+- [x] `grep -n '^- \*\*runes\*\*' CLAUDE.md | grep -q '\*\*Explain\*\* —'` exits 0 (the paragraph is on the runes bullet's line)
+- [x] `grep -q "default-src 'none'; style-src 'unsafe-inline'; img-src data:" CLAUDE.md` exits 0
+- [x] `grep -q 'runes:explain-checker' CLAUDE.md && grep -q 'SubagentHandback' CLAUDE.md && grep -q '.local/share/q-lab/runes/explain/' CLAUDE.md` exits 0
+- [x] `grep -nE '└── explain/ +# ' CLAUDE.md` prints one line
+- [x] `git diff -U0 -- CLAUDE.md | grep -c '^-[^-]'` prints `2` at most: the runes bullet's line (rewritten with the Explain paragraph appended) and the `clawd/` tree connector line; every other changed line is an addition
 
 ## Eval rubric
 
