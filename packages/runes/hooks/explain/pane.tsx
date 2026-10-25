@@ -25,8 +25,12 @@ const ACCENT = "#d97757";
 const OK_COLOR = "#8fbf7f";
 const WARN_COLOR = "#e0b060";
 const EMPTY = "Press [Explain plz!] under Clawd.";
+const PENDING = "new explanation…";
+const WRITING = "Writing the answer…";
+const ASK_LABEL = "ASK · type below";
 const BORDER_AND_PADDING = 4;
 const NOTE_LINES = 2;
+const SPINNER_CELLS = 2;
 
 export const kilo = (n: number) =>
   n < 1000 ? String(Math.round(n)) : `${(n / 1000).toFixed(1)}k`;
@@ -58,7 +62,7 @@ const clip = (text: string, width: number, lines: number) => {
 
 export const explainPane = (on: On) => {
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Input } = $.ui.resolve(e);
+    const { Box, Text, Button, Input, Client } = $.ui.resolve(e);
     const width = e.props.bodyColumns ?? COLUMNS;
     const inner = Math.max(10, width - BORDER_AND_PADDING);
     const v = (await read($, VIEW)) as ExplainView;
@@ -121,11 +125,11 @@ export const explainPane = (on: On) => {
     };
 
     const status = v.isRunning
-      ? { text: "◐ explaining…", color: ACCENT }
+      ? { text: "explaining…", color: ACCENT, spins: true }
       : v.error
-        ? { text: `✗ ${v.error}`, color: ERROR_COLOR }
+        ? { text: `✗ ${v.error}`, color: ERROR_COLOR, spins: false }
         : selected?.kind === "html" && selected.check === "pending"
-          ? { text: "◌ checking layout…", color: undefined }
+          ? { text: "checking layout…", color: undefined, spins: true }
           : undefined;
     const banner = status ? (
       <Box
@@ -136,24 +140,37 @@ export const explainPane = (on: On) => {
         borderDimColor={!status.color}
         paddingX={1}
       >
-        {clip(status.text, inner, NOTE_LINES).map((line) => (
-          <Text color={status.color} dimColor={!status.color}>
-            {line}
-          </Text>
+        {clip(status.text, inner - (status.spins ? SPINNER_CELLS : 0), NOTE_LINES).map((line, i) => (
+          <Box key={`explain-status:${i}`}>
+            {status.spins && i === 0 ? (
+              <Client
+                key="explain-spinner"
+                module="../transcript/spinner.tsx"
+                props={{ color: status.color ?? OK_COLOR }}
+                width={SPINNER_CELLS}
+              />
+            ) : null}
+            <Text color={status.color} dimColor={!status.color}>
+              {line}
+            </Text>
+          </Box>
         ))}
       </Box>
     ) : null;
 
-    const tail = [
-      <Input
-        key="explain-ask"
-        placeholder="ask a follow-up, or name what to explain"
-        submitLabel="ask"
-        onSubmit={() => undefined}
-      />,
-    ];
+    const tail = (
+      <Box key="explain-ask-box" flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
+        <Text dimColor bold>{ASK_LABEL}</Text>
+        <Input
+          key="explain-ask"
+          placeholder="ask a follow-up, or name what to explain"
+          submitLabel="ask"
+          onSubmit={() => undefined}
+        />
+      </Box>
+    );
 
-    if (!selected)
+    if (!selected && !v.isRunning)
       return (
         <Box flexDirection="column" gap={1}>
           {banner}
@@ -170,7 +187,9 @@ export const explainPane = (on: On) => {
         </Box>
       );
 
-    const u = selected.usage;
+    // while a fork runs, the answer box belongs to the answer being written, not to the last one
+    const current = v.isRunning ? undefined : selected;
+    const u = current?.usage;
     return (
       <Box flexDirection="column" gap={1}>
         {banner}
@@ -182,7 +201,7 @@ export const explainPane = (on: On) => {
           paddingX={1}
         >
           <Box justifyContent="space-between">
-            <Text dimColor bold>{`HISTORY · ${v.entries.length}`}</Text>
+            <Text dimColor bold>{`HISTORY · ${v.entries.length + (v.isRunning ? 1 : 0)}`}</Text>
             <Button
               key="explain-clear"
               label="clear"
@@ -190,8 +209,13 @@ export const explainPane = (on: On) => {
               onPress={() => explainClear($)}
             />
           </Box>
+          {v.isRunning && (
+            <Text key="explain-entry-new" color={ACCENT} bold>
+              {wrap(`● ${PENDING}`, inner)[0]!}
+            </Text>
+          )}
           {v.entries.map((entry) => {
-            const isSelected = entry.id === selected.id;
+            const isSelected = entry.id === current?.id;
             const label = wrap(`${isSelected ? "●" : "○"} ${entry.title}`, inner)[0]!;
             return (
               <Button
@@ -215,9 +239,9 @@ export const explainPane = (on: On) => {
             borderColor={ACCENT}
             paddingX={1}
           >
-            <Text bold color={ACCENT}>{selected.title}</Text>
+            <Text bold color={ACCENT}>{current?.title ?? PENDING}</Text>
             <Box flexDirection="column" marginTop={1}>
-              {body(selected)}
+              {current ? body(current) : <Text dimColor>{WRITING}</Text>}
             </Box>
           </Box>
           {u && (
