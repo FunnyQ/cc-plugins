@@ -1,5 +1,20 @@
 # Changelog
 
+## [runes 0.9.1] - 2026-10-25
+
+_tracks tag `runes-v0.9.1`_
+
+### Added
+- The Explain pane shows its status in a banner at the top, so a short docked pane no longer clips it, and you can now delete or clear explanation history, with pages moved to the Trash so a slip stays recoverable.
+- Explanations are written in the language set in your Claude Code settings.
+
+### Changed
+- The Explain button is now a visible [Explain plz!] button centred under Clawd, with a more playful tone in the docs.
+
+### Fixed
+- The Explain pane is easier to read, split into a history box, an answer box and hotkey options, and the layout checker is no longer denied in auto mode.
+- Numbered steps on the explanation page no longer push inline code into the number column and overlap the text.
+
 ## [runes 0.9.0] - 2026-10-25
 
 _tracks tag `runes-v0.9.0`_
