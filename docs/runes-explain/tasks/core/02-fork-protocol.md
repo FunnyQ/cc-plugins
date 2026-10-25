@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: core/03
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -135,24 +135,24 @@ a global match.
 
 ## Acceptance criteria
 
-- [ ] `protocol.ts` exports `Ask`, `Reply`, `RULES`, `FRAGMENT_RULES`, `buildPrompt`, `parseReply` with the
+- [x] `protocol.ts` exports `Ask`, `Reply`, `RULES`, `FRAGMENT_RULES`, `buildPrompt`, `parseReply` with the
       signatures above, and imports nothing at runtime.
-- [ ] `RULES` carries the six items in order; a test asserts the index of each item's key phrase ("UI button",
+- [x] `RULES` carries the six items in order; a test asserts the index of each item's key phrase ("UI button",
       "five", "recap", "`html` when", the `<mode>` grammar, the fragment rules) increases.
-- [ ] `FRAGMENT_RULES` names every class and element: `answer`, `analogy`, `section`, `takeaway`, `spread`,
+- [x] `FRAGMENT_RULES` names every class and element: `answer`, `analogy`, `section`, `takeaway`, `spread`,
       `plate`, `figcaption`, `text`, `parts`, `data-part`, `steps`, `compare`, `timeline`, `ink`, `ink-accent`,
       `dash`, `wash-warm`, `wash-cool`, `wash-sage`, `label`, `label-soft`, `part`, `viewBox`, `title`; a test
       loops over that list.
-- [ ] `buildPrompt` output starts with `RULES` for all four kinds and carries each kind's paragraph content.
-- [ ] `buildPrompt` on `follow` with a 5,000-character `previous.text` includes its first 4,000 characters
+- [x] `buildPrompt` output starts with `RULES` for all four kinds and carries each kind's paragraph content.
+- [x] `buildPrompt` on `follow` with a 5,000-character `previous.text` includes its first 4,000 characters
       and not the 4,001st.
-- [ ] `parseReply` passes one test per rule 1–14 above.
+- [x] `parseReply` passes one test per rule 1–14 above.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including `hooks/explain/protocol.test.ts`.
-- [ ] `claude plugin validate packages/runes` reports no errors.
-- [ ] `grep -n "interface " packages/runes/hooks/explain/protocol.ts` prints nothing.
+- [x] `claude plugin test packages/runes` passes, including `hooks/explain/protocol.test.ts`.
+- [x] `claude plugin validate packages/runes` reports no errors.
+- [x] `grep -n "interface " packages/runes/hooks/explain/protocol.ts` prints nothing.
 
 ## Eval rubric
 
