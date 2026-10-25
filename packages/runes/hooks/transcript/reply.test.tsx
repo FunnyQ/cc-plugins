@@ -137,10 +137,10 @@ test("a drawn bubble still runs the chain, so a plugin beneath sees the row", as
 
 test("the desktop keeps the engine's own reply: runes draws nothing there", async ($, on) => {
   await startSession($, on, { run: () => ran(0, GLOW) });
-  // mount refuses a surface where the plugin drew nothing
-  await expect(
-    $.ui.mount({ ...(REPLY("hi") as object), surface: "desktop" } as never),
-  ).rejects.toThrow("runes drew nothing on the desktop surface");
+  const desk = await $.ui.mount({ ...(REPLY("hi") as object), surface: "desktop" } as never);
+  expect(await desk.find({ key: "reply" })).toBeUndefined();
+  expect(await desk.find({ type: "Text", text: "engine" })).toBeDefined();
+  await desk.unmount();
   const term = await $.ui.mount(REPLY("hi"));
   expect(await term.find({ key: "reply" })).toBeDefined();
   await term.unmount();

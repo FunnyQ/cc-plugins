@@ -67,6 +67,7 @@ export const fakeHost = (
   });
   on("ui.toast", (_$, e) => {
     toasts.push(e.text);
+    return { value: undefined } as never;
   });
   on("process.run", (_$, e, next) => {
     if (e.argv[0] !== "bun" || e.argv[1] !== "-e") return (run ? run(e) : next(e)) as never;
@@ -93,7 +94,7 @@ export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof f
   for (const component of ["UserMessage", "AssistantMessage"] as const)
     on("ui.render", { component }, (_$, e) => {
       beneath.push(e.requestId);
-      return { type: "Text", props: { key: "engine" }, children: ["engine"] } as never;
+      return { type: "Text", props: {}, children: ["engine"] } as never;
     });
   await $.session.start({
     cwd: "/",
