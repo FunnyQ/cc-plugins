@@ -67,24 +67,17 @@ const setup = async (
 const label = async (ui: Awaited<ReturnType<Engine["ui"]["mount"]>>) =>
   (await ui.find({ key: "explain" }))?.text ?? "";
 
-test("the button draws below clawd-row with its label", async ($, on) => {
+// inside Clawd's slot, so the map beside it ends on the button's line rather than above an empty one
+test("the button draws under Clawd inside clawd-slot, with no row of its own", async ($, on) => {
   const { ui } = await setup($, on);
   expect(await label(ui)).toContain("[Explain plz!]");
-  const row = (await ui.find({ key: "explain-row" })) as { props?: { justifyContent?: string } } | undefined;
-  expect(row?.props?.justifyContent).toBe("flex-end");
-  type Slot = { props?: { justifyContent?: string; width?: number } } | undefined;
-  const under = (await ui.find({ key: "explain-under-clawd" })) as Slot;
+  expect(await ui.find({ key: "explain-row" })).toBeUndefined();
+  type Slot = { props?: { flexDirection?: string; alignItems?: string; width?: number }; children?: unknown[] } | undefined;
   const slot = (await ui.find({ key: "clawd-slot" })) as Slot;
-  expect(under?.props?.justifyContent).toBe("center");
-  expect(slot?.props?.justifyContent).toBe("center");
-  expect(under?.props?.width).toBeGreaterThanOrEqual("[Explain plz!]".length);
-  expect(slot?.props?.width).toBe(under?.props?.width);
-  const band = await ui.find({ key: "explain-band" });
-  const keys = (band?.children ?? []).map((c) => (c as { props?: { key?: string } }).props?.key);
-  expect(keys.indexOf("explain-row")).toBeGreaterThan(
-    keys.indexOf("clawd-row"),
-  );
-  expect(keys.indexOf("clawd-row")).toBeGreaterThanOrEqual(0);
+  expect(slot?.props).toMatchObject({ flexDirection: "column", alignItems: "center" });
+  expect(slot?.props?.width).toBeGreaterThanOrEqual("[Explain plz!]".length);
+  const last = slot?.children?.at(-1) as { props?: { key?: string } } | undefined;
+  expect(last?.props?.key).toBe("explain");
   await ui.unmount();
 });
 

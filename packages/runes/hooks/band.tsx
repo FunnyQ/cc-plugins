@@ -68,19 +68,20 @@ export const band = (on: On) => {
     const withNotice = (node: ReturnType<typeof row>) => (notice ? <Box key="teacher-band" flexDirection="column">{notice}{node}</Box> : node)
 
     const picture = sprite(ui, e.surface === 'desktop', frame)
+    const button = hasButton && term
+      ? <term.Button key="explain" plain onPress={() => undefined}>{view?.isRunning ? RUNNING : LABEL}</term.Button>
+      : undefined
     const clawdRow = config.enabled.clawd
-      ? row(hasButton ? <Box key="clawd-slot" flexDirection="row" justifyContent="center" width={slot}>{picture}</Box> : picture)
+      ? row(button ? <Box key="clawd-slot" flexDirection="column" alignItems="center" width={slot}>{picture}{button}</Box> : picture)
       : map ? row() : undefined
-    if (!hasButton || !term) return clawdRow ? withNotice(clawdRow) : (notice || next(e))
+    if (!button || config.enabled.clawd) return clawdRow ? withNotice(clawdRow) : (notice || next(e))
     return (
       <Box key={notice ? 'teacher-band' : 'explain-band'} flexDirection="column">
         {notice}
         {clawdRow}
         <Box key="explain-row" flexDirection="row" justifyContent="flex-end" width={e.props.bodyColumns}>
           <Box key="explain-under-clawd" flexDirection="row" justifyContent="center" width={slot}>
-            <term.Button key="explain" plain onPress={() => undefined}>
-              {view?.isRunning ? RUNNING : LABEL}
-            </term.Button>
+            {button}
           </Box>
         </Box>
       </Box>
