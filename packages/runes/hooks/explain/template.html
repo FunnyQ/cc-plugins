@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      :root {
+        --paper: #f3eee3; /* --paper: cold-press sheet, the page ground */
+        --paper-slip: #fbf8f1; /* --paper-slip: a lighter slip tipped onto the sheet (analogy, takeaway) */
+        --ink: #23201c; /* --ink: pen line and body text */
+        --ink-soft: #5b5348; /* --ink-soft: captions, masthead, muted labels (7:1 on paper) */
+        --ink-accent: #a64a29; /* --ink-accent: the one red-brown pen: arrows, step numbers, part letters */
+        --wash-warm: #d97757; /* --wash-warm: Clawd orange watercolour, the thing being explained */
+        --wash-cool: #7da0b8; /* --wash-cool: blue-grey wash, the outside or the other side */
+        --wash-sage: #9bb08a; /* --wash-sage: green wash, the good or finished state */
+        --wash-opacity: .26; /* --wash-opacity: how much pigment a wash lays down */
+        --shadow: rgba(70, 50, 25, .32); /* --shadow: slip and plate shadow */
+        --vignette: rgba(
+          120,
+          95,
+          60,
+          .14
+        ); /* --vignette: sheet edge darkening */
+      }
+      body {
+        background-color: var(--paper);
+        background-image:
+          radial-gradient(
+            ellipse at 50% 30%,
+            transparent 60%,
+            var(--vignette) 100%
+          ),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23fff' surfaceScale='1.1'%3E%3CfeDistantLight azimuth='45' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+        background-blend-mode: normal, multiply;
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--wash-warm) 40%, transparent);
+      }
+      .sheet {
+        container-type: inline-size;
+        max-width: 1280px;
+        margin: 0 auto;
+        background-color: var(--paper);
+        background-image:
+          radial-gradient(
+            ellipse at 50% 30%,
+            transparent 60%,
+            var(--vignette) 100%
+          ),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23fff' surfaceScale='1.1'%3E%3CfeDistantLight azimuth='45' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+        background-blend-mode: normal, multiply;
+        color: var(--ink);
+        font:
+          18px/1.62 -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        font-kerning: normal;
+        padding: 64px 88px 72px;
+      }
+      .masthead {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 32px;
+      }
+      .sheet > h1 {
+        font-size: clamp(32px, 4.2cqi, 52px);
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        max-width: 20ch;
+        margin-bottom: 18px;
+        text-wrap: balance;
+      }
+      main > * + * {
+        margin-top: 20px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 64ch;
+      }
+      main h2 {
+        font-size: 28px;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        margin: 0 0 14px;
+        text-wrap: balance;
+      }
+      main a {
+        color: var(--ink-accent);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font:
+          0.88em ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        background: color-mix(in srgb, var(--wash-cool) 22%, transparent);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+
+      .answer {
+        font-size: 24px;
+        line-height: 1.45;
+        font-weight: 500;
+        max-width: 46ch;
+      }
+      .analogy,
+      .takeaway {
+        background: var(--paper-slip);
+        padding: 18px 24px;
+        max-width: 52ch;
+        font-size: 19px;
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+        transform: rotate(-0.6deg);
+      }
+      .analogy::before {
+        content: "Think of it like this";
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 4px;
+      }
+      .takeaway {
+        transform: rotate(0.5deg);
+        font-weight: 600;
+        margin-top: 56px !important;
+      }
+      .takeaway::before {
+        content: "Take this with you";
+        display: block;
+        font-size: 12px;
+        font-weight: 400;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 4px;
+      }
+
+      main > section {
+        margin-top: 64px;
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 56px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 16px;
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        font-size: 15px;
+        color: var(--ink-soft);
+        margin-top: 10px;
+        max-width: 52ch;
+      }
+
+      .parts {
+        display: grid;
+        gap: 6px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 8px;
+        padding: 6px 10px 6px 6px;
+        border-radius: 6px;
+        transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        font-weight: 800;
+        color: var(--ink-accent);
+      }
+      .parts dd b {
+        display: block;
+      }
+      .parts > div:hover {
+        background: color-mix(in srgb, var(--wash-warm) 18%, transparent);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.2;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 16px;
+      }
+      .steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 48px 1fr;
+      }
+      .steps > li::before {
+        content: counter(step);
+        font-size: 38px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--ink-accent);
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 56px 1fr;
+        align-items: center;
+      }
+      .compare > div {
+        padding: 20px 24px;
+        background: var(--paper-slip);
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+      }
+      .compare > div:first-child {
+        transform: rotate(-0.5deg);
+      }
+      .compare > div:last-child {
+        transform: rotate(0.4deg);
+      }
+      .compare h3 {
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .compare::after {
+        content: "";
+        grid-column: 2;
+        grid-row: 1;
+        height: 24px;
+        background: var(--ink-accent);
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 24'%3E%3Cpath d='M4 13c14-3 30-3 44 0M38 4l10 9-11 8' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+      }
+      .compare > div:last-child {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .timeline {
+        list-style: none;
+        padding: 0 0 0 36px;
+        position: relative;
+        display: grid;
+        gap: 28px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: var(--ink);
+        opacity: 0.7;
+        border-radius: 2px;
+      }
+      .timeline > li {
+        position: relative;
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        left: -36px;
+        top: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 48% 52% 45% 55%;
+        background: var(--wash-warm);
+        opacity: 0.7;
+      }
+      .timeline time {
+        display: block;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      .timeline b {
+        display: block;
+        font-size: 20px;
+      }
+
+      /* SVG vocabulary the fork draws with */
+      .plate .ink {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--ink-accent);
+        stroke-width: 3.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .dash {
+        stroke-dasharray: 4 7;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        opacity: var(--wash-opacity);
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: var(--wash-warm);
+      }
+      .plate .wash-cool {
+        fill: var(--wash-cool);
+      }
+      .plate .wash-sage {
+        fill: var(--wash-sage);
+      }
+      .plate .label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-family: inherit;
+      }
+      .plate .label-soft {
+        fill: var(--ink-soft);
+        font-size: 14px;
+        font-family: inherit;
+      }
+
+      .colophon {
+        margin-top: 72px;
+        padding-top: 14px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        position: relative;
+      }
+      .colophon::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 120px;
+        height: 2px;
+        background: var(--ink);
+        opacity: 0.6;
+        border-radius: 2px;
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare::after {
+          grid-column: 1;
+          grid-row: 2;
+          transform: rotate(90deg);
+          height: 20px;
+        }
+        .compare > div:last-child {
+          grid-column: 1;
+          grid-row: 3;
+        }
+        .answer {
+          font-size: 21px;
+        }
+        main h2 {
+          font-size: 24px;
+        }
+        main > section {
+          margin-top: 48px;
+        }
+      }
+      @media (max-width: 760px) {
+        .sheet {
+          padding: 36px 22px 44px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency=".035"
+            numOctaves="3"
+            seed="4"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="18" />
+          <feGaussianBlur stdDeviation=".6" />
+        </filter>
+      </defs>
+    </svg>
+    <article class="sheet">
+      <header class="masthead">
+        <span>{{project}} · explained</span><time>{{generatedAt}}</time>
+      </header>
+      <h1>{{title}}</h1>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <span>Written by a fork of this session</span>
+      </footer>
+    </article>
+  </body>
+</html>

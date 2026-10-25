@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: html/02, core/03
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -113,24 +113,24 @@ Use an in-memory `io` (a `Map<string, string>` for files, an array recording `mk
 
 ## Acceptance criteria
 
-- [ ] `template.html` holds each of `{{csp}}`, `{{title}}`, `{{project}}`, `{{generatedAt}}`, `{{main}}`, and
+- [x] `template.html` holds each of `{{csp}}`, `{{title}}`, `{{project}}`, `{{generatedAt}}`, `{{main}}`, and
       the meta `http-equiv="Content-Security-Policy" content="{{csp}}"`.
-- [ ] `template.html` holds no `<script`, no `http://` / `https://` URL other than the SVG namespace
+- [x] `template.html` holds no `<script`, no `http://` / `https://` URL other than the SVG namespace
       `http://www.w3.org/2000/svg`, no `prefers-color-scheme`, and its tokens sit on `:root`.
-- [ ] `assemble` escapes `& < > " '` in title, project and generatedAt; inserts `main` unescaped (including a
+- [x] `assemble` escapes `& < > " '` in title, project and generatedAt; inserts `main` unescaped (including a
       literal `$&`); replaces both `{{title}}` occurrences; none of the five placeholders of the shipped
       template remains in the output, while a `main` holding `{{ message }}` and `{{title}}` keeps both
       verbatim.
-- [ ] `cleanMain` turns the meta-refresh example into `<p class="answer">hi</p>`, and strips a `<script>…</script>`,
+- [x] `cleanMain` turns the meta-refresh example into `<p class="answer">hi</p>`, and strips a `<script>…</script>`,
       an `onclick=`, a `style=`, a `<base href>`, and an `href="https://…"`, while keeping `href="#part-a"`, an
       inline `<svg>` with its classes, and every component class from `design.md`.
-- [ ] The assembled page contains `content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"`.
-- [ ] `slugOf` gives the two examples above, `"explainer"` for `"?!"` and `""`, and at most 40 code points
+- [x] The assembled page contains `content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"`.
+- [x] `slugOf` gives the two examples above, `"explainer"` for `"?!"` and `""`, and at most 40 code points
       for a long title.
-- [ ] `explainerPath` zero-pads month, day, hour and minute (`new Date(2026, 0, 5, 7, 3)` → `20260105-0703-…`), and slugs the project directory (`"My Project"` → `/explain/my-project/`), so no path the checker screenshots holds a space.
-- [ ] `writeExplainer` calls `mkdir` with the explainer directory, writes to `-2` when the first path exists
+- [x] `explainerPath` zero-pads month, day, hour and minute (`new Date(2026, 0, 5, 7, 3)` → `20260105-0703-…`), and slugs the project directory (`"My Project"` → `/explain/my-project/`), so no path the checker screenshots holds a space.
+- [x] `writeExplainer` calls `mkdir` with the explainer directory, writes to `-2` when the first path exists
       and `-3` when both do, never overwrites an existing file, and returns the path it wrote.
-- [ ] (human) Assemble the template with the inner HTML of `#diagram`'s `<main>` in `docs/runes-explain/design/mock.html`
+- [x] (human) Assemble the template with the inner HTML of `#diagram`'s `<main>` in `docs/runes-explain/design/mock.html`
       (the diagram-heavy specimen) as `main`, title `How a press becomes an explainer`. **Wide:** open it in a
       1280-wide window and the mock in a 1376-wide one (the mock's `.specimen` adds 48px padding each side, so
       both sheets are 1280 wide), side by side at `#diagram`. These must match: paper colour and grain, masthead
@@ -144,10 +144,10 @@ Use an in-memory `io` (a `Map<string, string>` for files, an array recording `mk
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including `hooks/explain/html.test.ts`.
-- [ ] `claude plugin validate packages/runes` reports no error.
-- [ ] `for p in '{{csp}}' '{{title}}' '{{project}}' '{{generatedAt}}' '{{main}}' 'http-equiv="Content-Security-Policy" content="{{csp}}"'; do grep -qF "$p" packages/runes/hooks/explain/template.html || echo "missing $p"; done` prints nothing.
-- [ ] `grep -cE '<script|prefers-color-scheme' packages/runes/hooks/explain/template.html` prints `0`.
+- [x] `claude plugin test packages/runes` passes, including `hooks/explain/html.test.ts`.
+- [x] `claude plugin validate packages/runes` reports no error.
+- [x] `for p in '{{csp}}' '{{title}}' '{{project}}' '{{generatedAt}}' '{{main}}' 'http-equiv="Content-Security-Policy" content="{{csp}}"'; do grep -qF "$p" packages/runes/hooks/explain/template.html || echo "missing $p"; done` prints nothing.
+- [x] `grep -cE '<script|prefers-color-scheme' packages/runes/hooks/explain/template.html` prints `0`.
 
 ## Eval rubric
 
