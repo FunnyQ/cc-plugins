@@ -8,7 +8,7 @@
 >
 > **Depends on**: core/01, core/02, html/01, html/02
 > **Blocks**: ui/01, ui/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -125,28 +125,28 @@ Use `startSession` / `fakeHost` from `hooks/transcript/test-session.ts`, a fake 
 
 ## Acceptance criteria
 
-- [ ] `press` with a `text` reply: `ui.open` called with `{ id: "runes-explain", title: "hey mate", columns: 64 }`, one `model.fork` whose prompt equals `buildPrompt({ kind: "press" })`, one `text` entry stored first and selected, its `usage` from `usageOf`, `isRunning` false after.
-- [ ] `press` with an `ask` reply stores an `ask` entry with its question and options.
-- [ ] `press` with an `html` reply writes one file under `~/.local/share/q-lab/runes/explain/<project>/`, stores `check: "pending"`, spawns the checker; after the checker's `turn.complete` answers `FIXED 2` the entry reads `check: "fixed"`, `note: "2 fix(es)"`, and `process.run` received `["open", <that path>]`.
-- [ ] A denied checker spawn still runs `open` and leaves `check: "failed"`.
-- [ ] `isPlaced: false` raises the toast `hey mate needs a wider terminal; the answer is in the pane once it fits` and the fork still runs.
-- [ ] `{ isAnswered: false, reason: "nothing-to-fork" }` sets `error` to `nothing to explain yet`, stores nothing, and clears `isRunning`; `api-error` sets an error starting `the fork failed: api-error`.
-- [ ] A fork that throws clears `isRunning` and sets `error`.
-- [ ] A second `press` while the first fork is pending makes no second `model.fork` call.
-- [ ] Press A returns html and its check stays pending; press B starts and its fork stays pending; A's check then answers: `isRunning` is still true, and a third press makes no `model.fork` call. B's fork then resolves and `isRunning` turns false.
-- [ ] `explainPress` resolves before the checker answers; the checker's later `turn.complete` patches the entry and runs `open`.
-- [ ] `ask("why?")` with a text entry selected forks with `buildPrompt({ kind: "follow", previous: { title, text: body }, question: "why?" })`; with no entries, with `{ kind: "free", question: "why?" }`; an empty or whitespace `ask` forks nothing.
-- [ ] `pick("the parser")` forks with `buildPrompt({ kind: "pick", topic: "the parser" })`.
-- [ ] Two entries in the same millisecond get ids `x<at>` and `x<at>-2`.
-- [ ] `select(id)` sets `selected`; `reopen(id)` on an html entry runs `open` with its path and on a text entry runs nothing.
-- [ ] `register.tsx` calls `explainHooks(on)` in `register()`, and still calls `registerChecker($)` and `checker(on)` exactly once each.
-- [ ] With the whole runes plugin loaded through `register.tsx` (so Clawd's unmatched and fold's `{ reason }` `turn.complete` hooks run too), `claude plugin validate packages/runes` passes and a checker answer still settles its html entry.
+- [x] `press` with a `text` reply: `ui.open` called with `{ id: "runes-explain", title: "hey mate", columns: 64 }`, one `model.fork` whose prompt equals `buildPrompt({ kind: "press" })`, one `text` entry stored first and selected, its `usage` from `usageOf`, `isRunning` false after.
+- [x] `press` with an `ask` reply stores an `ask` entry with its question and options.
+- [x] `press` with an `html` reply writes one file under `~/.local/share/q-lab/runes/explain/<project>/`, stores `check: "pending"`, spawns the checker; after the checker's `turn.complete` answers `FIXED 2` the entry reads `check: "fixed"`, `note: "2 fix(es)"`, and `process.run` received `["open", <that path>]`.
+- [x] A denied checker spawn still runs `open` and leaves `check: "failed"`.
+- [x] `isPlaced: false` raises the toast `hey mate needs a wider terminal; the answer is in the pane once it fits` and the fork still runs.
+- [x] `{ isAnswered: false, reason: "nothing-to-fork" }` sets `error` to `nothing to explain yet`, stores nothing, and clears `isRunning`; `api-error` sets an error starting `the fork failed: api-error`.
+- [x] A fork that throws clears `isRunning` and sets `error`.
+- [x] A second `press` while the first fork is pending makes no second `model.fork` call.
+- [x] Press A returns html and its check stays pending; press B starts and its fork stays pending; A's check then answers: `isRunning` is still true, and a third press makes no `model.fork` call. B's fork then resolves and `isRunning` turns false.
+- [x] `explainPress` resolves before the checker answers; the checker's later `turn.complete` patches the entry and runs `open`.
+- [x] `ask("why?")` with a text entry selected forks with `buildPrompt({ kind: "follow", previous: { title, text: body }, question: "why?" })`; with no entries, with `{ kind: "free", question: "why?" }`; an empty or whitespace `ask` forks nothing.
+- [x] `pick("the parser")` forks with `buildPrompt({ kind: "pick", topic: "the parser" })`.
+- [x] Two entries in the same millisecond get ids `x<at>` and `x<at>-2`.
+- [x] `select(id)` sets `selected`; `reopen(id)` on an html entry runs `open` with its path and on a text entry runs nothing.
+- [x] `register.tsx` calls `explainHooks(on)` in `register()`, and still calls `registerChecker($)` and `checker(on)` exactly once each.
+- [x] With the whole runes plugin loaded through `register.tsx` (so Clawd's unmatched and fold's `{ reason }` `turn.complete` hooks run too), `claude plugin validate packages/runes` passes and a checker answer still settles its html entry.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including `hooks/explain/explain.test.ts`.
-- [ ] `claude plugin validate packages/runes` reports no refusal.
-- [ ] `grep -n "explainHooks(on)" packages/runes/hooks/register.tsx` prints one line.
+- [x] `claude plugin test packages/runes` passes, including `hooks/explain/explain.test.ts`.
+- [x] `claude plugin validate packages/runes` reports no refusal.
+- [x] `grep -n "explainHooks(on)" packages/runes/hooks/register.tsx` prints one line.
 
 ## Eval rubric
 
