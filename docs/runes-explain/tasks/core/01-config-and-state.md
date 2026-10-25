@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: html/02, core/03
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -135,20 +135,20 @@ Entries in tests are plain object literals typed `ExplainEntry`; the helpers are
 
 ## Acceptance criteria
 
-- [ ] `RUNES` ends with `"explain"`, `TOP` ends with `"explain"`, and `DEFAULTS.enabled.explain` is `true`.
-- [ ] `TEMPLATE` ends with the `explain:` block above, after `teacher:`, with its comment text byte for byte.
-- [ ] `setSwitch(…, "explain", false)` edits one line and reads back as `false`, every other switch unchanged.
-- [ ] `types/index.d.ts` declares `ExplainUsage`, `ExplainCheck`, `ExplainEntry`, `ExplainView` exactly as in
+- [x] `RUNES` ends with `"explain"`, `TOP` ends with `"explain"`, and `DEFAULTS.enabled.explain` is `true`.
+- [x] `TEMPLATE` ends with the `explain:` block above, after `teacher:`, with its comment text byte for byte.
+- [x] `setSwitch(…, "explain", false)` edits one line and reads back as `false`, every other switch unchanged.
+- [x] `types/index.d.ts` declares `ExplainUsage`, `ExplainCheck`, `ExplainEntry`, `ExplainView` exactly as in
       `protocol.md`, and `PluginState.runes.explain: ExplainView`.
-- [ ] `hooks/explain/state.ts` exports `MAX_ENTRIES`, `view`, `usageOf`, `selectedOf`, `withEntry`,
+- [x] `hooks/explain/state.ts` exports `MAX_ENTRIES`, `view`, `usageOf`, `selectedOf`, `withEntry`,
       `patchEntry` with the `protocol.md` signatures and nothing else.
-- [ ] Every test listed above exists and passes; every pre-existing runes test still passes.
+- [x] Every test listed above exists and passes; every pre-existing runes test still passes.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes.
-- [ ] `claude plugin validate packages/runes` reports no problem, including the `explain` state key.
-- [ ] `grep -n '"explain"' packages/runes/hooks/config.ts` shows it in both `RUNES` and `TOP`.
+- [x] `claude plugin test packages/runes` passes.
+- [x] `claude plugin validate packages/runes` reports no problem, including the `explain` state key.
+- [x] `grep -n '"explain"' packages/runes/hooks/config.ts` shows it in both `RUNES` and `TOP`.
 
 ## Eval rubric
 

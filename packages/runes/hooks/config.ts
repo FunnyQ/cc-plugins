@@ -13,6 +13,7 @@ export const RUNES = [
   "fold",
   "minimap",
   "teacher",
+  "explain",
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
@@ -206,9 +207,11 @@ minimap:
   # marker_color: "${DEFAULTS.minimap.marker_color}"   # the mark for where you are
 teacher:
   enabled: ${enabled.teacher}    # the English teacher: a better phrasing under an English prompt that could read better; needs TYPESAFE_API_KEY, sends each (secret-masked) English-looking prompt to TypeSafe's Jev, and asks haiku for the rewrite
+explain:
+  enabled: ${enabled.explain} # the "hey mate, explain please" button under the minimap; a press forks this session to explain it, ELI5
 `;
 
-const TOP = ["clawd", "transcript", "minimap", "teacher"] as const;
+const TOP = ["clawd", "transcript", "minimap", "teacher", "explain"] as const;
 const UNDER = [
   "prompt",
   "reply",

@@ -28,6 +28,7 @@ const CURRENT = () => ({
   },
   minimap: { enabled: true },
   teacher: { enabled: true },
+  explain: { enabled: true },
 });
 
 test("normalize fills every missing field from the defaults", () => {
@@ -281,4 +282,29 @@ test("a block ends before a trailing blank or a comment no deeper than its heade
   expect(
     setSwitch("transcript:\n  prompt:\n    enabled: true\n  # note\n\nminimap:\n", "peer", false),
   ).toBe("transcript:\n  prompt:\n    enabled: true\n  # note\n  peer:\n    enabled: false\n\nminimap:\n");
+});
+
+test("explain is on by default and its switch sits at the top level after teacher", () => {
+  expect(DEFAULTS.enabled.explain).toBe(true);
+  const t = TEMPLATE(DEFAULTS.enabled);
+  expect(t).toContain("\nexplain:\n  enabled: true");
+  expect(t.indexOf("\nexplain:")).toBeGreaterThan(t.indexOf("\nteacher:"));
+});
+
+test("the explain template line names the button", () => {
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain(
+    '# the "hey mate, explain please" button under the minimap',
+  );
+});
+
+test("/runes explain off reads back as off", () => {
+  const before = TEMPLATE(DEFAULTS.enabled).split("\n");
+  const after = setSwitch(TEMPLATE(DEFAULTS.enabled), "explain", false).split("\n");
+  expect(after).toHaveLength(before.length);
+  const changed = after.filter((l, i) => l !== before[i]);
+  expect(changed).toHaveLength(1);
+  expect(changed[0]).toMatch(/^  enabled: false #/);
+  expect(after[after.indexOf(changed[0]!) - 1]).toBe("explain:");
+  const enabled = Object.fromEntries(RUNES.map((r) => [r, r !== "explain" && DEFAULTS.enabled[r]]));
+  expect(TEMPLATE(enabled as typeof DEFAULTS.enabled).split("\n")).toEqual(after);
 });
