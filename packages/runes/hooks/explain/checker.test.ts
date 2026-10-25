@@ -199,7 +199,10 @@ type Hooks = Record<
 
 let epoch = 0;
 
-const rig = async (opts: { chrome?: boolean; deny?: string } = {}) => {
+// `geometry` is the geometry CLI's stdout; absent, the CLI exits 1, and an Error is a run that cannot start
+const rig = async (
+  opts: { chrome?: boolean; deny?: string; geometry?: string | Error } = {},
+) => {
   // checker.ts keeps its pending checks and token counter per module, so each rig starts far enough on to expire the last rig's leftovers
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
   let version = 1;
@@ -218,15 +221,23 @@ const rig = async (opts: { chrome?: boolean; deny?: string } = {}) => {
   let explain = fresh();
   const spawns: { prompt: string }[] = [];
   const opened: string[][] = [];
+  const measured: string[][] = [];
   const agents: { id: string; type: string }[] = [];
   const $ = {
-    plugin: { name: "runes" },
+    plugin: { name: "runes", root: "/plugin" },
     fs: {
       exists: async (path: string) => opts.chrome !== false && path === CHROME,
     },
     clock: { now: async () => now },
     process: {
       run: async (argv: string[]) => {
+        if (argv[0] === "bun") {
+          measured.push(argv);
+          if (opts.geometry instanceof Error) throw opts.geometry;
+          return opts.geometry === undefined
+            ? { exitCode: 1, stdout: "", stderr: "" }
+            : { exitCode: 0, stdout: opts.geometry, stderr: "" };
+        }
         opened.push(argv);
         return { exitCode: 0, stdout: "", stderr: "" };
       },
@@ -270,13 +281,14 @@ const rig = async (opts: { chrome?: boolean; deny?: string } = {}) => {
   opened.length = 0;
   explain = fresh();
   const token = (i: number) =>
-    spawns[i]!.prompt.split("token is ")[1]!.replace(".", "");
+    spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!;
   return {
     $,
     token,
     hooks,
     spawns,
     opened,
+    measured,
     entry,
     turnEnd,
     advance: (ms: number) => {
@@ -323,6 +335,40 @@ test("missing Chrome settles the check as skipped and opens the page", async () 
     expect.objectContaining({ check: "skipped", note: "no Chrome" }),
   );
   expect(r.opened).toEqual([["open", PAGE]]);
+});
+
+test("a clean geometry check settles ok and opens the page without spawning the checker", async () => {
+  const r = await rig({ geometry: '{"faults":[]}' });
+  await startCheck(r.$, "a", PAGE);
+  expect(r.measured).toEqual([
+    ["bun", "/plugin/hooks/explain/geometry-cli.ts", CHROME, PAGE],
+  ]);
+  expect(r.spawns).toHaveLength(0);
+  expect(r.entry("a")).toEqual(
+    expect.objectContaining({ check: "ok", note: "geometry clean" }),
+  );
+  expect(r.opened).toEqual([["open", PAGE]]);
+});
+
+test("geometry faults go to the checker's task message", async () => {
+  const r = await rig({
+    geometry: '{"faults":["1280: figure 1 \\"C\\" overlaps \\"D\\""]}',
+  });
+  await startCheck(r.$, "a", PAGE);
+  expect(r.spawns[0]!.prompt).toBe(
+    `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.\nA geometry check found:\n- 1280: figure 1 "C" overlaps "D"`,
+  );
+  expect(r.entry("a")).toEqual(expect.objectContaining({ check: "pending" }));
+});
+
+test("a geometry check that fails, cannot start, or prints no verdict leaves the checker as before", async () => {
+  for (const geometry of [undefined, new Error("bun: not found"), "garbage"]) {
+    const r = await rig({ geometry });
+    await startCheck(r.$, "a", PAGE);
+    expect(r.spawns[0]!.prompt).toBe(
+      `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.`,
+    );
+  }
 });
 
 test("a denied spawn settles the check as failed with the deny text", async () => {

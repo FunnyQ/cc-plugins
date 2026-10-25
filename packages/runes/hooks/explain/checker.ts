@@ -9,6 +9,7 @@ export const CHECKER = "runes:explain-checker";
 export const CHROME =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const CHECK_TIMEOUT_MS = 180_000;
+const GEOMETRY_TIMEOUT_MS = 20_000;
 export type CheckResult = { check: ExplainCheck; note?: string };
 
 export const CHECKER_PROMPT = [
@@ -108,6 +109,25 @@ export async function registerChecker($: EngineInterface): Promise<void> {
   });
 }
 
+// undefined when the check could not run (no bun, Chrome never answered): the checker then looks at the page unaided
+async function measure(
+  $: EngineInterface,
+  path: string,
+): Promise<string[] | undefined> {
+  try {
+    const run = await $.process.run(
+      ["bun", `${$.plugin.root}/hooks/explain/geometry-cli.ts`, CHROME, path],
+      { timeoutMs: GEOMETRY_TIMEOUT_MS },
+    );
+    const { faults } = JSON.parse(run.stdout) as { faults?: unknown };
+    return run.exitCode === 0 && Array.isArray(faults)
+      ? faults.map(String)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function startCheck(
   $: EngineInterface,
   entryId: string,
@@ -118,10 +138,19 @@ export async function startCheck(
     await settle($, entryId, path, { check: "skipped", note: "no Chrome" });
     return;
   }
+  const found = await measure($, path);
+  if (found?.length === 0) {
+    await settle($, entryId, path, { check: "ok", note: "geometry clean" });
+    return;
+  }
   const token = `c${++checks}`;
   const spawned = await $.agent.spawn({
     subagentType: CHECKER,
-    prompt: `Check this explainer page: ${path}\nYour check token is ${token}.`,
+    prompt:
+      `Check this explainer page: ${path}\nYour check token is ${token}.` +
+      (found
+        ? `\nA geometry check found:\n${found.map((f) => `- ${f}`).join("\n")}`
+        : ""),
     description: "check explainer layout",
   });
   if (spawned.deny !== undefined) {
@@ -166,7 +195,9 @@ const allowsBash = (command: string) => {
     else return false;
   }
   return (
-    files.length === 1 && shots.length <= 1 && [...files, ...shots].every(inside)
+    files.length === 1 &&
+    shots.length <= 1 &&
+    [...files, ...shots].every(inside)
   );
 };
 
@@ -178,11 +209,18 @@ const complete: TurnComplete = async ($, e, next) => {
   if (!(await isChecker($, e.agentId))) return ran;
   const verdict = e.reason === "answer" ? parseVerdict(e.answer) : undefined;
   // a token or the spawn's own agentId only: arrival order or a lone-waiter fallback would let a timed-out check's late answer settle a newer one
-  const token = verdict?.token ?? [...pending].find(([, p]) => p.agentId === e.agentId)?.[0];
+  const token =
+    verdict?.token ??
+    [...pending].find(([, p]) => p.agentId === e.agentId)?.[0];
   const p = token === undefined ? undefined : pending.get(token);
   if (!p) return ran;
   pending.delete(token!);
-  await settle($, p.entryId, p.path, verdict ?? { check: "failed", note: e.reason });
+  await settle(
+    $,
+    p.entryId,
+    p.path,
+    verdict ?? { check: "failed", note: e.reason },
+  );
   return ran;
 };
 
