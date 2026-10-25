@@ -3,6 +3,7 @@ import type { On } from 'claude-code'
 
 import { clawd, seen, sprite, spriteColumns } from './clawd/mascot'
 import { config } from './config'
+import { explainPress } from './explain/explain'
 import { inlineMap } from './minimap/minimap'
 import { stem } from './minimap/rows'
 import { TEACHER_COLOR, TEACHER_ICON } from './teacher/lesson'
@@ -14,21 +15,24 @@ import { innerWidth, wrapWords } from './transcript/text'
 const FRAME = { plugin: 'runes', key: 'frame' } as const
 const MAP_ROWS = { plugin: 'runes', key: 'minimapRows' } as const
 const MAP_SHOWN = { plugin: 'runes', key: 'minimapShown' } as const
+const VIEW = { plugin: 'runes', key: 'explain' } as const
 
 export const band = (on: On) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const hasMap = config.enabled.minimap && e.surface === 'terminal'
     const lesson = e.surface === 'terminal' ? teacher.latest() : undefined
-    if ((!config.enabled.clawd && !hasMap && !lesson) || e.props.hasSurvey) return next(e)
+    const hasButton = config.enabled.explain && e.surface === 'terminal'
+    if ((!config.enabled.clawd && !hasMap && !lesson && !hasButton) || e.props.hasSurvey) return next(e)
 
     seen(e.requestId, e.surface === 'desktop')
     if (e.surface !== 'desktop' && e.surface !== 'terminal') return next(e)
     const ui = $.ui.resolve(e)
     const { Box } = ui
-    const [{ value: frame = { clip: clawd.clip, index: clawd.index } }, list, shown] = await Promise.all([
+    const [{ value: frame = { clip: clawd.clip, index: clawd.index } }, list, shown, view] = await Promise.all([
       $.state.get(FRAME),
       hasMap ? read($, MAP_ROWS) : undefined,
       hasMap ? read($, MAP_SHOWN) : undefined,
+      hasButton ? read($, VIEW) : undefined,
     ])
     // the columns Clawd and its gap take off the map's width; bodyColumns, not the viewport, since a docked pane narrows the band
     const reserved = config.enabled.clawd ? spriteColumns() + config.minimap.gap : 0
@@ -60,7 +64,18 @@ export const band = (on: On) => {
     })
     const withNotice = (node: ReturnType<typeof row>) => (notice ? <Box key="teacher-band" flexDirection="column">{notice}{node}</Box> : node)
 
-    if (!config.enabled.clawd) return map ? withNotice(row()) : (notice || next(e))
-    return withNotice(row(sprite(ui, e.surface === 'desktop', frame)))
+    const clawdRow = config.enabled.clawd ? row(sprite(ui, e.surface === 'desktop', frame)) : map ? row() : undefined
+    if (!hasButton || !term) return clawdRow ? withNotice(clawdRow) : (notice || next(e))
+    return (
+      <Box key={notice ? 'teacher-band' : 'explain-band'} flexDirection="column">
+        {notice}
+        {clawdRow}
+        <Box key="explain-row" flexDirection="row" width={e.props.bodyColumns}>
+          <term.Button key="explain" plain onPress={() => (view?.isRunning ? undefined : explainPress($))}>
+            {view?.isRunning ? 'explaining…' : 'hey mate, explain please'}
+          </term.Button>
+        </Box>
+      </Box>
+    )
   })
 }

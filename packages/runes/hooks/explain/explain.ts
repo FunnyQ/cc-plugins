@@ -20,7 +20,7 @@ const messageOf = (err: unknown) =>
 
 const basename = (path: string) => path.split("/").filter(Boolean).at(-1) ?? "";
 
-const run = async ($: EngineInterface, ask: Ask) => {
+async function run($: EngineInterface, ask: Ask): Promise<void> {
   let started = false;
   await update($, view, (v) => {
     started = !v.isRunning;
@@ -121,7 +121,7 @@ const run = async ($: EngineInterface, ask: Ask) => {
     await update($, view, (v) => ({ ...v, isRunning: false }));
   }
   if (check) await startCheck($, check.id, check.path);
-};
+}
 
 export async function explainPress($: EngineInterface): Promise<void> {
   await run($, { kind: "press" });

@@ -9,7 +9,7 @@
 >
 > **Depends on**: core/03
 > **Blocks**: docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -104,18 +104,18 @@ Every existing test in `clawd/mascot.test.tsx` and `runes.test.tsx` must stay gr
 
 ## Acceptance criteria
 
-- [ ] On the terminal with `explain` on, the band draws a Button keyed `explain` labelled `hey mate, explain please` on a row keyed `explain-row` below the map/Clawd row.
-- [ ] Pressing it returns the promise `explainPress($)` gives (the handler never drops it with `void`), so `$` stays inside the press's hook until the fork returns; it calls one `$.model.fork` call and `$.ui.open` with `id: 'runes-explain'`.
-- [ ] While `isRunning` is true the label is `explaining…` and a press does not fork again.
-- [ ] With Clawd off, the minimap off and no lesson, the band draws the button row instead of returning `next(e)`.
-- [ ] With `explain` off, a survey showing, or on the desktop, the band draws no button and is otherwise unchanged.
-- [ ] (human) In a real terminal session, the button draws under the map/Clawd row and reads explaining… while a fork runs.
+- [x] On the terminal with `explain` on, the band draws a Button keyed `explain` labelled `hey mate, explain please` on a row keyed `explain-row` below the map/Clawd row.
+- [x] Pressing it returns the promise `explainPress($)` gives (the handler never drops it with `void`), so `$` stays inside the press's hook until the fork returns; it calls one `$.model.fork` call and `$.ui.open` with `id: 'runes-explain'`.
+- [x] While `isRunning` is true the label is `explaining…` and a press does not fork again.
+- [x] With Clawd off, the minimap off and no lesson, the band draws the button row instead of returning `next(e)`.
+- [x] With `explain` off, a survey showing, or on the desktop, the band draws no button and is otherwise unchanged.
+- [x] (human) In a real terminal session, the button draws under the map/Clawd row and reads explaining… while a fork runs.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including every case in `hooks/explain/button.test.tsx` and the existing band tests in `hooks/clawd/mascot.test.tsx`.
-- [ ] `claude plugin validate packages/runes` reports no refused `$.state` key (the `explain` key read in `band.tsx` is declared in `types/index.d.ts`).
-- [ ] `rg -n "explaining…|hey mate, explain please" packages/runes/hooks/band.tsx` finds both labels.
+- [x] `claude plugin test packages/runes` passes, including every case in `hooks/explain/button.test.tsx` and the existing band tests in `hooks/clawd/mascot.test.tsx`.
+- [x] `claude plugin validate packages/runes` reports no refused `$.state` key (the `explain` key read in `band.tsx` is declared in `types/index.d.ts`).
+- [x] `rg -n "explaining…|hey mate, explain please" packages/runes/hooks/band.tsx` finds both labels.
 
 ## Eval rubric
 
