@@ -172,6 +172,49 @@ export async function explainReopen(
   if (entry?.kind === "html") await $.process.run(["open", entry.path]);
 }
 
+// trash, not rm: an explainer is the one artifact of a press that outlives the session, so a slip stays recoverable
+async function trashPages(
+  $: EngineInterface,
+  entries: ExplainEntry[],
+): Promise<string | undefined> {
+  const paths = entries.flatMap((e) => (e.kind === "html" ? [e.path] : []));
+  if (!paths.length) return undefined;
+  const { exitCode, stderr } = await $.process
+    .run(["trash", ...paths])
+    .catch((err: unknown) => ({ exitCode: 1, stderr: String(err) }));
+  if (exitCode === 0) return undefined;
+  const what = paths.length === 1 ? basename(paths[0]!) : `${paths.length} pages`;
+  return `could not move ${what} to the Trash: ${stderr.trim()}`;
+}
+
+export async function explainDelete(
+  $: EngineInterface,
+  id: string,
+): Promise<void> {
+  const entry = (await read($, view)).entries.find((e) => e.id === id);
+  if (!entry) return;
+  const error = await trashPages($, [entry]);
+  await update($, view, (v) =>
+    error
+      ? { ...v, error }
+      : {
+          ...v,
+          error: undefined,
+          entries: v.entries.filter((e) => e.id !== id),
+          selected: v.selected === id ? undefined : v.selected,
+        },
+  );
+}
+
+export async function explainClear($: EngineInterface): Promise<void> {
+  const error = await trashPages($, (await read($, view)).entries);
+  await update($, view, (v) =>
+    error
+      ? { ...v, error }
+      : { ...v, error: undefined, entries: [], selected: undefined },
+  );
+}
+
 export function explainHooks(on: On): void {
   checker(on);
 

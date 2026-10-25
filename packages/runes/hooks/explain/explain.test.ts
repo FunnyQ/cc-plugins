@@ -7,6 +7,8 @@ import { where } from "../transcript/where";
 import { CHECK_TIMEOUT_MS, CHECKER, CHROME } from "./checker";
 import {
   explainAsk,
+  explainClear,
+  explainDelete,
   explainHooks,
   explainPick,
   explainPress,
@@ -64,6 +66,7 @@ const rig = async (
     writeFails?: boolean;
     entries?: ExplainEntry[];
     language?: string;
+    trashFails?: boolean;
   } = {},
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
@@ -116,6 +119,8 @@ const rig = async (
       run: async (argv: string[]) => {
         runs.push(argv);
         const git = argv[0] === "git";
+        if (argv[0] === "trash" && opts.trashFails)
+          return { exitCode: 1, stdout: "", stderr: "trash: no such file" };
         return {
           exitCode: git && opts.git === undefined ? 128 : 0,
           stdout: git ? `${opts.git ?? ""}\n` : "",
@@ -434,6 +439,43 @@ test("select sets selected; reopen opens an html entry and nothing else", async 
   expect(r.runs).toEqual([]);
   await explainReopen(r.$, "h");
   expect(r.runs).toEqual([["open", "/p/h.html"]]);
+});
+
+const pages: ExplainEntry[] = [
+  { id: "h2", at: 3, title: "h2", kind: "html", summary: "", path: "/p/h2.html", check: "ok" },
+  { id: "t", at: 2, title: "t", kind: "text", body: "" },
+  { id: "h1", at: 1, title: "h1", kind: "html", summary: "", path: "/p/h1.html", check: "ok" },
+];
+
+test("explainDelete moves an html entry's page to the Trash and drops the entry; a text entry just drops", async () => {
+  const r = await rig({ entries: pages });
+  await explainSelect(r.$, "h2");
+  await explainDelete(r.$, "h2");
+  expect(r.runs).toEqual([["trash", "/p/h2.html"]]);
+  expect(r.view().entries.map((e) => e.id)).toEqual(["t", "h1"]);
+  expect(r.view().selected).toBeUndefined();
+  await explainDelete(r.$, "t");
+  expect(r.runs).toHaveLength(1);
+  expect(r.view().entries.map((e) => e.id)).toEqual(["h1"]);
+});
+
+test("a failed trash keeps the entry and names the page in the error", async () => {
+  const r = await rig({ entries: pages, trashFails: true });
+  await explainDelete(r.$, "h1");
+  expect(r.view().entries).toHaveLength(3);
+  expect(r.view().error).toBe("could not move h1.html to the Trash: trash: no such file");
+});
+
+test("explainClear trashes every html page in one call and empties the history", async () => {
+  const r = await rig({ entries: pages });
+  await explainClear(r.$);
+  expect(r.runs).toEqual([["trash", "/p/h2.html", "/p/h1.html"]]);
+  expect(r.view().entries).toEqual([]);
+  expect(r.view().selected).toBeUndefined();
+  const failing = await rig({ entries: pages, trashFails: true });
+  await explainClear(failing.$);
+  expect(failing.view().entries).toHaveLength(3);
+  expect(failing.view().error).toBe("could not move 2 pages to the Trash: trash: no such file");
 });
 
 test("explainHooks hooks the checker, the two presses and the follow-up submit", async () => {

@@ -282,13 +282,37 @@ test("an error draws in #cc6666, and no error draws no error line", async ($, on
   expect(await red()).toHaveLength(0);
 });
 
-test("while running, explaining… sits directly above the Input", async ($, on) => {
-  await session($, on, { entries: [text("x1")], isRunning: true });
-  const kids = (await tree($)).children as Node[];
-  expect(kids.at(-1)?.type).toBe("Input");
-  expect(
-    texts(kids.at(-2)!.type === "Text" ? { children: [kids.at(-2)] } : {}),
-  ).toEqual(["explaining…"]);
+test("the status banner tops the pane: running, then an error, then a pending check; none when idle", async ($, on) => {
+  const page = { id: "h1", at: 1, title: "P", kind: "html", summary: "s", path: "/p/p.html", check: "pending" } as ExplainEntry;
+  const box = await session($, on, { entries: [text("x1")], isRunning: true, error: "boom" });
+  const first = async () => ((await tree($)).children as Node[])[0]!;
+  const banner = async () => {
+    const top = await first();
+    return top.props?.key === "explain-status" ? texts({ children: [top] }).join("") : undefined;
+  };
+  expect(await banner()).toContain("explaining…");
+  box.view = { entries: [text("x1")], isRunning: false, error: "boom" };
+  expect(await banner()).toContain("✗ boom");
+  box.view = { entries: [page], isRunning: false };
+  expect(await banner()).toContain("checking layout…");
+  box.view = { entries: [text("x1")], isRunning: false };
+  expect(await banner()).toBeUndefined();
+  expect(((await tree($)).children as Node[]).at(-1)?.type).toBe("Input");
+});
+
+test("an html entry has a delete button and the history a clear button, each moving pages to the Trash", async ($, on) => {
+  const page = (id: string) => ({ id, at: 1, title: id, kind: "html", summary: "s", path: `/p/${id}.html`, check: "ok" }) as ExplainEntry;
+  const box = await session($, on, { entries: [page("h2"), page("h1")], isRunning: false });
+  const ui = await $.ui.mount(PANE);
+  await ui.press({ key: "explain-delete:h2" });
+  await ui.unmount();
+  expect(box.opens).toContainEqual(["trash", "/p/h2.html"]);
+  expect(box.view.entries.map((e) => e.id)).toEqual(["h1"]);
+  const again = await $.ui.mount(PANE);
+  await again.press({ key: "explain-clear" });
+  await again.unmount();
+  expect(box.opens).toContainEqual(["trash", "/p/h1.html"]);
+  expect(box.view.entries).toEqual([]);
 });
 
 test("submitting asks a follow-up; a blank submit asks nothing", async ($, on) => {

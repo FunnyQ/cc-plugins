@@ -7,6 +7,8 @@ import { runLine } from "../transcript/bubble";
 import { glow } from "../transcript/glow";
 import { wrap, wrapWords } from "../transcript/text";
 import {
+  explainClear,
+  explainDelete,
   explainReopen,
   explainSelect,
   COLUMNS,
@@ -81,11 +83,17 @@ export const explainPane = (on: On) => {
             ? clip(entry.note, inner, NOTE_LINES).map((line) => <Text dimColor>{line}</Text>)
             : null}
           <Text dimColor wrap="truncate-middle">{entry.path}</Text>
-          <Box marginTop={1}>
+          <Box marginTop={1} gap={2}>
             <Button
               key={`explain-open:${entry.id}`}
               label="open again"
               onPress={() => explainReopen($, entry.id)}
+            />
+            <Button
+              key={`explain-delete:${entry.id}`}
+              label="delete"
+              dimColor
+              onPress={() => explainDelete($, entry.id)}
             />
           </Box>
         </Box>
@@ -112,17 +120,31 @@ export const explainPane = (on: On) => {
       return [...markdown(entry.id, entry.summary), page(entry)];
     };
 
+    const status = v.isRunning
+      ? { text: "◐ explaining…", color: ACCENT }
+      : v.error
+        ? { text: `✗ ${v.error}`, color: ERROR_COLOR }
+        : selected?.kind === "html" && selected.check === "pending"
+          ? { text: "◌ checking layout…", color: undefined }
+          : undefined;
+    const banner = status ? (
+      <Box
+        key="explain-status"
+        flexDirection="column"
+        borderStyle="round"
+        borderColor={status.color}
+        borderDimColor={!status.color}
+        paddingX={1}
+      >
+        {clip(status.text, inner, NOTE_LINES).map((line) => (
+          <Text color={status.color} dimColor={!status.color}>
+            {line}
+          </Text>
+        ))}
+      </Box>
+    ) : null;
+
     const tail = [
-      v.error ? (
-        <Box key="explain-error" marginTop={1} paddingX={1}>
-          <Text color={ERROR_COLOR}>{`✗ ${v.error}`}</Text>
-        </Box>
-      ) : null,
-      v.isRunning ? (
-        <Text key="explain-running" color={ACCENT}>
-          explaining…
-        </Text>
-      ) : null,
       <Input
         key="explain-ask"
         placeholder="ask a follow-up, or name what to explain"
@@ -134,6 +156,7 @@ export const explainPane = (on: On) => {
     if (!selected)
       return (
         <Box flexDirection="column" gap={1}>
+          {banner}
           <Box
             key="explain-answer"
             borderStyle="round"
@@ -150,6 +173,7 @@ export const explainPane = (on: On) => {
     const u = selected.usage;
     return (
       <Box flexDirection="column" gap={1}>
+        {banner}
         <Box
           key="explain-history"
           flexDirection="column"
@@ -157,7 +181,15 @@ export const explainPane = (on: On) => {
           borderDimColor
           paddingX={1}
         >
-          <Text dimColor bold>{`HISTORY · ${v.entries.length}`}</Text>
+          <Box justifyContent="space-between">
+            <Text dimColor bold>{`HISTORY · ${v.entries.length}`}</Text>
+            <Button
+              key="explain-clear"
+              label="clear"
+              dimColor
+              onPress={() => explainClear($)}
+            />
+          </Box>
           {v.entries.map((entry) => {
             const isSelected = entry.id === selected.id;
             const label = wrap(`${isSelected ? "●" : "○"} ${entry.title}`, inner)[0]!;
