@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>
+      runes explain — approved mock (Picture-Book Workshop, sticky plate spread)
+    </title>
+    <style>
+      /* One light theme only; no dark mode. template.html puts these tokens on :root. */
+      .sheet {
+        --paper: #f3eee3; /* --paper: cold-press sheet, the page ground */
+        --paper-slip: #fbf8f1; /* --paper-slip: a lighter slip tipped onto the sheet (analogy, takeaway) */
+        --ink: #23201c; /* --ink: pen line and body text */
+        --ink-soft: #5b5348; /* --ink-soft: captions, masthead, muted labels (7:1 on paper) */
+        --ink-accent: #a64a29; /* --ink-accent: the one red-brown pen: arrows, step numbers, part letters */
+        --wash-warm: #d97757; /* --wash-warm: Clawd orange watercolour, the thing being explained */
+        --wash-cool: #7da0b8; /* --wash-cool: blue-grey wash, the outside or the other side */
+        --wash-sage: #9bb08a; /* --wash-sage: green wash, the good or finished state */
+        --wash-opacity: .26; /* --wash-opacity: how much pigment a wash lays down */
+        --shadow: rgba(70, 50, 25, .32); /* --shadow: slip and plate shadow */
+        --vignette: rgba(
+          120,
+          95,
+          60,
+          .14
+        ); /* --vignette: sheet edge darkening */
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      body {
+        background: #2c2925;
+        color: #efe8da;
+        font:
+          15px/1.5 -apple-system,
+          "Helvetica Neue",
+          sans-serif;
+      }
+      .index {
+        padding: 36px 48px 12px;
+        max-width: 980px;
+      }
+      .index h1 {
+        font-size: 22px;
+        margin-bottom: 6px;
+      }
+      .index p {
+        color: #cfc6b6;
+        margin-bottom: 8px;
+      }
+      .index nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 20px;
+      }
+      .index a {
+        color: #f0b59a;
+      }
+      .specimen {
+        padding: 28px 48px 40px;
+      }
+      .specimen > h2 {
+        font-size: 15px;
+        font-weight: 600;
+        color: #cfc6b6;
+        margin-bottom: 12px;
+        letter-spacing: 0.02em;
+      }
+      .specimen.narrow .sheet {
+        width: 420px;
+      }
+
+      /* ---------- the skeleton: everything below ships in template.html ---------- */
+      ::selection {
+        background: color-mix(in srgb, var(--wash-warm) 40%, transparent);
+      }
+      .sheet {
+        container-type: inline-size;
+        max-width: 1280px;
+        margin: 0 auto;
+        background-color: var(--paper);
+        background-image:
+          radial-gradient(
+            ellipse at 50% 30%,
+            transparent 60%,
+            var(--vignette) 100%
+          ),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeDiffuseLighting lighting-color='%23fff' surfaceScale='1.1'%3E%3CfeDistantLight azimuth='45' elevation='58'/%3E%3C/feDiffuseLighting%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
+        background-blend-mode: normal, multiply;
+        color: var(--ink);
+        font:
+          18px/1.62 -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        font-kerning: normal;
+        padding: 64px 88px 72px;
+        box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.6);
+      }
+      .masthead {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 32px;
+      }
+      .sheet > h1 {
+        font-size: clamp(32px, 4.2cqi, 52px);
+        line-height: 1.08;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        max-width: 20ch;
+        margin-bottom: 18px;
+        text-wrap: balance;
+      }
+      main > * + * {
+        margin-top: 20px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 64ch;
+      }
+      main h2 {
+        font-size: 28px;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+        margin: 0 0 14px;
+        text-wrap: balance;
+      }
+      main a {
+        color: var(--ink-accent);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font:
+          0.88em ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        background: color-mix(in srgb, var(--wash-cool) 22%, transparent);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+
+      .answer {
+        font-size: 24px;
+        line-height: 1.45;
+        font-weight: 500;
+        max-width: 46ch;
+      }
+      .analogy,
+      .takeaway {
+        background: var(--paper-slip);
+        padding: 18px 24px;
+        max-width: 52ch;
+        font-size: 19px;
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+        transform: rotate(-0.6deg);
+      }
+      .analogy::before {
+        content: "Think of it like this";
+        display: block;
+        font-size: 12px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 4px;
+      }
+      .takeaway {
+        transform: rotate(0.5deg);
+        font-weight: 600;
+        margin-top: 56px !important;
+      }
+      .takeaway::before {
+        content: "Take this with you";
+        display: block;
+        font-size: 12px;
+        font-weight: 400;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 4px;
+      }
+
+      main > section {
+        margin-top: 64px;
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 56px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 16px;
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        font-size: 15px;
+        color: var(--ink-soft);
+        margin-top: 10px;
+        max-width: 52ch;
+      }
+
+      .parts {
+        display: grid;
+        gap: 6px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 8px;
+        padding: 6px 10px 6px 6px;
+        border-radius: 6px;
+        transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        font-weight: 800;
+        color: var(--ink-accent);
+      }
+      .parts dd b {
+        display: block;
+      }
+      .parts > div:hover {
+        background: color-mix(in srgb, var(--wash-warm) 18%, transparent);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.2;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 16px;
+      }
+      .steps > li {
+        counter-increment: step;
+        display: grid;
+        grid-template-columns: 48px 1fr;
+      }
+      .steps > li::before {
+        content: counter(step);
+        font-size: 38px;
+        font-weight: 800;
+        line-height: 1;
+        color: var(--ink-accent);
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 56px 1fr;
+        align-items: center;
+      }
+      .compare > div {
+        padding: 20px 24px;
+        background: var(--paper-slip);
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+      }
+      .compare > div:first-child {
+        transform: rotate(-0.5deg);
+      }
+      .compare > div:last-child {
+        transform: rotate(0.4deg);
+      }
+      .compare h3 {
+        font-size: 13px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+      .compare::after {
+        content: "";
+        grid-column: 2;
+        grid-row: 1;
+        height: 24px;
+        background: var(--ink-accent);
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 24'%3E%3Cpath d='M4 13c14-3 30-3 44 0M38 4l10 9-11 8' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+      }
+      .compare > div:last-child {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .timeline {
+        list-style: none;
+        padding: 0 0 0 36px;
+        position: relative;
+        display: grid;
+        gap: 28px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 8px;
+        bottom: 8px;
+        width: 2px;
+        background: var(--ink);
+        opacity: 0.7;
+        border-radius: 2px;
+      }
+      .timeline > li {
+        position: relative;
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        left: -36px;
+        top: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 48% 52% 45% 55%;
+        background: var(--wash-warm);
+        opacity: 0.7;
+      }
+      .timeline time {
+        display: block;
+        font-size: 13px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      .timeline b {
+        display: block;
+        font-size: 20px;
+      }
+
+      /* SVG vocabulary the fork draws with */
+      .plate .ink {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 2.4;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--ink-accent);
+        stroke-width: 3.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .dash {
+        stroke-dasharray: 4 7;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        opacity: var(--wash-opacity);
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: var(--wash-warm);
+      }
+      .plate .wash-cool {
+        fill: var(--wash-cool);
+      }
+      .plate .wash-sage {
+        fill: var(--wash-sage);
+      }
+      .plate .label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-family: inherit;
+      }
+      .plate .label-soft {
+        fill: var(--ink-soft);
+        font-size: 14px;
+        font-family: inherit;
+      }
+
+      .colophon {
+        margin-top: 72px;
+        padding-top: 14px;
+        font-size: 13px;
+        color: var(--ink-soft);
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        position: relative;
+      }
+      .colophon::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 120px;
+        height: 2px;
+        background: var(--ink);
+        opacity: 0.6;
+        border-radius: 2px;
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare::after {
+          grid-column: 1;
+          grid-row: 2;
+          transform: rotate(90deg);
+          height: 20px;
+        }
+        .compare > div:last-child {
+          grid-column: 1;
+          grid-row: 3;
+        }
+        .answer {
+          font-size: 21px;
+        }
+        main h2 {
+          font-size: 24px;
+        }
+        main > section {
+          margin-top: 48px;
+        }
+      }
+      @media (max-width: 760px) {
+        .sheet {
+          padding: 36px 22px 44px;
+        }
+      }
+      .specimen.narrow .sheet {
+        padding: 36px 22px 44px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency=".035"
+            numOctaves="3"
+            seed="4"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="18" />
+          <feGaussianBlur stdDeviation=".6" />
+        </filter>
+      </defs>
+    </svg>
+
+    <div class="index">
+      <h1>runes explain — the explainer skeleton</h1>
+      <p>
+        Picture-Book Workshop, sticky-plate spread. Every state the template
+        must carry, in order. Hover a lettered part in any "parts" list to light
+        that part of the drawing.
+      </p>
+      <nav>
+        <a href="#diagram">1 · Diagram-heavy</a
+        ><a href="#text">2 · Short, text only</a
+        ><a href="#recap">3 · Long recap</a><a href="#narrow">4 · 420 wide</a>
+      </nav>
+    </div>
+
+    <div class="specimen" id="diagram">
+      <h2>1 · Diagram-heavy explainer, day paper, 1280</h2>
+      <article class="sheet">
+        <header class="masthead">
+          <span>cc-plugins · explained</span><time>25 Oct 2026 · 14:32</time>
+        </header>
+        <h1>Why a fork, not Jev, decides what to explain</h1>
+        <main>
+          <p class="answer">
+            The fork already read the whole session, so it picks the topic
+            itself without sending anything off your machine.
+          </p>
+          <p class="analogy">
+            Photocopying your whole notebook and handing the copy to a friend,
+            instead of tearing out one page and posting it to a stranger.
+          </p>
+          <section class="spread">
+            <figure class="plate">
+              <svg viewBox="0 0 560 520">
+                <title>
+                  The session notebook is photocopied into a fork on your
+                  machine; Jev waits outside with one torn page
+                </title>
+                <path
+                  class="wash-warm part"
+                  data-part="a"
+                  d="M40 110c40-60 200-70 230-10s10 260-60 290-190 10-190-90 0-130 20-190z"
+                />
+                <path
+                  class="wash-cool part"
+                  data-part="c"
+                  d="M360 360c40-30 150-30 170 20s-20 110-90 110-120-90-80-130z"
+                />
+                <path
+                  class="ink part"
+                  data-part="a"
+                  d="M70 90l170-20 10 260-170 20z"
+                />
+                <path
+                  class="ink part"
+                  data-part="a"
+                  d="M95 125l120-14M98 160l100-12M101 195l120-14M104 230l80-9M107 265l110-13"
+                />
+                <path
+                  class="ink-accent"
+                  d="M262 200c40-10 70-10 100 0M350 188l14 12-16 10"
+                />
+                <path
+                  class="ink part"
+                  data-part="b"
+                  d="M380 110l150 6-4 200-150-6z"
+                />
+                <path
+                  class="ink part"
+                  data-part="b"
+                  d="M398 150l105 4M398 185l90 3M398 220l110 4"
+                />
+                <path class="ink dash" d="M200 352v68h190" />
+                <path
+                  class="ink part"
+                  data-part="c"
+                  d="M400 390l60-16 40 30-50 24z"
+                />
+                <text class="label" x="72" y="372">A · the session</text>
+                <text class="label" x="382" y="96">B · the fork</text>
+                <text class="label" x="392" y="472">C · Jev, outside</text>
+                <text class="label-soft" x="210" y="410">
+                  only one torn page
+                </text>
+              </svg>
+              <figcaption>
+                Plate 1. Everything the fork needs is already on your machine.
+              </figcaption>
+            </figure>
+            <div class="text">
+              <h2>The three parts</h2>
+              <dl class="parts">
+                <div data-part="a">
+                  <dt>A</dt>
+                  <dd>
+                    <b>Transcript</b>Everything said and done in this session,
+                    in order.
+                  </dd>
+                </div>
+                <div data-part="b">
+                  <dt>B</dt>
+                  <dd>
+                    <b>Fork</b>A copy of the conversation asked one extra
+                    question, then thrown away.
+                  </dd>
+                </div>
+                <div data-part="c">
+                  <dt>C</dt>
+                  <dd>
+                    <b>Jev</b>A small outside model that scores only the snippet
+                    we send it.
+                  </dd>
+                </div>
+              </dl>
+              <h2>What happens when you press</h2>
+              <ol class="steps">
+                <li>
+                  The mod copies the conversation (A) into a fork (B). Nothing
+                  is added to your chat.
+                </li>
+                <li>
+                  The fork looks at your last exchange and the whole session,
+                  and picks what is worth explaining.
+                </li>
+                <li>
+                  It answers in the side pane, or writes a page like this one
+                  when a picture helps.
+                </li>
+              </ol>
+              <p>
+                Jev (C) would only ever see the snippet we chose, and that
+                snippet would leave your machine.
+              </p>
+            </div>
+          </section>
+          <p class="takeaway">
+            The fork is the one reader that was in the room the whole time.
+          </p>
+        </main>
+        <footer class="colophon">
+          <span>Written by a fork of this session</span
+          ><span>Layout checked · ok</span>
+        </footer>
+      </article>
+    </div>
+
+    <div class="specimen" id="text">
+      <h2>2 · Short explainer, text only (no plate), day paper</h2>
+      <article class="sheet">
+        <header class="masthead">
+          <span>cc-plugins · explained</span><time>25 Oct 2026 · 15:04</time>
+        </header>
+        <h1>What <code>isPlaced: false</code> means</h1>
+        <main>
+          <p class="answer">
+            The pane exists, but your terminal is too narrow to show it, so it
+            waits until there is room.
+          </p>
+          <p class="analogy">
+            A table booked at a full restaurant: the booking is real, you sit
+            down when a table frees up.
+          </p>
+          <section>
+            <h2>Why it happens</h2>
+            <p>
+              A pane you did not ask for only takes a seat from 144 columns.
+              Pressing the button may or may not count as asking; we have not
+              measured it yet.
+            </p>
+            <p>
+              When the pane is not placed, the mod shows a short toast so you
+              know the answer is waiting.
+            </p>
+          </section>
+        </main>
+        <footer class="colophon">
+          <span>Written by a fork of this session</span
+          ><span>Layout checked · fixed 1</span>
+        </footer>
+      </article>
+    </div>
+
+    <div class="specimen" id="recap">
+      <h2>3 · Long session recap: timeline, before/after, then a spread</h2>
+      <article class="sheet">
+        <header class="masthead">
+          <span>cc-plugins · session recap</span
+          ><time>25 Oct 2026 · 17:48</time>
+        </header>
+        <h1>How the explain button got planned</h1>
+        <main>
+          <p class="answer">
+            We turned "explain this to me" into a button that forks the session,
+            and a hidden helper checks the drawings before you see them.
+          </p>
+          <section>
+            <h2>What happened, in order</h2>
+            <ol class="timeline">
+              <li>
+                <time>09:40</time><b>The idea</b>Single-page HTML explainers
+                were being asked for by hand, again and again.
+              </li>
+              <li>
+                <time>10:15</time><b>Where it lives</b>Not in cockpit: a page
+                running inside cockpit could reach its private inbox. It became
+                a rune instead.
+              </li>
+              <li>
+                <time>11:02</time><b>Who decides the topic</b>Jev was dropped;
+                the session's own fork already knows everything.
+              </li>
+              <li>
+                <time>13:30</time><b>A test before the plan</b>A throwaway mod
+                proved a hidden helper may run Chrome and look at a screenshot.
+              </li>
+              <li>
+                <time>16:20</time><b>The look</b>Three rolls of the dice, then
+                cold-press paper and ink-and-wash drawings.
+              </li>
+            </ol>
+          </section>
+          <section>
+            <h2>Before and after</h2>
+            <div class="compare">
+              <div>
+                <h3>Before</h3>
+                You typed "explain this as an HTML page with diagrams", waited,
+                and opened the file yourself.
+              </div>
+              <div>
+                <h3>After</h3>
+                You press one button. The answer lands in the pane, or a checked
+                page opens on its own.
+              </div>
+            </div>
+          </section>
+          <section class="spread">
+            <figure class="plate">
+              <svg viewBox="0 0 560 420">
+                <title>
+                  The page is written, a helper screenshots it, fixes overlaps,
+                  and then it opens
+                </title>
+                <path
+                  class="wash-warm part"
+                  data-part="a"
+                  d="M30 120c20-50 160-60 180 0s0 160-80 160-120-110-100-160z"
+                />
+                <path
+                  class="wash-sage part"
+                  data-part="c"
+                  d="M380 120c30-50 150-40 160 20s-30 150-100 140-80-110-60-160z"
+                />
+                <path class="ink part" data-part="a" d="M60 90h120v170H60z" />
+                <path
+                  class="ink part"
+                  data-part="b"
+                  d="M250 140h90v70h-90zM270 140v-14h50v14"
+                />
+                <path class="ink part" data-part="c" d="M410 90h120v170H410z" />
+                <path
+                  class="ink-accent"
+                  d="M186 175c20-6 40-6 58 0M234 166l12 9-13 8M346 175c20-6 40-6 58 0M394 166l12 9-13 8"
+                />
+                <text class="label" x="60" y="300">A · written</text>
+                <text class="label" x="240" y="240">B · checked</text>
+                <text class="label" x="410" y="300">C · opened</text>
+              </svg>
+              <figcaption>
+                Plate 1. A page is never opened before the helper has looked at
+                it.
+              </figcaption>
+            </figure>
+            <div class="text">
+              <h2>The page's journey</h2>
+              <dl class="parts">
+                <div data-part="a">
+                  <dt>A</dt>
+                  <dd>
+                    <b>Written</b>The fork writes the drawing and the words into
+                    this paper template.
+                  </dd>
+                </div>
+                <div data-part="b">
+                  <dt>B</dt>
+                  <dd>
+                    <b>Checked</b>A hidden helper photographs the page at two
+                    widths and fixes labels that overlap.
+                  </dd>
+                </div>
+                <div data-part="c">
+                  <dt>C</dt>
+                  <dd>
+                    <b>Opened</b>Your browser opens it, even when the check
+                    could not run.
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+          <p class="takeaway">
+            One press, one fork, and nothing new in your chat.
+          </p>
+        </main>
+        <footer class="colophon">
+          <span>Written by a fork of this session</span
+          ><span>Layout not checked · no Chrome</span>
+        </footer>
+      </article>
+    </div>
+
+    <div class="specimen narrow" id="narrow">
+      <h2>4 · 420 wide: the spread stacks, the plate stops sticking</h2>
+      <article class="sheet">
+        <header class="masthead">
+          <span>cc-plugins · explained</span><time>25 Oct · 14:32</time>
+        </header>
+        <h1>Why a fork, not Jev, decides what to explain</h1>
+        <main>
+          <p class="answer">
+            The fork already read the whole session, so it picks the topic
+            itself without sending anything off your machine.
+          </p>
+          <section class="spread">
+            <figure class="plate">
+              <svg viewBox="0 0 560 520">
+                <title>
+                  The session notebook is photocopied into a fork; Jev waits
+                  outside
+                </title>
+                <path
+                  class="wash-warm part"
+                  data-part="a"
+                  d="M40 110c40-60 200-70 230-10s10 260-60 290-190 10-190-90 0-130 20-190z"
+                />
+                <path
+                  class="wash-cool part"
+                  data-part="c"
+                  d="M360 360c40-30 150-30 170 20s-20 110-90 110-120-90-80-130z"
+                />
+                <path
+                  class="ink part"
+                  data-part="a"
+                  d="M70 90l170-20 10 260-170 20z"
+                />
+                <path
+                  class="ink-accent"
+                  d="M262 200c40-10 70-10 100 0M350 188l14 12-16 10"
+                />
+                <path
+                  class="ink part"
+                  data-part="b"
+                  d="M380 110l150 6-4 200-150-6z"
+                />
+                <path
+                  class="ink part"
+                  data-part="c"
+                  d="M400 390l60-16 40 30-50 24z"
+                />
+                <text class="label" x="72" y="372" style="font-size: 24px">
+                  A · session
+                </text>
+                <text class="label" x="382" y="96" style="font-size: 24px">
+                  B · fork
+                </text>
+                <text class="label" x="392" y="472" style="font-size: 24px">
+                  C · Jev
+                </text>
+              </svg>
+              <figcaption>
+                Plate 1. Everything the fork needs is already on your machine.
+              </figcaption>
+            </figure>
+            <div class="text">
+              <dl class="parts">
+                <div data-part="a">
+                  <dt>A</dt>
+                  <dd>
+                    <b>Transcript</b>Everything said and done in this session.
+                  </dd>
+                </div>
+                <div data-part="b">
+                  <dt>B</dt>
+                  <dd><b>Fork</b>A copy asked one extra question.</dd>
+                </div>
+                <div data-part="c">
+                  <dt>C</dt>
+                  <dd><b>Jev</b>Scores only the snippet we send.</dd>
+                </div>
+              </dl>
+              <ol class="steps">
+                <li>The mod copies the conversation into a fork.</li>
+                <li>The fork picks what is worth explaining.</li>
+              </ol>
+            </div>
+          </section>
+          <p class="takeaway">
+            The fork is the one reader that was in the room the whole time.
+          </p>
+        </main>
+        <footer class="colophon">
+          <span>Written by a fork</span><span>Layout checked · ok</span>
+        </footer>
+      </article>
+    </div>
+  </body>
+</html>
