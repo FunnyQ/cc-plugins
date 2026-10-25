@@ -1,5 +1,18 @@
 # Changelog
 
+## [runes 0.10.0] - 2026-10-25
+
+_tracks tag `runes-v0.10.0`_
+
+### Added
+- Explain pages are checked for layout faults by a fast geometry measurement in headless Chrome (about 0.7s) that finds overlapping, clipped or out-of-bounds labels, and a clean page opens at once without spawning the checker subagent.
+- The explain pane shows a running placeholder and a new-explanation row while an answer is being produced, so the previous answer is not mistaken for the result, and the follow-up box is now a labelled ASK box with a spinner in the status banners.
+- Explain pages are filed in per-session folders (project/date-session/time-title.html), keeping one session's pages together and still sorted by time.
+
+### Fixed
+- The check's screenshot files are deleted after each run instead of piling up beside the explain pages.
+- The Explain button sits inside the Clawd column, so the minimap no longer has an empty line beneath it.
+
 ## [runes 0.9.1] - 2026-10-25
 
 _tracks tag `runes-v0.9.1`_
