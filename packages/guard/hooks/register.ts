@@ -20,7 +20,12 @@ const NAME = "comment-reviewer";
 const AGENT = `guard:${NAME}`;
 const MAX_REVIEW_HOLD_MS = 10 * 60_000;
 
-type Found = { report: string; blocks: number; note: string | null };
+type Found = {
+  report: string;
+  blocks: number;
+  note: string | null;
+  settled?: string[];
+};
 
 let warned = false;
 
@@ -137,6 +142,12 @@ export const register: Register = (on) => {
     const found = JSON.parse(out) as Found;
     if (found.note) $.ui.toast(found.note);
     if (!found.report) return ran;
+    if (found.settled) {
+      if (found.settled.length > 0) {
+        void $.prompt.submit({ text: deliverPrompt(found.settled.join("\n")) });
+      }
+      return ran;
+    }
 
     const spawned = await $.agent.spawn({
       subagentType: AGENT,

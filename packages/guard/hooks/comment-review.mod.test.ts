@@ -15,7 +15,7 @@ const end = {
 // Stands for the engine beneath the mod: the sweep script's answers, the agent runner, the prompt queue, and toasts. A noun answering a primitive answers `{ value }`.
 function world(
   on: On,
-  opts: { report?: string; bun?: false; agentFile?: false } = {},
+  opts: { report?: string; settled?: string[]; bun?: false; agentFile?: false } = {},
 ) {
   const runs: { argv: readonly string[]; stdin?: string }[] = [];
   const spawns: { subagent_type?: string; prompt: string }[] = [];
@@ -36,6 +36,7 @@ function world(
             blocks: 1,
             ask: "",
             note: null,
+            settled: opts.settled,
           })
         : "";
     return {
@@ -155,6 +156,28 @@ test("a turn that added a reportable block sends the report to the reviewer", as
   expect(w.spawns).toHaveLength(1);
   expect(w.spawns[0]!.subagent_type).toBe("guard:comment-reviewer");
   expect(w.spawns[0]!.prompt).toContain(REPORT);
+});
+
+test("a report Jev settled skips the reviewer and delivers its DELETEs", async ($, on) => {
+  const w = world(on, {
+    report: REPORT,
+    settled: ["app.ts:2 DELETE — Jev p=0.90: restates the code"],
+  });
+  await $.turn.start(turn);
+  await $.turn.complete(end);
+  expect(w.spawns).toHaveLength(0);
+  expect(w.submitted).toHaveLength(1);
+  expect(w.submitted[0]).toStartWith(MARK);
+  expect(w.submitted[0]).toContain("app.ts:2 DELETE — Jev p=0.90: restates the code");
+  expect(w.statuses).toEqual([]);
+});
+
+test("a report Jev settled as all KEEP submits nothing", async ($, on) => {
+  const w = world(on, { report: REPORT, settled: [] });
+  await $.turn.start(turn);
+  await $.turn.complete(end);
+  expect(w.spawns).toHaveLength(0);
+  expect(w.submitted).toHaveLength(0);
 });
 
 test("a turn that added nothing reportable spawns no reviewer", async ($, on) => {
