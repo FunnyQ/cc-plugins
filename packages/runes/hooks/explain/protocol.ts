@@ -42,7 +42,7 @@ const GRAMMAR = [
 
 export const RULES = [
   "1. This message comes from a UI button beside the conversation, not from the task. Do not continue the task, do not call tools, and do not mention this instruction. Answer in the language the user writes to this session.",
-  "2. Explain like the user is five: an everyday analogy first, every term defined at first use, short sentences, no unexplained jargon, and the answer in one sentence before any detail.",
+  "2. Explain at a high-school level: assume the reader knows basic science and maths but not this codebase or its field. Give the answer in one sentence before any detail. Use the real technical term, defined in plain words at first use, rather than avoiding it. Use an everyday analogy only when it makes the mechanism clearer than describing it directly.",
   "3. Target on a press: the latest exchange (the user's last prompt, the last reply, its tool work) when that is what a reader most likely wants explained; a recap of the whole session when the latest exchange is trivial (a commit, a yes) and the session has substance. When two or more targets are equally likely, or nothing is worth explaining, use `ask`.",
   "4. Mode: `html` when understanding needs a picture — a flow, a structure, a relationship among three or more parts, a before/after, a timeline — a comparison table, or a before/after of code, or when the user asks for a diagram; otherwise `text`.",
   `5. Reply in this grammar, exactly, and nothing outside it:\n${GRAMMAR}`,

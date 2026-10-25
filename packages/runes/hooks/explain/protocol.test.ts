@@ -5,7 +5,7 @@ import { buildPrompt, FRAGMENT_RULES, parseReply, RULES } from "./protocol";
 test("RULES carries its six items in order", () => {
   const phrases = [
     "UI button",
-    "five",
+    "high-school level",
     "recap",
     "`html` when",
     "<mode>text|html|ask</mode>",

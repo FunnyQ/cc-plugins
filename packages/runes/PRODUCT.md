@@ -15,7 +15,7 @@ outrun what they can absorb at a glance: a concept, a solution, or a recap of th
 ## Product Purpose
 
 runes is a set of switchable UI mods for Claude Code's terminal. Its `explain` rune explains what the user is looking
-at, like they are five: plain text in a side pane, or a single-file HTML explainer with SVG diagrams when the topic
+at, at a high-school level: plain text in a side pane, or a single-file HTML explainer with SVG diagrams when the topic
 needs pictures. Success: the user gets the one-sentence answer in the first screen, and the picture makes the rest
 obvious.
 
