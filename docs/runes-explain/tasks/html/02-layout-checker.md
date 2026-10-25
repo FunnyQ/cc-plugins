@@ -9,7 +9,7 @@
 >
 > **Depends on**: core/01, html/01
 > **Blocks**: core/03
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
@@ -96,7 +96,7 @@ await $.agent.register({
    Write no screenshot anywhere else. Then Read each PNG. Chrome captures the window, not the whole page, so
    the heights are tall on purpose; check that the colophon (`Written by a fork of this session`) is visible
    at the bottom of each shot. When it is not, the page is taller than the shot: answer `FAILED page taller
-   than the screenshot` rather than `OK`. One round is one wide plus one narrow shot.
+than the screenshot` rather than `OK`. One round is one wide plus one narrow shot.
 3. Fix only: overlapping or clipped labels, arrows pointing at the wrong box, text outside its box, illegible
    contrast. Fix by editing the HTML file with Edit, inside `<main>` only. Never rewrite prose, never add or
    remove a section, never touch `<head>`, the CSP meta, or the `#wash` filter.
@@ -123,7 +123,9 @@ started; whichever hook later learns the result **settles** the check with its o
 
 ```ts
 async function settle($: EngineInterface, p: Pending, r: CheckResult) {
-  update($, view, (v) => patchEntry(v, p.entryId, { check: r.check, note: r.note }));
+  update($, view, (v) =>
+    patchEntry(v, p.entryId, { check: r.check, note: r.note }),
+  );
   await $.process.run(["open", p.path]);
 }
 ```
@@ -233,12 +235,12 @@ For the kit idiom of firing `tool.check`, `tool.call` and a subagent's `turn.com
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension               | Weight | 0–1 (fail)                                                                             | 2–3 (below bar)                                             | 4–5 (pass)                                                                      |
-| ----------------------- | ------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Correctness             | ×3     | the allow-list admits a path outside `explainDir`, or a check can settle twice or never | happy path works; timeout, deny, or late-answer path drifts | every branch matches the contract; the allow-list refuses every listed escape   |
-| Test coverage           | ×2     | no tests                                                                               | verdict parsing and happy path only                         | every acceptance bullet has a test, each pass-through case included             |
-| Interface & readability | ×1     | signatures differ from the contract; `$` used after its hook returned                  | contract kept but hooks hard to follow                      | exports exactly as specified; one guard helper for "is this the checker's loop" |
-| Assumptions & docs      | ×1     | unexplained magic numbers or engine quirks                                             | quirks relied on without a why                              | the type-match, the token/`agentId` settling (why arrival order and a lone-waiter fallback would let a late answer settle a newer check) and the classifier reasons each carry one line of why          |
+| Dimension               | Weight | 0–1 (fail)                                                                              | 2–3 (below bar)                                             | 4–5 (pass)                                                                                                                                                                                     |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | the allow-list admits a path outside `explainDir`, or a check can settle twice or never | happy path works; timeout, deny, or late-answer path drifts | every branch matches the contract; the allow-list refuses every listed escape                                                                                                                  |
+| Test coverage           | ×2     | no tests                                                                                | verdict parsing and happy path only                         | every acceptance bullet has a test, each pass-through case included                                                                                                                            |
+| Interface & readability | ×1     | signatures differ from the contract; `$` used after its hook returned                   | contract kept but hooks hard to follow                      | exports exactly as specified; one guard helper for "is this the checker's loop"                                                                                                                |
+| Assumptions & docs      | ×1     | unexplained magic numbers or engine quirks                                              | quirks relied on without a why                              | the type-match, the token/`agentId` settling (why arrival order and a lone-waiter fallback would let a late answer settle a newer check) and the classifier reasons each carry one line of why |
 
 ## Out of scope
 
