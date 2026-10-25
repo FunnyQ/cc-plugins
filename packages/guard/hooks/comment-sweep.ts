@@ -18,7 +18,8 @@ import {
   type Hunk,
 } from "./comment-core.ts";
 import { fetchPost } from "./jev-fetch.ts";
-import { screenBlocks, screenNote } from "./jev-screen.ts";
+import { type Post, screenBlocks, screenNote } from "./jev-screen.ts";
+import { triage } from "./jev-triage.ts";
 import {
   clearBaseline,
   clearReported,
@@ -138,9 +139,19 @@ export type Found = {
   blocks: number;
   ask: string;
   note: string | null;
+  settled?: string[];
 };
 
-export async function collect(payload: Payload): Promise<Found | null> {
+type Jev = { apiKey: string | undefined; fetch: Post; triage: boolean };
+
+export async function collect(
+  payload: Payload,
+  jev: Jev = {
+    apiKey: process.env.TYPESAFE_API_KEY,
+    fetch: fetchPost,
+    triage: false,
+  },
+): Promise<Found | null> {
   const sessionId = payload.session_id;
   if (!sessionId) return null;
   const baseline = readBaseline(sessionId);
@@ -182,7 +193,7 @@ export async function collect(payload: Payload): Promise<Found | null> {
     ]) ?? "",
   );
 
-  const found: { file: string; blocks: CommentBlock[] }[] = [];
+  const found: { file: string; text: string; blocks: CommentBlock[] }[] = [];
   for (const file of files) {
     const diff = git(root, [
       "diff-tree",
@@ -215,17 +226,12 @@ export async function collect(payload: Payload): Promise<Found | null> {
     if (added instanceof Set ? added.size === 0 : added.length === 0) continue;
 
     const blocks = flaggedBlocks(text, syntaxFor(file)!, added);
-    if (blocks.length > 0) found.push({ file, blocks });
+    if (blocks.length > 0) found.push({ file, text, blocks });
   }
 
   // In parallel: 20 files asked one by one could outlast the hook's 10 s timeout.
   const screened = await Promise.all(
-    found.map(({ file, blocks }) =>
-      screenBlocks(file, blocks, {
-        apiKey: process.env.TYPESAFE_API_KEY,
-        fetch: fetchPost,
-      }),
-    ),
+    found.map(({ file, blocks }) => screenBlocks(file, blocks, jev)),
   );
   const reasons = found.flatMap(({ file }, i) =>
     screened[i]!.kept.length > 0
@@ -239,11 +245,23 @@ export async function collect(payload: Payload): Promise<Found | null> {
   });
   const kept = screened.flatMap((s) => s.kept);
   if (reasons.length === 0 && !note) return null;
+  const settled =
+    jev.triage && kept.length > 0
+      ? await triage(
+          found.map(({ file, text }, i) => ({
+            file,
+            text,
+            blocks: screened[i]!.kept,
+          })),
+          jev,
+        )
+      : null;
   return {
     report: reasons.join("\n\n"),
     blocks: kept.length,
     ask: askFor(kept),
     note,
+    ...(settled && { settled }),
   };
 }
 
@@ -270,7 +288,11 @@ async function main(): Promise<void> {
   if (process.argv[2] !== "sweep") return;
   const out =
     process.argv[3] === "--json"
-      ? await collect(payload)
+      ? await collect(payload, {
+          apiKey: process.env.TYPESAFE_API_KEY,
+          fetch: fetchPost,
+          triage: true,
+        })
       : await sweep(payload);
   if (out) console.log(JSON.stringify(out));
 }

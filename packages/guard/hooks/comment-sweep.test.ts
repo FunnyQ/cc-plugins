@@ -218,4 +218,56 @@ describe("collect", () => {
     await collect(payload);
     expect(await collect(payload)).toBeNull();
   });
+
+  // Screen requests carry `state.comment`, triage requests `state.block`; the screen keeps every block here.
+  const jev = (pDelete: number) =>
+    (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      const probabilities = body.state.comment
+        ? { why: 0.1, excuse: 0.1, what: 0.8 }
+        : { keep: 0.05, delete: pDelete, must_kill: 0.95 - pDelete };
+      const answers = Object.fromEntries(
+        Object.keys(body.questions).map((k) => [k, { probabilities }]),
+      );
+      return new Response(JSON.stringify({ answers }));
+    }) as unknown as typeof fetch;
+
+  test("settles a report Jev is sure of, so no reviewer is needed", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    const found = await collect(payload, {
+      apiKey: "k",
+      fetch: jev(0.9),
+      triage: true,
+    });
+    expect(found?.settled).toEqual([
+      "app.ts:2 DELETE — Jev p=0.90: restates the code",
+      "app.ts:3 DELETE — Jev p=0.90: restates the code",
+      "app.ts:4 DELETE — Jev p=0.90: restates the code",
+    ]);
+  });
+
+  test("keeps the report for the reviewer when Jev is unsure", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    const found = await collect(payload, {
+      apiKey: "k",
+      fetch: jev(0.4),
+      triage: true,
+    });
+    expect(found?.settled).toBeUndefined();
+    expect(found?.report).toContain("+ 2  // one");
+  });
+
+  test("never settles on the Stop path, which asks the author instead", async () => {
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    const found = await collect(payload, {
+      apiKey: "k",
+      fetch: jev(0.9),
+      triage: false,
+    });
+    expect(found?.settled).toBeUndefined();
+    expect(found?.report).toContain("+ 2  // one");
+  });
 });
