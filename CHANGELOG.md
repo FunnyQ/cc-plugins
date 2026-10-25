@@ -1,5 +1,15 @@
 # Changelog
 
+## [runes 0.9.0] - 2026-10-25
+
+_tracks tag `runes-v0.9.0`_
+
+### Added
+- Add an explain rune: a "hey mate, explain please" button below the map and Clawd row asks the model to explain the current work, and it shows "explaining…" while that runs instead of forking twice.
+- Add an explain pane that shows the history of explanations, including text, questions and HTML pages, with usage and errors, and takes follow-up questions through its input.
+- Render each explanation as an HTML page, and check its layout with a restricted hidden checker agent whose Chrome access is limited to known flags, one page and one screenshot inside the explainer folder.
+- Add an explain switch to the runes config and to `/runes`, so the feature can be turned on or off like the other runes.
+
 ## [guard 0.9.0] - 2026-10-25
 
 _tracks tag `guard-v0.9.0`_
