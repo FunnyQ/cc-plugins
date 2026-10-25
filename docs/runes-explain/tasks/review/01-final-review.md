@@ -8,7 +8,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: docs/01
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -87,21 +87,21 @@ before a press; no release, version bump, or CHANGELOG entry; no cross-session t
 
 ## Acceptance criteria
 
-- [ ] With `BASE=$(git log --diff-filter=A --format=%H -1 -- docs/runes-explain/tasks/_context/protocol.md)` set and non-empty, `git diff --name-only "$BASE" -- packages/runes CLAUDE.md` lists `packages/runes/hooks/explain/explain.ts`, `packages/runes/hooks/explain/pane.tsx`, `packages/runes/hooks/explain/checker.ts`, `packages/runes/hooks/explain/template.html`, `packages/runes/hooks/band.tsx`, `packages/runes/hooks/register.tsx`, and `CLAUDE.md`.
-- [ ] `grep -c 'http-equiv="Content-Security-Policy"' packages/runes/hooks/explain/template.html` prints `1`, `grep -ciE '<script|@import|@font-face' packages/runes/hooks/explain/template.html` prints `0`, and `grep -oiE 'https?://[^"'"'"' )]+' packages/runes/hooks/explain/template.html | grep -v '^http://www.w3.org/2000/svg$'` prints nothing.
-- [ ] `grep -rnE 'TYPESAFE_API_KEY|typesafe\.|transcript/jev|api\.typesafe' packages/runes/hooks/explain --exclude='*.test.ts' --exclude='*.test.tsx'` prints nothing (no TypeSafe call; a test string naming Jev is fine).
-- [ ] With 13 explanations made in one session, the pane lists 12, the first one is gone, and its HTML file (if any) is still on disk.
-- [ ] `grep -n 'registerChecker\|explainHooks\|explainPane' packages/runes/hooks/register.tsx` shows all three wired.
-- [ ] `git diff --name-only "$BASE" -- packages/runes/.claude-plugin CHANGELOG.md` prints nothing (no version bump, no changelog entry).
-- [ ] (human) Press the button in a real session and see each of `text`, `html` and `ask` once, and follow up once from the pane's Input.
-- [ ] (human) Open a generated explainer beside `docs/runes-explain/design/mock.html` and confirm it matches the skeleton (paper, masthead, sticky plate spread, slips, colophon).
-- [ ] (human) Judge whether the explanations read ELI5-clear: answer in one sentence first, an everyday analogy, every term defined.
+- [x] With `BASE=$(git log --diff-filter=A --format=%H -1 -- docs/runes-explain/tasks/_context/protocol.md)` set and non-empty, `git diff --name-only "$BASE" -- packages/runes CLAUDE.md` lists `packages/runes/hooks/explain/explain.ts`, `packages/runes/hooks/explain/pane.tsx`, `packages/runes/hooks/explain/checker.ts`, `packages/runes/hooks/explain/template.html`, `packages/runes/hooks/band.tsx`, `packages/runes/hooks/register.tsx`, and `CLAUDE.md`.
+- [x] `grep -c 'http-equiv="Content-Security-Policy"' packages/runes/hooks/explain/template.html` prints `1`, `grep -ciE '<script|@import|@font-face' packages/runes/hooks/explain/template.html` prints `0`, and `grep -oiE 'https?://[^"'"'"' )]+' packages/runes/hooks/explain/template.html | grep -v '^http://www.w3.org/2000/svg$'` prints nothing.
+- [x] `grep -rnE 'TYPESAFE_API_KEY|typesafe\.|transcript/jev|api\.typesafe' packages/runes/hooks/explain --exclude='*.test.ts' --exclude='*.test.tsx'` prints nothing (no TypeSafe call; a test string naming Jev is fine).
+- [x] With 13 explanations made in one session, the pane lists 12, the first one is gone, and its HTML file (if any) is still on disk.
+- [x] `grep -n 'registerChecker\|explainHooks\|explainPane' packages/runes/hooks/register.tsx` shows all three wired.
+- [x] `git diff --name-only "$BASE" -- packages/runes/.claude-plugin` prints nothing (no version bump), and `git diff "$BASE" -- CHANGELOG.md | grep -c '^+## \[runes'` prints `0` (no runes changelog entry; other plugins' releases may touch `CHANGELOG.md` after `BASE`).
+- [x] (human) Press the button in a real session and see each of `text`, `html` and `ask` once, and follow up once from the pane's Input.
+- [x] (human) Open a generated explainer beside `docs/runes-explain/design/mock.html` and confirm it matches the skeleton (paper, masthead, sticky plate spread, slips, colophon).
+- [x] (human) Judge whether the explanations read ELI5-clear: answer in one sentence first, an everyday analogy, every term defined.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes (the whole runes suite).
-- [ ] `claude plugin validate packages/runes` reports no errors.
-- [ ] `bunx --bun tsc --noEmit | grep packages/runes` prints nothing.
+- [x] `claude plugin test packages/runes` passes (the whole runes suite).
+- [x] `claude plugin validate packages/runes` reports no errors.
+- [x] `bunx --bun tsc --noEmit | grep packages/runes` prints nothing.
 
 ## Eval rubric
 

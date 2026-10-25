@@ -1,12 +1,7 @@
-import { atom } from "claude-code";
 import type { ModelUsage } from "claude-code";
 import type { ExplainEntry, ExplainUsage, ExplainView } from "../../types";
 
 export const MAX_ENTRIES = 12; // the pane draws every entry, so this is also the history list's height
-export const view = atom(
-  { plugin: "runes", key: "explain" } as const,
-  { entries: [], isRunning: false } as ExplainView,
-);
 export const usageOf = (u: ModelUsage): ExplainUsage => ({
   input: u.input_tokens + u.cache_creation_input_tokens,
   cacheRead: u.cache_read_input_tokens,

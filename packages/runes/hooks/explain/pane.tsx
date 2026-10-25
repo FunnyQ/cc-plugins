@@ -3,6 +3,7 @@ import type { On } from "claude-code";
 
 import type { ExplainEntry, ExplainView } from "../../types";
 import type { Run } from "../transcript/ansi";
+import { runLine } from "../transcript/bubble";
 import { glow } from "../transcript/glow";
 import { wrap, wrapWords } from "../transcript/text";
 import {
@@ -10,14 +11,13 @@ import {
   explainPick,
   explainReopen,
   explainSelect,
+  COLUMNS,
   PANE,
 } from "./explain";
 import { selectedOf } from "./state";
 
 // the state scan needs the literal key in the file that reads the atom
 const VIEW = { plugin: "runes", key: "explain" } as const;
-// the columns explain.ts opens the pane with
-const COLUMNS = 64;
 // the dark-theme deletion red of the Edit card
 const ERROR_COLOR = "#cc6666";
 const EMPTY = 'Press "hey mate, explain please" under the minimap.';
@@ -45,17 +45,7 @@ export const explainPane = (on: On) => {
     const markdown = (id: string, text: string) => {
       const lines: Run[][] =
         glow.view(width, text, `explain:${id}`) ?? wrapWords([{ text }], width);
-      return lines.map((runs) =>
-        runs.length === 0 ? (
-          <Text> </Text>
-        ) : (
-          <Box flexDirection="row">
-            {runs.map(({ text, ...style }) => (
-              <Text {...style}>{text}</Text>
-            ))}
-          </Box>
-        ),
-      );
+      return lines.map((runs) => runLine(Text, runs));
     };
 
     const body = (entry: ExplainEntry) => {

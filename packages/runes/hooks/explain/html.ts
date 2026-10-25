@@ -25,8 +25,7 @@ const ESCAPES: Record<string, string> = {
 const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => ESCAPES[c]);
 
-// regex pass, not a parser: a fork writing malformed markup on purpose can slip past; take a parser if an explainer is seen to load or navigate
-export const cleanMain = (main: string): string =>
+const cleanOnce = (main: string): string =>
   main
     .replace(
       /<(script|style|iframe|object|embed|form|foreignObject)\b[\s\S]*?<\/\1\s*>/gi,
@@ -41,6 +40,12 @@ export const cleanMain = (main: string): string =>
       /\s(href|src|xlink:href)\s*=\s*("(?!#)[^"]*"|'(?!#)[^']*'|(?![#"'])[^\s>]+)/gi,
       "",
     );
+
+// regex passes repeated until nothing changes, so a tag spliced across a removed one (`<me<base>ta …>`) is caught on the next pass; a parser if an explainer is still seen to load or navigate
+export const cleanMain = (main: string): string => {
+  for (let prev = ""; prev !== main; ) [prev, main] = [main, cleanOnce(main)];
+  return main;
+};
 
 export const assemble = (template: string, page: Page): string =>
   template.replace(
@@ -61,6 +66,9 @@ export const slugOf = (title: string): string => {
   return trimDashes([...dashed].slice(0, 40).join("")) || "explainer";
 };
 
+export const explainRoot = (home: string): string =>
+  `${home}/.local/share/q-lab/runes/explain/`;
+
 const pad = (n: number): string => String(n).padStart(2, "0");
 
 export const explainerPath = (
@@ -71,7 +79,7 @@ export const explainerPath = (
 ): string => {
   const day = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}`;
   const time = `${pad(at.getHours())}${pad(at.getMinutes())}`;
-  return `${home}/.local/share/q-lab/runes/explain/${slugOf(project)}/${day}-${time}-${slugOf(title)}.html`;
+  return `${explainRoot(home)}${slugOf(project)}/${day}-${time}-${slugOf(title)}.html`;
 };
 
 const MONTHS = [

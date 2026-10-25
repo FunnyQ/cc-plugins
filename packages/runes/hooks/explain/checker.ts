@@ -1,6 +1,8 @@
 import { atom, update } from "claude-code";
 import type { EngineInterface, Hook, On } from "claude-code";
 import type { ExplainCheck, ExplainView } from "../../types";
+import { where } from "../transcript/where";
+import { explainRoot } from "./html";
 import { patchEntry } from "./state";
 
 export const CHECKER = "runes:explain-checker";
@@ -19,8 +21,6 @@ export const CHECKER_PROMPT = [
 ]
   .map((line, i) => `${i + 1}. ${line}`)
   .join("\n");
-
-const UNREADABLE: CheckResult = { check: "failed", note: "unreadable verdict" };
 
 export const parseVerdict = (
   answer: string,
@@ -43,7 +43,7 @@ export const parseVerdict = (
         ? { check: "fixed", note: `${fixed[1]} fix(es)` }
         : failed
           ? { check: "failed", note: failed[1]!.trim() }
-          : UNREADABLE;
+          : { check: "failed", note: "unreadable verdict" };
   return token ? { token, ...result } : result;
 };
 
@@ -51,10 +51,10 @@ type Pending = {
   entryId: string;
   path: string;
   agentId?: string;
-  startedAt?: number;
+  startedAt: number;
 };
 
-// the engine's state scan reads only an atom made in this file, so state.ts's `view` cannot be imported here
+// the engine's state scan reads only an atom made in this file, so each reader makes its own
 const view = atom(
   { plugin: "runes", key: "explain" } as const,
   { entries: [], isRunning: false } as ExplainView,
@@ -64,20 +64,25 @@ let explainDir = "";
 let checks = 0;
 const pending = new Map<string, Pending>();
 
-async function settle($: EngineInterface, p: Pending, r: CheckResult) {
+async function settle(
+  $: EngineInterface,
+  entryId: string,
+  path: string,
+  r: CheckResult,
+) {
   await update($, view, (v) =>
-    patchEntry(v, p.entryId, { check: r.check, note: r.note }),
+    patchEntry(v, entryId, { check: r.check, note: r.note }),
   );
-  await $.process.run(["open", p.path]);
+  await $.process.run(["open", path]);
 }
 
 async function expire($: EngineInterface) {
   if (pending.size === 0) return;
   const now = await $.clock.now();
   for (const [token, p] of pending) {
-    if (now - p.startedAt! < CHECK_TIMEOUT_MS) continue;
+    if (now - p.startedAt < CHECK_TIMEOUT_MS) continue;
     pending.delete(token);
-    await settle($, p, { check: "failed", note: "timed out" });
+    await settle($, p.entryId, p.path, { check: "failed", note: "timed out" });
   }
 }
 
@@ -90,9 +95,7 @@ async function isChecker($: EngineInterface, agentId: string | undefined) {
 }
 
 export async function registerChecker($: EngineInterface): Promise<void> {
-  // a mod's child gets no HOME, so it is read here
-  const home = (await $.env.get("HOME")) ?? "";
-  explainDir = home ? `${home}/.local/share/q-lab/runes/explain/` : "";
+  explainDir = where.home ? explainRoot(where.home) : "";
   await $.agent.register({
     name: "explain-checker",
     description:
@@ -112,7 +115,7 @@ export async function startCheck(
 ): Promise<void> {
   await expire($);
   if (!(await $.fs.exists(CHROME))) {
-    await settle($, { entryId, path }, { check: "skipped", note: "no Chrome" });
+    await settle($, entryId, path, { check: "skipped", note: "no Chrome" });
     return;
   }
   const token = `c${++checks}`;
@@ -122,7 +125,7 @@ export async function startCheck(
     description: "check explainer layout",
   });
   if (spawned.deny !== undefined) {
-    await settle($, { entryId, path }, { check: "failed", note: spawned.deny });
+    await settle($, entryId, path, { check: "failed", note: spawned.deny });
     return;
   }
   pending.set(token, {
@@ -138,13 +141,33 @@ const inside = (path: string) =>
   path.startsWith(explainDir) &&
   !path.split("/").includes("..");
 
+const FLAGS = new Set([
+  "--headless=new",
+  "--disable-gpu",
+  "--hide-scrollbars",
+  "--window-size=1280,4000",
+  "--window-size=420,7000",
+]);
+
+// every argument is a known flag, one screenshot target or one page: any other flag (`--log-net-log=…`) or URL could write or fetch outside the root
 const allowsBash = (command: string) => {
   if (explainDir === "" || explainDir.includes(" ")) return false;
-  if (!command.startsWith(`"${CHROME}" `)) return false;
-  if (/[;|&`$<>%\n]/.test(command)) return false;
-  const files = [...command.matchAll(/file:\/\/(\S*)/g)].map((m) => m[1]!);
-  const shots = [...command.matchAll(/--screenshot=(\S*)/g)].map((m) => m[1]!);
-  return files.length > 0 && [...files, ...shots].every(inside);
+  const prefix = `"${CHROME}" `;
+  if (!command.startsWith(prefix)) return false;
+  const args = command.slice(prefix.length);
+  if (/[^\p{L}\p{N}\/._,=:-]/u.test(args.replaceAll(" ", ""))) return false;
+  const files: string[] = [];
+  const shots: string[] = [];
+  for (const arg of args.split(" ").filter(Boolean)) {
+    if (FLAGS.has(arg)) continue;
+    if (arg.startsWith("file://")) files.push(arg.slice("file://".length));
+    else if (arg.startsWith("--screenshot="))
+      shots.push(arg.slice("--screenshot=".length));
+    else return false;
+  }
+  return (
+    files.length === 1 && shots.length <= 1 && [...files, ...shots].every(inside)
+  );
 };
 
 type TurnComplete = Hook<"turn.complete">;
@@ -159,7 +182,7 @@ const complete: TurnComplete = async ($, e, next) => {
   const p = token === undefined ? undefined : pending.get(token);
   if (!p) return ran;
   pending.delete(token!);
-  await settle($, p, verdict ?? { check: "failed", note: e.reason });
+  await settle($, p.entryId, p.path, verdict ?? { check: "failed", note: e.reason });
   return ran;
 };
 
@@ -183,17 +206,12 @@ export function checker(on: On): void {
     return allowsBash(command ?? "") ? { decision: "allow" } : next(e);
   });
 
-  on("tool.check", { tool: "Read" }, async ($, e, next) => {
-    if (!(await isChecker($, e.agentId))) return next(e);
-    const { file_path } = e.input as { file_path?: string };
-    return inside(file_path ?? "") ? { decision: "allow" } : next(e);
-  });
-
-  on("tool.check", { tool: "Edit" }, async ($, e, next) => {
-    if (!(await isChecker($, e.agentId))) return next(e);
-    const { file_path } = e.input as { file_path?: string };
-    return inside(file_path ?? "") ? { decision: "allow" } : next(e);
-  });
+  for (const tool of ["Read", "Edit"] as const)
+    on("tool.check", { tool }, async ($, e, next) => {
+      if (!(await isChecker($, e.agentId))) return next(e);
+      const { file_path } = e.input as { file_path?: string };
+      return inside(file_path ?? "") ? { decision: "allow" } : next(e);
+    });
 
   // `as never`: the harness adds this tool to every subagent, so the types list no such name
   on("tool.call", { tool: "SubagentHandback" as never }, async ($, e, next) => {

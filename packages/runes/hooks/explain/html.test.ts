@@ -34,11 +34,21 @@ const template = `<meta http-equiv="Content-Security-Policy" content="{{csp}}" /
 
 test("every placeholder of the template is replaced and the CSP lands", () => {
   const out = assemble(template, { ...page, title: "Twice" });
-  for (const p of ["{{csp}}", "{{title}}", "{{project}}", "{{generatedAt}}", "{{main}}"]) {
+  for (const p of [
+    "{{csp}}",
+    "{{title}}",
+    "{{project}}",
+    "{{generatedAt}}",
+    "{{main}}",
+  ]) {
     expect(out.includes(p)).toBe(false);
   }
   expect(out.split("Twice").length - 1).toBe(2);
-  expect(out.includes(`content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"`)).toBe(true);
+  expect(
+    out.includes(
+      `content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"`,
+    ),
+  ).toBe(true);
 });
 
 test("cleanMain drops a meta refresh", () => {
@@ -47,6 +57,14 @@ test("cleanMain drops a meta refresh", () => {
       '<p class="answer">hi</p><meta http-equiv="refresh" content="0;url=https://example.com/">',
     ),
   ).toBe('<p class="answer">hi</p>');
+});
+
+test("cleanMain drops a meta refresh spliced across a removed tag", () => {
+  expect(
+    cleanMain(
+      '<me<base>ta http-equiv="refresh" content="0;url=https://example.com/"><p>hi</p>',
+    ),
+  ).toBe("<p>hi</p>");
 });
 
 test("cleanMain strips scripts, handlers, styles, base and external links", () => {

@@ -66,6 +66,7 @@ const rig = async (
   } = {},
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
+  where.home = HOME;
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
@@ -99,7 +100,6 @@ const rig = async (
       },
     },
     clock: { now: async () => now },
-    env: { get: async (name: string) => (name === "HOME" ? HOME : undefined) },
     fs: {
       read: async (p: string) => files.get(p),
       write: async (p: string, text: string) => {

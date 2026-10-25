@@ -135,6 +135,10 @@ test("Bash allows only the checker's quoted Chrome shot inside the explainer roo
     shot(`${DIR}/%2e%2e/x.html`),
     shot(PAGE).replace(`"${CHROME}"`, CHROME),
     `"${CHROME}" --screenshot=${DIR}/x.png`,
+    `${shot(PAGE)} --log-net-log=/tmp/outside.json`,
+    `${shot(PAGE)} https://example.com`,
+    `${shot(PAGE)} file://${DIR}/repo/other.html`,
+    `"${CHROME}" --headless=new https://example.com # file://${PAGE}`,
   ])
     expect(await bash(command, "k1")).toEqual(asks);
   expect(await bash(shot(PAGE))).toEqual(asks);

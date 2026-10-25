@@ -8,8 +8,9 @@ import { buildPrompt, parseReply, type Ask } from "./protocol";
 import { selectedOf, usageOf, withEntry } from "./state";
 
 export const PANE = "runes-explain";
+export const COLUMNS = 64;
 
-// the engine's state scan reads only an atom made in this file, so state.ts's `view` cannot be imported here
+// the engine's state scan reads only an atom made in this file, so each reader makes its own
 const view = atom(
   { plugin: "runes", key: "explain" } as const,
   { entries: [], isRunning: false } as ExplainView,
@@ -34,7 +35,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
     const { isPlaced } = await $.ui.open({
       id: PANE,
       title: "hey mate",
-      columns: 64,
+      columns: COLUMNS,
     });
     if (!isPlaced)
       $.ui.toast(
@@ -70,7 +71,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
       body = { kind: "ask", question: reply.question, options: reply.options };
     else {
       try {
-        const home = (await $.env.get("HOME")) ?? "";
+        const home = where.home;
         const git = await $.process
           .run(["git", "rev-parse", "--show-toplevel"], {
             cwd: where.cwd || undefined,
