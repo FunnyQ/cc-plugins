@@ -11,6 +11,7 @@ import {
   explainDelete,
   explainReopen,
   explainSelect,
+  explainShowHistory,
   COLUMNS,
   PANE,
 } from "./explain";
@@ -24,10 +25,11 @@ const ERROR_COLOR = "#cc6666";
 const ACCENT = "#d97757";
 const OK_COLOR = "#8fbf7f";
 const WARN_COLOR = "#e0b060";
-const EMPTY = "Press [Explain plz!] under Clawd.";
+const EMPTY = "Press [Explain plz!] under Clawd, or type below.";
 const PENDING = "new explanation…";
 const WRITING = "Writing the answer…";
 const ASK_LABEL = "ASK · type below";
+const NEW_LABEL = "NEW QUESTION · type below";
 const BORDER_AND_PADDING = 4;
 const NOTE_LINES = 2;
 const SPINNER_CELLS = 2;
@@ -158,9 +160,9 @@ export const explainPane = (on: On) => {
       </Box>
     ) : null;
 
-    const tail = (
+    const askBox = (label: string) => (
       <Box key="explain-ask-box" flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-        <Text dimColor bold>{ASK_LABEL}</Text>
+        <Text dimColor bold>{label}</Text>
         <Input
           key="explain-ask"
           placeholder="ask a follow-up, or name what to explain"
@@ -169,6 +171,19 @@ export const explainPane = (on: On) => {
         />
       </Box>
     );
+
+    const tail = askBox(ASK_LABEL);
+
+    if (v.isAsking && !v.isRunning)
+      return (
+        <Box flexDirection="column" gap={1}>
+          {banner}
+          {askBox(NEW_LABEL)}
+          <Box justifyContent="flex-end">
+            <Button key="explain-show-history" label="history" dimColor onPress={() => explainShowHistory($)} />
+          </Box>
+        </Box>
+      );
 
     if (!selected && !v.isRunning)
       return (

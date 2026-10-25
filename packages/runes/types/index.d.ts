@@ -22,6 +22,7 @@ export type ExplainView = {
   entries: ExplainEntry[]; // newest first
   selected?: string; // an entry id; absent means the newest
   isRunning: boolean; // a fork is in flight
+  isAsking?: boolean; // [Tell me…] opened the pane for a fresh question; the history stays hidden until a fork starts
   error?: string; // the last failure, cleared by the next press
 };
 

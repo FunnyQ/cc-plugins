@@ -10,10 +10,12 @@ import {
   explainClear,
   explainDelete,
   explainHooks,
+  explainOpen,
   explainPick,
   explainPress,
   explainReopen,
   explainSelect,
+  explainShowHistory,
   PANE,
 } from "./explain";
 import { buildPrompt } from "./protocol";
@@ -367,6 +369,30 @@ test("a finishing check does not clear a newer press's isRunning", async () => {
   expect(r.view().isRunning).toBe(false);
 });
 
+// ask mode hides the history, so a submit there must not ride an answer the user cannot see
+test("[Tell me…] opens ask mode; a submit there asks fresh past the selected entry and leaves ask mode", async () => {
+  const r = await rig();
+  await explainOpen(r.$);
+  expect(r.view().isAsking).toBe(true);
+  expect(r.forks).toEqual([]);
+  r.replies.push(answered(textReply));
+  await explainAsk(r.$, "why?");
+  expect(r.forks).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
+  expect(r.view().isAsking).toBeFalsy();
+});
+
+test("[history] and an Explain plz! press each leave ask mode", async () => {
+  const r = await rig();
+  await explainOpen(r.$);
+  await explainShowHistory(r.$);
+  expect(r.view().isAsking).toBeFalsy();
+  expect(r.forks).toEqual([]);
+  await explainOpen(r.$);
+  r.replies.push(answered(textReply));
+  await explainPress(r.$);
+  expect(r.view().isAsking).toBeFalsy();
+});
+
 test("ask follows the selected entry, asks free with none, and ignores blank text", async () => {
   const none = await rig();
   none.replies.push(answered(textReply));
@@ -482,7 +508,7 @@ test("explainClear trashes every html page in one call and empties the history",
   expect(failing.view().error).toBe("could not move 2 pages to the Trash: trash: no such file");
 });
 
-test("explainHooks hooks the checker, the two presses and the follow-up submit", async () => {
+test("explainHooks hooks the checker, the three presses and the follow-up submit", async () => {
   const hooks: Record<string, number> = {};
   explainHooks(((event: string) => {
     hooks[event] = (hooks[event] ?? 0) + 1;
@@ -493,7 +519,7 @@ test("explainHooks hooks the checker, the two presses and the follow-up submit",
     "tool.check": 4,
     "tool.call": 1,
     "turn.complete": 2,
-    "ui.press": 2,
+    "ui.press": 3,
     "ui.input": 1,
   });
 });

@@ -24,7 +24,7 @@ test('Clawd sits at the right edge of the band, sized to bodyColumns rather than
     expect(row?.props).toMatchObject({ flexDirection: 'row', justifyContent: 'flex-end', width: 63 })
     type Node = { type?: string; props?: { key?: string }; children?: unknown[] } | undefined
     const first = row?.children?.[0] as Node
-    const picture = surface === 'desktop' ? first : (first?.props?.key === 'clawd-slot' ? first.children?.[0] as Node : undefined)
+    const picture = surface === 'desktop' ? first : (first?.props?.key === 'clawd-slot' ? first.children?.at(-1) as Node : undefined)
     expect(picture?.type).toBe(surface === 'desktop' ? 'Svg' : 'Image')
     await ui.unmount()
   }

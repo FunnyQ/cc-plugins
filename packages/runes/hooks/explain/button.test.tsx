@@ -68,16 +68,22 @@ const label = async (ui: Awaited<ReturnType<Engine["ui"]["mount"]>>) =>
   (await ui.find({ key: "explain" }))?.text ?? "";
 
 // inside Clawd's slot, so the map beside it ends on the button's line rather than above an empty one
-test("the button draws under Clawd inside clawd-slot, with no row of its own", async ($, on) => {
+// beside Clawd, stacked, so the band needs no line of its own for them and the map ends level with Clawd
+test("the buttons stack left of Clawd inside clawd-slot, right-aligned, with no row of their own", async ($, on) => {
   const { ui } = await setup($, on);
   expect(await label(ui)).toContain("[Explain plz!]");
   expect(await ui.find({ key: "explain-row" })).toBeUndefined();
-  type Slot = { props?: { flexDirection?: string; alignItems?: string; width?: number }; children?: unknown[] } | undefined;
-  const slot = (await ui.find({ key: "clawd-slot" })) as Slot;
-  expect(slot?.props).toMatchObject({ flexDirection: "column", alignItems: "center" });
+  type Node = { props?: { key?: string; flexDirection?: string; alignItems?: string; width?: number }; children?: Node[] } | undefined;
+  const slot = (await ui.find({ key: "clawd-slot" })) as Node;
+  expect(slot?.props).toMatchObject({ flexDirection: "row", alignItems: "flex-end" });
   expect(slot?.props?.width).toBeGreaterThanOrEqual("[Explain plz!]".length);
-  const last = slot?.children?.at(-1) as { props?: { key?: string } } | undefined;
-  expect(last?.props?.key).toBe("explain");
+  const first = slot?.children?.[0];
+  // a column's alignItems leaves a Button at the left edge, so each sits in a row that pushes it right
+  expect(first?.props).toMatchObject({ key: "explain-buttons", flexDirection: "column" });
+  for (const line of first?.children ?? [])
+    expect(line?.props).toMatchObject({ flexDirection: "row", justifyContent: "flex-end", width: first?.props?.width });
+  expect(first?.children?.map((c) => c?.children?.[0]?.props?.key)).toEqual(["explain", "explain-open"]);
+  expect(slot?.children?.at(-1)?.props?.key).toBe("clawd");
   await ui.unmount();
 });
 
@@ -86,6 +92,15 @@ test("a press forks once and opens the runes-explain pane", async ($, on) => {
   await ui.press({ key: "explain" });
   expect(forks).toHaveLength(1);
   expect(opens[0]?.id).toBe("runes-explain");
+  await ui.unmount();
+});
+
+test("[Tell me…] opens the runes-explain pane and forks nothing", async ($, on) => {
+  const { ui, forks, opens } = await setup($, on);
+  expect((await ui.find({ key: "explain-open" }))?.text).toContain("[Tell me…]");
+  await ui.press({ key: "explain-open" });
+  expect(forks).toHaveLength(0);
+  expect(opens.map((o) => o.id)).toEqual(["runes-explain"]);
   await ui.unmount();
 });
 

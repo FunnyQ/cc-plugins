@@ -21,26 +21,30 @@ const messageOf = (err: unknown) =>
 
 const basename = (path: string) => path.split("/").filter(Boolean).at(-1) ?? "";
 
+async function openPane($: EngineInterface): Promise<void> {
+  const { isPlaced } = await $.ui.open({
+    id: PANE,
+    title: "Explain plz!",
+    columns: COLUMNS,
+  });
+  if (!isPlaced)
+    $.ui.toast(
+      "Explain plz! needs a wider terminal; the answer is in the pane once it fits",
+    );
+}
+
 async function run($: EngineInterface, ask: Ask): Promise<void> {
   let started = false;
   await update($, view, (v) => {
     started = !v.isRunning;
     if (!started) return v;
-    const { error: _cleared, ...rest } = v;
+    const { error: _cleared, isAsking: _asked, ...rest } = v;
     return { ...rest, isRunning: true };
   });
   if (!started) return;
   let check: { id: string; path: string } | undefined;
   try {
-    const { isPlaced } = await $.ui.open({
-      id: PANE,
-      title: "Explain plz!",
-      columns: COLUMNS,
-    });
-    if (!isPlaced)
-      $.ui.toast(
-        "Explain plz! needs a wider terminal; the answer is in the pane once it fits",
-      );
+    await openPane($);
     const { language } = (await $.settings.read()) as { language?: string };
     const r = await $.model.fork({ prompt: buildPrompt(ask, language) });
     if (!r.isAnswered) {
@@ -130,13 +134,24 @@ export async function explainPress($: EngineInterface): Promise<void> {
   await run($, { kind: "press" });
 }
 
+export async function explainOpen($: EngineInterface): Promise<void> {
+  await update($, view, (v) => ({ ...v, isAsking: true }));
+  await openPane($);
+}
+
+export async function explainShowHistory($: EngineInterface): Promise<void> {
+  await update($, view, ({ isAsking: _asked, ...v }) => v);
+}
+
 export async function explainAsk(
   $: EngineInterface,
   text: string,
 ): Promise<void> {
   const question = text.trim();
   if (!question) return;
-  const entry = selectedOf(await read($, view));
+  const v = await read($, view);
+  // ask mode hides the history, so a fresh question there never rides an answer the user cannot see
+  const entry = v.isAsking ? undefined : selectedOf(v);
   if (!entry) return run($, { kind: "free", question });
   const previous =
     entry.kind === "text"
@@ -224,6 +239,12 @@ export function explainHooks(on: On): void {
   on("ui.press", { plugin: "runes", element: "explain" }, async ($, e, next) => {
     const pressed = await next(e);
     await explainPress($);
+    return pressed;
+  });
+
+  on("ui.press", { plugin: "runes", element: "explain-open" }, async ($, e, next) => {
+    const pressed = await next(e);
+    await explainOpen($);
     return pressed;
   });
 

@@ -94,7 +94,7 @@ test("an empty view draws the hint and the follow-up Input", async ($, on) => {
   await session($, on, { entries: [], isRunning: false });
   const root = await tree($);
   expect(texts(root)).toContain(
-    'Press [Explain plz!] under Clawd.',
+    'Press [Explain plz!] under Clawd, or type below.',
   );
   const ui = await $.ui.mount(PANE);
   expect(await ui.find({ key: "explain-ask" })).toBeDefined();
@@ -146,7 +146,7 @@ test("a running fork with no history draws the placeholder, not the hint", async
   await session($, on, { entries: [], isRunning: true });
   const all = texts(await tree($));
   expect(all).toContain("new explanation…");
-  expect(all).not.toContain("Press [Explain plz!] under Clawd.");
+  expect(all).not.toContain("Press [Explain plz!] under Clawd, or type below.");
 });
 
 test("the follow-up Input sits in a dim rounded border under its label, with or without history", async ($, on) => {
@@ -177,6 +177,17 @@ test("the banner turns a spinner while explaining or checking, and none on an er
   seeded.view = { entries: [page], isRunning: false, error: "boom" };
   expect(await spinner()).toBeUndefined();
   expect(texts(await tree($))).toContain("✗ boom");
+});
+
+test("ask mode draws only the new-question box and a [history] button", async ($, on) => {
+  await session($, on, { entries: [text("x1", "old title", "old body")], isRunning: false, isAsking: true });
+  const root = await tree($);
+  const all = texts(root).join("\n");
+  expect(all).toContain("NEW QUESTION · type below");
+  expect(all).not.toContain("old title");
+  expect(all).not.toContain("HISTORY");
+  expect(buttons(root).map((b) => b.props?.key)).toContain("explain-show-history");
+  expect(flat(root).some((n) => n.props?.key === "explain-ask")).toBe(true);
 });
 
 test("pressing a history row selects that entry", async ($, on) => {

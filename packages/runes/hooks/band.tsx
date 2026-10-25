@@ -17,6 +17,7 @@ const MAP_SHOWN = { plugin: 'runes', key: 'minimapShown' } as const
 const VIEW = { plugin: 'runes', key: 'explain' } as const
 const LABEL = '[Explain plz!]'
 const RUNNING = '[explaining…]'
+const ASK = '[Tell me…]'
 
 export const band = (on: On) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -36,8 +37,9 @@ export const band = (on: On) => {
       hasButton ? read($, VIEW) : undefined,
     ])
     // the columns Clawd and its gap take off the map's width; bodyColumns, not the viewport, since a docked pane narrows the band
-    // Clawd and the button share one slot, each centred in it, so their centres line up
-    const slot = hasButton ? Math.max(spriteColumns(), LABEL.length, RUNNING.length) : spriteColumns()
+    // the buttons stack left of Clawd in its slot, beside it rather than under it, so they take no line of their own
+    const buttons = Math.max(LABEL.length, RUNNING.length, ASK.length)
+    const slot = hasButton ? spriteColumns() + 1 + buttons : spriteColumns()
     const reserved = config.enabled.clawd ? slot + config.minimap.gap : 0
     const room = (e.props.bodyColumns ?? 0) - reserved
     const map = list?.length && room > 4
@@ -69,10 +71,19 @@ export const band = (on: On) => {
 
     const picture = sprite(ui, e.surface === 'desktop', frame)
     const button = hasButton && term
-      ? <term.Button key="explain" plain onPress={() => undefined}>{view?.isRunning ? RUNNING : LABEL}</term.Button>
+      ? (
+        <Box key="explain-buttons" flexDirection="column" width={buttons}>
+          <Box key="explain-line" flexDirection="row" justifyContent="flex-end" width={buttons}>
+            <term.Button key="explain" plain onPress={() => undefined}>{view?.isRunning ? RUNNING : LABEL}</term.Button>
+          </Box>
+          <Box key="explain-open-line" flexDirection="row" justifyContent="flex-end" width={buttons}>
+            <term.Button key="explain-open" plain dimColor onPress={() => undefined}>{ASK}</term.Button>
+          </Box>
+        </Box>
+      )
       : undefined
     const clawdRow = config.enabled.clawd
-      ? row(button ? <Box key="clawd-slot" flexDirection="column" alignItems="center" width={slot}>{picture}{button}</Box> : picture)
+      ? row(button ? <Box key="clawd-slot" flexDirection="row" alignItems="flex-end" gap={1} width={slot}>{button}{picture}</Box> : picture)
       : map ? row() : undefined
     if (!button || config.enabled.clawd) return clawdRow ? withNotice(clawdRow) : (notice || next(e))
     return (
