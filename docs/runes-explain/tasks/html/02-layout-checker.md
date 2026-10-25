@@ -9,7 +9,7 @@
 >
 > **Depends on**: core/01, html/01
 > **Blocks**: core/03
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -22,9 +22,13 @@ entry's check status, so Q never opens a page with a broken drawing.
 - `packages/runes/hooks/explain/checker.ts` (new) — the agent definition, its prompt, `registerChecker`,
   `startCheck`, `parseVerdict`, and the `checker(on)` hooks.
 - `packages/runes/hooks/explain/checker.test.ts` (new) — plugin-test-kit tests for every branch below.
+- `packages/runes/hooks/register.tsx` (modify) — import `{ checker, registerChecker }` from
+  `./explain/checker`; in the unmatched `on("session.start", …)`, add `await registerChecker($);` before
+  `return next(e);`; in `register()`, add `checker(on);` after `teach(on);`. Touch nothing else in it.
 
-`register.tsx` is not touched here: the orchestrator wires `registerChecker` into `session.start` and
-`checker(on)` into `register()`. Tests register `checker(on)` themselves.
+This task wires the checker into `register.tsx` because the plugin test kit refuses any `$` call made from a
+hook the test registers (`$.env.get refused: its hooks module does not call it`). A test therefore cannot
+register `checker(on)` itself; it drives the plugin's own hooks, loaded through `register.tsx`.
 
 ## Implementation notes
 
@@ -209,27 +213,30 @@ side by side. Every function here that takes `$` and is called from another file
 ### Tests (`checker.test.ts`)
 
 Use `{ expect, mock, test } from "claude-code/testing"` and `fakeHost` / `startSession` from
-`hooks/transcript/test-session.ts`; register `checker(on)` in the test plugin. A noun stub answers
+`hooks/transcript/test-session.ts`; never register `checker(on)` in the test plugin, since the plugin already
+registers it through `register.tsx`. The test plugin registers only stubs. A noun stub answers
 `{ value }`, an event stub (`agent.spawn`) answers its result bare, and `$.clock` needs `mock.clock(on)`.
 For the kit idiom of firing `tool.check`, `tool.call` and a subagent's `turn.complete`, read
 `packages/guard/hooks/comment-review.mod.test.ts`.
 
 ## Acceptance criteria
 
-- [ ] `parseVerdict` returns the table's result for `OK`, `FIXED 2`, `FAILED chrome crashed`, `FIXED x`, `FAILED`, `""`, `"Looked fine.\nOK"`, and `"c3 FIXED 2"` (token `c3`).
-- [ ] `registerChecker` registers `explain-checker` with model `sonnet`, effort `medium`, tools exactly `["Bash", "Read", "Edit"]`, and `omitClaudeMd: true`; `CHECKER_PROMPT` contains the Chrome command shape with `1280,4000` and `420,7000`, the colophon-visible rule with `FAILED page taller than the screenshot`, every SVG class listed above, `24 viewBox units`, `at most 3`, and `OK`, `FIXED <n>`, `FAILED <reason>`.
-- [ ] `agent.offer` for `runes:explain-checker` answers `isOffered: false`; `tool.check` `Agent` allows this plugin's spawn of `runes:explain-checker` and passes another plugin's or another type through.
-- [ ] `tool.check` `Bash` allows a checker command matching the shape under `explainDir`, and passes through: a command from the main loop, a path outside `explainDir`, a `..` path, a command with `;` or `$`, a `file://<explainDir>/%2e%2e/x.html` path, an unquoted Chrome path. `Read`/`Edit` allow inside `explainDir` only, and with HOME missing (`explainDir` empty) `Bash`, `Read` and `Edit` all pass through.
-- [ ] `tool.call` `SubagentHandback` from the checker is denied with the exact deny text; from another agent or the main loop it passes through.
-- [ ] `startCheck` resolves right after the spawn, without waiting for an answer; each check settles exactly once — the entry's `check`/`note` patched and `process.run` called with `["open", path]` — as `skipped`/`"no Chrome"` when Chrome is missing, `failed`/the deny text when the spawn is denied, the parsed verdict on the checker's `turn.complete`, and `failed`/`"timed out"` at the first `turn.complete` after 180 000 ms have passed (`mock.clock`).
-- [ ] Two checks started back to back and answered in reverse order (`c2 OK`, then `c1 FIXED 1`) each get their own verdict.
-- [ ] After check A times out and check B starts, A's late answer — tokened, untokened, or a non-answer `turn.complete` — leaves B pending.
+- [x] `parseVerdict` returns the table's result for `OK`, `FIXED 2`, `FAILED chrome crashed`, `FIXED x`, `FAILED`, `""`, `"Looked fine.\nOK"`, and `"c3 FIXED 2"` (token `c3`).
+- [x] `registerChecker` registers `explain-checker` with model `sonnet`, effort `medium`, tools exactly `["Bash", "Read", "Edit"]`, and `omitClaudeMd: true`; `CHECKER_PROMPT` contains the Chrome command shape with `1280,4000` and `420,7000`, the colophon-visible rule with `FAILED page taller than the screenshot`, every SVG class listed above, `24 viewBox units`, `at most 3`, and `OK`, `FIXED <n>`, `FAILED <reason>`.
+- [x] `agent.offer` for `runes:explain-checker` answers `isOffered: false`; `tool.check` `Agent` allows this plugin's spawn of `runes:explain-checker` and passes another plugin's or another type through.
+- [x] `tool.check` `Bash` allows a checker command matching the shape under `explainDir`, and passes through: a command from the main loop, a path outside `explainDir`, a `..` path, a command with `;` or `$`, a `file://<explainDir>/%2e%2e/x.html` path, an unquoted Chrome path. `Read`/`Edit` allow inside `explainDir` only, and with HOME missing (`explainDir` empty) `Bash`, `Read` and `Edit` all pass through.
+- [x] `tool.call` `SubagentHandback` from the checker is denied with the exact deny text; from another agent or the main loop it passes through.
+- [x] `startCheck` resolves right after the spawn, without waiting for an answer; each check settles exactly once — the entry's `check`/`note` patched and `process.run` called with `["open", path]` — as `skipped`/`"no Chrome"` when Chrome is missing, `failed`/the deny text when the spawn is denied, the parsed verdict on the checker's `turn.complete`, and `failed`/`"timed out"` at the first `turn.complete` after 180 000 ms have passed (`mock.clock`).
+- [x] `register.tsx` calls `registerChecker($)` in its unmatched `session.start` and `checker(on)` in `register()`, and `claude plugin validate packages/runes` passes with all of the checker's hooks loaded beside Clawd's and fold's.
+- [x] Two checks started back to back and answered in reverse order (`c2 OK`, then `c1 FIXED 1`) each get their own verdict.
+- [x] After check A times out and check B starts, A's late answer — tokened, untokened, or a non-answer `turn.complete` — leaves B pending.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including `hooks/explain/checker.test.ts`.
-- [ ] `claude plugin validate packages/runes` reports no errors.
-- [ ] `git status --short -- packages/runes/hooks/explain/checker.ts packages/runes/hooks/explain/checker.test.ts` lists both files.
+- [x] `claude plugin test packages/runes` passes, including `hooks/explain/checker.test.ts`.
+- [x] `claude plugin validate packages/runes` reports no errors.
+- [x] `git status --short -- packages/runes/hooks/explain/checker.ts packages/runes/hooks/explain/checker.test.ts` lists both files.
+- [x] `grep -n "checker(on)" packages/runes/hooks/register.tsx` prints one line.
 
 ## Eval rubric
 
@@ -244,5 +251,4 @@ For the kit idiom of firing `tool.check`, `tool.call` and a subagent's `turn.com
 
 ## Out of scope
 
-- Calling `registerChecker` from `session.start` and `checker(on)` from `register()` — Deferred. Reason: the orchestrator owns `register.tsx`.
 - Firefox or Safari screenshots — Deferred. Reason: the spike proved headless Chrome only.

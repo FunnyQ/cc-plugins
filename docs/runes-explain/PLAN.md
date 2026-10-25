@@ -157,8 +157,8 @@ html/01 ──┴─▶ html/02 ───────┘
 ```
 
 File ownership, so parallel worktrees never edit one file: `config.ts`, `config.test.ts` and
-`types/index.d.ts` belong to config-and-state; `band.tsx` to band-button; `register.tsx` to the orchestrator
-and then the pane, which runs after it.
+`types/index.d.ts` belong to config-and-state; `band.tsx` to band-button; `register.tsx` to the layout checker, then
+the orchestrator, then the pane, each running after the one before.
 
 ## Human checks
 

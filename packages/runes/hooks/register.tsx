@@ -2,6 +2,7 @@ import type { Hook, Register } from "claude-code";
 
 import { band } from "./band";
 import { mascot } from "./clawd/mascot";
+import { checker, registerChecker } from "./explain/checker";
 import { minimap } from "./minimap/minimap";
 import { teach, teacher } from "./teacher/teacher";
 import {
@@ -144,6 +145,7 @@ export const register: Register = (on) => {
       },
       redraw,
     });
+    await registerChecker($);
     return next(e);
   });
 
@@ -200,4 +202,5 @@ export const register: Register = (on) => {
   peer(on);
   minimap(on);
   teach(on);
+  checker(on);
 };

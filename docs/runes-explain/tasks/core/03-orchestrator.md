@@ -19,10 +19,10 @@ entry, and for an html reply writes the explainer, has it layout-checked, then o
 
 - `packages/runes/hooks/explain/explain.ts` (new) — `PANE`, the five handler `function` declarations (`explainPress` … `explainReopen`), `explainHooks(on)`.
 - `packages/runes/hooks/explain/explain.test.ts` (new) — its tests in the plugin test kit.
-- `packages/runes/hooks/register.tsx` (modify) — call `registerChecker($)` in the unmatched `session.start`,
-  and `explainHooks(on)` in `register()`.
+- `packages/runes/hooks/register.tsx` (modify) — call `explainHooks(on)` in `register()`.
 
-This task owns `register.tsx` first; the pane runs after it and adds its own `explainPane(on)` line. Do not
+The layout checker already wired `registerChecker($)` and `checker(on)` into `register.tsx`; do not add them
+again. This task edits `register.tsx` next; the pane runs after it and adds its own `explainPane(on)` line. Do not
 touch `band.tsx`, `config.ts`, `types/index.d.ts`, `state.ts`, `protocol.ts`, `html.ts` or `checker.ts`.
 
 ## Implementation notes
@@ -113,9 +113,8 @@ clear a newer press's `isRunning`, since only that press's own `finally` writes 
 
 ### `register.tsx` edits
 
-- Import `{ explainHooks }` from `./explain/explain` and `{ registerChecker }` from `./explain/checker`.
-- In the unmatched `on("session.start", …)`, add `await registerChecker($);` before `return next(e);`.
-- In `register()`, add `explainHooks(on);` after `teach(on);`.
+- Import `{ explainHooks }` from `./explain/explain`.
+- In `register()`, add `explainHooks(on);` after `checker(on);`.
 
 ### Tests (`explain.test.ts`)
 
@@ -140,7 +139,7 @@ Use `startSession` / `fakeHost` from `hooks/transcript/test-session.ts`, a fake 
 - [ ] `pick("the parser")` forks with `buildPrompt({ kind: "pick", topic: "the parser" })`.
 - [ ] Two entries in the same millisecond get ids `x<at>` and `x<at>-2`.
 - [ ] `select(id)` sets `selected`; `reopen(id)` on an html entry runs `open` with its path and on a text entry runs nothing.
-- [ ] `register.tsx` calls `registerChecker($)` in `session.start` and `explainHooks(on)` in `register()`.
+- [ ] `register.tsx` calls `explainHooks(on)` in `register()`, and still calls `registerChecker($)` and `checker(on)` exactly once each.
 - [ ] With the whole runes plugin loaded through `register.tsx` (so Clawd's unmatched and fold's `{ reason }` `turn.complete` hooks run too), `claude plugin validate packages/runes` passes and a checker answer still settles its html entry.
 
 ## Verification

@@ -49,6 +49,11 @@ export const fakeHost = (
 ) => {
   const store = new Map<string, unknown>();
   const toasts: string[] = [];
+  const registered: Record<string, unknown>[] = [];
+  on("agent.register", (_$, e) => {
+    registered.push(e as never);
+    return { value: { agent: `runes:${e.name}` } } as never;
+  });
   on("store.get", (_$, e) => ({ value: store.get(e.key) }) as never);
   on("store.set", (_$, e) => {
     store.set(e.key, e.value);
@@ -84,7 +89,7 @@ export const fakeHost = (
   });
   on("command.register", () => ({ value: undefined }) as never);
   on("session.messages", () => ({ value: messages }) as never);
-  return { files, store, toasts };
+  return { files, store, toasts, registered };
 };
 
 export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof fakeHost>[1]) => {
