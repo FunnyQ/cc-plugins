@@ -40,8 +40,8 @@ and sometimes revisits it later. The page has one light theme; dark mode is defe
 
 ## Brand Commitments
 
-runes lives in the terminal beside Clawd, a pixel mascot in Claude's warm orange. The button reads
-"hey mate, explain please": the voice is warm and informal, never childish.
+runes lives in the terminal beside Clawd, a pixel mascot in Claude's warm orange. The button under Clawd reads
+`[Explain plz!]`: the voice is playful and informal, never childish.
 
 ## Product Principles
 
