@@ -222,6 +222,7 @@ const rig = async (
   const spawns: { prompt: string }[] = [];
   const opened: string[][] = [];
   const measured: string[][] = [];
+  const removed: string[][] = [];
   const agents: { id: string; type: string }[] = [];
   const $ = {
     plugin: { name: "runes", root: "/plugin" },
@@ -238,7 +239,8 @@ const rig = async (
             ? { exitCode: 1, stdout: "", stderr: "" }
             : { exitCode: 0, stdout: opts.geometry, stderr: "" };
         }
-        opened.push(argv);
+        if (argv[0] === "rm") removed.push(argv);
+        else opened.push(argv);
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     },
@@ -279,6 +281,7 @@ const rig = async (
     };
   await turnEnd({});
   opened.length = 0;
+  removed.length = 0;
   explain = fresh();
   const token = (i: number) =>
     spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!;
@@ -289,6 +292,7 @@ const rig = async (
     spawns,
     opened,
     measured,
+    removed,
     entry,
     turnEnd,
     advance: (ms: number) => {
@@ -369,6 +373,18 @@ test("a geometry check that fails, cannot start, or prints no verdict leaves the
       `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.`,
     );
   }
+});
+
+test("settling removes the page's screenshots, whichever way it settles", async () => {
+  const shots = ["rm", "-f", PAGE.replace(/\.html$/, ".check.png"), PAGE.replace(/\.html$/, ".check-narrow.png")];
+  const clean = await rig({ geometry: '{"faults":[]}' });
+  await startCheck(clean.$, "a", PAGE);
+  expect(clean.removed).toEqual([shots]);
+  const answered = await rig();
+  await startCheck(answered.$, "a", PAGE);
+  expect(answered.removed).toEqual([]);
+  await answered.turnEnd({ agentId: "k1", answer: `${answered.token(0)} FIXED 1` });
+  expect(answered.removed).toEqual([shots]);
 });
 
 test("a denied spawn settles the check as failed with the deny text", async () => {

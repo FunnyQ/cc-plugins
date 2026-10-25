@@ -75,6 +75,8 @@ async function settle(
     patchEntry(v, entryId, { check: r.check, note: r.note }),
   );
   await $.process.run(["open", path]);
+  const shot = path.replace(/\.html$/, "");
+  await $.process.run(["rm", "-f", `${shot}.check.png`, `${shot}.check-narrow.png`]);
 }
 
 async function expire($: EngineInterface) {
