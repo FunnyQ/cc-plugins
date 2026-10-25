@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: html/02, core/03
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 

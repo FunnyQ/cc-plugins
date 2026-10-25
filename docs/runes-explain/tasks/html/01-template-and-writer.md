@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: html/02, core/03
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
@@ -140,7 +140,7 @@ Use an in-memory `io` (a `Map<string, string>` for files, an array recording `mk
       and compare behaviour, not content: the spread stacks with the plate above the text and no longer sticky,
       labels grow to 24px / 21px, the sheet padding is `36px 22px 44px`. Expected differences, not defects: no
       sheet shadow or specimen frame and heading, the body itself carries the paper, the colophon reads `Written
-      by a fork of this session` with no check status, and the masthead shows the assembled project and time.
+    by a fork of this session` with no check status, and the masthead shows the assembled project and time.
 
 ## Verification
 
