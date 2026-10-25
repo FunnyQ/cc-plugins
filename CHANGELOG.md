@@ -1,5 +1,16 @@
 # Changelog
 
+## [guard 0.9.0] - 2026-10-25
+
+_tracks tag `guard-v0.9.0`_
+
+### Added
+- The comment sweep now asks TypeSafe's Jev for a KEEP / DELETE verdict on each added comment line before involving the reviewer, settling a report only when Jev is sure of every block (DELETE at 0.6, KEEP at 0.8, MUST KILL never).
+- A report Jev settles now delivers its DELETE lines straight to the main agent with no reviewer subagent, skipping a wait of about 26 seconds per report and the agent card in the TUI; without TYPESAFE_API_KEY, or if Jev fails, the reviewer runs as before.
+
+### Security
+- Privacy change: when TYPESAFE_API_KEY is set, what guard sends to TypeSafe grows from the comment text alone to the comment plus 40 lines of code around it, in every repo.
+
 ## [relay 0.9.3] - 2026-10-24
 
 _tracks tag `relay-v0.9.3`_
