@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.10.2] - 2026-10-25
+
+_tracks tag `runes-v0.10.2`_
+
+### Changed
+- Explain now writes for a high-school reader instead of a five-year-old: it keeps the one-sentence answer first, defines the real technical term the first time it appears, and uses an analogy only when it explains the mechanism better than describing it directly.
+
 ## [runes 0.10.1] - 2026-10-25
 
 _tracks tag `runes-v0.10.1`_
