@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{lang}}">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
@@ -233,10 +233,12 @@
       }
       .steps > li {
         counter-increment: step;
-        display: grid;
-        grid-template-columns: 48px 1fr;
+        position: relative;
+        padding-left: 48px;
       }
       .steps > li::before {
+        position: absolute;
+        left: 0;
         content: counter(step);
         font-size: 38px;
         font-weight: 800;
