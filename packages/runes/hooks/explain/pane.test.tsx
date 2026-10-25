@@ -391,6 +391,30 @@ test("submitting asks a follow-up; a blank submit asks nothing", async ($, on) =
   expect(box.forks[0]).toContain("why?");
 });
 
+// the stubbed state.set redraws nothing, so each look mounts the pane afresh
+test("the ask field draws what was typed and clears on submit", async ($, on) => {
+  const box = await session($, on, {
+    entries: [text("x1", "Forks", "a fork copies")],
+    isRunning: false,
+  });
+  const field = async () => {
+    const look = await $.ui.mount(PANE);
+    const value = (await look.find({ key: "explain-ask" }))?.props?.value;
+    await look.unmount();
+    return value;
+  };
+  const type = async (text: string, kind: "change" | "submit") => {
+    const ui = await $.ui.mount(PANE);
+    await ui.input({ key: "explain-ask", text, kind });
+    await ui.unmount();
+  };
+  await type("wh", "change");
+  expect(await field()).toBe("wh");
+  await type("why?", "submit");
+  expect(await field()).toBe("");
+  expect(box.forks[0]).toContain("why?");
+});
+
 // a fork that writes a page spawns the checker, which the engine lets runes allow only from inside a runes hook
 test("a pick and a follow-up fork from runes' own hooks once the press and submit bottoms returned", async ($, on) => {
   const forks: string[] = [];

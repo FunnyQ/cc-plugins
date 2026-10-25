@@ -166,6 +166,7 @@ export const explainPane = (on: On) => {
         <Input
           key="explain-ask"
           placeholder="ask a follow-up, or name what to explain"
+          value={v.draft ?? ""}
           submitLabel="ask"
           onSubmit={() => undefined}
         />
