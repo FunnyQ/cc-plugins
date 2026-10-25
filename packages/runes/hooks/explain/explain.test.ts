@@ -86,6 +86,7 @@ const rig = async (
   const agents: { id: string; type: string }[] = [];
   const $ = {
     plugin: { name: "runes", root: ROOT },
+    session: { id: async () => "94e739d6-4f3e-4ab7-8896-2a0aebe5aac2" },
     ui: {
       open: async (e: unknown) => {
         opens.push(e);
@@ -244,6 +245,9 @@ test("press with an html reply writes the file, stores pending, and the checker'
     entry.path.startsWith(
       `${HOME}/.local/share/q-lab/runes/explain/cc-plugins/`,
     ),
+  ).toBe(true);
+  expect(
+    /\/cc-plugins\/\d{8}-94e739d6\/\d{4}-[^/]+\.html$/.test(entry.path),
   ).toBe(true);
   expect(r.files.has(entry.path)).toBe(true);
   expect(r.spawns).toHaveLength(1);

@@ -82,12 +82,13 @@ const pad = (n: number): string => String(n).padStart(2, "0");
 export const explainerPath = (
   home: string,
   project: string,
+  session: string,
   at: Date,
   title: string,
 ): string => {
   const day = `${at.getFullYear()}${pad(at.getMonth() + 1)}${pad(at.getDate())}`;
   const time = `${pad(at.getHours())}${pad(at.getMinutes())}`;
-  return `${explainRoot(home)}${slugOf(project)}/${day}-${time}-${slugOf(title)}.html`;
+  return `${explainRoot(home)}${slugOf(project)}/${day}-${session.slice(0, 8)}/${time}-${slugOf(title)}.html`;
 };
 
 const MONTHS = [
@@ -112,11 +113,12 @@ export const writeExplainer = async (
   io: Io,
   root: string,
   home: string,
+  session: string,
   page: Omit<Page, "generatedAt">,
   at: Date,
 ): Promise<string> => {
   const template = await io.read(`${root}/hooks/explain/template.html`);
-  const first = explainerPath(home, page.project, at, page.title);
+  const first = explainerPath(home, page.project, session, at, page.title);
   await io.mkdir(first.slice(0, first.lastIndexOf("/")));
   let path = first;
   for (let n = 2; await io.exists(path); n++)

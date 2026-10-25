@@ -100,11 +100,11 @@ test("slugOf", () => {
   expect(long.endsWith("-")).toBe(false);
 });
 
-test("explainerPath zero-pads and slugs the project", () => {
+test("explainerPath files a page under its project, then its day and session, zero-padded and slugged", () => {
   expect(
-    explainerPath("/h", "My Project", new Date(2026, 0, 5, 7, 3), "Hi there"),
+    explainerPath("/h", "My Project", "94e739d6-4f3e-4ab7-8896-2a0aebe5aac2", new Date(2026, 0, 5, 7, 3), "Hi there"),
   ).toBe(
-    "/h/.local/share/q-lab/runes/explain/my-project/20260105-0703-hi-there.html",
+    "/h/.local/share/q-lab/runes/explain/my-project/20260105-94e739d6/0703-hi-there.html",
   );
 });
 
@@ -122,28 +122,29 @@ test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async
   const dirs: string[] = [];
   const io = memoryIo(files, dirs);
   const at = new Date(2026, 9, 5, 14, 2);
-  const dir = "/h/.local/share/q-lab/runes/explain/proj";
+  const dir = "/h/.local/share/q-lab/runes/explain/proj/20261005-abcd1234";
   const args = [
     "/r",
     "/h",
+    "abcd1234-0000",
     { title: "T", main: "<p>x</p>", project: "proj" },
     at,
   ] as const;
 
-  expect(await writeExplainer(io, ...args)).toBe(`${dir}/20261005-1402-t.html`);
+  expect(await writeExplainer(io, ...args)).toBe(`${dir}/1402-t.html`);
   expect(dirs).toEqual([dir]);
-  expect(files.get(`${dir}/20261005-1402-t.html`)).toBe(
+  expect(files.get(`${dir}/1402-t.html`)).toBe(
     "<time>5 Oct 2026 · 14:02</time><p>x</p>",
   );
 
-  files.set(`${dir}/20261005-1402-t.html`, "keep");
+  files.set(`${dir}/1402-t.html`, "keep");
   expect(await writeExplainer(io, ...args)).toBe(
-    `${dir}/20261005-1402-t-2.html`,
+    `${dir}/1402-t-2.html`,
   );
   expect(await writeExplainer(io, ...args)).toBe(
-    `${dir}/20261005-1402-t-3.html`,
+    `${dir}/1402-t-3.html`,
   );
-  expect(files.get(`${dir}/20261005-1402-t.html`)).toBe("keep");
+  expect(files.get(`${dir}/1402-t.html`)).toBe("keep");
 });
 
 test("assemble writes a language tag into {{lang}}, and leaves it empty for a name that is not one", () => {

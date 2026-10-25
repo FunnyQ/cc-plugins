@@ -93,6 +93,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           },
           $.plugin.root,
           home,
+          await $.session.id(),
           { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
         );

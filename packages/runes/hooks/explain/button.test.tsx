@@ -149,6 +149,7 @@ test("a press that writes an html page spawns the checker from inside runes' own
     return <Text key="engine">engine</Text>;
   });
   on("ui.open", () => ({ value: { isPlaced: true } }) as never);
+  on("session.id", () => ({ value: "94e739d6-4f3e-4ab7-8896-2a0aebe5aac2" }) as never);
   on("model.fork", () => ({ value: { isAnswered: true, text: html, usage: USAGE } }) as never);
   on("agent.spawn", (_$, e) => {
     spawns.push(e.prompt.split("\n")[0]!);
