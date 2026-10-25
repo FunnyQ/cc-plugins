@@ -4,6 +4,7 @@ import { band } from "./band";
 import { mascot } from "./clawd/mascot";
 import { checker, registerChecker } from "./explain/checker";
 import { explainHooks } from "./explain/explain";
+import { explainPane } from "./explain/pane";
 import { minimap } from "./minimap/minimap";
 import { teach, teacher } from "./teacher/teacher";
 import {
@@ -205,4 +206,5 @@ export const register: Register = (on) => {
   teach(on);
   checker(on);
   explainHooks(on);
+  explainPane(on);
 };

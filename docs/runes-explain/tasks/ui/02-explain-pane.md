@@ -9,7 +9,7 @@
 >
 > **Depends on**: core/03
 > **Blocks**: docs/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -131,26 +131,26 @@ returned tree. Stub `process.run` so glow either returns rendered output or is a
 
 ## Acceptance criteria
 
-- [ ] An empty view draws `Press "hey mate, explain please" under the minimap.` and the `explain-ask` Input.
-- [ ] With 12 entries, exactly 12 history Buttons draw, newest first, and only the selected one starts `› `.
-- [ ] Pressing a history Button calls `explainSelect` with that entry's id.
-- [ ] A text entry draws glow's runs when glow has rendered, and the plain wrapped body when `glow.view`
+- [x] An empty view draws `Press "hey mate, explain please" under the minimap.` and the `explain-ask` Input.
+- [x] With 12 entries, exactly 12 history Buttons draw, newest first, and only the selected one starts `› `.
+- [x] Pressing a history Button calls `explainSelect` with that entry's id.
+- [x] A text entry draws glow's runs when glow has rendered, and the plain wrapped body when `glow.view`
       returns `null`.
-- [ ] An ask entry draws its question and one Button per option; pressing one calls `explainPick` with
+- [x] An ask entry draws its question and one Button per option; pressing one calls `explainPick` with
       that option's text.
-- [ ] An html entry draws its summary, its path dim, the status line for each of the five `check` values
+- [x] An html entry draws its summary, its path dim, the status line for each of the five `check` values
       exactly as tabled, and an `open again` Button that calls `explainReopen` with its id.
-- [ ] The usage line reads `12.3k in · 812 cached · 1.0k out` for usage `{ input: 12345, cacheRead: 812, output: 1000 }`.
-- [ ] `error` draws in `#cc6666`; no error, no error line.
-- [ ] Submitting `why?` in the Input calls `explainAsk($, "why?")`; submitting `   ` calls nothing.
-- [ ] `register.tsx` calls `explainPane(on)`, and no other line of it changed.
-- [ ] (human) In a real session, press the button and see one text, one html and one ask entry in the pane; submit one follow-up.
+- [x] The usage line reads `12.3k in · 812 cached · 1.0k out` for usage `{ input: 12345, cacheRead: 812, output: 1000 }`.
+- [x] `error` draws in `#cc6666`; no error, no error line.
+- [x] Submitting `why?` in the Input calls `explainAsk($, "why?")`; submitting `   ` calls nothing.
+- [x] `register.tsx` calls `explainPane(on)`, and no other line of it changed.
+- [x] (human) In a real session, press the button and see one text, one html and one ask entry in the pane; submit one follow-up.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` passes, including `hooks/explain/pane.test.tsx`.
-- [ ] `claude plugin validate packages/runes` reports no refusal.
-- [ ] `git diff -- packages/runes/hooks/register.tsx` shows only the `explainPane` import and call.
+- [x] `claude plugin test packages/runes` passes, including `hooks/explain/pane.test.tsx`.
+- [x] `claude plugin validate packages/runes` reports no refusal.
+- [x] `git diff -- packages/runes/hooks/register.tsx` shows only the `explainPane` import and call.
 
 ## Eval rubric
 

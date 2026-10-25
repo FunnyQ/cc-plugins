@@ -1,0 +1,283 @@
+import type { On } from "claude-code";
+import { expect, test, type Engine } from "claude-code/testing";
+
+import type { ExplainEntry, ExplainView } from "../../types";
+import { eventually, ran, startSession } from "../transcript/test-session";
+
+const PANE = {
+  plugin: "runes",
+  surface: "terminal",
+  component: "Pane",
+  requestId: "runes-explain",
+  props: { bodyColumns: 64 },
+} as never;
+
+const GLOW = "\n  \x1b[38;5;252;1mglowed\x1b[m\x1b[38;5;252m words\x1b[m\n\n";
+
+type Node = {
+  type?: string;
+  props?: Record<string, unknown>;
+  children?: unknown[];
+};
+
+const text = (id: string, title = id, body = "a body"): ExplainEntry => ({
+  id,
+  at: 1,
+  title,
+  kind: "text",
+  body,
+});
+
+// the view atom answers from here, so a test seeds it and reads what a press wrote
+const seed = (on: On, initial: ExplainView) => {
+  const box = {
+    view: initial,
+    version: 1,
+    forks: [] as string[],
+    opens: [] as string[][],
+  };
+  on(
+    "state.get",
+    { plugin: "runes" } as never,
+    (_$, e, next) =>
+      ((e as { key: string }).key === "explain"
+        ? { value: { value: box.view, version: box.version } }
+        : next(e)) as never,
+  );
+  on("state.set", { plugin: "runes" } as never, (_$, e, next) => {
+    if ((e as { key: string }).key !== "explain") return next(e) as never;
+    box.view = (e as unknown as { value: ExplainView }).value;
+    return { value: { isSet: true, version: ++box.version } } as never;
+  });
+  on("ui.open", () => ({ value: { isPlaced: true } }) as never);
+  on("model.fork", (_$, e) => {
+    box.forks.push((e as { prompt: string }).prompt);
+    return { value: { isAnswered: false, reason: "nothing-to-fork" } } as never;
+  });
+  return box;
+};
+
+const session = ($: Engine, on: On, view: ExplainView, glow?: string) => {
+  const box = seed(on, view);
+  return startSession($, on, {
+    run: (e) => {
+      box.opens.push(e.argv);
+      if (e.argv[0] === "glow") {
+        if (glow === undefined) throw new Error("glow: not found");
+        return ran(glow);
+      }
+      return ran("");
+    },
+  }).then(() => box);
+};
+
+const tree = async ($: Engine) => {
+  const ui = await $.ui.mount(PANE);
+  const root = (await ui.find({ type: "Box" })) as Node;
+  await ui.unmount();
+  return root;
+};
+
+const flat = (n: unknown): Node[] =>
+  typeof n === "object" && n !== null
+    ? [n as Node, ...((n as Node).children ?? []).flatMap(flat)]
+    : [];
+const texts = (root: Node) =>
+  flat(root)
+    .filter((n) => n.type === "Text")
+    .map((n) =>
+      (n.children ?? []).filter((c) => typeof c === "string").join(""),
+    );
+const buttons = (root: Node) => flat(root).filter((n) => n.type === "Button");
+
+test("an empty view draws the hint and the follow-up Input", async ($, on) => {
+  await session($, on, { entries: [], isRunning: false });
+  const root = await tree($);
+  expect(texts(root)).toContain(
+    'Press "hey mate, explain please" under the minimap.',
+  );
+  const ui = await $.ui.mount(PANE);
+  expect(await ui.find({ key: "explain-ask" })).toBeDefined();
+  await ui.unmount();
+});
+
+test("twelve entries draw twelve history rows, newest first, only the selected one marked", async ($, on) => {
+  const entries = Array.from({ length: 12 }, (_, i) =>
+    text(`x${12 - i}`, `title ${12 - i}`),
+  );
+  await session($, on, { entries, isRunning: false, selected: "x5" });
+  const rows = buttons(await tree($)).filter((b) =>
+    String(b.props?.key).startsWith("explain-entry:"),
+  );
+  expect(rows.map((b) => b.props?.key)).toEqual(
+    entries.map((e) => `explain-entry:${e.id}`),
+  );
+  expect(
+    rows
+      .filter((b) => String(b.props?.label).startsWith("› "))
+      .map((b) => b.props?.label),
+  ).toEqual(["› title 5"]);
+  expect(rows[0]!.props?.label).toBe("  title 12");
+});
+
+test("pressing a history row selects that entry", async ($, on) => {
+  const box = await session($, on, {
+    entries: [text("x2"), text("x1")],
+    isRunning: false,
+  });
+  const ui = await $.ui.mount(PANE);
+  await ui.press({ key: "explain-entry:x1" });
+  await ui.unmount();
+  expect(box.view.selected).toBe("x1");
+});
+
+test("a text entry draws glow's runs once glow has rendered", async ($, on) => {
+  await session(
+    $,
+    on,
+    { entries: [text("x1", "t", "**glowed** words")], isRunning: false },
+    GLOW,
+  );
+  expect(
+    await eventually(async () => texts(await tree($)).includes("glowed")),
+  ).toBe(true);
+});
+
+test("a text entry draws its plain wrapped body when glow is missing", async ($, on) => {
+  const body = "one two three\nfour";
+  await session($, on, { entries: [text("x1", "t", body)], isRunning: false });
+  // the first draw queues glow, which fails; every later draw takes the fallback
+  await tree($);
+  const shown = await eventually(async () =>
+    texts(await tree($)).includes("four"),
+  );
+  expect(shown).toBe(true);
+  expect(texts(await tree($))).toContain("one");
+});
+
+test("an ask entry draws its question and one Button per option, each picking its option", async ($, on) => {
+  const box = await session($, on, {
+    entries: [
+      {
+        id: "x1",
+        at: 1,
+        title: "Which?",
+        kind: "ask",
+        question: "What next?",
+        options: ["the parser", "the fork"],
+      },
+    ],
+    isRunning: false,
+  });
+  const root = await tree($);
+  expect(texts(root)).toContain("What next?");
+  const picks = buttons(root).filter((b) =>
+    String(b.props?.key).startsWith("explain-pick:"),
+  );
+  expect(picks.map((b) => [b.props?.key, b.props?.label])).toEqual([
+    ["explain-pick:x1:0", "the parser"],
+    ["explain-pick:x1:1", "the fork"],
+  ]);
+  const ui = await $.ui.mount(PANE);
+  await ui.press({ key: "explain-pick:x1:1" });
+  await ui.unmount();
+  expect(box.forks).toHaveLength(1);
+  expect(box.forks[0]).toContain("the fork");
+});
+
+test("an html entry draws summary, dim path, each check's status line, and open again", async ($, on) => {
+  const cases: [
+    ExplainEntry & { kind: "html" } extends infer H ? Partial<H> : never,
+    string,
+  ][] = [
+    [{ check: "pending" }, "checking layout…"],
+    [{ check: "ok" }, "layout ok"],
+    [{ check: "fixed", note: "2 fix(es)" }, "fixed 2"],
+    [{ check: "failed", note: "boom" }, "not checked: boom"],
+    [{ check: "skipped", note: "no Chrome" }, "not checked: no Chrome"],
+    [{ check: "failed" }, "not checked"],
+    [{ check: "skipped" }, "not checked"],
+  ];
+  const html = (patch: object): ExplainEntry =>
+    ({
+      id: "x1",
+      at: 1,
+      title: "Flow",
+      kind: "html",
+      summary: "It flows.",
+      path: "/p/flow.html",
+      check: "ok",
+      ...patch,
+    }) as ExplainEntry;
+  const box = await session($, on, { entries: [html({})], isRunning: false });
+  for (const [patch, line] of cases) {
+    box.view = { entries: [html(patch)], isRunning: false };
+    const root = await tree($);
+    expect(texts(root)).toContain(line);
+    expect(texts(root).join("")).toContain("It flows.");
+    const path = flat(root).find(
+      (n) => n.type === "Text" && (n.children ?? []).includes("/p/flow.html"),
+    );
+    expect(path?.props?.dimColor).toBe(true);
+  }
+  const ui = await $.ui.mount(PANE);
+  expect((await ui.find({ key: "explain-open:x1" }))?.props).toMatchObject({
+    label: "open again",
+  });
+  await ui.press({ key: "explain-open:x1" });
+  await ui.unmount();
+  expect(box.opens).toContainEqual(["open", "/p/flow.html"]);
+});
+
+test("the usage line formats each count in kilo", async ($, on) => {
+  await session($, on, {
+    entries: [
+      {
+        ...text("x1"),
+        usage: { input: 12345, cacheRead: 812, output: 1000 },
+      } as ExplainEntry,
+    ],
+    isRunning: false,
+  });
+  expect(texts(await tree($))).toContain("12.3k in · 812 cached · 1.0k out");
+});
+
+test("an error draws in #cc6666, and no error draws no error line", async ($, on) => {
+  const box = await session($, on, {
+    entries: [text("x1")],
+    isRunning: false,
+    error: "the fork failed: api-error 500",
+  });
+  const red = () =>
+    tree($).then((r) => flat(r).filter((n) => n.props?.color === "#cc6666"));
+  const shown = await red();
+  expect(shown).toHaveLength(1);
+  expect(texts(shown[0]!.children ? { children: [shown[0]] } : {})).toContain(
+    "the fork failed: api-error 500",
+  );
+  box.view = { entries: [text("x1")], isRunning: false };
+  expect(await red()).toHaveLength(0);
+});
+
+test("while running, explaining… sits directly above the Input", async ($, on) => {
+  await session($, on, { entries: [text("x1")], isRunning: true });
+  const kids = (await tree($)).children as Node[];
+  expect(kids.at(-1)?.type).toBe("Input");
+  expect(
+    texts(kids.at(-2)!.type === "Text" ? { children: [kids.at(-2)] } : {}),
+  ).toEqual(["explaining…"]);
+});
+
+test("submitting asks a follow-up; a blank submit asks nothing", async ($, on) => {
+  const box = await session($, on, {
+    entries: [text("x1", "Forks", "a fork copies")],
+    isRunning: false,
+  });
+  const ui = await $.ui.mount(PANE);
+  await ui.input({ key: "explain-ask", text: "   " });
+  expect(box.forks).toHaveLength(0);
+  await ui.input({ key: "explain-ask", text: "why?" });
+  await ui.unmount();
+  expect(box.forks).toHaveLength(1);
+  expect(box.forks[0]).toContain("why?");
+});
