@@ -293,7 +293,7 @@ test("explain is on by default and its switch sits at the top level after teache
 
 test("the explain template line names the button", () => {
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
-    '# the "hey mate, explain please" button under the minimap',
+    '# the [Explain plz!] button under Clawd',
   );
 });
 

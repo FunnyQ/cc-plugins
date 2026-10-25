@@ -22,7 +22,10 @@ test('Clawd sits at the right edge of the band, sized to bodyColumns rather than
     const ui = await $.ui.mount({ plugin: 'runes', surface, ...BAND, props: { ...BAND.props, bodyColumns: 63 } })
     const row = await ui.find({ key: 'clawd-row' })
     expect(row?.props).toMatchObject({ flexDirection: 'row', justifyContent: 'flex-end', width: 63 })
-    expect((row?.children?.[0] as { type?: string } | undefined)?.type).toBe(surface === 'desktop' ? 'Svg' : 'Image')
+    type Node = { type?: string; props?: { key?: string }; children?: unknown[] } | undefined
+    const first = row?.children?.[0] as Node
+    const picture = surface === 'desktop' ? first : (first?.props?.key === 'clawd-slot' ? first.children?.[0] as Node : undefined)
+    expect(picture?.type).toBe(surface === 'desktop' ? 'Svg' : 'Image')
     await ui.unmount()
   }
 })

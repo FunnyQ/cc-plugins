@@ -24,7 +24,7 @@ const USAGE = {
   cache_creation_input_tokens: 5,
 };
 const TOAST =
-  "hey mate needs a wider terminal; the answer is in the pane once it fits";
+  "Explain plz! needs a wider terminal; the answer is in the pane once it fits";
 const ROOT = "/plugin";
 const TEMPLATE_PATH = `${ROOT}/hooks/explain/template.html`;
 const textReply =
@@ -63,6 +63,7 @@ const rig = async (
     git?: string;
     writeFails?: boolean;
     entries?: ExplainEntry[];
+    language?: string;
   } = {},
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
@@ -70,7 +71,7 @@ const rig = async (
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
-    [TEMPLATE_PATH, "<html>{{main}}</html>"],
+    [TEMPLATE_PATH, '<html lang="{{lang}}">{{main}}</html>'],
     [CHROME, ""],
   ]);
   const forks: string[] = [];
@@ -100,6 +101,9 @@ const rig = async (
       },
     },
     clock: { now: async () => now },
+    settings: {
+      read: async () => (opts.language === undefined ? {} : { language: opts.language }),
+    },
     fs: {
       read: async (p: string) => files.get(p),
       write: async (p: string, text: string) => {
@@ -188,7 +192,7 @@ test("press with a text reply opens the pane, forks once, and stores a selected 
   r.replies.push(answered(textReply));
   await explainPress(r.$);
   expect(r.opens).toEqual([
-    { id: "runes-explain", title: "hey mate", columns: 64 },
+    { id: "runes-explain", title: "Explain plz!", columns: 64 },
   ]);
   expect(PANE).toBe("runes-explain");
   expect(r.forks).toEqual([buildPrompt({ kind: "press" })]);
@@ -276,6 +280,17 @@ test("a write that throws keeps the summary as a text entry and sets the error",
   expect(r.view().error).toBe("could not write the explainer: disk full");
   expect(r.spawns).toHaveLength(0);
   expect(r.view().isRunning).toBe(false);
+});
+
+test("a press forks in the language settings name, and an html page carries it as its lang", async () => {
+  const r = await rig({ language: "ja" });
+  r.replies.push(answered(textReply));
+  await explainPress(r.$);
+  expect(r.forks).toEqual([buildPrompt({ kind: "press" }, "ja")]);
+  r.replies.push(answered(htmlReply));
+  await explainPress(r.$);
+  const page = [...r.files.entries()].find(([p]) => p.endsWith(".html") && p !== TEMPLATE_PATH);
+  expect(page?.[1]).toContain('lang="ja"');
 });
 
 test("an unplaced pane raises the toast and the fork still runs", async () => {
@@ -421,7 +436,7 @@ test("select sets selected; reopen opens an html entry and nothing else", async 
   expect(r.runs).toEqual([["open", "/p/h.html"]]);
 });
 
-test("explainHooks hooks only the checker", async () => {
+test("explainHooks hooks the checker, the two presses and the follow-up submit", async () => {
   const hooks: Record<string, number> = {};
   explainHooks(((event: string) => {
     hooks[event] = (hooks[event] ?? 0) + 1;
@@ -432,6 +447,8 @@ test("explainHooks hooks only the checker", async () => {
     "tool.check": 4,
     "tool.call": 1,
     "turn.complete": 2,
+    "ui.press": 2,
+    "ui.input": 1,
   });
 });
 

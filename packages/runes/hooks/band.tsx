@@ -3,7 +3,6 @@ import type { On } from 'claude-code'
 
 import { clawd, seen, sprite, spriteColumns } from './clawd/mascot'
 import { config } from './config'
-import { explainPress } from './explain/explain'
 import { inlineMap } from './minimap/minimap'
 import { stem } from './minimap/rows'
 import { TEACHER_COLOR, TEACHER_ICON } from './teacher/lesson'
@@ -16,6 +15,8 @@ const FRAME = { plugin: 'runes', key: 'frame' } as const
 const MAP_ROWS = { plugin: 'runes', key: 'minimapRows' } as const
 const MAP_SHOWN = { plugin: 'runes', key: 'minimapShown' } as const
 const VIEW = { plugin: 'runes', key: 'explain' } as const
+const LABEL = '[Explain plz!]'
+const RUNNING = '[explaining…]'
 
 export const band = (on: On) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -35,7 +36,9 @@ export const band = (on: On) => {
       hasButton ? read($, VIEW) : undefined,
     ])
     // the columns Clawd and its gap take off the map's width; bodyColumns, not the viewport, since a docked pane narrows the band
-    const reserved = config.enabled.clawd ? spriteColumns() + config.minimap.gap : 0
+    // Clawd and the button share one slot, each centred in it, so their centres line up
+    const slot = hasButton ? Math.max(spriteColumns(), LABEL.length, RUNNING.length) : spriteColumns()
+    const reserved = config.enabled.clawd ? slot + config.minimap.gap : 0
     const room = (e.props.bodyColumns ?? 0) - reserved
     const map = list?.length && room > 4
       ? inlineMap(ui, list, new Set((shown ?? []).map(stem)), room, config.minimap.bar_rows, target => () => void $.ui.scroll({ to: { requestId: target }, block: 'start' }))
@@ -64,16 +67,21 @@ export const band = (on: On) => {
     })
     const withNotice = (node: ReturnType<typeof row>) => (notice ? <Box key="teacher-band" flexDirection="column">{notice}{node}</Box> : node)
 
-    const clawdRow = config.enabled.clawd ? row(sprite(ui, e.surface === 'desktop', frame)) : map ? row() : undefined
+    const picture = sprite(ui, e.surface === 'desktop', frame)
+    const clawdRow = config.enabled.clawd
+      ? row(hasButton ? <Box key="clawd-slot" flexDirection="row" justifyContent="center" width={slot}>{picture}</Box> : picture)
+      : map ? row() : undefined
     if (!hasButton || !term) return clawdRow ? withNotice(clawdRow) : (notice || next(e))
     return (
       <Box key={notice ? 'teacher-band' : 'explain-band'} flexDirection="column">
         {notice}
         {clawdRow}
-        <Box key="explain-row" flexDirection="row" width={e.props.bodyColumns}>
-          <term.Button key="explain" plain onPress={() => (view?.isRunning ? undefined : explainPress($))}>
-            {view?.isRunning ? 'explaining…' : 'hey mate, explain please'}
-          </term.Button>
+        <Box key="explain-row" flexDirection="row" justifyContent="flex-end" width={e.props.bodyColumns}>
+          <Box key="explain-under-clawd" flexDirection="row" justifyContent="center" width={slot}>
+            <term.Button key="explain" plain onPress={() => undefined}>
+              {view?.isRunning ? RUNNING : LABEL}
+            </term.Button>
+          </Box>
         </Box>
       </Box>
     )

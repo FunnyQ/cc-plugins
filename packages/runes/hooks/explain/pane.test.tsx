@@ -94,7 +94,7 @@ test("an empty view draws the hint and the follow-up Input", async ($, on) => {
   await session($, on, { entries: [], isRunning: false });
   const root = await tree($);
   expect(texts(root)).toContain(
-    'Press "hey mate, explain please" under the minimap.',
+    'Press [Explain plz!] under Clawd.',
   );
   const ui = await $.ui.mount(PANE);
   expect(await ui.find({ key: "explain-ask" })).toBeDefined();
@@ -114,10 +114,18 @@ test("twelve entries draw twelve history rows, newest first, only the selected o
   );
   expect(
     rows
-      .filter((b) => String(b.props?.label).startsWith("› "))
+      .filter((b) => String(b.props?.label).startsWith("● "))
       .map((b) => b.props?.label),
-  ).toEqual(["› title 5"]);
-  expect(rows[0]!.props?.label).toBe("  title 12");
+  ).toEqual(["● title 5"]);
+  expect(rows[0]!.props?.label).toBe("○ title 12");
+});
+
+test("history and the selected entry each sit in a rounded border, the answer's in the accent colour", async ($, on) => {
+  await session($, on, { entries: [text("x2"), text("x1")], isRunning: false });
+  const root = await tree($);
+  const box = (key: string) => flat(root).find((n) => n.props?.key === key);
+  expect(box("explain-history")?.props).toMatchObject({ borderStyle: "round", borderDimColor: true });
+  expect(box("explain-answer")?.props).toMatchObject({ borderStyle: "round", borderColor: "#d97757" });
 });
 
 test("pressing a history row selects that entry", async ($, on) => {
@@ -193,8 +201,8 @@ test("an html entry draws summary, dim path, each check's status line, and open 
     [{ check: "pending" }, "checking layout…"],
     [{ check: "ok" }, "layout ok"],
     [{ check: "fixed", note: "2 fix(es)" }, "fixed 2"],
-    [{ check: "failed", note: "boom" }, "not checked: boom"],
-    [{ check: "skipped", note: "no Chrome" }, "not checked: no Chrome"],
+    [{ check: "failed", note: "boom" }, "boom"],
+    [{ check: "skipped", note: "no Chrome" }, "no Chrome"],
     [{ check: "failed" }, "not checked"],
     [{ check: "skipped" }, "not checked"],
   ];
@@ -229,6 +237,21 @@ test("an html entry draws summary, dim path, each check's status line, and open 
   expect(box.opens).toContainEqual(["open", "/p/flow.html"]);
 });
 
+test("a long check note wraps inside the answer box and stops at two lines", async ($, on) => {
+  const note = "The server-side auto mode classifier gave no verdict for Agent: the request that produced this action did not ask for one. Issue the action again once, as-is.";
+  await session($, on, {
+    entries: [
+      { id: "x1", at: 1, title: "Flow", kind: "html", summary: "It flows.", path: "/p/flow.html", check: "failed", note } as ExplainEntry,
+    ],
+    isRunning: false,
+  });
+  const noteLines = texts(await tree($)).filter((t) => t.trim() && note.includes(t.replace(/…$/, "")) && t !== "It flows.");
+  expect(noteLines.length).toBeGreaterThan(0);
+  expect(noteLines.length).toBeLessThanOrEqual(2);
+  for (const line of noteLines) expect(line.length).toBeLessThanOrEqual(64 - 4);
+  expect(noteLines.at(-1)!.endsWith("…")).toBe(true);
+});
+
 test("the usage line formats each count in kilo", async ($, on) => {
   await session($, on, {
     entries: [
@@ -252,7 +275,7 @@ test("an error draws in #cc6666, and no error draws no error line", async ($, on
     tree($).then((r) => flat(r).filter((n) => n.props?.color === "#cc6666"));
   const shown = await red();
   expect(shown).toHaveLength(1);
-  expect(texts(shown[0]!.children ? { children: [shown[0]] } : {})).toContain(
+  expect(texts({ children: [shown[0]] }).join("")).toContain(
     "the fork failed: api-error 500",
   );
   box.view = { entries: [text("x1")], isRunning: false };
@@ -280,4 +303,33 @@ test("submitting asks a follow-up; a blank submit asks nothing", async ($, on) =
   await ui.unmount();
   expect(box.forks).toHaveLength(1);
   expect(box.forks[0]).toContain("why?");
+});
+
+// a fork that writes a page spawns the checker, which the engine lets runes allow only from inside a runes hook
+test("a pick and a follow-up fork from runes' own hooks once the press and submit bottoms returned", async ($, on) => {
+  const forks: string[] = [];
+  const forksPastBottom: number[] = [];
+  on("ui.press", async (_$, e, next) => {
+    const pressed = await next(e);
+    forksPastBottom.push(forks.length);
+    return pressed;
+  });
+  on("ui.input", async (_$, e, next) => {
+    const submitted = await next(e);
+    forksPastBottom.push(forks.length);
+    return submitted;
+  });
+  const box = await session($, on, {
+    entries: [
+      { id: "x1", at: 1, title: "Which?", kind: "ask", question: "What next?", options: ["the parser", "the fork"] },
+    ],
+    isRunning: false,
+  });
+  box.forks = forks;
+  const ui = await $.ui.mount(PANE);
+  await ui.press({ key: "explain-pick:x1:1" });
+  await ui.input({ key: "explain-ask", text: "why?" });
+  await ui.unmount();
+  expect(box.forks).toEqual([expect.stringContaining("the fork"), expect.stringContaining("why?")]);
+  expect(forksPastBottom).toEqual([0, 1]);
 });

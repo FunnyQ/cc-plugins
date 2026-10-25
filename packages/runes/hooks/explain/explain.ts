@@ -34,14 +34,15 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
   try {
     const { isPlaced } = await $.ui.open({
       id: PANE,
-      title: "hey mate",
+      title: "Explain plz!",
       columns: COLUMNS,
     });
     if (!isPlaced)
       $.ui.toast(
-        "hey mate needs a wider terminal; the answer is in the pane once it fits",
+        "Explain plz! needs a wider terminal; the answer is in the pane once it fits",
       );
-    const r = await $.model.fork({ prompt: buildPrompt(ask) });
+    const { language } = (await $.settings.read()) as { language?: string };
+    const r = await $.model.fork({ prompt: buildPrompt(ask, language) });
     if (!r.isAnswered) {
       const status =
         "status" in r && r.status !== undefined ? ` ${r.status}` : "";
@@ -92,7 +93,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           },
           $.plugin.root,
           home,
-          { title: reply.title, main: reply.main, project },
+          { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
         );
         body = { kind: "html", summary: reply.summary, path, check: "pending" };
@@ -173,4 +174,27 @@ export async function explainReopen(
 
 export function explainHooks(on: On): void {
   checker(on);
+
+  // a spawn raised from a closure leaves out every runes hook, the checker's Agent allow too; from a hook, only that hook.
+  // next runs first: the redraw a run starts drops the pressed element's handler
+  on("ui.press", { plugin: "runes", element: "explain" }, async ($, e, next) => {
+    const pressed = await next(e);
+    await explainPress($);
+    return pressed;
+  });
+
+  on("ui.press", { plugin: "runes", requestId: PANE }, async ($, e, next) => {
+    const pressed = await next(e);
+    const pick = e.element.match(/^explain-pick:(.+):(\d+)$/);
+    const entry = pick && (await read($, view)).entries.find((x) => x.id === pick[1]);
+    const option = entry?.kind === "ask" ? entry.options[Number(pick![2])] : undefined;
+    if (option !== undefined) await explainPick($, option);
+    return pressed;
+  });
+
+  on("ui.input", { plugin: "runes", element: "explain-ask", kind: "submit" }, async ($, e, next) => {
+    const submitted = await next(e);
+    await explainAsk($, e.value);
+    return submitted;
+  });
 }
