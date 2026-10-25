@@ -59,7 +59,10 @@ const taskOf = (ask: Ask): string => {
   }
 };
 
-export const buildPrompt = (ask: Ask): string => `${RULES}\n\n${taskOf(ask)}`;
+export const buildPrompt = (ask: Ask, language?: string): string =>
+  [RULES, taskOf(ask), language?.trim() && `Write the whole reply, the title included, in ${language.trim()}.`]
+    .filter(Boolean)
+    .join("\n\n");
 
 const tag = (raw: string, name: string): string | undefined =>
   new RegExp(`<${name}>([\\s\\S]*?)</${name}>`).exec(raw)?.[1]?.trim();

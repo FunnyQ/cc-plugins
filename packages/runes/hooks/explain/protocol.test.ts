@@ -206,3 +206,11 @@ test("rule 14: main is returned raw, scripts included", () => {
     ),
   ).toEqual({ kind: "html", title: "T", summary: "S", main });
 });
+
+test("buildPrompt names the configured language for the whole reply, and keeps the session's language without one", () => {
+  const set = buildPrompt({ kind: "press" }, "zh-TW");
+  expect(set.startsWith(RULES)).toBe(true);
+  expect(set).toContain("Write the whole reply, the title included, in zh-TW.");
+  expect(buildPrompt({ kind: "press" })).not.toContain("Write the whole reply");
+  expect(buildPrompt({ kind: "press" }, "  ")).not.toContain("Write the whole reply");
+});

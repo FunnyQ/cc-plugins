@@ -6,6 +6,7 @@ export type Page = {
   main: string;
   project: string;
   generatedAt: string;
+  lang?: string;
 };
 
 type Io = {
@@ -47,11 +48,18 @@ export const cleanMain = (main: string): string => {
   return main;
 };
 
+// settings.language is free text ("zh-TW", "Japanese"); only a BCP 47 shaped tag becomes the page's lang
+export const langTag = (language?: string): string => {
+  const tag = language?.trim() ?? "";
+  return /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag) ? tag : "";
+};
+
 export const assemble = (template: string, page: Page): string =>
   template.replace(
-    /\{\{(csp|title|project|generatedAt|main)\}\}/g,
+    /\{\{(csp|title|project|generatedAt|main|lang)\}\}/g,
     (_, key: string) => {
       if (key === "csp") return CSP;
+      if (key === "lang") return langTag(page.lang);
       if (key === "main") return cleanMain(page.main);
       return escapeHtml(page[key as "title" | "project" | "generatedAt"]);
     },

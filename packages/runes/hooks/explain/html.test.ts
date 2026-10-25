@@ -145,3 +145,11 @@ test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async
   );
   expect(files.get(`${dir}/20261005-1402-t.html`)).toBe("keep");
 });
+
+test("assemble writes a language tag into {{lang}}, and leaves it empty for a name that is not one", () => {
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: "zh-TW" })).toBe('<html lang="zh-TW">');
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: " ja " })).toBe('<html lang="ja">');
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: "Traditional Chinese" })).toBe('<html lang="">');
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: 'en" onload="x' })).toBe('<html lang="">');
+  expect(assemble('<html lang="{{lang}}">', page)).toBe('<html lang="">');
+});

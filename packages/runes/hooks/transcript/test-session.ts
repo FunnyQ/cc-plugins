@@ -88,6 +88,7 @@ export const fakeHost = (
     } as never;
   });
   on("command.register", () => ({ value: undefined }) as never);
+  on("settings.read", () => ({ value: {} }) as never);
   on("session.messages", () => ({ value: messages }) as never);
   return { files, store, toasts, registered };
 };
