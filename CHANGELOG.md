@@ -1,5 +1,16 @@
 # Changelog
 
+## [runes 0.10.1] - 2026-10-25
+
+_tracks tag `runes-v0.10.1`_
+
+### Added
+- Explain pages can now show tables, code samples, before/after diffs, callouts, and Mermaid diagrams; a diagram that fails to parse falls back to its escaped source with a note.
+- A new [Tell me…] button opens the explain pane for a typed question without forking right away, and the two buttons now stack left of Clawd without taking an extra line.
+
+### Fixed
+- The explain pane's question box now clears after you submit a question.
+
 ## [runes 0.10.0] - 2026-10-25
 
 _tracks tag `runes-v0.10.0`_
