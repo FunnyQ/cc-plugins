@@ -24,6 +24,7 @@ export type ExplainView = {
   isRunning: boolean; // a fork is in flight
   isAsking?: boolean; // [Tell me…] opened the pane for a fresh question; the history stays hidden until a fork starts
   error?: string; // the last failure, cleared by the next press
+  draft?: string; // what the ask field holds: a redraw keeps it, a submit clears it
 };
 
 declare module "claude-code" {

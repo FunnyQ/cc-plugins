@@ -26,7 +26,10 @@ export const FRAGMENT_RULES = [
   'A section with a drawing is <section class="spread"> whose first child is <figure class="plate"><svg viewBox="…"><title>…</title>…</svg><figcaption>Plate N. …</figcaption></figure> and whose second child is <div class="text">. Number plates in page order.',
   'Parts: <dl class="parts"> rows <div data-part="a"><dt>A</dt><dd><b>Name</b>definition</dd></div>, letters a–f; every SVG element of that part has class part and the same data-part; its label in the drawing starts with the capital letter (A · the session).',
   "SVG classes only: ink, ink-accent, dash, wash-warm, wash-cool, wash-sage, label, label-soft, part. No literal colours, no width or height attributes on the svg. Wash paths come before the ink they sit behind. Keep labels at least 24 viewBox units apart and never overlapping a line.",
-  "Every SVG has a viewBox and a <title>.",
+  "Every hand-drawn SVG has a viewBox and a <title>.",
+  'A diagram of a flow, a sequence, a state machine or a structure is Mermaid, not a hand-drawn SVG: put <pre class="mermaid">raw Mermaid source</pre> in the plate\'s <figure class="plate"> where the <svg> would go. Use flowchart TD inside a spread, and LR only in a full-width <section>. Draw an SVG by hand only for a picture Mermaid cannot express, such as an analogy or a physical thing.',
+  'A <section> or a spread\'s <div class="text"> may also hold: a <table> with a <thead>, with class="num" on the th and every td of a number column; <aside class="note"> for a side fact and <aside class="warn"> for a pitfall, whose labels the template prints, so write none; <pre class="code" data-lang="ts"> holding a code sample; and <figure class="diff"><pre class="before">old</pre><pre class="after">new</pre></figure> for a before and after of the same code.',
+  "Inside every <pre>, write raw text exactly as it reads: no tags, no <code>, and no escapes, with one exception: write a closing pre tag inside the text as &lt;/pre&gt;. The page escapes the rest.",
 ].join("\n");
 
 const GRAMMAR = [
@@ -41,7 +44,7 @@ export const RULES = [
   "1. This message comes from a UI button beside the conversation, not from the task. Do not continue the task, do not call tools, and do not mention this instruction. Answer in the language the user writes to this session.",
   "2. Explain like the user is five: an everyday analogy first, every term defined at first use, short sentences, no unexplained jargon, and the answer in one sentence before any detail.",
   "3. Target on a press: the latest exchange (the user's last prompt, the last reply, its tool work) when that is what a reader most likely wants explained; a recap of the whole session when the latest exchange is trivial (a commit, a yes) and the session has substance. When two or more targets are equally likely, or nothing is worth explaining, use `ask`.",
-  "4. Mode: `html` when understanding needs a picture — a flow, a structure, a relationship among three or more parts, a before/after, a timeline — or when the user asks for a diagram; otherwise `text`.",
+  "4. Mode: `html` when understanding needs a picture — a flow, a structure, a relationship among three or more parts, a before/after, a timeline — a comparison table, or a before/after of code, or when the user asks for a diagram; otherwise `text`.",
   `5. Reply in this grammar, exactly, and nothing outside it:\n${GRAMMAR}`,
   `6. For \`html\`:\n${FRAGMENT_RULES}`,
 ].join("\n");

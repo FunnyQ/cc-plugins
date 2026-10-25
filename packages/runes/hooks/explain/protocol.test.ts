@@ -43,6 +43,17 @@ test("FRAGMENT_RULES names every class and element", () => {
     "part",
     "viewBox",
     "title",
+    "<table>",
+    'class="num"',
+    '<aside class="note">',
+    '<aside class="warn">',
+    '<pre class="code" data-lang=',
+    '<figure class="diff">',
+    '<pre class="before">',
+    '<pre class="after">',
+    '<pre class="mermaid">',
+    "flowchart TD",
+    "&lt;/pre&gt;",
   ];
   for (const w of words) expect(FRAGMENT_RULES.includes(w)).toBe(true);
 });

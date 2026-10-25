@@ -262,6 +262,25 @@ test("press with an html reply writes the file, stores pending, and the checker'
   expect(opened(r.runs)).toEqual([["open", entry.path]]);
 });
 
+test("an html reply with a diagram renders it in a bun child, after the entry lands and before the geometry check", async () => {
+  const r = await rig();
+  r.replies.push(
+    answered(htmlReply.replace("</main>", '<pre class="mermaid">A --> B</pre></main>')),
+  );
+  await explainPress(r.$);
+  const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
+  const bun = r.runs.filter((a) => a[0] === "bun");
+  expect(bun[0]).toEqual(["bun", "/plugin/hooks/explain/pele-cli.ts", entry.path]);
+  expect(bun[1]![1]).toBe("/plugin/hooks/explain/geometry-cli.ts");
+});
+
+test("an html reply without a diagram starts no pele child", async () => {
+  const r = await rig();
+  r.replies.push(answered(htmlReply));
+  await explainPress(r.$);
+  expect(r.runs.some((a) => a[1]?.endsWith("pele-cli.ts"))).toBe(false);
+});
+
 test("the project falls back to the cwd's basename when git fails", async () => {
   const r = await rig();
   r.replies.push(answered(htmlReply));
@@ -508,7 +527,7 @@ test("explainClear trashes every html page in one call and empties the history",
   expect(failing.view().error).toBe("could not move 2 pages to the Trash: trash: no such file");
 });
 
-test("explainHooks hooks the checker, the three presses and the follow-up submit", async () => {
+test("explainHooks hooks the checker, the three presses, the ask draft and the follow-up submit", async () => {
   const hooks: Record<string, number> = {};
   explainHooks(((event: string) => {
     hooks[event] = (hooks[event] ?? 0) + 1;
@@ -520,7 +539,7 @@ test("explainHooks hooks the checker, the three presses and the follow-up submit
     "tool.call": 1,
     "turn.complete": 2,
     "ui.press": 3,
-    "ui.input": 1,
+    "ui.input": 2,
   });
 });
 

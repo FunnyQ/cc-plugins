@@ -99,6 +99,7 @@ test("the session registers the checker on sonnet at medium effort, with a promp
     "FAILED page taller than the screenshot",
     "`ink`, `ink-accent`, `dash`, `wash-warm`, `wash-cool`, `wash-sage`, `label`, `label-soft`, `part`",
     "24 viewBox units",
+    "never edit an `svg` with class `pele`",
     "at most 3",
     "`OK`",
     "`FIXED <n>`",

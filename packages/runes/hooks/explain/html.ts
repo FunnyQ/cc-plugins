@@ -1,3 +1,5 @@
+import { escapeHtml, prepareBlocks } from "./blocks";
+
 export const CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
 
@@ -15,16 +17,6 @@ type Io = {
   exists: (path: string) => Promise<boolean>;
   mkdir: (dir: string) => Promise<void>;
 };
-
-const ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-const escapeHtml = (text: string): string =>
-  text.replace(/[&<>"']/g, (c) => ESCAPES[c]);
 
 const cleanOnce = (main: string): string =>
   main
@@ -54,13 +46,23 @@ export const langTag = (language?: string): string => {
   return /^[a-z]{2,3}(-[a-z0-9]{2,8})*$/i.test(tag) ? tag : "";
 };
 
+// tables wrap after the cleaner and before the splice, so a table quoted inside a code block is never touched
+export const renderMain = (main: string): string => {
+  const blocks = prepareBlocks(main);
+  return blocks.splice(
+    cleanMain(blocks.main)
+      .replace(/<table\b/gi, '<div class="table"><table')
+      .replace(/<\/table\s*>/gi, "</table></div>"),
+  );
+};
+
 export const assemble = (template: string, page: Page): string =>
   template.replace(
     /\{\{(csp|title|project|generatedAt|main|lang)\}\}/g,
     (_, key: string) => {
       if (key === "csp") return CSP;
       if (key === "lang") return langTag(page.lang);
-      if (key === "main") return cleanMain(page.main);
+      if (key === "main") return renderMain(page.main);
       return escapeHtml(page[key as "title" | "project" | "generatedAt"]);
     },
   );

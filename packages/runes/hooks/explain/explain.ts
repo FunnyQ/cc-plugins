@@ -2,6 +2,7 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 import type { ExplainEntry, ExplainView } from "../../types";
 import { where } from "../transcript/where";
+import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
 import { writeExplainer } from "./html";
 import { buildPrompt, parseReply, type Ask } from "./protocol";
@@ -9,6 +10,7 @@ import { selectedOf, usageOf, withEntry } from "./state";
 
 export const PANE = "runes-explain";
 export const COLUMNS = 64;
+const PELE_TIMEOUT_MS = 10_000;
 
 // the engine's state scan reads only an atom made in this file, so each reader makes its own
 const view = atom(
@@ -43,6 +45,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
   });
   if (!started) return;
   let check: { id: string; path: string } | undefined;
+  let diagrams = false;
   try {
     await openPane($);
     const { language } = (await $.settings.read()) as { language?: string };
@@ -101,6 +104,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
         );
+        diagrams = hasDiagram(reply.main);
         body = { kind: "html", summary: reply.summary, path, check: "pending" };
       } catch (err) {
         error = `could not write the explainer: ${messageOf(err)}`;
@@ -127,7 +131,15 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
   } finally {
     await update($, view, (v) => ({ ...v, isRunning: false }));
   }
-  if (check) await startCheck($, check.id, check.path);
+  if (!check) return;
+  // a failed render leaves the source fallback the page was written with
+  if (diagrams)
+    await $.process
+      .run(["bun", `${$.plugin.root}/hooks/explain/pele-cli.ts`, check.path], {
+        timeoutMs: PELE_TIMEOUT_MS,
+      })
+      .catch(() => undefined);
+  await startCheck($, check.id, check.path);
 }
 
 export async function explainPress($: EngineInterface): Promise<void> {
@@ -257,8 +269,15 @@ export function explainHooks(on: On): void {
     return pressed;
   });
 
+  on("ui.input", { plugin: "runes", element: "explain-ask", kind: "change" }, async ($, e, next) => {
+    const changed = await next(e);
+    await update($, view, (v) => ({ ...v, draft: e.value }));
+    return changed;
+  });
+
   on("ui.input", { plugin: "runes", element: "explain-ask", kind: "submit" }, async ($, e, next) => {
     const submitted = await next(e);
+    await update($, view, (v) => ({ ...v, draft: "" }));
     await explainAsk($, e.value);
     return submitted;
   });

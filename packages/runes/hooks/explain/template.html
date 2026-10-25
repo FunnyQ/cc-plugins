@@ -19,6 +19,7 @@
         --wash-warm: #d97757; /* --wash-warm: Clawd orange watercolour, the thing being explained */
         --wash-cool: #7da0b8; /* --wash-cool: blue-grey wash, the outside or the other side */
         --wash-sage: #9bb08a; /* --wash-sage: green wash, the good or finished state */
+        --ink-sage: #3f5a31; /* --ink-sage: the + of an added diff line, legible where the sage wash is not */
         --wash-opacity: .26; /* --wash-opacity: how much pigment a wash lays down */
         --shadow: rgba(70, 50, 25, .32); /* --shadow: slip and plate shadow */
         --vignette: rgba(
@@ -132,7 +133,9 @@
           0 8px 18px -10px var(--shadow);
         transform: rotate(-0.6deg);
       }
-      .analogy::before {
+      .analogy::before,
+      aside.note::before,
+      aside.warn::before {
         content: "Think of it like this";
         display: block;
         font-size: 12px;
@@ -264,7 +267,8 @@
       .compare > div:last-child {
         transform: rotate(0.4deg);
       }
-      .compare h3 {
+      .compare h3,
+      main th {
         font-size: 13px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
@@ -375,6 +379,215 @@
         font-family: inherit;
       }
 
+      main {
+        scrollbar-color: color-mix(in srgb, var(--ink-soft) 55%, transparent)
+          transparent;
+      }
+
+      main .code,
+      main .diff {
+        position: relative;
+        background: var(--paper-slip);
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+        transform: rotate(-0.3deg);
+        padding: 30px 0 16px;
+        max-width: 100%;
+        overflow-x: auto;
+        font:
+          14px/1.6 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        tab-size: 2;
+      }
+      main .plate > .code {
+        transform: none;
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 24px;
+        font: inherit;
+        background: none;
+        border-radius: 0;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 8px;
+        left: 24px;
+        font:
+          600 11px/1 -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      main .diff::before {
+        content: "Before → after";
+      }
+      main .diff span {
+        display: block;
+        padding: 0 24px 0 28px;
+        margin: 0 -24px;
+        position: relative;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 10px;
+        color: var(--ink-soft);
+      }
+      main .diff .del {
+        color: var(--ink-soft);
+        text-decoration: line-through;
+        text-decoration-color: var(--ink-accent);
+        text-decoration-thickness: 1.5px;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: var(--ink-accent);
+      }
+      main .diff .add {
+        background: color-mix(in srgb, var(--wash-sage) 30%, transparent);
+      }
+      main .diff .add::before {
+        content: "+";
+        color: var(--ink-sage);
+        font-weight: 700;
+      }
+
+      main .table {
+        overflow-x: auto;
+      }
+      main table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+      }
+      main caption {
+        text-align: left;
+        font-size: 15px;
+        color: var(--ink-soft);
+        padding-bottom: 8px;
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 22px 9px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+      }
+      main th {
+        border-bottom: 2px solid var(--ink);
+        white-space: nowrap;
+      }
+      main tbody tr:last-child td {
+        border-bottom: 0;
+      }
+      main :is(th, td).num {
+        text-align: right;
+      }
+      main :is(th, td):last-child {
+        padding-right: 0;
+      }
+
+      aside.note,
+      aside.warn {
+        position: relative;
+        background: var(--paper-slip);
+        padding: 22px 24px 16px;
+        max-width: 52ch;
+        box-shadow:
+          0 1px 1px var(--shadow),
+          0 8px 18px -10px var(--shadow);
+        transform: rotate(0.4deg);
+      }
+      aside.note::after,
+      aside.warn::after {
+        content: "";
+        position: absolute;
+        top: -9px;
+        left: 22px;
+        width: 92px;
+        height: 20px;
+        transform: rotate(-3deg);
+        background: color-mix(in srgb, var(--wash-cool) 55%, transparent);
+        filter: url(#wash);
+      }
+      aside.warn::after {
+        background: color-mix(in srgb, var(--wash-warm) 60%, transparent);
+      }
+      aside.note::before {
+        content: "Good to know";
+      }
+      aside.warn::before {
+        content: "Watch out";
+        color: var(--ink-accent);
+        font-weight: 600;
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 36px;
+      }
+
+      svg.pele {
+        --_bg: var(--paper);
+        --_fg: var(--ink);
+        --_m: var(--ink-soft);
+        --_l: var(--ink);
+        --_s: color-mix(in srgb, var(--wash-warm) 30%, transparent);
+        --_a: color-mix(in srgb, var(--wash-cool) 30%, transparent);
+        --_b: var(--ink);
+        --_c: var(--ink-accent);
+        --_r: 6px;
+        color: var(--ink);
+        font:
+          16px -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges {
+        filter: url(#pen);
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 2.2;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: none;
+        stroke-width: 2;
+        stroke-linejoin: round;
+        filter: url(#pen);
+      }
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: var(--wash-warm);
+        opacity: 0.38;
+        filter: url(#wash);
+        transform: translate(3px, 3px);
+      }
+      svg.pele .pele-node > rect:not([rx]) {
+        rx: var(--_r);
+      }
+      main .render-note {
+        font-size: 15px;
+        color: var(--ink-accent);
+        margin-top: 10px;
+      }
+
       .colophon {
         margin-top: 72px;
         padding-top: 14px;
@@ -434,6 +647,13 @@
         main > section {
           margin-top: 48px;
         }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
       }
       @media (max-width: 760px) {
         .sheet {
@@ -460,6 +680,15 @@
           />
           <feDisplacementMap in="SourceGraphic" scale="18" />
           <feGaussianBlur stdDeviation=".6" />
+        </filter>
+        <filter id="pen" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency=".04"
+            numOctaves="2"
+            seed="7"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="3" />
         </filter>
       </defs>
     </svg>
