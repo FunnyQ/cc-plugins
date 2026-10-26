@@ -1,5 +1,67 @@
 # Changelog
 
+## [runes 0.11.0] - 2026-10-26
+
+_tracks tag `runes-v0.11.0`_
+
+### Added
+- Each Explain press now draws a random page brief covering opening, analogy, first section and ending, so generated pages stop all coming out in the same layout.
+
+### Changed
+- Explain summaries are now written to read well in the narrow side pane, and the teacher quip prompt states its goal positively instead of listing banned words.
+
+## [chronicle 0.22.6] - 2026-10-26
+
+_tracks tag `chronicle-v0.22.6`_
+
+### Changed
+- Corrected stale details in chronicle docs and prompts: a wrong script name, when barrowkeeper runs, and which branch guard applies on Claude Code.
+
+### Fixed
+- Chronicle scripts now typecheck cleanly, with no change to their runtime behaviour.
+
+## [dispatch 5.7.7] - 2026-10-26
+
+_tracks tag `dispatch-v5.7.7`_
+
+### Changed
+- Fixed dispatch docs that contradicted current behaviour, and made the flightplan review prompt plainer so the model stops inventing P1 defects.
+
+## [browsers 0.1.2] - 2026-10-26
+
+_tracks tag `browsers-v0.1.2`_
+
+### Changed
+- Reformatted the browsers code with the repo formatter; behaviour is unchanged.
+
+## [guard 0.9.1] - 2026-10-26
+
+_tracks tag `guard-v0.9.1`_
+
+### Changed
+- The comments-reaper description now says it never edits code and writes only the verdicts file its task names, instead of calling itself read-only.
+
+## [herdr 0.7.14] - 2026-10-26
+
+_tracks tag `herdr-v0.7.14`_
+
+### Changed
+- Reformatted the herdr code with the repo formatter; behaviour is unchanged.
+
+## [monitor 8.3.2] - 2026-10-26
+
+_tracks tag `monitor-v8.3.2`_
+
+### Changed
+- Removed references to the retired `cockpit start` and `atlas statusline` commands from monitor docs and prompts, and documented `push-usage`.
+
+## [relay 0.9.4] - 2026-10-26
+
+_tracks tag `relay-v0.9.4`_
+
+### Changed
+- Relay command prompts now state their constraints in plain language instead of capitalised shouting, with the same meaning.
+
 ## [runes 0.10.2] - 2026-10-25
 
 _tracks tag `runes-v0.10.2`_
