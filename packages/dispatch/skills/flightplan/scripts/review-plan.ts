@@ -194,6 +194,11 @@ For each finding give: the file, the section or field, what the two sides say (o
 `.trim();
 }
 
+const PLACEHOLDER_PREMISE = `
+Note: \`<baseRef>\` is a placeholder that autopilot substitutes with
+the commit the run started from, so it is defined. Do not report it as undefined.
+`.trim();
+
 const PRIOR_FINDINGS_RULE = `
 # Findings already reported
 
@@ -250,6 +255,7 @@ export async function buildReviewPrompt(
 ): Promise<string> {
   const sections: string[] = [
     opts?.narrow ? narrowInstructions(opts.priorPasses) : REVIEW_INSTRUCTIONS,
+    `\n\n${PLACEHOLDER_PREMISE}`,
   ];
   if (priorFindings && priorFindings.trim().length > 0) {
     sections.push(`\n\n${PRIOR_FINDINGS_RULE}\n\n${priorFindings.trim()}\n`);

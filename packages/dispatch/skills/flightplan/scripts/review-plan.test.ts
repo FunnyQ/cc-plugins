@@ -125,6 +125,21 @@ describe("buildReviewPrompt", () => {
     await rm(root, { recursive: true });
   });
 
+  test("both modes say <baseRef> is a substituted placeholder, not an undefined name", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    for (const narrow of [false, true]) {
+      const result = await buildReviewPrompt([file], undefined, { narrow });
+      expect(result).toContain("`<baseRef>`");
+      expect(result).toContain("autopilot substitutes");
+      expect(result).toContain("commit the run started from");
+    }
+
+    await rm(root, { recursive: true });
+  });
+
   test("each file appears as a header with relative path", async () => {
     const root = await newRoot();
     const plan = join(root, "PLAN.md");
