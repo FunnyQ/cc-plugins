@@ -36,7 +36,7 @@ const GRAMMAR = [
   "<mode>text|html|ask</mode>",
   `<title>a headline, at most ${MAX_TITLE} characters</title>`,
   "text → <body>markdown</body>",
-  "html → <summary>2–4 sentences of markdown</summary><main>an HTML fragment</main>",
+  "html → <summary>a short markdown summary, read in a narrow side pane above the page's link</summary><main>an HTML fragment</main>",
   `ask  → <question>one line</question><option>a topic</option> … ${MIN_OPTIONS} to ${MAX_OPTIONS} options`,
 ].join("\n");
 

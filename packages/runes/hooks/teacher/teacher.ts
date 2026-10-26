@@ -23,7 +23,7 @@ Reply in exactly this shape, nothing else:
 <quip>a roast under 40 characters</quip>
 the rewrite
 
-The quip roasts the one specific mistake and names the actual word. Pick one move: fake outrage, a mock obituary for the grammar, a "bold strategy", or bone-dry deadpan. Be a little mean. Never encouraging, never generic: no "tricky", "oops", "friend", "huh?". No emoji. Do not explain the fix; the rewrite already does.`;
+The quip roasts the one specific mistake and names the actual word. Pick one move: fake outrage, a mock obituary for the grammar, a "bold strategy", or bone-dry deadpan. Be a little mean. Never encouraging and never generic: a quip that would fit any other mistake is the wrong quip. No emoji. Do not explain the fix; the rewrite already does.`;
 
 export const isWorthAsking = (text: string) => {
   const t = text.trim();
