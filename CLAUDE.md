@@ -17,7 +17,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **browsers**  | Drive Firefox, Zen, Chrome, and Safari from the terminal                | `firefox`, `chrome`, `safari`                                          |
 | **runes**     | Switchable UI mods, Claude Code only; first rune is the Clawd mascot    | _(none — a function-hooks mod, toggled by `/runes`)_                   |
 
-Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: the repo layout, monitor's dashboard internals, and the release rules.
+Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: per-plugin design facts, the repo layout, monitor's dashboard internals, the cockpit and harness constraints, the commands, and the release rules.
 
 ### Plugin summaries
 
@@ -58,7 +58,7 @@ cc-plugins/
 │   │       ├── cockpit/
 │   │       │   ├── SKILL.md              # router only
 │   │       │   ├── PRODUCT.md / DESIGN.md  # brand + Night Flight design system
-│   │       │   ├── references/           # pilot / scribe / restart / claude-cli / codex
+│   │       │   ├── references/           # pilot / scribe / restart / claude-cli / codex / opencode / diagram
 │   │       │   ├── bin/cockpit          # POSIX sh shim: fetch + verify + exec
 │   │       │   ├── contract/            # permanent Bun black-box suite
 │   │       │   ├── scripts/             # kept TS + their tests
@@ -103,7 +103,7 @@ cc-plugins/
 │   │   ├── herdr/
 │   │   │   ├── references/               # config / cli / socket-api / plugin-development / agent-orchestration
 │   │   │   └── scripts/herd.ts           # typed Bun wrapper: spawn/tell/send/ask/collect/keys/wait/read/list/close
-│   │   ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/text/snapshot/watch/endpoint
+│   │   ├── herdr-browser/scripts/browser.ts  # browser pane + CDP driver: open/goto/text/snapshot/click/type/eval/screenshot/console/watch/endpoint/…
 │   │   ├── tell/                         # hand a job to another project's agent, fire-and-forget
 │   │   ├── ask/                          # ask another project's agent and get the answer back
 │   │   └── herdr-protocol-upgrade/       # raises a plugin's minimum-protocol constant
@@ -130,7 +130,9 @@ cc-plugins/
 │       ├── NOTICE                        # hey-clawd's MIT licence, for clawd/frames.ts
 │       └── hooks/                        # register.tsx (/runes) + config.ts (RUNES, DEFAULTS, config.yaml)
 │           ├── clawd/                    # mascot.tsx + director.ts + encode.ts + frames.ts; *.test.ts
-│           └── explain/                  # explain.ts + protocol.ts + html.ts + template.html + checker.ts + pane.tsx + state.ts; *.test.ts
+│           ├── transcript/               # the card runes: fold.tsx + spinner.tsx + jev.ts + test-session.ts + one file per card; *.test.ts
+│           ├── minimap/ / teacher/       # the minimap and English-teacher runes
+│           └── explain/                  # explain.ts + protocol.ts + html.ts + blocks.ts + pele.ts + pele-cli.ts + geometry.ts + geometry-cli.ts + template.html + checker.ts + pane.tsx + state.ts + vendor/pele.js; *.test.ts
 └── opencode/                          # OpenCode runtime layer — repo infra, outside packages/, owns no version
     ├── plugin.ts                          # the OpenCode plugin module (single file, no repo imports)
     ├── plugin.test.ts
@@ -156,7 +158,7 @@ Every `packages/<plugin>/` holds both a `.claude-plugin/plugin.json` and a `.cod
 
 Claude Code deletes transcripts after `cleanupPeriodDays` (default 30). The rollup DB makes token history outlive that deletion.
 
-**Never read transcript contents on the request path.** `read_rollup()` (`claude.rs`) walks `PROJECTS_DIR` for paths only (~110ms of readdir), hands them to `update_rollup()`, and reads everything else back out of the DB. Reading the transcripts there instead cost 13.4s per request on a 2.2GB corpus.
+**Never read transcript contents on the request path.** `read_rollup()` (`claude.rs`) walks `paths::projects_dir()` for paths only (~110ms of readdir), hands them to `update_rollup()`, and reads everything else back out of the DB. Reading the transcripts there instead cost 13.4s per request on a 2.2GB corpus.
 
 - `rollup_update.rs` (`cockpit atlas rollup-update`) tail-parses each transcript from `ingested_files.bytes_parsed` at UTF-8-safe newline boundaries, dedups billing across runs through `seen_requests`, and upserts additively into `usage_hourly(hour_ms, project, model)`. The same pass fills the session ledger — one parse, both outputs.
 - The rollup stores **tokens only**. Cost stays a downstream computation, so price corrections apply retroactively. The ledger follows the same rule: `date`, `projectName`, `model` and `tokens` are all derived in `read_rollup_ledger()`, never stored.
@@ -241,15 +243,15 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 Hook parity — which Claude hooks port to which OpenCode events:
 
-| Plugin    | Hook                                                                                                                 | Command                                           | Ported to OpenCode?                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| monitor   | `SessionStart` (`startup\|resume\|clear\|compact`)                                                                   | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping orphaned Claude processes) is Claude-only |
-| monitor   | `SessionStart` (same matcher)                                                                                        | `skills/cockpit/bin/cockpit hook session-start`   | Yes → `session.created` event, delivered by `experimental.chat.system.transform`                                                                                                               |
-| monitor   | `Stop`                                                                                                               | `skills/cockpit/bin/cockpit hook stop`            | Yes → `session.idle` event, same delivery                                                                                                                                                      |
-| chronicle | `PreToolUse` (matcher `Bash`) — OpenCode only; Claude Code runs the `classic.PreToolUse` mod, Codex runs neither     | `hooks/check-branch.sh`                           | Yes → `tool.execute.before` on the `bash` tool                                                                                                                                                 |
-| dispatch  | `PostToolUse` (matcher `Edit\|Write`) — OpenCode only; Claude Code runs the `tool.call` mod, Codex runs neither      | `hooks/flightplan-lint.sh`                        | Yes → `tool.execute.after`                                                                                                                                                                     |
-| guard     | `PostToolUse` (matcher `Edit\|Write`) — Codex only; Claude Code runs the turn-end reviewer mod                       | `hooks/comment-guard.ts`                          | Yes → `tool.execute.after`, sharing the event with the lint                                                                                                                                    |
-| guard     | `UserPromptSubmit` + `Stop` — Codex only; the Claude Code mod runs the same script at `turn.start` / `turn.complete` | `hooks/comment-sweep.ts snapshot` / `sweep`       | **No** — `session.idle` has no way to hand a reason back to the model                                                                                                                          |
+| Plugin    | Hook                                                                                                                 | Command                                           | Ported to OpenCode?                                                                                                                                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| monitor   | `SessionStart` (`startup\|resume\|clear\|compact`)                                                                   | `skills/install/scripts/setup.ts --session-check` | **No** — dead code outside Claude Code: it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work (statusline-path migration, reaping cockpit channel and daemon processes orphaned by older monitor versions, the drift watch) is Claude-only |
+| monitor   | `SessionStart` (same matcher)                                                                                        | `skills/cockpit/bin/cockpit hook session-start`   | Yes → `session.created` event, delivered by `experimental.chat.system.transform`                                                                                                                                                                              |
+| monitor   | `Stop`                                                                                                               | `skills/cockpit/bin/cockpit hook stop`            | Yes → `session.idle` event, same delivery                                                                                                                                                                                                                     |
+| chronicle | `PreToolUse` (matcher `Bash`) — OpenCode only; Claude Code runs the `classic.PreToolUse` mod, Codex runs neither     | `hooks/check-branch.sh`                           | Yes → `tool.execute.before` on the `bash` tool                                                                                                                                                                                                                |
+| dispatch  | `PostToolUse` (matcher `Edit\|Write`) — OpenCode only; Claude Code runs the `tool.call` mod, Codex runs neither      | `hooks/flightplan-lint.sh`                        | Yes → `tool.execute.after`                                                                                                                                                                                                                                    |
+| guard     | `PostToolUse` (matcher `Edit\|Write`) — Codex only; Claude Code runs the turn-end reviewer mod                       | `hooks/comment-guard.ts`                          | Yes → `tool.execute.after`, sharing the event with the lint                                                                                                                                                                                                   |
+| guard     | `UserPromptSubmit` + `Stop` — Codex only; the Claude Code mod runs the same script at `turn.start` / `turn.complete` | `hooks/comment-sweep.ts snapshot` / `sweep`       | **No** — `session.idle` has no way to hand a reason back to the model                                                                                                                                                                                         |
 
 **The module supports opencode 1.x only.** It targets the V1 plugin API: an exported `async (ctx) => hooks` function. OpenCode 2.x replaced that API, so on 2.x the module fails to load and none of its hooks run. The cockpit send and relay's opencode backend are 1.x-only too.
 
@@ -269,7 +271,7 @@ Three rules make it safe. Matching is two-phase: a marker matches on `cwd` alone
 
 A `pending` live result keeps its marker: the pane is still running and still being nudged, so the marker has to outlive relay and retire on `expiresAt` instead. Every other outcome clears it.
 
-**The autopilot wrappers suppress through the env, not the marker.** `codex-run.ts` and `opencode-run.ts` spawn with `env: { ...process.env, RELAY_DELEGATED: "1" }`. They never went through relay, so before this they set nothing at all. `codex exec` and opencode both read the var, so neither needs the marker.
+**The autopilot wrappers suppress through the env, not the marker.** `codex-run.ts` and `opencode-run.ts` spawn with `env: { ...process.env, RELAY_DELEGATED: "1" }`, since they do not go through relay. `codex exec` and opencode both read the var, so neither needs the marker.
 
 **The usage limits come from a mod, not the statusline.** monitor's `hooks/register.ts` hooks `session.measure` and pipes the rate-limit windows, reshaped to the statusline's `{rate_limits: {five_hour: {used_percentage, resets_at}}}`, to `cockpit atlas measure` (`measure.rs`), the one writer of the rate-limit cache and its throttle marker. Its tests import `claude-code/testing`, so bun and tsc exclude `packages/monitor/hooks/**`, and `claude plugin test packages/monitor` cannot run in place — it collects monitor's bun suites too, and refuses a symlinked folder as path-traversal. Copy the mod out first (see Commands). The `cockpit atlas statusline` passthrough is gone; monitor's `SessionStart` hook still unwraps a leftover wiring once per version (marker `$CLAUDE_PLUGIN_DATA/.wired-version`), so keep `unwrapCollectorCommand`. Until that first hook runs, a statusline still pointing at it gets the CLI's unknown-subcommand usage error, so the statusline renders empty for that one session. The hook never fresh-wires.
 
@@ -339,8 +341,7 @@ bun test --parallel .
 
 # Typecheck. Run it before calling a refactor done — `bun build` bundles
 # without typechecking, and `bun test` only reaches the paths a test drives.
-bunx --bun tsc --noEmit                              # whole repo
-bunx --bun tsc --noEmit | grep <path-you-touched>    # must print nothing
+bunx --bun tsc --noEmit                              # whole repo; must print nothing
 ```
 
 **Typecheck against the root `tsconfig.json`, never against a file list.** Naming
@@ -349,10 +350,6 @@ files on the command line drops the config, so `strict` runs without
 name. Real errors then hide among a dozen fake ones — this is how a `Target`
 literal missing a required field once shipped and failed at runtime on every
 command.
-
-The repo-wide run is **not** green — pre-existing errors remain elsewhere — so
-a change is clean when `grep <path-you-touched>` prints nothing, not when the
-count is zero.
 
 ## Code Conventions
 
