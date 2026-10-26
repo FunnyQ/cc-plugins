@@ -24,7 +24,7 @@ Capture what the user wants *before* anyone decides how to build it. One file, `
 
 Check before Step 1. Hand off by name, in one line, and stop:
 
-- Wants it planned and built now, this session → **`hop`** *(the skill once named `preflight`)*
+- Wants it planned and built now, this session → **`hop`**
 - Wants a full spec and a task tree frozen to disk → **`flightplan`**
 - Wants a multi-milestone roadmap → **`waypoints`**
 - Wants the want written down and nothing else → stay here.

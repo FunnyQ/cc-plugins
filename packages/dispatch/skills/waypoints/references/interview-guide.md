@@ -114,4 +114,4 @@ Stop interviewing when:
 - The order is defensible by dependency or risk.
 - No leg is secretly a task breakdown.
 
-Then write `docs/<proj>/WAYPOINTS.md` directly. Until `flightplan` is invoked for the active leg, do not scaffold leg tasks.
+Then draft the roadmap in the conversation and take it through the approval gate in `SKILL.md` before writing `docs/<proj>/WAYPOINTS.md`. Until `flightplan` is invoked for the active leg, do not scaffold leg tasks.

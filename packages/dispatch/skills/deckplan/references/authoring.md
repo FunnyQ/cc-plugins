@@ -8,7 +8,7 @@ Fix all nodes and edges at authoring time. Prepare the graph according to the sp
 
 ## 2. Keep writes inside spawned agents
 
-Use only the Workflow globals `agent`, `phase`, `parallel`, `pipeline`, and `meta` to orchestrate the script. Do not import modules or access the filesystem from the script. Prepare the graph and run identity outside the script before starting it. During the run, put every write inside a spawned, tool-capable agent and spell its shell command out in full in the prompt. A script that tries to write the trail itself has no such capability; the author may discover the missing events only when the panel is empty after the run.
+Orchestrate with the Workflow script globals only; the canonical `autopilot/references/orchestrator.md` uses `agent`, `parallel`, `phase`, `log`, and `budget`, and exports `meta`. Do not import modules or access the filesystem from the script. Prepare the graph and run identity outside the script before starting it. During the run, put every write inside a spawned, tool-capable agent and spell its shell command out in full in the prompt. A script that tries to write the trail itself has no such capability; the author may discover the missing events only when the panel is empty after the run.
 
 ## 3. Bake absolute paths into prompts
 

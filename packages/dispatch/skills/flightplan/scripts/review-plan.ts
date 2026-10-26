@@ -105,9 +105,9 @@ const REVIEW_INSTRUCTIONS = `
 You are reviewing a flightplan artifact — a multi-file planning blueprint written
 to disk so a sub-agent can execute each task independently in a later session.
 
-The plan files are embedded below. Review the ENTIRE plan tree for planning
-quality. Be sharp — findings should be actionable: name the file, the section
-or field, and the concrete fix.
+The plan files are embedded below. Review the whole plan tree for planning
+quality. Make each finding actionable: name the file, the section or field,
+and the concrete fix.
 
 Focus on:
 
@@ -123,8 +123,6 @@ Two things in the bundle are NOT under review:
 
 - The task index in \`tasks/README.md\` sits between generated markers and is rewritten by a script from the task headers. Report nothing inside it.
 - A "## Known gaps" entry — in \`tasks/README.md\` or in PLAN.md — is the author's dispositioned decision: a defect they already saw and chose to accept. Never report one as P1. Raise it as P2 only when you can name a consequence the author's own note does not cover.
-
-Treat every vague acceptance criterion and every cross-file inconsistency as a real defect, not a minor note.
 
 Label every finding P1 or P2 as the first token of its line, because the caller
 loops until no P1 remains:
