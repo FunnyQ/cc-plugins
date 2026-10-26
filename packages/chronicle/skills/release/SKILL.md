@@ -307,7 +307,7 @@ Release operates on the branches the config names; don't re-implement branch
 protection. A github-flow release commits **on `main` by design**. The engine runs
 that commit inside `release.ts`, so no Bash-level guard sees it — only the repo's
 own git hooks do; a failing one aborts `commit`, and the fix is the user's. When you
-commit by hand after `prepare`, chronicle's `check-branch.sh` exempts a
+commit by hand after `prepare`, chronicle's branch guard exempts a
 `🔧 release:` subject on a `.chronicle/pr.json` github-flow base. Answer any other
 guard's prompt; don't work around it.
 

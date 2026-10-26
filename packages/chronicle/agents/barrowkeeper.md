@@ -1,6 +1,6 @@
 ---
 name: barrowkeeper
-description: "Chronicle's barrowkeeper. Runs adr-commit.ts apply, which writes the approved ADR records, applies the lifecycle-metadata update, validates, and archives with the approved plan, then relays its result. Spawned by the ADR skill main agent after the second confirmation gate. Never writes, edits, or moves a file itself."
+description: "Chronicle's barrowkeeper. Runs adr-commit.ts apply, which writes the approved ADR records, applies the lifecycle-metadata update, validates, and archives with the approved plan, then relays its result. Spawned by the ADR skill main agent after the run's last confirmation gate — gate 2, or gate 1 when nothing was promoted. Never writes, edits, or moves a file itself."
 model: haiku
 effort: low
 tools: ["Bash", "Read"]

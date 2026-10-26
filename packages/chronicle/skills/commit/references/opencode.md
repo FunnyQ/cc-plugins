@@ -29,4 +29,4 @@ the result.
 ## Spawn depth
 
 This skill is flat: the Lawspeaker spawns nobody, so it runs at OpenCode's default
-`subagent_depth` of `1`. Every chronicle skill is flat now.
+`subagent_depth` of `1`. Every chronicle skill is flat.
