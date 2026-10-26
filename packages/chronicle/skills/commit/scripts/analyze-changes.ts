@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { $ } from "bun";
+import { $, type ShellExpression } from "bun";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { extname, resolve } from "node:path";
@@ -242,9 +242,9 @@ export async function resolvePromptPath(): Promise<string> {
 
 async function gitText(
   args: TemplateStringsArray,
-  ...values: unknown[]
+  ...values: ShellExpression[]
 ): Promise<string> {
-  return await $({ raw: args }, ...values).text();
+  return await $(args, ...values).text();
 }
 
 function lineCount(content: string): number {

@@ -22,7 +22,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { $ } from "bun";
+import { $, type ShellExpression } from "bun";
 
 import {
   allTags,
@@ -361,9 +361,9 @@ export type RunResult = {
 
 async function shOrThrow(
   strings: TemplateStringsArray,
-  ...v: unknown[]
+  ...v: ShellExpression[]
 ): Promise<string> {
-  return (await $({ raw: strings }, ...v).quiet()).stdout.toString().trim();
+  return (await $(strings, ...v).quiet()).stdout.toString().trim();
 }
 
 async function checkout(branch: string): Promise<void> {

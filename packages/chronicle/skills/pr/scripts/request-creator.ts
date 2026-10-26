@@ -272,8 +272,8 @@ async function realRunner(cmd: string[]): ReturnType<Runner> {
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    proc.stdout.text(),
-    proc.stderr.text(),
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
     proc.exited,
   ]);
 

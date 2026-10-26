@@ -7,7 +7,7 @@
  *   bun analyze-release.ts --verify 0.5.0 --component chronicle
  */
 
-import { $, Glob } from "bun";
+import { $, Glob, type ShellExpression } from "bun";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -549,10 +549,10 @@ const MANIFEST_GLOBS: Array<{ glob: string; kind: VersionFileKind }> = [
 
 export async function git(
   strings: TemplateStringsArray,
-  ...v: unknown[]
+  ...v: ShellExpression[]
 ): Promise<string> {
   try {
-    return (await $({ raw: strings }, ...v).quiet()).stdout.toString().trim();
+    return (await $(strings, ...v).quiet()).stdout.toString().trim();
   } catch {
     return "";
   }
