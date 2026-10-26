@@ -253,5 +253,6 @@ test("buildPrompt appends the brief after everything else, scoped to html", () =
   const tail = out.slice(plain.length);
   expect(tail).toContain("If you reply in html");
   expect(tail).toContain("never overrides");
+  expect(tail).toContain("decides rule 2's analogy choice");
   for (const option of Object.values(brief)) expect(tail).toContain(option);
 });

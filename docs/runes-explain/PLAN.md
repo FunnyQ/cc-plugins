@@ -189,6 +189,9 @@ the orchestrator, then the pane, each running after the one before.
   - Code draws the page-level axes; the model keeps every choice that depends on the content, such as which
     block shows a section and how many sections a page needs.
   - The brief narrows rule 6 and never overrides it, so `FRAGMENT_RULES` is unchanged.
+  - Its analogy line overrides rule 2's "analogy only when clearer": without that, 2 of 4 forks drawn
+    the SVG-plate analogy drew a mechanism instead (HTTP2Shell, a three-way merge); with it, 4 of 4
+    drew an analogy, those two sessions included. A `p` analogy was followed 8 of 8 even before.
   - The draw is plain `Math.random`: two presses in a row may draw the same brief.
   - Per-section pattern lists were rejected: a page mixes several patterns, and a drawn subset can hold none
     that fits.

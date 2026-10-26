@@ -101,7 +101,7 @@ export const drawBrief = (rand: () => number): Brief => {
 
 const briefOf = (brief: Brief): string =>
   [
-    "If you reply in html, lay this page out as follows. This brief narrows rule 6 and never overrides it.",
+    "If you reply in html, lay this page out as follows. Its analogy line decides rule 2's analogy choice for this page; otherwise this brief narrows rule 6 and never overrides it.",
     `- The answer: ${brief.opening}.`,
     `- Analogy: ${brief.analogy}.`,
     `- The first section: ${brief.lead}.`,
