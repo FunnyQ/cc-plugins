@@ -1,5 +1,22 @@
 # Changelog
 
+## [dispatch 5.8.0] - 2026-10-27
+
+_tracks tag `dispatch-v5.8.0`_
+
+### Added
+- Flightplan reviews now run as two gates of persona lenses (Sim Instructor, Navigator, Check Airman, Tower) in place of one broad reviewer: the lenses split the review criteria and run in parallel, the design gate checks PLAN.md and _context/ before the task files are written (Light skips it), and Navigator, Check Airman and Tower run on sonnet subagents while Sim Instructor uses the picked engine.
+
+### Fixed
+- The plan reviewer no longer files a false P1 claiming `<baseRef>` is undefined, because its prompt now says autopilot substitutes the run's starting commit.
+
+## [runes 0.11.2] - 2026-10-27
+
+_tracks tag `runes-v0.11.2`_
+
+### Added
+- Pressing [Tell me…] now focuses the question box in the explain pane, so you can type straight away; [Explain plz!] still leaves the keyboard on your prompt.
+
 ## [runes 0.11.1] - 2026-10-26
 
 _tracks tag `runes-v0.11.1`_
