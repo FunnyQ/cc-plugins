@@ -71,6 +71,7 @@ try {
       i++
     )
       await Bun.sleep(20);
+    await evaluate("document.fonts.ready.then(() => true)");
     byWidth[width] = JSON.parse(await evaluate(MEASURE));
   }
   console.log(JSON.stringify({ faults: faults(byWidth) }));
