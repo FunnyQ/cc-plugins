@@ -49,7 +49,7 @@ When the session is in plan mode, ask the user to switch it off with Shift+Tab b
 
 Ask these **before the interview**, in one `AskUserQuestion` call. A question asked an hour later lands on a user who has stopped tracking the details, so every choice the run needs gets settled while attention is highest. After the plan is approved in Step 6, the rest of the run is unattended, except the compact suggestion, an impeccable design phase, or a review that ends without converging.
 
-**Review engine** — who critiques the written tree in Step 7. All three share one source of criteria; only the reviewer changes.
+**Sim Instructor engine** — who runs the hazard lens in Step 7's design and tree gates, and the narrow phase. The other three lenses run on sonnet subagents whatever the pick. Every engine reads the same criteria from `review-plan.ts`.
 
 1. **Codex (Recommended)** — cross-vendor critique an all-Claude author can't produce.
 2. **OpenCode** — also cross-vendor; pick it to use opencode's models.
@@ -63,7 +63,7 @@ Ask these **before the interview**, in one `AskUserQuestion` call. A question as
 | **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 | 8 | +5 |
 | **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 | 12 | +5 |
 
-Floor, checkpoint, cap, and narrow phase are defined in Step 7. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
+Floor, checkpoint, cap, and narrow phase are defined in Step 7; they govern the tree gate. **Light skips the design gate**, and its tree gate runs Navigator in its place. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
 
 Carry both answers to Step 7. The tier is a guess about a tree that doesn't exist yet — Step 5 restates it beside the finished task index, which is the user's one chance to correct it. After that, honor the pick, except for Step 7's single evidence-based re-cut.
 
@@ -152,6 +152,8 @@ Either way, never leave a half-written tree.
 
 2. **Write PLAN.md and every `_context/*.md` yourself** — never delegate these. They are the contract every task file agrees to, and a single author is what keeps them from drifting (PLAN.md is already drafted, so this is transcription, plus any design-phase reconciliation). Step 1 already wrote all but `_context/design.md`; finish that one here after a design phase. Write `_context/rubric.md` first when the bar is shared. Finish all of them **before** spawning anything: the forks read these files off disk, so the finalized file is the contract, not whatever they inherited from the transcript. Follow `references/plan-template.md` and `references/context-files.md`; don't improvise structure. After a design phase, inline every value the mock uses into `_context/design.md`, in impeccable's DESIGN.md format, list it under Required reading in every UI task, and give the task that first makes the UI visible a `- [ ] (human)` check against `docs/<slug>/design/mock.html` opened side by side.
 
+   **Then run Step 7's design gate** over PLAN.md and `_context/`, on Standard and Deep. Light skips it. It runs here because a contract defect fixed now lives in one file, while the same fix after the fan-out has to land in every task file that copied it.
+
 3. **Fan the task files out to forked subagents** — one `Agent` per task file, all in a single message so they run concurrently. Use `subagent_type: "fork"` and only that; omitting it starts a fresh, context-less agent that never saw the interview and will invent the decisions.
 
    **Write them inline and serially instead** when the tree has ≤3 task files (spawn overhead beats the gain), or when the `Agent` tool is unavailable because flightplan is itself running inside a subagent (a fork is a leaf and cannot spawn). Beyond ~10 tasks, spawn one batch per bucket so a failed batch stays contained.
@@ -199,31 +201,48 @@ Either way, never leave a half-written tree.
    ```
    It fails loudly on malformed or duplicate-ref tasks rather than dropping them, and preserves the human-authored prologue/epilogue between the generated markers. Two of those sections are yours to fill, and the skeleton ships them as placeholder comments that will otherwise be delivered as-is: **`## Where to start`** (name the first task file) and **`## Known gaps`**. `tasks/README.md` is what an executor opens, so a gap recorded only in PLAN.md never reaches them. Revisit both after Step 7 — most gaps surface during the review loop, not the interview.
 
-### Step 7 — Review the written artifact (engine and depth chosen in Step 2; iterate to convergence)
+### Step 7 — Review in two gates (engine and depth chosen in Step 2; iterate to convergence)
 
-Once lint passes, run an independent review over the whole tree, then **loop**: review → fix → re-review. This is a mandatory content-quality gate, a different lens from `lint-task.ts`'s structural checks. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects here, not nitpicks.
+Two gates review the plan, each with persona lenses running in parallel, and each loops review → fix → re-review. This is a mandatory content-quality gate, a different lens from `lint-task.ts`'s structural checks. Cross-file inconsistencies, vague acceptance criteria, oversized tasks, and goal drift are real defects here, not nitpicks.
 
-**Make one fresh review directory before pass 1**, and call the path it prints `<review>`: `mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug> && mktemp -d /tmp/q-lab/dispatch/flightplan/<project>/<slug>/review-XXXXXX`. A fixed path would hand an earlier review's `pass-1.md` to this one.
+One broad reviewer reports a handful of findings per pass, so it drains a plan's defects one pass at a time. Each lens owns a slice of the criteria, so one pass surfaces more of them, and the design gate fixes contract defects before any task file copies them.
 
-**Run the engine the user picked in Step 2 — do not ask again.** Ask here only when Step 2 never happened (a resumed or handed-over session). All three share one source of criteria — the 7-point checklist baked into `review-plan.ts`. Only *who critiques* changes.
+| Lens | Hunts | Design gate | Tree gate | Engine |
+|---|---|---|---|---|
+| `sim-instructor` — Sim Instructor | races, lifecycle and ownership, security boundaries, platform constraints; reads the real code | yes | yes | the Step 2 pick |
+| `navigator` — Navigator | goal against decisions, non-goals, and the plan's own claims | yes | Light only | sonnet / medium |
+| `check-airman` — Check Airman | whether a correct implementation passes every gate and a broken one fails | — | yes | sonnet / medium |
+| `tower` — Tower | contradictions, unpropagated renames, ownership, dependencies, self-containment, task scope | — | yes, every pass | sonnet / medium |
 
-- **Codex** (default) — the cross-vendor signal an all-Claude author can't produce:
+**Make one fresh review directory before the design gate**, or before the tree gate on Light, and call the path it prints `<review>`: `mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug> && mktemp -d /tmp/q-lab/dispatch/flightplan/<project>/<slug>/review-XXXXXX`. A fixed path would hand an earlier review's findings to this one. Each lens's raw findings go to `<review>/<gate>-N-<lens>.md`, where `<gate>` is `design` or `pass` (the tree gate). These are scratch, not artifacts.
+
+**Run the engine the user picked in Step 2 — do not ask again.** Ask here only when Step 2 never happened (a resumed or handed-over session).
+
+**Run every lens of a pass in one message, so they run concurrently.** `<scope>` is `design` in the design gate and `tree` in the tree gate.
+
+- **Sim Instructor on Codex** (default) or **OpenCode** — one background Bash call:
   ```bash
-  bun "$SCRIPTS"/review-plan.ts docs/<slug>
+  bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens sim-instructor --scope <scope> > <review>/<gate>-N-sim-instructor.md
+  # OpenCode: add --engine opencode, optionally --model <provider/model>
   ```
-- **OpenCode** — also cross-vendor; pick it to use opencode's models:
-  ```bash
-  bun "$SCRIPTS"/review-plan.ts docs/<slug> --engine opencode   # optional: --model <provider/model>
-  ```
-  Both bundle the plan files, so the scope is exactly the tree regardless of other uncommitted changes. If the CLI isn't installed the script exits 0 with a warning — skip the gate, note it as a Known gap in `tasks/README.md`, and go to Step 8.
-- **Opus** — a strong Claude reviewer, but **you wrote this plan, so you must not review it yourself**; author bias defeats the gate. Each pass:
-  1. Capture the same bundle the CLIs get into a file: `bun "$SCRIPTS"/review-plan.ts docs/<slug> --print > <review>/bundle.md`
-  2. Invoke `/relay:claude-cli` with `review --prompt-file <review>/bundle.md --model opus --effort high --headless`. Relay runs a fresh `claude -p` process on opus/high under its read-only review contract. The fresh process starts context-less, so the author never reviews its own plan. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out). `--model` here is this step's fixed choice, not a user pick, so skip relay's save-to-config question. When relay rejects `--effort` as an unknown flag, the installed relay predates it: tell the user to update relay, and do not rerun without the flag.
+  Both bundle the plan files, so the scope is exactly the tree regardless of other uncommitted changes. If the CLI isn't installed the script exits 0 with a warning — skip that lens for the rest of the review, record it as a Known gap (see below for where), and run the other lenses. A missing CLI never ends the review or skips the rest of Step 6.
+- **Sim Instructor on Opus** — a strong Claude reviewer, but **you wrote this plan, so you must not review it yourself**; author bias defeats the gate. Each pass:
+  1. Capture the same bundle the CLIs get into a file: `bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens sim-instructor --scope <scope> --print > <review>/bundle-sim-instructor.md`
+  2. Invoke `/relay:claude-cli` with `review --prompt-file <review>/bundle-sim-instructor.md --model opus --effort high --headless`. Relay runs a fresh `claude -p` process on opus/high under its read-only review contract. The fresh process starts context-less, so the author never reviews its own plan. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out). `--model` here is this step's fixed choice, not a user pick, so skip relay's save-to-config question. When relay rejects `--effort` as an unknown flag, the installed relay predates it: tell the user to update relay, and do not rerun without the flag.
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
+- **Navigator, Check Airman, Tower** — capture each lens's bundle with `bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens <lens> --scope <scope> --print > <review>/bundle-<lens>.md`, then spawn one `Agent` per lens with `subagent_type: "Explore"`, `model: "sonnet"`, and `effort: "medium"`. Never use a fork, which would inherit the interview. The prompt is: *"Read `<review>/bundle-<lens>.md` and follow its instructions exactly. Reply with the findings only."* Write each reply to `<review>/<gate>-N-<lens>.md` yourself. Explore is read-only and starts context-less, so the author never reviews its own plan. **OpenCode and Codex** have no such subagent: run these three lenses on the Sim Instructor engine instead, with the same `--lens` flags.
 
-**From pass 2 on, hand the reviewer what the last pass found.** Save each pass's raw findings to `<review>/pass-N.md` (outside the tree — these are scratch, not artifacts), then add `--prior-findings <review>/pass-<N-1>.md` to the next pass's command. It works on all three engines, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned, and the loop never reaches a P1-clean pass. The bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
+**From pass 2 on, hand each lens what it found last pass:** add `--prior-findings <review>/<gate>-<N-1>-<lens>.md` to that lens's command. It works on every engine, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned, and the loop never reaches a P1-clean pass. The tree bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
 
-**Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap in `tasks/README.md` with the reason, and don't re-fix it when a later pass raises it again.
+**Rerun only the lenses that still have work.** Pass 1 of a gate runs every lens of that gate. A later pass reruns each lens that reported a P1 on the previous pass, plus Tower on every tree-gate pass, because a fix in one file is what leaves another stale. Every lens except Tower that came back P1-free stays off for the rest of that gate.
+
+**Act on findings between every pass.** Re-reviewing unchanged files just repeats the same findings. Rewrite vague criteria, split tasks that mix concerns, fix goal drift, add missing `Depends on` edges. After any structural change, re-run `lint-task.ts` and `build-readme.ts`. Skip a finding only when it conflicts with an intentional recorded decision — then log it as a Known gap with the reason, and don't re-fix it when a later pass raises it again. During the design gate, `tasks/README.md` does not exist and the design bundle excludes it, so log the gap under a `## Known gaps` section in PLAN.md; copy it into `tasks/README.md`'s Known gaps once `build-readme.ts` writes that file.
+
+**After a fix that renames a symbol or changes a decision, grep the tree for the old term and fix every hit before the next pass.** In two measured reviews, 7 of 42 findings were an earlier fix that missed a sibling file.
+
+**The design gate** runs from Step 6, after PLAN.md and every `_context/*.md` are written and before the task fan-out. It is skipped on Light. Its lenses are Sim Instructor and Navigator, at `--scope design`. Fix its findings in PLAN.md and `_context/` only, since no task file exists yet. Floor 1, cap 3: stop at the first pass with no P1. When P1s are still open at the cap, put them in `<review>/design-open.md` and pass that file as `--prior-findings` to every tree-gate lens on pass 1, so the tree gate adjudicates them. When any of them is Navigator's, the tree gate also runs Navigator, at `--scope tree`, until it comes back P1-free, because no other lens reports outside its own concerns.
+
+**The tree gate** runs once Step 6's lint and `build-readme.ts` pass. Its lenses are Sim Instructor, Check Airman, and Tower at `--scope tree`, plus Navigator on Light, whose design gate did not run. Everything below — floor, checkpoint, cap, re-cut, and the narrow phase — governs the tree gate, and "the broad loop" means the tree gate. **A pass's open-P1 count is the sum across every lens that ran in it**; a lens that sat the pass out adds zero.
 
 **Sort every finding into two buckets before deciding anything:**
 
@@ -245,10 +264,10 @@ A broad prompt aimed at a plan that has already been revised a dozen times manuf
 
 ```bash
 bun "$SCRIPTS"/review-plan.ts docs/<slug> --narrow --prior-passes <broad passes run> \
-  --prior-findings <review>/pass-<last>.md
+  --prior-findings <review>/pass-<last>-all.md
 ```
 
-On the Opus engine, add the same two flags to the `--print` capture (`--print --narrow --prior-passes <n>`) and invoke relay exactly as before — `/relay:claude-cli`, never a fork.
+Run the narrow phase on the Sim Instructor engine. `pass-<last>-all.md` is every lens file of the last tree-gate pass, concatenated; write it before the first narrow pass, and save each narrow pass to `<review>/narrow-N.md`. Narrow pass 1 takes `--prior-findings <review>/pass-<last>-all.md`; every later narrow pass takes `--prior-findings <review>/narrow-<N-1>.md`. On the Opus engine, add the same two flags to the `--print` capture (`--print --narrow --prior-passes <n>`) and invoke relay exactly as before — `/relay:claude-cli`, never a fork.
 
 - **Carry the still-open P1s in on `--prior-findings`, always.** The narrow reviewer must *adjudicate* what the broad loop left open, not merely fail to mention it. A P1 that survives adjudication is real. One the narrow pass drops was noise — and you may only treat it as noise because a reviewer was shown it and declined it, never because the prompt changed underneath it.
 - **Reset the convergence counter at the switch.** The two-consecutive-passes rule compares open-P1 counts, and a new prompt is a new denominator. The count falling on the first narrow pass is the prompt working, not the plan improving. Do not compare across the switch; start counting again from the first narrow pass, so ending the narrow phase early needs two consecutive narrow passes that fail to lower it.

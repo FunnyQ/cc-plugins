@@ -29,6 +29,6 @@ Resolve the sibling script from this skill's load-time base directory:
    Each leg is its own lintable tree with its own closing gate, so end `<buckets>` with `review` exactly as a normal plan does. The leg's final review task goes at `review/01`.
 
    When the interview chose impeccable, run SKILL.md Step 6's design phase right after `leg-scaffold`, which creates the leg directory non-recursively and throws when it already exists. Replace `docs/<slug>/` with `docs/<proj>/legs/<NN-slug>/` in every path it names, so the mock lands at `docs/<proj>/legs/<NN-slug>/design/mock.html`.
-5. Write the leg's spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`, using the same split as SKILL.md Step 6: author the spec and `_context/` yourself, fan the task files out one forked subagent each.
-6. Run `lint-task.ts`, `build-readme.ts`, and `review-plan.ts` against that leg path. They already accept arbitrary paths.
+5. Write the leg's spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`, using the same split as SKILL.md Step 6: author the spec and `_context/` yourself, run SKILL.md Step 7's design gate over them (Standard and Deep), then fan the task files out one forked subagent each.
+6. Run `lint-task.ts`, `build-readme.ts`, and then SKILL.md Step 7's tree gate against that leg path. The scripts already accept arbitrary paths.
 7. Execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.

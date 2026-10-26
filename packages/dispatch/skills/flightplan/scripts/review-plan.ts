@@ -12,31 +12,34 @@
  *   opencode — delegates to the sibling `opencode-run.ts review` wrapper, which
  *              wraps `opencode run` (opencode has no native review). The bundle is
  *              handed over via `--prompt-file`.
- * The Opus engine is NOT a CLI — it is handled by the flightplan skill, which
- * spawns a fresh independent reviewer subagent. That subagent calls this script
- * with `--print` to obtain the exact same instructions+bundle and reviews it
- * itself, so all three engines share one source of review criteria.
+ * Claude reviewers (the Opus engine, and the sonnet lens subagents) are NOT a
+ * CLI — the flightplan skill spawns them, and they call this script with
+ * `--print` to obtain the exact same instructions+bundle, so every engine shares
+ * one source of review criteria.
  *
  * Usage:
- *   bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>]
- *   bun review-plan.ts docs/<slug> --prior-findings <file>   # round 2+
+ *   bun review-plan.ts docs/<slug> --lens <lens> [--scope design|tree] [--engine codex|opencode] [--model <m>]
+ *   bun review-plan.ts docs/<slug> --lens <lens> --prior-findings <file>   # pass 2+
  *   bun review-plan.ts docs/<slug> --narrow --prior-passes 8 # the post-cap phase
- *   bun review-plan.ts docs/<slug> --print     # emit the instructions+bundle, no CLI
+ *   bun review-plan.ts docs/<slug> --lens <lens> --print     # emit the instructions+bundle, no CLI
  *
- * Two instruction sets, one per phase, both baked in here so all three engines
- * share one source of criteria: the broad one (7 checks, P1+P2) for the main
- * loop, and the narrow one (`--narrow`, blocking classes only, at most five
- * findings) for the phase Step 7 enters after the broad loop hits its cap.
+ * Instruction sets: one per lens (sim-instructor, navigator, check-airman,
+ * tower — P1+P2, each limited to its own concerns) for the design and tree
+ * gates, and the narrow one (`--narrow`, blocking classes only, at most five
+ * findings) for the phase Step 7 enters after the tree gate hits its cap.
+ * `--scope design` bundles PLAN.md and _context/ only, for the gate that runs
+ * before the task files are written.
  *
  * Exits with the reviewer's exit code so callers can gate on failure; a missing
  * CLI exits 0 with a warning (skip the gate, record a Known gap).
  *
  * Export surface (for tests):
- *   collectPlanFiles(planDir) — returns ordered list of plan file paths
- *   buildReviewPrompt(files, prior?, opts?) — the bundle: instructions + prior
+ *   collectPlanFiles(planDir, scope?) — returns ordered list of plan file paths
+ *   buildReviewPrompt(files, prior, opts) — the bundle: instructions + prior
  *                                      findings + file contents
+ *   lensInstructions(lens, scope) — one lens's instruction text
  *   narrowInstructions(n?)    — the narrow-phase instruction text
- *   parseArgs(argv)           — pure parse of planDir/engine/model/print/prior/narrow
+ *   parseArgs(argv)           — pure parse of planDir/engine/model/print/prior/narrow/lens/scope
  */
 
 import { readdir, readFile, stat } from "node:fs/promises";
@@ -46,6 +49,15 @@ import { join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export type ReviewEngine = "codex" | "opencode";
+export type ReviewLens =
+  "sim-instructor" | "navigator" | "check-airman" | "tower";
+export type ReviewScope = "design" | "tree";
+const LENS_NAMES: ReviewLens[] = [
+  "sim-instructor",
+  "navigator",
+  "check-airman",
+  "tower",
+];
 export type ReviewArgs = {
   planDir?: string;
   engine: ReviewEngine;
@@ -54,10 +66,17 @@ export type ReviewArgs = {
   priorFindings?: string;
   narrow: boolean;
   priorPasses?: number;
+  lens?: ReviewLens;
+  scope: ReviewScope;
 };
 
 export function parseArgs(argv: string[]): ReviewArgs {
-  const out: ReviewArgs = { engine: "codex", print: false, narrow: false };
+  const out: ReviewArgs = {
+    engine: "codex",
+    print: false,
+    narrow: false,
+    scope: "tree",
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--narrow") {
@@ -71,6 +90,22 @@ export function parseArgs(argv: string[]): ReviewArgs {
         );
       }
       out.priorPasses = n;
+    } else if (a === "--lens") {
+      const v = argv[++i];
+      if (!LENS_NAMES.includes(v as ReviewLens)) {
+        throw new Error(
+          `Unknown --lens: ${v ?? "(missing)"} (expected ${LENS_NAMES.join("|")})`,
+        );
+      }
+      out.lens = v as ReviewLens;
+    } else if (a === "--scope") {
+      const v = argv[++i];
+      if (v !== "design" && v !== "tree") {
+        throw new Error(
+          `Unknown --scope: ${v ?? "(missing)"} (expected design|tree)`,
+        );
+      }
+      out.scope = v;
     } else if (a === "--engine") {
       const v = argv[++i];
       if (v !== "codex" && v !== "opencode") {
@@ -81,11 +116,11 @@ export function parseArgs(argv: string[]): ReviewArgs {
       out.engine = v;
     } else if (a === "--model") {
       const v = argv[++i];
-      if (!v) throw new Error("Missing value after --model");
+      if (!v || v.startsWith("--")) throw new Error("Missing value after --model");
       out.model = v;
     } else if (a === "--prior-findings") {
       const v = argv[++i];
-      if (!v) throw new Error("Missing value after --prior-findings");
+      if (!v || v.startsWith("--")) throw new Error("Missing value after --prior-findings");
       out.priorFindings = v;
     } else if (a === "--print") {
       out.print = true;
@@ -98,26 +133,83 @@ export function parseArgs(argv: string[]): ReviewArgs {
   if (out.priorPasses !== undefined && !out.narrow) {
     throw new Error("--prior-passes requires --narrow");
   }
+  if (out.narrow && out.lens) {
+    throw new Error(
+      "--narrow takes no --lens: the narrow phase is one unified prompt",
+    );
+  }
+  if (out.narrow && out.scope === "design") {
+    throw new Error("--narrow reviews the whole tree; drop --scope design");
+  }
+  if (!out.narrow && !out.lens) {
+    throw new Error(
+      `--lens is required (${LENS_NAMES.join("|")}), or pass --narrow`,
+    );
+  }
   return out;
 }
 
-const REVIEW_INSTRUCTIONS = `
-You are reviewing a flightplan artifact — a multi-file planning blueprint written
-to disk so a sub-agent can execute each task independently in a later session.
+const LENS_TITLES: Record<ReviewLens, string> = {
+  "sim-instructor": "Sim Instructor",
+  navigator: "Navigator",
+  "check-airman": "Check Airman",
+  tower: "Tower",
+};
 
-The plan files are embedded below. Review the whole plan tree for planning
-quality. Make each finding actionable: name the file, the section or field,
-and the concrete fix.
+const LENS_CRITERIA: Record<ReviewLens, string> = {
+  "sim-instructor": `
+You inject failures before anything flies. Find where the planned design breaks
+in the real environment:
 
-Focus on:
+1. Concurrency and ordering — races, re-entrancy, two runs overlapping, results that arrive late or out of order, a timeout that fires while work is still in flight.
+2. Lifecycle and ownership — state cleared by a party that does not own it, a resource that dies before its user or outlives it, a cleanup path that skips a case.
+3. Security boundaries — allow-lists and path prefixes, an empty or missing value (an empty root prefix matches every path), encoded traversal, quoting and spaces in paths, untrusted content reaching a privileged sink.
+4. Platform and engine constraints — time budgets, API limits, sandbox rules, what the runtime actually allows. Read the real code and type definitions the plan names; report a constraint only when you can cite the file that states it.
 
-1. Goal consistency — does PLAN.md's stated goal match what the task files actually implement? Flag drift.
-2. Acceptance criteria — are they concrete and verifiable, or vague ("should work", "is correct")? Every criterion must be checkable without ambiguity.
-3. Task scope — is any single task too large to finish in one session? Flag tasks that mix multiple concerns; suggest a split.
-4. Self-containment — can an executor understand each task from _context/ + the task file alone, without opening PLAN.md or sibling tasks?
-5. Dependency gaps — are there implicit ordering assumptions not captured in "Depends on:" fields?
-6. Eval rubric quality — are rubric dimensions specific to the task, or generic filler? Does the pass threshold make sense for what's being built?
-7. Final review completeness — does the final-review task's "Depends on:" field reach every other task in the tree?
+For each hazard, name the concrete input or sequence of events that triggers it.
+`,
+  navigator: `
+You check the plan is still heading where it says it is going:
+
+1. Goal against decisions — every decision serves the stated goal, and no decision makes the goal unreachable.
+2. Goal against non-goals — no decision builds something the Non-goals exclude, and no Non-goal removes something the goal needs.
+3. Claims — every promise the plan makes (privacy, cost, performance, compatibility, "sends nothing", "loads nothing") is true of the mechanism it describes. Name the mechanism that contradicts the claim.
+4. Numbers and limits — a cap, count, or retention rule matches every other place that states it.
+5. At tree scope, the task files together implement the goal: flag drift between what PLAN.md promises and what the tasks build.
+`,
+  "check-airman": `
+You check that every gate actually checks. For every \`## Verification\` command
+and every \`## Acceptance criteria\` item, run two thought experiments:
+
+1. A correct implementation — would it pass? Flag a check that cannot pass: malformed shell (\`grep -c\` asked to print content, an unquoted placeholder), a pattern that also matches legitimate content (tests, fixtures, a namespace URL), a wrong expected value, a check that forbids an edit the task itself requires.
+2. A deliberately broken implementation — would it fail? Flag a criterion loose enough to pass a regression: "not 404" that also accepts a 500, "behaves as before" with no recorded baseline.
+3. Checks no command can make must be tagged \`(human)\`, and a human check still needs a fixed sample and a pass condition.
+4. Eval rubric quality — dimensions specific to the task, a pass threshold that makes sense for what is built.
+
+Quote the command or criterion, and name the implementation that breaks it.
+`,
+  tower: `
+You hold every file to every other file:
+
+1. Contradictions — two files disagreeing on a name, type, path, default, flag, or required behavior. Name both sides.
+2. Propagation — a renamed symbol or changed decision that some file still states the old way. Search the bundle for the old term.
+3. Ownership and order — a task whose check needs work a later task does, or a task that edits a file another task owns.
+4. Dependencies — an ordering assumption missing from "Depends on:", and a Final review task whose "Depends on:" does not reach every other task.
+5. Self-containment — each task can be done from _context/ plus its own file, without PLAN.md or a sibling task.
+6. Task scope — a task too large for one session, or one that mixes concerns; suggest the split.
+`,
+};
+
+const DESIGN_SCOPE_NOTE = `
+This is the design review. Only PLAN.md and the _context/ files exist; the task
+files are written from them after this review passes.
+Do not report missing task files, verification commands, or rubrics.
+`.trim();
+
+const SHARED_RULES = `
+Three other lenses review this plan in parallel, each for its own concerns.
+Report only findings inside your lens; a finding outside it is noise here. Make
+each finding actionable: name the file, the section or field, and the concrete fix.
 
 Two things in the bundle are NOT under review:
 
@@ -130,10 +222,20 @@ loops until no P1 remains:
 - P1 — an executor hits this and stalls or guesses: a missing or contradicted decision, two files that disagree, an unverifiable acceptance criterion, a dependency edge that cannot be satisfied, a task that cannot be done from _context/ plus its own file.
 - P2 — an executor ships anyway: wording, ordering, a criterion that could be sharper, a task that could split more cleanly.
 
-Do not inflate P2 into P1 to seem thorough, and do not soften a P1 to seem agreeable. If the plan is clean, say so and return no findings.
-
----
+Do not inflate P2 into P1 to seem thorough, and do not soften a P1 to seem agreeable. If the plan is clean inside your lens, say so and return no findings.
 `.trim();
+
+export function lensInstructions(lens: ReviewLens, scope: ReviewScope): string {
+  const sections = [
+    `You are reviewing a flightplan artifact — a multi-file planning blueprint written
+to disk so a sub-agent can execute each task independently in a later session.
+The plan files are embedded below.`,
+    `# Your lens: ${LENS_TITLES[lens]}\n\n${LENS_CRITERIA[lens].trim()}`,
+  ];
+  if (scope === "design") sections.push(DESIGN_SCOPE_NOTE);
+  sections.push(SHARED_RULES, "---");
+  return sections.join("\n\n");
+}
 
 // The narrow phase (`--narrow`), which Step 7 enters when the broad loop hits
 // its cap with P1s still open. It does NOT lower the bar: its five qualifying
@@ -209,7 +311,10 @@ missed. Anything the author banked as a Known gap is a decision, not an
 unfixed defect. Rank findings NEW to this pass above repeats.
 `.trim();
 
-export async function collectPlanFiles(planDir: string): Promise<string[]> {
+export async function collectPlanFiles(
+  planDir: string,
+  scope: ReviewScope = "tree",
+): Promise<string[]> {
   const files: string[] = [];
 
   try {
@@ -219,10 +324,12 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
 
   const tasksDir = join(planDir, "tasks");
 
-  try {
-    await stat(join(tasksDir, "README.md"));
-    files.push(join(tasksDir, "README.md"));
-  } catch {}
+  if (scope === "tree") {
+    try {
+      await stat(join(tasksDir, "README.md"));
+      files.push(join(tasksDir, "README.md"));
+    } catch {}
+  }
 
   try {
     const contextFiles = await readdir(join(tasksDir, "_context"));
@@ -230,6 +337,8 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
       if (f.endsWith(".md")) files.push(join(tasksDir, "_context", f));
     }
   } catch {}
+
+  if (scope === "design") return files;
 
   try {
     const buckets = await readdir(tasksDir, { withFileTypes: true });
@@ -250,11 +359,15 @@ export async function collectPlanFiles(planDir: string): Promise<string[]> {
 
 export async function buildReviewPrompt(
   files: string[],
-  priorFindings?: string,
-  opts?: { narrow?: boolean; priorPasses?: number },
+  priorFindings: string | undefined,
+  opts:
+    | { lens: ReviewLens; scope?: ReviewScope }
+    | { narrow: true; priorPasses?: number },
 ): Promise<string> {
   const sections: string[] = [
-    opts?.narrow ? narrowInstructions(opts.priorPasses) : REVIEW_INSTRUCTIONS,
+    "narrow" in opts
+      ? narrowInstructions(opts.priorPasses)
+      : lensInstructions(opts.lens, opts.scope ?? "tree"),
     `\n\n${PLACEHOLDER_PREMISE}`,
   ];
   if (priorFindings && priorFindings.trim().length > 0) {
@@ -372,19 +485,19 @@ async function main() {
   } catch (err) {
     console.error((err as Error).message);
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--narrow [--prior-passes <n>]] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> (--lens sim-instructor|navigator|check-airman|tower [--scope design|tree] | --narrow [--prior-passes <n>]) [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
     );
     process.exit(2);
   }
 
   if (!args.planDir) {
     console.error(
-      "Usage: bun review-plan.ts docs/<slug> [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--narrow [--prior-passes <n>]] [--print]",
+      "Usage: bun review-plan.ts docs/<slug> (--lens sim-instructor|navigator|check-airman|tower [--scope design|tree] | --narrow [--prior-passes <n>]) [--engine codex|opencode] [--model <m>] [--prior-findings <file>] [--print]",
     );
     process.exit(2);
   }
 
-  const files = await collectPlanFiles(args.planDir);
+  const files = await collectPlanFiles(args.planDir, args.scope);
   if (files.length === 0) {
     console.error(
       `No plan files found in ${resolve(args.planDir)} — run scaffold.ts first.` +
@@ -405,18 +518,22 @@ async function main() {
     }
   }
 
-  const prompt = await buildReviewPrompt(files, prior, {
-    narrow: args.narrow,
-    priorPasses: args.priorPasses,
-  });
+  const prompt = await buildReviewPrompt(
+    files,
+    prior,
+    args.lens
+      ? { lens: args.lens, scope: args.scope }
+      : { narrow: true, priorPasses: args.priorPasses },
+  );
 
   if (args.print) {
     process.stdout.write(prompt);
     process.exit(0);
   }
 
+  const label = args.lens ? `${args.lens}, ${args.scope}` : "narrow";
   console.log(
-    `Flightplan review (${args.engine}${args.narrow ? ", narrow" : ""}) — ${files.length} file(s):`,
+    `Flightplan review (${args.engine}, ${label}) — ${files.length} file(s):`,
   );
   for (const f of files) console.log(`  ${relative(process.cwd(), f)}`);
   console.log();

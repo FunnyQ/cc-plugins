@@ -101,6 +101,24 @@ describe("collectPlanFiles", () => {
     await rm(root, { recursive: true });
   });
 
+  test("design scope keeps PLAN.md and _context/ only, before any task file exists", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "tasks/_context"), { recursive: true });
+    await mkdir(join(root, "tasks/ui"), { recursive: true });
+    await writeFile(join(root, "PLAN.md"), "# Plan\n");
+    await writeFile(join(root, "tasks/README.md"), "# Index\n");
+    await writeFile(join(root, "tasks/_context/shared.md"), "# Shared\n");
+    await writeFile(join(root, "tasks/ui/01-build.md"), "# Build\n");
+
+    const result = await collectPlanFiles(root, "design");
+    expect(result).toEqual([
+      join(root, "PLAN.md"),
+      join(root, "tasks/_context/shared.md"),
+    ]);
+
+    await rm(root, { recursive: true });
+  });
+
   test("returns empty array when planDir is empty", async () => {
     const root = await newRoot();
 
@@ -117,7 +135,7 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file]);
+    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
     expect(result.startsWith("You are reviewing a flightplan artifact")).toBe(
       true,
     );
@@ -130,8 +148,8 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    for (const narrow of [false, true]) {
-      const result = await buildReviewPrompt([file], undefined, { narrow });
+    for (const opts of [{ lens: "tower" as const }, { narrow: true as const }]) {
+      const result = await buildReviewPrompt([file], undefined, opts);
       expect(result).toContain("`<baseRef>`");
       expect(result).toContain("autopilot substitutes");
       expect(result).toContain("commit the run started from");
@@ -148,7 +166,7 @@ describe("buildReviewPrompt", () => {
     await writeFile(plan, "# Plan\n");
     await writeFile(task, "# Build\n");
 
-    const result = await buildReviewPrompt([plan, task]);
+    const result = await buildReviewPrompt([plan, task], undefined, { lens: "tower" });
     expect(result).toContain(`## ${relative(process.cwd(), plan)}`);
     expect(result).toContain(`## ${relative(process.cwd(), task)}`);
 
@@ -160,7 +178,7 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n\nAcceptance criteria\n");
 
-    const result = await buildReviewPrompt([file]);
+    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
     expect(result).toContain(
       `## ${relative(process.cwd(), file)}\n\`\`\`markdown\n# Plan\n\nAcceptance criteria\n\n\`\`\``,
     );
@@ -173,7 +191,7 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file]);
+    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
     expect(result).not.toContain("Findings already reported");
 
     await rm(root, { recursive: true });
@@ -187,6 +205,7 @@ describe("buildReviewPrompt", () => {
     const result = await buildReviewPrompt(
       [file],
       "P1 ui/01: acceptance criterion is unverifiable",
+      { lens: "tower" },
     );
     expect(result.startsWith("You are reviewing a flightplan artifact")).toBe(
       true,
@@ -208,7 +227,7 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file], "   \n  ");
+    const result = await buildReviewPrompt([file], "   \n  ", { lens: "tower" });
     expect(result).not.toContain("Findings already reported");
 
     await rm(root, { recursive: true });
@@ -221,11 +240,56 @@ describe("buildReviewPrompt", () => {
     await writeFile(second, "# Second\n");
     await writeFile(first, "# First\n");
 
-    const result = await buildReviewPrompt([second, first]);
+    const result = await buildReviewPrompt([second, first], undefined, { lens: "tower" });
     const secondIndex = result.indexOf(`## ${relative(process.cwd(), second)}`);
     const firstIndex = result.indexOf(`## ${relative(process.cwd(), first)}`);
     expect(secondIndex).toBeGreaterThan(-1);
     expect(firstIndex).toBeGreaterThan(secondIndex);
+
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("buildReviewPrompt (lenses)", () => {
+  const LENSES = [
+    ["sim-instructor", "Sim Instructor"],
+    ["navigator", "Navigator"],
+    ["check-airman", "Check Airman"],
+    ["tower", "Tower"],
+  ] as const;
+
+  test("each lens names itself, keeps the shared rules, and differs from the others", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    const prompts = new Set<string>();
+    for (const [lens, title] of LENSES) {
+      const out = await buildReviewPrompt([file], undefined, { lens });
+      expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(true);
+      expect(out).toContain(`# Your lens: ${title}`);
+      expect(out).toContain("Report only findings inside your lens");
+      expect(out).toContain("Label every finding P1 or P2");
+      expect(out).toContain("## Known gaps");
+      prompts.add(out);
+    }
+    expect(prompts.size).toBe(LENSES.length);
+
+    await rm(root, { recursive: true });
+  });
+
+  test("design scope tells the lens that task files do not exist yet", async () => {
+    const root = await newRoot();
+    const file = join(root, "PLAN.md");
+    await writeFile(file, "# Plan\n");
+
+    const design = await buildReviewPrompt([file], undefined, {
+      lens: "navigator",
+      scope: "design",
+    });
+    const tree = await buildReviewPrompt([file], undefined, { lens: "navigator" });
+    expect(design).toContain("Do not report missing task files");
+    expect(tree).not.toContain("Do not report missing task files");
 
     await rm(root, { recursive: true });
   });
@@ -265,42 +329,88 @@ describe("collapseDuplicateReviewOutput", () => {
 });
 
 describe("parseArgs", () => {
-  test("defaults: engine codex, no model, not print", () => {
-    expect(parseArgs(["docs/my-plan"])).toEqual({
+  test("defaults: engine codex, no model, not print, tree scope", () => {
+    expect(parseArgs(["docs/my-plan", "--lens", "tower"])).toEqual({
       planDir: "docs/my-plan",
       engine: "codex",
       print: false,
       narrow: false,
+      lens: "tower",
+      scope: "tree",
     });
+  });
+
+  test("--lens and --scope are captured", () => {
+    const out = parseArgs(["docs/p", "--lens", "navigator", "--scope", "design"]);
+    expect(out.lens).toBe("navigator");
+    expect(out.scope).toBe("design");
+  });
+
+  test("rejects an unknown lens", () => {
+    expect(() => parseArgs(["docs/p", "--lens", "pilot"])).toThrow(
+      /Unknown --lens/,
+    );
+  });
+
+  test("rejects an unknown scope", () => {
+    expect(() =>
+      parseArgs(["docs/p", "--lens", "tower", "--scope", "tasks"]),
+    ).toThrow(/Unknown --scope/);
+  });
+
+  test("a lens review without --lens is rejected rather than run with no criteria", () => {
+    expect(() => parseArgs(["docs/p"])).toThrow(/--lens is required/);
+  });
+
+  test("rejects --lens with --narrow, since the narrow phase is one unified prompt", () => {
+    expect(() =>
+      parseArgs(["docs/p", "--narrow", "--lens", "tower"]),
+    ).toThrow(/--narrow takes no --lens/);
+  });
+
+  test("rejects --scope design with --narrow, since the narrow phase reviews the tree", () => {
+    expect(() =>
+      parseArgs(["docs/p", "--narrow", "--scope", "design"]),
+    ).toThrow(/--narrow reviews the whole tree/);
   });
 
   test("--engine opencode + --model are captured", () => {
     expect(
-      parseArgs(["docs/my-plan", "--engine", "opencode", "--model", "x/y"]),
+      parseArgs([
+        "docs/my-plan",
+        "--engine",
+        "opencode",
+        "--model",
+        "x/y",
+        "--lens",
+        "sim-instructor",
+      ]),
     ).toEqual({
       planDir: "docs/my-plan",
       engine: "opencode",
       model: "x/y",
       print: false,
       narrow: false,
+      lens: "sim-instructor",
+      scope: "tree",
     });
   });
 
   test("--print sets print and ignores engine wiring", () => {
-    const out = parseArgs(["docs/my-plan", "--print"]);
+    const out = parseArgs(["docs/my-plan", "--print", "--lens", "tower"]);
     expect(out.print).toBe(true);
     expect(out.planDir).toBe("docs/my-plan");
   });
 
   test("flag order is irrelevant; planDir can come after flags", () => {
-    expect(parseArgs(["--engine", "opencode", "docs/p"]).planDir).toBe(
+    expect(parseArgs(["--engine", "opencode", "--lens", "tower", "docs/p"]).planDir).toBe(
       "docs/p",
     );
   });
 
   test("--prior-findings captures the path", () => {
     expect(
-      parseArgs(["docs/p", "--prior-findings", "/tmp/round-2.md"])
+      parseArgs(["docs/p", "--lens", "tower", "--prior-findings", "/tmp/round-2.md"])
         .priorFindings,
     ).toBe("/tmp/round-2.md");
   });
@@ -311,14 +421,23 @@ describe("parseArgs", () => {
     );
   });
 
+  test("a flag after --model or --prior-findings is never swallowed as its value", () => {
+    expect(() =>
+      parseArgs(["docs/p", "--lens", "tower", "--model", "--print"]),
+    ).toThrow(/Missing value after --model/);
+    expect(() =>
+      parseArgs(["docs/p", "--lens", "tower", "--prior-findings", "--narrow"]),
+    ).toThrow(/Missing value after --prior-findings/);
+  });
+
   test("rejects an unknown engine", () => {
-    expect(() => parseArgs(["docs/p", "--engine", "gemini"])).toThrow(
+    expect(() => parseArgs(["docs/p", "--lens", "tower", "--engine", "gemini"])).toThrow(
       /Unknown --engine/,
     );
   });
 
   test("rejects an unexpected argument", () => {
-    expect(() => parseArgs(["docs/p", "--frob"])).toThrow(
+    expect(() => parseArgs(["docs/p", "--lens", "tower", "--frob"])).toThrow(
       /Unexpected argument/,
     );
   });
@@ -335,8 +454,8 @@ describe("parseArgs", () => {
     expect(out.priorPasses).toBeUndefined();
   });
 
-  test("rejects --prior-passes without --narrow rather than silently running the broad prompt", () => {
-    expect(() => parseArgs(["docs/p", "--prior-passes", "8"])).toThrow(
+  test("rejects --prior-passes without --narrow rather than silently running a lens prompt", () => {
+    expect(() => parseArgs(["docs/p", "--lens", "tower", "--prior-passes", "8"])).toThrow(
       /--prior-passes requires --narrow/,
     );
   });
@@ -377,7 +496,7 @@ describe("--print (integration)", () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
 
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print"], {
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print", "--lens", "tower"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -404,8 +523,32 @@ describe("--print (integration)", () => {
     const out = res.stdout.toString();
     expect(out).toContain("has already been through 4 review passes");
     expect(out).toContain("Report at most five.");
-    expect(out).not.toContain("Focus on:");
+    expect(out).not.toContain("# Your lens");
     expect(out).toContain("Goal: ship it.");
+
+    await rm(root, { recursive: true });
+  });
+});
+
+describe("--print --scope design (integration)", () => {
+  test("bundles only PLAN.md and _context/ under the chosen lens", async () => {
+    const root = await newRoot();
+    await mkdir(join(root, "tasks/_context"), { recursive: true });
+    await mkdir(join(root, "tasks/ui"), { recursive: true });
+    await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
+    await writeFile(join(root, "tasks/_context/shared.md"), "Shared facts.\n");
+    await writeFile(join(root, "tasks/ui/01-build.md"), "Task body.\n");
+
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--print", "--lens", "check-airman", "--scope", "design"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(res.success).toBe(true);
+    const out = res.stdout.toString();
+    expect(out).toContain("# Your lens: Check Airman");
+    expect(out).toContain("Goal: ship it.");
+    expect(out).toContain("Shared facts.");
+    expect(out).not.toContain("Task body.");
 
     await rm(root, { recursive: true });
   });
@@ -417,11 +560,11 @@ describe("buildReviewPrompt (narrow)", () => {
     const plan = join(root, "PLAN.md");
     await writeFile(plan, "# Plan\n\nGoal: ship it.\n");
 
-    const broad = await buildReviewPrompt([plan]);
+    const lens = await buildReviewPrompt([plan], undefined, { lens: "tower" });
     const narrow = await buildReviewPrompt([plan], undefined, { narrow: true });
 
-    expect(broad).toContain("Focus on:");
-    expect(narrow).not.toContain("Focus on:");
+    expect(lens).toContain("# Your lens: Tower");
+    expect(narrow).not.toContain("# Your lens");
     expect(narrow).toContain("Report a finding only if it meets this bar");
     expect(narrow).toContain("Goal: ship it.");
 
@@ -477,7 +620,7 @@ describe("formatCodexReviewOutput", () => {
 describe("review-plan CLI exit codes", () => {
   test("an empty plan dir exits 2, never the reviewer's 1, and names the working directory", async () => {
     const root = await newRoot();
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print"], {
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print", "--lens", "tower"], {
       stdout: "pipe",
       stderr: "pipe",
     });
@@ -497,6 +640,8 @@ describe("review-plan CLI exit codes", () => {
         SCRIPT,
         root,
         "--print",
+        "--lens",
+        "tower",
         "--prior-findings",
         join(root, "nope.md"),
       ],
@@ -510,7 +655,7 @@ describe("review-plan CLI exit codes", () => {
   test("an unreachable opencode warns and skips the gate with exit 0, like a missing codex", async () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n");
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--engine", "opencode"], {
+    const res = Bun.spawnSync(["bun", SCRIPT, root, "--engine", "opencode", "--lens", "sim-instructor"], {
       stdout: "pipe",
       stderr: "pipe",
       env: { ...process.env, OPENCODE_BIN: join(root, "no-opencode") },
