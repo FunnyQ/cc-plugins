@@ -178,6 +178,25 @@ the orchestrator, then the pane, each running after the one before.
 
 - Fork cost on a lapsed cache bills the whole prefix at the main model's price; shown, not prevented.
 
+## Iteration: page brief (2026-10-26)
+
+- **What**: every fork prompt ends with a page brief. `drawBrief(Math.random)` draws one option per axis of
+  `BRIEF_AXES` in `protocol.ts`: the answer's opening, the analogy, the first section's form, and the ending.
+- **Why**: left to choose, the fork laid out every page alike. Measured on 4 sessions before the brief: 4 of 4
+  pages ran answer, analogy, a spread with a Mermaid plate, then `aside.warn` and `takeaway`. The middle
+  sections already varied with the content.
+- **Decisions**:
+  - Code draws the page-level axes; the model keeps every choice that depends on the content, such as which
+    block shows a section and how many sections a page needs.
+  - The brief narrows rule 6 and never overrides it, so `FRAGMENT_RULES` is unchanged.
+  - The draw is plain `Math.random`: two presses in a row may draw the same brief.
+  - Per-section pattern lists were rejected: a page mixes several patterns, and a drawn subset can hold none
+    that fits.
+  - Visual looks (CSS variants on `data-look`) are deferred to the next iteration.
+- **Measured after** (10 sessions, `claude -p --resume --fork-session`, not `$.model.fork`): analogy, first
+  section and ending followed the brief in 28 of 30 draws; both misses were the "no closing aside" ending,
+  reworded to "no `<aside>` in the last section", which then held 3 of 3.
+
 ## References
 
 - Patterns: `packages/guard/hooks/register.ts`, `packages/dispatch/hooks/flightdeck/flightdeck.tsx`
