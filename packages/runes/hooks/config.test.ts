@@ -231,23 +231,35 @@ test("the minimap's look is read from its own section, each invalid field fallin
   const { config, problems } = normalize({
     minimap: { enabled: true, bar_rows: 4, gap: 0, marker_color: "#112233" },
   });
-  expect(config.minimap).toEqual({ bar_rows: 4, gap: 2, marker_color: "#112233" });
+  expect(config.minimap).toEqual({
+    bar_rows: 4,
+    gap: 2,
+    marker_color: "#112233",
+  });
   expect(config.enabled.minimap).toBe(true);
   expect(problems.join("\n")).toContain("minimap.gap");
-  expect(normalize(null).config.minimap).toEqual({ bar_rows: 3, gap: 2, marker_color: "#ff8c00" });
+  expect(normalize(null).config.minimap).toEqual({
+    bar_rows: 3,
+    gap: 2,
+    marker_color: "#ff8c00",
+  });
 });
 
 test("TEMPLATE lists the minimap's fields commented, so a changed default reaches every file", () => {
   const text = TEMPLATE(DEFAULTS.enabled);
-  expect(text).toContain('\n  # bar_rows: 3');
-  expect(text).toContain('\n  # gap: 2');
+  expect(text).toContain("\n  # bar_rows: 3");
+  expect(text).toContain("\n  # gap: 2");
   expect(text).toContain('\n  # marker_color: "#ff8c00"');
 });
 
 test("bash.jev is on by default, is read as a switch, and an invalid value falls back alone", () => {
   expect(DEFAULTS.bash.jev).toBe(true);
-  expect(normalize({ transcript: { bash: { jev: false } } }).config.bash.jev).toBe(false);
-  const { config, problems } = normalize({ transcript: { bash: { jev: "off", fold_lines: 4 } } });
+  expect(
+    normalize({ transcript: { bash: { jev: false } } }).config.bash.jev,
+  ).toBe(false);
+  const { config, problems } = normalize({
+    transcript: { bash: { jev: "off", fold_lines: 4 } },
+  });
   expect(config.bash.jev).toBe(true);
   expect(config.bash.fold_lines).toBe(4);
   expect(problems.join("\n")).toContain("transcript.bash.jev");
@@ -269,19 +281,38 @@ test("setSwitch restores a removed top-level section to its place in the templat
   for (const top of keys(t)) {
     const from = t.indexOf(top);
     const next = t.findIndex((l, i) => i > from && /^\w+:/.test(l));
-    const without = [...t.slice(0, from), ...(next === -1 ? [""] : t.slice(next))];
-    const out = setSwitch(without.join("\n"), top.slice(0, -1) as never, true).split("\n");
+    const without = [
+      ...t.slice(0, from),
+      ...(next === -1 ? [""] : t.slice(next)),
+    ];
+    const out = setSwitch(
+      without.join("\n"),
+      top.slice(0, -1) as never,
+      true,
+    ).split("\n");
     expect(keys(out)).toEqual(keys(t));
   }
 });
 
 test("a block ends before a trailing blank or a comment no deeper than its header, and keeps a deeper one", () => {
   expect(
-    setSwitch("transcript:\n  prompt:\n    enabled: true\n\n# next\nminimap:\n", "peer", false),
-  ).toBe("transcript:\n  prompt:\n    enabled: true\n  peer:\n    enabled: false\n\n# next\nminimap:\n");
+    setSwitch(
+      "transcript:\n  prompt:\n    enabled: true\n\n# next\nminimap:\n",
+      "peer",
+      false,
+    ),
+  ).toBe(
+    "transcript:\n  prompt:\n    enabled: true\n  peer:\n    enabled: false\n\n# next\nminimap:\n",
+  );
   expect(
-    setSwitch("transcript:\n  prompt:\n    enabled: true\n  # note\n\nminimap:\n", "peer", false),
-  ).toBe("transcript:\n  prompt:\n    enabled: true\n  # note\n  peer:\n    enabled: false\n\nminimap:\n");
+    setSwitch(
+      "transcript:\n  prompt:\n    enabled: true\n  # note\n\nminimap:\n",
+      "peer",
+      false,
+    ),
+  ).toBe(
+    "transcript:\n  prompt:\n    enabled: true\n  # note\n  peer:\n    enabled: false\n\nminimap:\n",
+  );
 });
 
 test("explain is on by default and its switch sits at the top level after teacher", () => {
@@ -293,18 +324,24 @@ test("explain is on by default and its switch sits at the top level after teache
 
 test("the explain template line names the button", () => {
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
-    '# the [Explain plz!] button under Clawd',
+    "# the [Explain plz!] button under Clawd",
   );
 });
 
 test("/runes explain off reads back as off", () => {
   const before = TEMPLATE(DEFAULTS.enabled).split("\n");
-  const after = setSwitch(TEMPLATE(DEFAULTS.enabled), "explain", false).split("\n");
+  const after = setSwitch(TEMPLATE(DEFAULTS.enabled), "explain", false).split(
+    "\n",
+  );
   expect(after).toHaveLength(before.length);
   const changed = after.filter((l, i) => l !== before[i]);
   expect(changed).toHaveLength(1);
   expect(changed[0]).toMatch(/^  enabled: false #/);
   expect(after[after.indexOf(changed[0]!) - 1]).toBe("explain:");
-  const enabled = Object.fromEntries(RUNES.map((r) => [r, r !== "explain" && DEFAULTS.enabled[r]]));
-  expect(TEMPLATE(enabled as typeof DEFAULTS.enabled).split("\n")).toEqual(after);
+  const enabled = Object.fromEntries(
+    RUNES.map((r) => [r, r !== "explain" && DEFAULTS.enabled[r]]),
+  );
+  expect(TEMPLATE(enabled as typeof DEFAULTS.enabled).split("\n")).toEqual(
+    after,
+  );
 });

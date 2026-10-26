@@ -223,8 +223,7 @@ test("pressing a title unfolds that call alone, under its title, and pressing it
   );
   expect(await row.find({ key: "bash" })).toBeDefined();
   const rail = (await row.find({ key: "fold:rail" })) as
-    | { props?: { backgroundColor?: string } }
-    | undefined;
+    { props?: { backgroundColor?: string } } | undefined;
   expect(rail?.props?.backgroundColor).toBeDefined();
   expect(rail?.props?.backgroundColor).toBe(PALETTES.dark.surface);
   expect(await row.find({ key: "fold:opened" })).toBeUndefined();
@@ -466,7 +465,11 @@ for (const reason of ["answer", "aborted", "refusal", "error"] as const)
 
 test("a subagent's turn ending leaves the main loop's pending calls held", async ($, on) => {
   await callPending($, on);
-  await $.turn.complete({ ...TURN_END, reason: "answer", agentId: "a" } as never);
+  await $.turn.complete({
+    ...TURN_END,
+    reason: "answer",
+    agentId: "a",
+  } as never);
   await new Promise((r) => setTimeout(r, 30));
   expect(await find($, RUNNING, { key: "fold:title" })).toBeDefined();
 });
@@ -493,8 +496,7 @@ test("a running title's spinner and a folded title's dot hold the same two cells
     ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true }),
   );
   const spinner = (await row.find({ key: "fold:spinner" })) as
-    | { props?: { width?: number } }
-    | undefined;
+    { props?: { width?: number } } | undefined;
   const running = (await row.find({ key: "fold:title" }))!.text;
   await row.unmount();
   const folded = (await find($, done, { key: "fold:title" }))!.text;

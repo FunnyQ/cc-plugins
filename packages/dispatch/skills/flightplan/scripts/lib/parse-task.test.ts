@@ -179,16 +179,22 @@ describe("parseTask Models", () => {
   });
 
   const fixtures: [string, TaskModels | null][] = [
-    ["dev=opus/high, verify=sonnet", {
-      dev: { model: "opus", effort: "high" },
-      verify: { model: "sonnet", effort: null },
-    }],
+    [
+      "dev=opus/high, verify=sonnet",
+      {
+        dev: { model: "opus", effort: "high" },
+        verify: { model: "sonnet", effort: null },
+      },
+    ],
     ["judge = opus / xhigh", { judge: { model: "opus", effort: "xhigh" } }],
     ["dev=opus,", { dev: { model: "opus", effort: null } }],
-    [" dev=sonnet/low , verify=haiku ", {
-      dev: { model: "sonnet", effort: "low" },
-      verify: { model: "haiku", effort: null },
-    }],
+    [
+      " dev=sonnet/low , verify=haiku ",
+      {
+        dev: { model: "sonnet", effort: "low" },
+        verify: { model: "haiku", effort: null },
+      },
+    ],
     ["dev=opus, dev=sonnet", null],
     ["dev=gpt5", null],
     ["dev=Opus", null],
@@ -244,7 +250,9 @@ describe("parseTask Models", () => {
   });
 
   test("drops empty comma pieces and accepts every remaining model and effort", () => {
-    const task = parse(", dev=haiku/medium,, verify=sonnet/low, judge=opus/high, fix=fable/max, ");
+    const task = parse(
+      ", dev=haiku/medium,, verify=sonnet/low, judge=opus/high, fix=fable/max, ",
+    );
     expect(task.models).toEqual({
       dev: { model: "haiku", effort: "medium" },
       verify: { model: "sonnet", effort: "low" },
@@ -255,7 +263,9 @@ describe("parseTask Models", () => {
   });
 
   test("reports each invalid entry while retaining valid entries", () => {
-    const task = parse("dev=opus, scout=haiku, verify=unknown, judge=opus/extreme");
+    const task = parse(
+      "dev=opus, scout=haiku, verify=unknown, judge=opus/extreme",
+    );
     expect(task.models).toEqual({ dev: { model: "opus", effort: null } });
     expect(task.modelErrors).toEqual([
       'Models entry "scout=haiku": unknown role "scout" (expected dev, verify, judge, fix)',

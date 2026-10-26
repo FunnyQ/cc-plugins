@@ -201,9 +201,19 @@ describe("classifyJudged", () => {
       tagName: "x-v1.0.0",
       headerLabel: "x 1.0.0",
       commits: [
-        { sha: "a1", subject: "📖 docs: Change skill", body: "", section: "judge" },
+        {
+          sha: "a1",
+          subject: "📖 docs: Change skill",
+          body: "",
+          section: "judge",
+        },
         { sha: "b2", subject: "✨ feat: New", body: "", section: "Added" },
-        { sha: "c3", subject: "♻️ refactor: Split", body: "", section: "judge" },
+        {
+          sha: "c3",
+          subject: "♻️ refactor: Split",
+          body: "",
+          section: "judge",
+        },
       ],
     },
   ];
@@ -226,15 +236,31 @@ describe("classifyJudged", () => {
     const result = await classifyJudged(facts, { apiKey: "k", fetch: impl });
     const body = JSON.parse(String(calls[0]?.body));
     expect(Object.keys(body.questions)).toEqual(["section:0", "section:1"]);
-    expect(body.state.commits.map((c: { subject: string }) => c.subject)).toEqual([
-      "📖 docs: Change skill",
-      "♻️ refactor: Split",
-    ]);
-    expect(result).toEqual({ answers: expect.any(Object), ms: expect.any(Number) });
+    expect(
+      body.state.commits.map((c: { subject: string }) => c.subject),
+    ).toEqual(["📖 docs: Change skill", "♻️ refactor: Split"]);
+    expect(result).toEqual({
+      answers: expect.any(Object),
+      ms: expect.any(Number),
+    });
     expect(facts[0]!.commits).toEqual([
-      { sha: "a1", subject: "📖 docs: Change skill", body: "", section: "Changed", judgedBy: "jev", confidence: 0.8 },
+      {
+        sha: "a1",
+        subject: "📖 docs: Change skill",
+        body: "",
+        section: "Changed",
+        judgedBy: "jev",
+        confidence: 0.8,
+      },
       { sha: "b2", subject: "✨ feat: New", body: "", section: "Added" },
-      { sha: "c3", subject: "♻️ refactor: Split", body: "", section: "omit", judgedBy: "jev", confidence: 0.6 },
+      {
+        sha: "c3",
+        subject: "♻️ refactor: Split",
+        body: "",
+        section: "omit",
+        judgedBy: "jev",
+        confidence: 0.6,
+      },
     ]);
   });
 
@@ -249,9 +275,17 @@ describe("classifyJudged", () => {
   test("makes no call when nothing needs judging", async () => {
     const { impl, calls } = fetchAnswering({});
     const facts: UnitFacts[] = [
-      { tagName: "x", headerLabel: "x", commits: [{ sha: "b2", subject: "feat: y", body: "", section: "Added" }] },
+      {
+        tagName: "x",
+        headerLabel: "x",
+        commits: [
+          { sha: "b2", subject: "feat: y", body: "", section: "Added" },
+        ],
+      },
     ];
-    expect(await classifyJudged(facts, { apiKey: "k", fetch: impl })).toBeNull();
+    expect(
+      await classifyJudged(facts, { apiKey: "k", fetch: impl }),
+    ).toBeNull();
     expect(calls).toHaveLength(0);
   });
 });

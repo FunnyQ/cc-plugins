@@ -5,7 +5,13 @@ export const claudeBackend: Backend = {
   supports: new Set(["delegate", "review"]),
 
   invoke(_mode: Mode, opts: InvokeOpts) {
-    const argv = ["claude", "-p", opts.promptText || "", "--output-format", "json"];
+    const argv = [
+      "claude",
+      "-p",
+      opts.promptText || "",
+      "--output-format",
+      "json",
+    ];
     if (opts.model) argv.push("--model", opts.model);
     if (opts.effort) argv.push("--effort", opts.effort);
     return { argv };

@@ -59,7 +59,10 @@ export function parseTerminalBrowsers(raw: string): Target[] {
     });
 }
 
-export function selectTarget(targets: Target[], requested: string | null): Target {
+export function selectTarget(
+  targets: Target[],
+  requested: string | null,
+): Target {
   if (targets.length === 0) {
     throw new Error("no browser is live; run `open <url>` first");
   }
@@ -90,11 +93,15 @@ export function terminalOpenArgs(
   // from, which is the human's.
   if (direction === null) {
     if (ratio !== null) {
-      throw new Error("--ratio needs --split: a full tab has nothing to divide");
+      throw new Error(
+        "--ratio needs --split: a full tab has nothing to divide",
+      );
     }
     return ["open", url];
   }
-  if (!SPLIT_DIRECTIONS.includes(direction as (typeof SPLIT_DIRECTIONS)[number])) {
+  if (
+    !SPLIT_DIRECTIONS.includes(direction as (typeof SPLIT_DIRECTIONS)[number])
+  ) {
     throw new Error(
       `invalid --split ${direction} (${SPLIT_DIRECTIONS.join(", ")})`,
     );
@@ -141,7 +148,10 @@ export function parseHerdrTab(raw: string): HerdrTab {
 
 // Two browsers can hold the same url, so a fresh one is only identifiable by
 // the key that was not there before it opened.
-export function newcomer(before: Target[], after: Target[]): Target | undefined {
+export function newcomer(
+  before: Target[],
+  after: Target[],
+): Target | undefined {
   const known = new Set(before.map((target) => target.id));
   return after.find((target) => !known.has(target.id));
 }

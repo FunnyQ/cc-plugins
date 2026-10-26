@@ -19,8 +19,7 @@ export type VersionFileKind = "json" | "toml" | "text";
 export type Workflow = "git-flow" | "github-flow";
 
 export type VersionFileSpec =
-  | { path: string; kind: VersionFileKind }
-  | { path: string; pattern: string };
+  { path: string; kind: VersionFileKind } | { path: string; pattern: string };
 
 /**
  * A committed build output that carries its version from the manifest at build

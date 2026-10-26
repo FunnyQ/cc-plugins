@@ -47,7 +47,6 @@ const DONE = {
   prompt: INPUT.prompt,
 };
 
-
 test("a finished agent draws its task, model, run totals and tool stats", async ($, on) => {
   await startSession($, on);
   const card = CALL({ output: DONE });
@@ -192,7 +191,10 @@ test("enabled.agent: false hands the row to the engine", async ($, on) => {
 
 test("a full model id shows as its family", async ($, on) => {
   await startSession($, on);
-  const card = CALL({ input: { ...INPUT, model: undefined }, output: { ...DONE, resolvedModel: "claude-sonnet-5-5" } });
+  const card = CALL({
+    input: { ...INPUT, model: undefined },
+    output: { ...DONE, resolvedModel: "claude-sonnet-5-5" },
+  });
   expect(
     await find($, card, { type: "Text", text: /Review the diff · sonnet\s*$/ }),
   ).toBeDefined();
@@ -200,7 +202,12 @@ test("a full model id shows as its family", async ($, on) => {
 
 test("the effort a subagent's requests carry joins its model as model/effort", async ($, on) => {
   on("turn.step", async function* (_$, e) {
-    return { turnId: e.turnId, index: e.index, answer: "", toolUses: [] } as never;
+    return {
+      turnId: e.turnId,
+      index: e.index,
+      answer: "",
+      toolUses: [],
+    } as never;
   });
   await startSession($, on);
   // the stream runs its hooks only as it is read
@@ -212,8 +219,14 @@ test("the effort a subagent's requests carry joins its model as model/effort", a
     messageCount: 1,
     agentId: "ag1",
   } as never));
-  const card = CALL({ input: { ...INPUT, model: "claude-sonnet-5-5" }, output: DONE });
+  const card = CALL({
+    input: { ...INPUT, model: "claude-sonnet-5-5" },
+    output: DONE,
+  });
   expect(
-    await find($, card, { type: "Text", text: /Review the diff · sonnet\/low/ }),
+    await find($, card, {
+      type: "Text",
+      text: /Review the diff · sonnet\/low/,
+    }),
   ).toBeDefined();
 });

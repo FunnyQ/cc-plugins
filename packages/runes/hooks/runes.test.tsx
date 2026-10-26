@@ -90,7 +90,8 @@ test("an edit that does not read back as intended is refused", async ($, on) => 
 });
 
 test("an upgrade whose read-back is shadowed by a duplicate key is not written", async ($, on) => {
-  const text = "clawd:\n  enabled: true\ntranscript:\n  enabled: true\ntranscript:\n  enabled: true\n";
+  const text =
+    "clawd:\n  enabled: true\ntranscript:\n  enabled: true\ntranscript:\n  enabled: true\n";
   const host = await start($, on, new Map([[CONFIG, text]]));
   await session($);
   expect(host.files.get(CONFIG)).toBe(text);
@@ -115,7 +116,9 @@ test("/runes reload re-reads a hand edit", async ($, on) => {
   await session($);
   host.files.set(
     CONFIG,
-    host.files.get(CONFIG)!.replace("clawd:\n  enabled: true", "clawd:\n  enabled: false"),
+    host.files
+      .get(CONFIG)!
+      .replace("clawd:\n  enabled: true", "clawd:\n  enabled: false"),
   );
   expect(await run($, "reload")).toContain("clawd: off");
   expect(await hasClawd($)).toBe(false);
@@ -128,7 +131,9 @@ test("a file from an older runes moves its switches into their sections and gain
   const text = host.files.get(CONFIG)!;
   expect(text).not.toMatch(/^enabled:/m);
   expect(text).toContain("clawd:\n  enabled: false\n");
-  expect(text).toContain("  reply:\n    enabled: true\n    side: right   # mine\n");
+  expect(text).toContain(
+    "  reply:\n    enabled: true\n    side: right   # mine\n",
+  );
   expect(text).toContain("  bash:\n    enabled: true");
   expect(text).toContain("  peer:\n    enabled: true");
   expect(await hasClawd($)).toBe(false);

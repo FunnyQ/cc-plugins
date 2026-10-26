@@ -72,7 +72,11 @@ async function request(
 
 async function pollInbox($: EngineInterface, mine: number, endedId?: string) {
   // The engine switches the id after session.end resolves; a poll parked on the ended id would hold the new session off for 30s.
-  for (let i = 0; i < ID_SWITCH_TRIES && (await $.session.id()) === endedId; i++) {
+  for (
+    let i = 0;
+    i < ID_SWITCH_TRIES && (await $.session.id()) === endedId;
+    i++
+  ) {
     await sleep($, ID_SWITCH_POLL_MS);
   }
   let failures = 0;
@@ -173,7 +177,8 @@ export const register: Register = (on) => {
   on("session.end", async ($, e, next) => {
     const result = await next(e);
     generation++;
-    if (e.reason === "clear" || e.reason === "resume") void pollInbox($, generation, e.sessionId);
+    if (e.reason === "clear" || e.reason === "resume")
+      void pollInbox($, generation, e.sessionId);
     return result;
   });
 
@@ -234,8 +239,7 @@ export const register: Register = (on) => {
     let isSettled = false;
     try {
       type Outcome =
-        | { result: Awaited<ReturnType<typeof next>> }
-        | { verdict: Verdict };
+        { result: Awaited<ReturnType<typeof next>> } | { verdict: Verdict };
       const engine: Promise<Outcome> = next(e).then((result) => ({ result }));
       const dashboard: Promise<Outcome> = opened.then(async () => {
         const verdict = await relay($, id, tool, args, () => isSettled);

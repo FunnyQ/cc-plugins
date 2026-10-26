@@ -120,8 +120,7 @@ function cockpitCliChecks(): Check[] {
   try {
     accessSync(COCKPIT_SHIM, constants.X_OK);
     executable = true;
-  } catch {
-  }
+  } catch {}
   add(
     "cockpit shim exists and is executable",
     executable,
@@ -405,8 +404,7 @@ function sessionCheck(): void {
     }
     try {
       writeFileSync(marker, `${version}\n`);
-    } catch {
-    }
+    } catch {}
   }
 
   const drift = [...driftReport(), ...staleDashboardReport(version)];
@@ -427,8 +425,7 @@ function sessionCheck(): void {
     notices.push(...drift.map((d) => d.message));
     try {
       writeFileSync(sigPath, `${signature}\n`);
-    } catch {
-    }
+    } catch {}
   }
 
   if (notices.length) emitHookNotice(notices);

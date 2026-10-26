@@ -1,26 +1,46 @@
 import type { Subprocess } from "bun";
 import { Database } from "bun:sqlite";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { command, PLUGIN_ROOT, type Proc } from "./launcher";
 
 export type Env = Record<string, string>;
-export type Homes = { cockpitHome: string; configHome: string; dataHome: string; root: string };
+export type Homes = {
+  cockpitHome: string;
+  configHome: string;
+  dataHome: string;
+  root: string;
+};
 
 export function makeHomes(): Homes {
-  const root = realpathSync(mkdtempSync(join(import.meta.dir, ".cockpit-contract-")));
+  const root = realpathSync(
+    mkdtempSync(join(import.meta.dir, ".cockpit-contract-")),
+  );
   const homes = {
     root,
     cockpitHome: join(root, "cockpit"),
     configHome: join(root, "config"),
     dataHome: join(root, "data"),
   };
-  for (const dir of [homes.cockpitHome, homes.configHome, homes.dataHome]) mkdirSync(dir);
+  for (const dir of [homes.cockpitHome, homes.configHome, homes.dataHome])
+    mkdirSync(dir);
   return homes;
 }
 
 export async function freePort(): Promise<number> {
-  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
+  const listener = Bun.listen({
+    hostname: "127.0.0.1",
+    port: 0,
+    socket: { data() {} },
+  });
   const port = listener.port;
   listener.stop(true);
   return port === 5858 ? freePort() : port;
@@ -33,21 +53,42 @@ export function baseEnv(h: Homes, extra: Env = {}): Env {
   }
   for (const key of Object.keys(env)) {
     if (
-      ["CLAUDE_CODE_SESSION_ID", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_PROJECT_DIR", "PLUGIN_ROOT", "RELAY_DELEGATED", "Q_DELEGATION_HOME"].includes(key) ||
+      [
+        "CLAUDE_CODE_SESSION_ID",
+        "CLAUDE_CODE_ENTRYPOINT",
+        "CLAUDE_PROJECT_DIR",
+        "PLUGIN_ROOT",
+        "RELAY_DELEGATED",
+        "Q_DELEGATION_HOME",
+      ].includes(key) ||
       key.startsWith("OPENCODE_") ||
-      (key.startsWith("COCKPIT_") && key !== "COCKPIT_BIN" && key !== "COCKPIT_PLUGIN_ROOT")
-    ) delete env[key];
+      (key.startsWith("COCKPIT_") &&
+        key !== "COCKPIT_BIN" &&
+        key !== "COCKPIT_PLUGIN_ROOT")
+    )
+      delete env[key];
   }
-  Object.assign(env, { HOME: h.root, COCKPIT_HOME: h.cockpitHome, XDG_CONFIG_HOME: h.configHome, XDG_DATA_HOME: h.dataHome });
+  Object.assign(env, {
+    HOME: h.root,
+    COCKPIT_HOME: h.cockpitHome,
+    XDG_CONFIG_HOME: h.configHome,
+    XDG_DATA_HOME: h.dataHome,
+  });
   env.COCKPIT_PLUGIN_ROOT = PLUGIN_ROOT;
   return { ...env, ...extra };
 }
 
 export type ProviderFixtures = {
-  claudeProjectsDir: string; claudeSessionsDir: string;
-  codexDir: string; codexStateDb: string; codexSessionsDir: string;
-  opencodeDb: string; projectDir: string; claudeSessionId: string;
-  codexThreadId: string; opencodeSessionId: string;
+  claudeProjectsDir: string;
+  claudeSessionsDir: string;
+  codexDir: string;
+  codexStateDb: string;
+  codexSessionsDir: string;
+  opencodeDb: string;
+  projectDir: string;
+  claudeSessionId: string;
+  codexThreadId: string;
+  opencodeSessionId: string;
 };
 
 export function makeProviderFixtures(h: Homes): ProviderFixtures {
@@ -63,31 +104,102 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
     codexThreadId: crypto.randomUUID(),
     opencodeSessionId: `ses_${crypto.randomUUID().replaceAll("-", "")}`,
   };
-  for (const dir of [f.claudeProjectsDir, f.claudeSessionsDir, f.codexSessionsDir, join(h.root, "opencode"), f.projectDir]) mkdirSync(dir, { recursive: true });
+  for (const dir of [
+    f.claudeProjectsDir,
+    f.claudeSessionsDir,
+    f.codexSessionsDir,
+    join(h.root, "opencode"),
+    f.projectDir,
+  ])
+    mkdirSync(dir, { recursive: true });
   mkdirSync(join(f.projectDir, ".git/objects"), { recursive: true });
   mkdirSync(join(f.projectDir, ".git/refs/heads"), { recursive: true });
   writeFileSync(join(f.projectDir, ".git/HEAD"), "ref: refs/heads/main\n");
-  writeFileSync(join(f.projectDir, ".git/config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n");
+  writeFileSync(
+    join(f.projectDir, ".git/config"),
+    "[core]\n\trepositoryformatversion = 0\n\tbare = false\n",
+  );
   const now = Date.now();
   const timestamp = new Date(now).toISOString();
-  const claudeDir = join(f.claudeProjectsDir, f.projectDir.replace(/[/.]/g, "-"));
+  const claudeDir = join(
+    f.claudeProjectsDir,
+    f.projectDir.replace(/[/.]/g, "-"),
+  );
   mkdirSync(claudeDir);
   const claudeEntries = [
     { type: "user", message: { role: "user", content: "Fixture request" } },
-    { type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "Fixture answer" }] } },
-    { type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "tool-fixture", name: "Read", input: { file_path: "README.md" } }] } },
+    {
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "Fixture answer" }],
+      },
+    },
+    {
+      type: "assistant",
+      message: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: "tool-fixture",
+            name: "Read",
+            input: { file_path: "README.md" },
+          },
+        ],
+      },
+    },
   ];
-  writeFileSync(join(claudeDir, `${f.claudeSessionId}.jsonl`), claudeEntries.map((entry) => JSON.stringify({ ...entry, uuid: crypto.randomUUID(), timestamp })).join("\n") + "\n");
-  writeFileSync(join(f.claudeSessionsDir, `${process.pid}.json`), JSON.stringify({ sessionId: f.claudeSessionId, cwd: f.projectDir, startedAt: now, updatedAt: now, status: "idle" }));
+  writeFileSync(
+    join(claudeDir, `${f.claudeSessionId}.jsonl`),
+    claudeEntries
+      .map((entry) =>
+        JSON.stringify({ ...entry, uuid: crypto.randomUUID(), timestamp }),
+      )
+      .join("\n") + "\n",
+  );
+  writeFileSync(
+    join(f.claudeSessionsDir, `${process.pid}.json`),
+    JSON.stringify({
+      sessionId: f.claudeSessionId,
+      cwd: f.projectDir,
+      startedAt: now,
+      updatedAt: now,
+      status: "idle",
+    }),
+  );
   const rollout = join(f.codexSessionsDir, `rollout-${f.codexThreadId}.jsonl`);
-  writeFileSync(rollout, JSON.stringify({ timestamp, type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "Fixture request" }] } }) + "\n");
+  writeFileSync(
+    rollout,
+    JSON.stringify({
+      timestamp,
+      type: "response_item",
+      payload: {
+        type: "message",
+        role: "user",
+        content: [{ type: "input_text", text: "Fixture request" }],
+      },
+    }) + "\n",
+  );
   const codex = new Database(f.codexStateDb, { create: true });
   try {
     codex.exec(`create table threads (
       id text primary key, cwd text, title text, archived integer, rollout_path text,
       created_at integer, updated_at integer, created_at_ms integer, updated_at_ms integer
     )`);
-    codex.query("insert into threads values (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(f.codexThreadId, f.projectDir, "Fixture thread", 0, rollout, Math.floor(now / 1000), Math.floor(now / 1000), now, now);
+    codex
+      .query("insert into threads values (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(
+        f.codexThreadId,
+        f.projectDir,
+        "Fixture thread",
+        0,
+        rollout,
+        Math.floor(now / 1000),
+        Math.floor(now / 1000),
+        now,
+        now,
+      );
   } finally {
     codex.close();
   }
@@ -103,8 +215,25 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
     create table part (
       id text primary key, message_id text, time_created integer, data text
     );`);
-    opencode.query("insert into session values (?, ?, ?, ?, ?, ?)").run(f.opencodeSessionId, f.projectDir, "Fixture session", now, now, null);
-    opencode.query("insert into message values (?, ?, ?, ?, ?)").run("msg_fixture", f.opencodeSessionId, now, now, JSON.stringify({ role: "user", content: "Fixture request" }));
+    opencode
+      .query("insert into session values (?, ?, ?, ?, ?, ?)")
+      .run(
+        f.opencodeSessionId,
+        f.projectDir,
+        "Fixture session",
+        now,
+        now,
+        null,
+      );
+    opencode
+      .query("insert into message values (?, ?, ?, ?, ?)")
+      .run(
+        "msg_fixture",
+        f.opencodeSessionId,
+        now,
+        now,
+        JSON.stringify({ role: "user", content: "Fixture request" }),
+      );
   } finally {
     opencode.close();
   }
@@ -122,11 +251,21 @@ export function fixtureEnv(f: ProviderFixtures): Env {
   };
 }
 
-export type Daemon = { proc: Subprocess; port: number; token: string; base: string; info: any };
+export type Daemon = {
+  proc: Subprocess;
+  port: number;
+  token: string;
+  base: string;
+  info: any;
+};
 
-export async function startDaemon(env: Env, opts: { port?: number } = {}): Promise<Daemon> {
-  if (!env.COCKPIT_HOME) throw new Error("startDaemon requires an isolated COCKPIT_HOME");
-  const port = opts.port ?? await freePort();
+export async function startDaemon(
+  env: Env,
+  opts: { port?: number } = {},
+): Promise<Daemon> {
+  if (!env.COCKPIT_HOME)
+    throw new Error("startDaemon requires an isolated COCKPIT_HOME");
+  const port = opts.port ?? (await freePort());
   const base = `http://127.0.0.1:${port}`;
   const argv = command("server", ["--no-open", "--port", String(port)]);
   if (argv[0] === "bun") argv[0] = process.execPath;
@@ -136,22 +275,28 @@ export async function startDaemon(env: Env, opts: { port?: number } = {}): Promi
   const deadline = Date.now() + 10000;
   try {
     for (let attempt = 0; attempt < 100 && Date.now() < deadline; attempt++) {
-      if (proc.exitCode !== null) throw new Error("Daemon exited before readiness");
+      if (proc.exitCode !== null)
+        throw new Error("Daemon exited before readiness");
       try {
-        const info = JSON.parse(readFileSync(join(env.COCKPIT_HOME, "daemon.json"), "utf8"));
+        const info = JSON.parse(
+          readFileSync(join(env.COCKPIT_HOME, "daemon.json"), "utf8"),
+        );
         if (info.port === port && info.pid === proc.pid) {
-          const response = await fetch(`${base}/api/token`, { signal: AbortSignal.timeout(100) });
+          const response = await fetch(`${base}/api/token`, {
+            signal: AbortSignal.timeout(100),
+          });
           if (response.ok) {
             await response.arrayBuffer();
             return { proc, port, token: info.token, base, info };
           }
           await response.body?.cancel();
         }
-      } catch {
-      }
+      } catch {}
       await Bun.sleep(50);
     }
-    throw new Error("Daemon did not become ready within 100 probes (10 s maximum)");
+    throw new Error(
+      "Daemon did not become ready within 100 probes (10 s maximum)",
+    );
   } catch (error) {
     await stopDaemon({ proc, port, token: "", base, info: null });
     throw new Error(`${error}\n${await stdout}\n${await stderr}`);
@@ -164,7 +309,9 @@ export async function stopDaemon(d: Daemon): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const exited = await Promise.race([
     d.proc.exited.then(() => true),
-    new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 3000); }),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), 3000);
+    }),
   ]);
   clearTimeout(timer);
   if (!exited) {
@@ -173,20 +320,36 @@ export async function stopDaemon(d: Daemon): Promise<void> {
   }
 }
 
-export function run(proc: Proc, argv: string[], opts: { env: Env; cwd?: string; stdin?: string }): { exitCode: number; stdout: string; stderr: string } {
+export function run(
+  proc: Proc,
+  argv: string[],
+  opts: { env: Env; cwd?: string; stdin?: string },
+): { exitCode: number; stdout: string; stderr: string } {
   const result = Bun.spawnSync(command(proc, argv), {
-    env: opts.env, cwd: opts.cwd,
+    env: opts.env,
+    cwd: opts.cwd,
     stdin: opts.stdin === undefined ? "ignore" : Buffer.from(opts.stdin),
-    stdout: "pipe", stderr: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
-  return { exitCode: result.exitCode, stdout: result.stdout.toString(), stderr: result.stderr.toString() };
+  return {
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  };
 }
 
 export function readJsonl(path: string): any[] {
-  return readFileSync(path, "utf8").split("\n").flatMap((line) => {
-    if (!line.trim()) return [];
-    try { return [JSON.parse(line)]; } catch { return []; }
-  });
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .flatMap((line) => {
+      if (!line.trim()) return [];
+      try {
+        return [JSON.parse(line)];
+      } catch {
+        return [];
+      }
+    });
 }
 
 export function cleanup(...dirs: string[]): void {
@@ -206,9 +369,16 @@ export type RegistryEntry = {
 // Freeze the shapes sampled from a direct TS `cockpit.ts log --needs-call` run.
 export const DECISION_RECORD = Object.freeze({
   id: "d8b1ecb9-3bbf-4fdf-9c64-b608f8ee7630",
-  type: "decision", kind: "decision", source: "agent",
-  decision: "Fixture decision", reason: "Fixture reason", tradeoff: "",
-  facets: [], needs_your_call: true, options: [], files: [],
+  type: "decision",
+  kind: "decision",
+  source: "agent",
+  decision: "Fixture decision",
+  reason: "Fixture reason",
+  tradeoff: "",
+  facets: [],
+  needs_your_call: true,
+  options: [],
+  files: [],
   timestamp: "2026-09-30T10:53:59.398Z",
 });
 
@@ -216,15 +386,23 @@ export const REGISTRY_ENTRY: Readonly<RegistryEntry> = Object.freeze({
   provider: "claude",
   project: "/fixture/project",
   sessionId: "11111111-1111-4111-8111-111111111111",
-  logPath: "/fixture/project/.cockpit/logs/11111111-1111-4111-8111-111111111111.jsonl",
+  logPath:
+    "/fixture/project/.cockpit/logs/11111111-1111-4111-8111-111111111111.jsonl",
   lastHeartbeat: "2026-09-30T10:53:59.399Z",
 });
 
-export function seedTrail(projectDir: string, sid: string, records: object[]): string {
+export function seedTrail(
+  projectDir: string,
+  sid: string,
+  records: object[],
+): string {
   const dir = join(projectDir, ".cockpit/logs");
   mkdirSync(dir, { recursive: true });
   const path = join(dir, `${sid}.jsonl`);
-  writeFileSync(path, records.map((record) => JSON.stringify(record) + "\n").join(""));
+  writeFileSync(
+    path,
+    records.map((record) => JSON.stringify(record) + "\n").join(""),
+  );
   return path;
 }
 
@@ -232,9 +410,15 @@ export function appendTrail(path: string, record: object): void {
   appendFileSync(path, JSON.stringify(record) + "\n");
 }
 
-export function seedRegistry(cockpitHome: string, entries: RegistryEntry[]): void {
+export function seedRegistry(
+  cockpitHome: string,
+  entries: RegistryEntry[],
+): void {
   mkdirSync(cockpitHome, { recursive: true });
-  writeFileSync(join(cockpitHome, "registry.json"), JSON.stringify({ sessions: entries }, null, 2));
+  writeFileSync(
+    join(cockpitHome, "registry.json"),
+    JSON.stringify({ sessions: entries }, null, 2),
+  );
 }
 
 export async function openSse(url: string): Promise<{
@@ -271,13 +455,19 @@ export async function openSse(url: string): Promise<{
         if (data.length) return { event, data: JSON.parse(data.join("\n")) };
       }
       const remaining = deadline - Date.now();
-      if (remaining <= 0) { await close(); throw new Error("SSE event deadline exceeded"); }
+      if (remaining <= 0) {
+        await close();
+        throw new Error("SSE event deadline exceeded");
+      }
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
         const chunk = await Promise.race([
           reader.read(),
           new Promise<never>((_, reject) => {
-            timer = setTimeout(() => reject(new Error("SSE event deadline exceeded")), remaining);
+            timer = setTimeout(
+              () => reject(new Error("SSE event deadline exceeded")),
+              remaining,
+            );
           }),
         ]);
         if (chunk.done) throw new Error("SSE stream ended before an event");

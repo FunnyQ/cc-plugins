@@ -244,9 +244,7 @@ describe("renderGlobalGraph", () => {
   });
 
   test("root with external/cross-bucket-only deps gets * marker", () => {
-    const tasks = parseAll([
-      HEADER("api", "01", "A1", "ui/99, backend/99"),
-    ]);
+    const tasks = parseAll([HEADER("api", "01", "A1", "ui/99, backend/99")]);
     const { graph } = renderGlobalGraph(tasks);
     expect(graph).toBe("api/01 *");
   });

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  encodeFrame,
-  FrameReader,
-  settle,
-} from "./marionette";
+import { encodeFrame, FrameReader, settle } from "./marionette";
 
 describe("encodeFrame", () => {
   test("prefixes the JSON body with its byte length, not its character count", () => {

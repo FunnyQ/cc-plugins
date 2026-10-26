@@ -1,6 +1,5 @@
 import { expect, test, type Engine } from "claude-code/testing";
 
-
 import { CONFIG, eventually, startSession } from "./test-session";
 
 const REPLY = (text: string, requestId = "a1") =>
@@ -39,10 +38,12 @@ const draws = async (
 
 test("a reply draws glow's lines inside the orange bubble once the worker has run", async ($, on) => {
   let home: string | undefined;
-  await startSession($, on, { run: (e) => {
-    home = e.init?.env?.HOME;
-    return ran(0, GLOW);
-  } });
+  await startSession($, on, {
+    run: (e) => {
+      home = e.init?.env?.HOME;
+      return ran(0, GLOW);
+    },
+  });
   expect(
     await eventually(() =>
       draws($, REPLY("**hi** there\n\nsecond"), { type: "Text", text: "hi" }),
@@ -58,7 +59,9 @@ test("a reply draws glow's lines inside the orange bubble once the worker has ru
 
 test("a draw never waits on glow: it shows the raw text in the bubble first", async ($, on) => {
   let release = () => {};
-  await startSession($, on, { run: () => new Promise((r) => (release = () => r(ran(0, GLOW)))) as never });
+  await startSession($, on, {
+    run: () => new Promise((r) => (release = () => r(ran(0, GLOW)))) as never,
+  });
   const row = await $.ui.mount(REPLY("still rendering"));
   expect(await row.find({ key: "reply" })).toBeDefined();
   expect(
@@ -70,10 +73,12 @@ test("a draw never waits on glow: it shows the raw text in the bubble first", as
 
 test("a streamed reply keeps its last formatted text while the next chunk renders", async ($, on) => {
   let release = () => {};
-  await startSession($, on, { run: (e) =>
-    e.init?.stdin === "first"
-      ? ran(0, GLOW)
-      : (new Promise((r) => (release = () => r(ran(0, GLOW)))) as never) });
+  await startSession($, on, {
+    run: (e) =>
+      e.init?.stdin === "first"
+        ? ran(0, GLOW)
+        : (new Promise((r) => (release = () => r(ran(0, GLOW)))) as never),
+  });
   expect(
     await eventually(() =>
       draws($, REPLY("first", "s1"), { type: "Text", text: "hi" }),
@@ -102,7 +107,8 @@ test("glow failing to start suggests installing it, once", async ($, on) => {
   expect(
     await eventually(
       async () =>
-        (await draws($, REPLY("a"), { key: "reply" })) && host.toasts.length > 0,
+        (await draws($, REPLY("a"), { key: "reply" })) &&
+        host.toasts.length > 0,
     ),
   ).toBe(true);
   for (const text of ["b", "c"])
@@ -116,17 +122,27 @@ test("enabled.reply: false hands the reply to the engine", async ($, on) => {
     const { Text } = $.ui.resolve(e);
     return <Text key="engine">engine</Text>;
   });
-  await startSession($, on, { files: new Map([[CONFIG, "reply:\n  enabled: false\n"]]), run: () => ran(1, "") });
+  await startSession($, on, {
+    files: new Map([[CONFIG, "reply:\n  enabled: false\n"]]),
+    run: () => ran(1, ""),
+  });
   expect(await draws($, REPLY("x"), { key: "reply" })).toBe(false);
-  expect(await draws($, REPLY("x"), { type: "Text", text: "engine" })).toBe(true);
+  expect(await draws($, REPLY("x"), { type: "Text", text: "engine" })).toBe(
+    true,
+  );
 });
 
 test("side: right moves the reply's bar after the bubble", async ($, on) => {
-  await startSession($, on, { files: new Map([[CONFIG, "reply:\n  side: right\n"]]), run: () => ran(1, "") });
+  await startSession($, on, {
+    files: new Map([[CONFIG, "reply:\n  side: right\n"]]),
+    run: () => ran(1, ""),
+  });
   const row = await $.ui.mount(REPLY("x"));
   const bubble = await row.find({ key: "reply" });
   await row.unmount();
-  expect(bubble?.children?.at(-1)).toMatchObject({ props: { backgroundColor: "#d97757" } });
+  expect(bubble?.children?.at(-1)).toMatchObject({
+    props: { backgroundColor: "#d97757" },
+  });
 });
 
 test("a drawn bubble still runs the chain, so a plugin beneath sees the row", async ($, on) => {
@@ -137,7 +153,10 @@ test("a drawn bubble still runs the chain, so a plugin beneath sees the row", as
 
 test("the desktop keeps the engine's own reply: runes draws nothing there", async ($, on) => {
   await startSession($, on, { run: () => ran(0, GLOW) });
-  const desk = await $.ui.mount({ ...(REPLY("hi") as object), surface: "desktop" } as never);
+  const desk = await $.ui.mount({
+    ...(REPLY("hi") as object),
+    surface: "desktop",
+  } as never);
   expect(await desk.find({ key: "reply" })).toBeUndefined();
   expect(await desk.find({ type: "Text", text: "engine" })).toBeDefined();
   await desk.unmount();
@@ -157,7 +176,8 @@ test("the header's raw button hands the reply's markdown to open-raw.ts", async 
   const row = await $.ui.mount(REPLY("**hi** there", "r9"));
   await row.press({ key: "reply:raw" });
   await row.unmount();
-  const opened = () => calls.find((c) => /hooks\/transcript\/open-raw\.ts$/.test(c.argv[1] ?? ""));
+  const opened = () =>
+    calls.find((c) => /hooks\/transcript\/open-raw\.ts$/.test(c.argv[1] ?? ""));
   expect(await eventually(async () => opened() !== undefined)).toBe(true);
   expect(opened()!.argv.slice(2)).toEqual(["r9"]);
   expect(opened()!.stdin).toBe("**hi** there");

@@ -397,7 +397,9 @@ describe("hasArtifacts", () => {
 
 describe("stages.ts", () => {
   test("imports no fs, shell, or git, so every release decision stays unit-testable", async () => {
-    const source = await Bun.file(new URL("./stages.ts", import.meta.url)).text();
+    const source = await Bun.file(
+      new URL("./stages.ts", import.meta.url),
+    ).text();
     const imports = new Bun.Transpiler({ loader: "ts" })
       .scanImports(source)
       .map((i) => i.path);

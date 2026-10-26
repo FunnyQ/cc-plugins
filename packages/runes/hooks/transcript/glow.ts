@@ -40,7 +40,8 @@ const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   if (map.size > CACHE_SIZE) map.delete(map.keys().next().value!);
 };
 
-export const INSTALL_HINT = "runes: install glow for markdown bubbles — brew install glow";
+export const INSTALL_HINT =
+  "runes: install glow for markdown bubbles — brew install glow";
 let hinted = false;
 
 export const glow = {
@@ -84,7 +85,10 @@ export const glow = {
         if (rendered.has(job.key)) continue;
         const t = transport!;
         try {
-          const { exitCode, stdout } = await t.run(glowArgv(job.width, job.style), { ...GLOW_INIT, stdin: job.text });
+          const { exitCode, stdout } = await t.run(
+            glowArgv(job.width, job.style),
+            { ...GLOW_INIT, stdin: job.text },
+          );
           keep(rendered, job.key, exitCode === 0 ? toLines(stdout) : null);
           if (slot !== job.key) {
             const old = landed.get(slot);

@@ -219,19 +219,22 @@ describe("--json CLI", () => {
     return { out: out.trim(), err, code };
   };
 
-  test.each([["--json"], []])("fails loudly on a malformed completion state, printing no ready set (%p)", async (...flags) => {
-    const root = await writeScenario({
-      "ui/01.md": MALFORMED_DONE("ui", "01", "none"),
-      "ui/02.md": TASK("ui", "02", "ui/01", "todo"),
-    });
-    const { out, err, code } = await run(join(root, "tasks"), ...flags);
-    expect(code).toBe(1);
-    expect(out).toBe("");
-    expect(err).toContain("ui/01");
-    expect(err).toContain("completion-state");
-    expect(err).toMatch(/Do NOT tick the boxes by hand/);
-    await rm(root, { recursive: true });
-  });
+  test.each([["--json"], []])(
+    "fails loudly on a malformed completion state, printing no ready set (%p)",
+    async (...flags) => {
+      const root = await writeScenario({
+        "ui/01.md": MALFORMED_DONE("ui", "01", "none"),
+        "ui/02.md": TASK("ui", "02", "ui/01", "todo"),
+      });
+      const { out, err, code } = await run(join(root, "tasks"), ...flags);
+      expect(code).toBe(1);
+      expect(out).toBe("");
+      expect(err).toContain("ui/01");
+      expect(err).toContain("completion-state");
+      expect(err).toMatch(/Do NOT tick the boxes by hand/);
+      await rm(root, { recursive: true });
+    },
+  );
 
   test("prints `[]` (not blank) when every task is done", async () => {
     const root = await writeScenario({
@@ -265,46 +268,74 @@ describe("--json CLI", () => {
 });
 
 describe("Models CLI output", () => {
-  test.each(["--json", "--summary"])("%s carries raw Models without validating", async (mode) => {
-    const raw = "dev=opus  , verify = haiku";
-    const withModels = (nn: string, value: string) =>
-      TASK("ui", nn, "none", "todo").replace(
-        "> **Status**: todo",
-        `> **Status**: todo\n> **Models**:  ${value}  `,
-      );
-    const root = await writeScenario({
-      "ui/01.md": withModels("01", raw),
-      "ui/02.md": TASK("ui", "02", "none", "todo"),
-      "ui/03.md": withModels("03", "dev=Opus"),
-      "ui/04.md": withModels("04", ""),
-    });
-    try {
-      const proc = Bun.spawn(
-        ["bun", join(import.meta.dir, "next-ready.ts"), join(root, "tasks"), mode],
-        { stdout: "pipe", stderr: "pipe" },
-      );
-      const [out, err, code] = await Promise.all([
-        new Response(proc.stdout).text(),
-        new Response(proc.stderr).text(),
-        proc.exited,
-      ]);
-      expect(code).toBe(0);
-      expect(err).toBe("");
-      const payload = JSON.parse(out);
-      const ready = mode === "--json" ? payload : payload.ready;
-      expect(ready).toEqual([
-        { ref: "ui/01", finalReview: false, path: join(root, "tasks/ui/01.md"), modelsRaw: raw },
-        { ref: "ui/02", finalReview: false, path: join(root, "tasks/ui/02.md"), modelsRaw: null },
-        { ref: "ui/03", finalReview: false, path: join(root, "tasks/ui/03.md"), modelsRaw: "dev=Opus" },
-        { ref: "ui/04", finalReview: false, path: join(root, "tasks/ui/04.md"), modelsRaw: "" },
-      ]);
-      for (const item of ready) {
-        expect(item).not.toHaveProperty("models");
+  test.each(["--json", "--summary"])(
+    "%s carries raw Models without validating",
+    async (mode) => {
+      const raw = "dev=opus  , verify = haiku";
+      const withModels = (nn: string, value: string) =>
+        TASK("ui", nn, "none", "todo").replace(
+          "> **Status**: todo",
+          `> **Status**: todo\n> **Models**:  ${value}  `,
+        );
+      const root = await writeScenario({
+        "ui/01.md": withModels("01", raw),
+        "ui/02.md": TASK("ui", "02", "none", "todo"),
+        "ui/03.md": withModels("03", "dev=Opus"),
+        "ui/04.md": withModels("04", ""),
+      });
+      try {
+        const proc = Bun.spawn(
+          [
+            "bun",
+            join(import.meta.dir, "next-ready.ts"),
+            join(root, "tasks"),
+            mode,
+          ],
+          { stdout: "pipe", stderr: "pipe" },
+        );
+        const [out, err, code] = await Promise.all([
+          new Response(proc.stdout).text(),
+          new Response(proc.stderr).text(),
+          proc.exited,
+        ]);
+        expect(code).toBe(0);
+        expect(err).toBe("");
+        const payload = JSON.parse(out);
+        const ready = mode === "--json" ? payload : payload.ready;
+        expect(ready).toEqual([
+          {
+            ref: "ui/01",
+            finalReview: false,
+            path: join(root, "tasks/ui/01.md"),
+            modelsRaw: raw,
+          },
+          {
+            ref: "ui/02",
+            finalReview: false,
+            path: join(root, "tasks/ui/02.md"),
+            modelsRaw: null,
+          },
+          {
+            ref: "ui/03",
+            finalReview: false,
+            path: join(root, "tasks/ui/03.md"),
+            modelsRaw: "dev=Opus",
+          },
+          {
+            ref: "ui/04",
+            finalReview: false,
+            path: join(root, "tasks/ui/04.md"),
+            modelsRaw: "",
+          },
+        ]);
+        for (const item of ready) {
+          expect(item).not.toHaveProperty("models");
+        }
+      } finally {
+        await rm(root, { recursive: true });
       }
-    } finally {
-      await rm(root, { recursive: true });
-    }
-  });
+    },
+  );
 });
 
 describe("loadAllTasks", () => {
@@ -568,7 +599,12 @@ describe("summarizeTree", () => {
     });
     await mkdir(join(root, "PLAN.md"));
     const proc = Bun.spawn(
-      ["bun", join(import.meta.dir, "next-ready.ts"), join(root, "tasks"), "--summary"],
+      [
+        "bun",
+        join(import.meta.dir, "next-ready.ts"),
+        join(root, "tasks"),
+        "--summary",
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     const payload = JSON.parse(await new Response(proc.stdout).text());

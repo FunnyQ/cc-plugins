@@ -49,4 +49,3 @@ describe("settle", () => {
     ).toThrow("Nope.method: 'Nope.method' wasn't found");
   });
 });
-

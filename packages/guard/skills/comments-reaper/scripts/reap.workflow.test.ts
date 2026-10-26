@@ -7,7 +7,7 @@ type Call = { prompt: string; opts: Record<string, unknown> };
 const body = readFileSync(
   join(import.meta.dir, "reap.workflow.js"),
   "utf8",
-).replace(/^export const meta = \{[\s\S]*?\n\}\n/, "");
+).replace(/^export const meta = \{[\s\S]*?\n\};?\n/, "");
 const AsyncFunction = Object.getPrototypeOf(async () => {}).constructor;
 
 async function run(

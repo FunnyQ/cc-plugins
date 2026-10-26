@@ -269,7 +269,9 @@ describe("waveCards", () => {
     ]);
     expect([b.time, b.tokens]).toEqual(["45s", null]);
     expect([c.time, c.tokens]).toEqual([null, null]);
-    expect(waveCards(s, 80, now, "billed").groups[0].cards[0].tokens).toBe("30.0M tok".padStart(inner));
+    expect(waveCards(s, 80, now, "billed").groups[0].cards[0].tokens).toBe(
+      "30.0M tok".padStart(inner),
+    );
   });
 
   test("W? group holds exactly the unschedulable refs, none when empty", () => {

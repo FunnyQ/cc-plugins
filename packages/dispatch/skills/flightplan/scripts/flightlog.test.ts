@@ -172,23 +172,45 @@ describe("progress CLI", () => {
     const root = await mkdtemp(join(tmpdir(), "flightlog-progress-"));
     const logFile = join(root, "run.jsonl");
     const log = Bun.spawn(
-      ["bun", SCRIPT, "log", logFile, "--task", "ui/01", "--role", "dev", "--message", "hi"],
+      [
+        "bun",
+        SCRIPT,
+        "log",
+        logFile,
+        "--task",
+        "ui/01",
+        "--role",
+        "dev",
+        "--message",
+        "hi",
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     expect(await log.exited).toBe(0);
-    const proc = Bun.spawn(["bun", SCRIPT, "progress", logFile, "--task", "ui/02"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const proc = Bun.spawn(
+      ["bun", SCRIPT, "progress", logFile, "--task", "ui/02"],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
     expect(await proc.exited).toBe(0);
-    expect(await new Response(proc.stdout).text()).toContain("no attempts recorded for ui/02");
+    expect(await new Response(proc.stdout).text()).toContain(
+      "no attempts recorded for ui/02",
+    );
     await rm(root, { recursive: true });
   });
 });
 
 describe("state CLI", () => {
   test("buildStateEntry preserves caller metadata without agent-turn fields", () => {
-    const meta = { task: "ui/03", state: "blocked", ts: "fixed", agentLabel: "workflow", message: "Waiting" } satisfies Parameters<typeof buildStateEntry>[0];
+    const meta = {
+      task: "ui/03",
+      state: "blocked",
+      ts: "fixed",
+      agentLabel: "workflow",
+      message: "Waiting",
+    } satisfies Parameters<typeof buildStateEntry>[0];
     expect(buildStateEntry(meta)).toEqual({ kind: "state", ...meta });
     expect(buildStateEntry(meta)).not.toHaveProperty("attempt");
     expect(buildStateEntry(meta)).not.toHaveProperty("role");
@@ -201,11 +223,17 @@ describe("state CLI", () => {
     { args: ["--task", "ui/03", "--state", "other"], error: "--state" },
     { args: ["--task", "ui/03", "--state", "blocked"], error: "--message" },
     { args: ["--task", "ui/03", "--state", "failed"], error: "--message" },
-    { args: ["--task", "ui/03", "--state", "failed", "--message"], error: "--message" },
+    {
+      args: ["--task", "ui/03", "--state", "failed", "--message"],
+      error: "--message",
+    },
   ])("rejects invalid flags: $args", async ({ args, error }) => {
     const root = await mkdtemp(join(tmpdir(), "flightlog-state-"));
     try {
-      const proc = Bun.spawn(["bun", SCRIPT, "state", join(root, "run.jsonl"), ...args], { stdout: "pipe", stderr: "pipe" });
+      const proc = Bun.spawn(
+        ["bun", SCRIPT, "state", join(root, "run.jsonl"), ...args],
+        { stdout: "pipe", stderr: "pipe" },
+      );
       expect(await proc.exited).toBe(2);
       expect(await new Response(proc.stderr).text()).toContain(error);
     } finally {
@@ -213,18 +241,44 @@ describe("state CLI", () => {
     }
   });
 
-  test.each(["done", "blocked", "failed"])("appends %s with optional agent and dash-prefixed reason", async (state) => {
-    const root = await mkdtemp(join(tmpdir(), "flightlog-state-"));
-    try {
-      const logFile = join(root, "run.jsonl");
-      const args = state === "done" ? [] : ["--message", "--waiting for input"];
-      const proc = Bun.spawn(["bun", SCRIPT, "state", logFile, "--task", "ui/03", "--state", state, "--agent", "workflow", ...args], { stdout: "pipe", stderr: "pipe" });
-      expect(await proc.exited).toBe(0);
-      const entry = JSON.parse(await readFile(logFile, "utf-8"));
-      expect(entry).toEqual({ kind: "state", task: "ui/03", state, agentLabel: "workflow", ts: expect.any(String), ...(state === "done" ? {} : { message: "--waiting for input" }) });
-      expect(Number.isNaN(Date.parse(entry.ts))).toBe(false);
-    } finally {
-      await rm(root, { recursive: true });
-    }
-  });
+  test.each(["done", "blocked", "failed"])(
+    "appends %s with optional agent and dash-prefixed reason",
+    async (state) => {
+      const root = await mkdtemp(join(tmpdir(), "flightlog-state-"));
+      try {
+        const logFile = join(root, "run.jsonl");
+        const args =
+          state === "done" ? [] : ["--message", "--waiting for input"];
+        const proc = Bun.spawn(
+          [
+            "bun",
+            SCRIPT,
+            "state",
+            logFile,
+            "--task",
+            "ui/03",
+            "--state",
+            state,
+            "--agent",
+            "workflow",
+            ...args,
+          ],
+          { stdout: "pipe", stderr: "pipe" },
+        );
+        expect(await proc.exited).toBe(0);
+        const entry = JSON.parse(await readFile(logFile, "utf-8"));
+        expect(entry).toEqual({
+          kind: "state",
+          task: "ui/03",
+          state,
+          agentLabel: "workflow",
+          ts: expect.any(String),
+          ...(state === "done" ? {} : { message: "--waiting for input" }),
+        });
+        expect(Number.isNaN(Date.parse(entry.ts))).toBe(false);
+      } finally {
+        await rm(root, { recursive: true });
+      }
+    },
+  );
 });

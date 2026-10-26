@@ -80,74 +80,169 @@ export const edit = (on: On) => {
     ["Write", "write"],
   ] as const) {
     hideResult(on, tool, rune);
-    on("ui.render", { component: "ToolUse", surface: "terminal", props: { tool } }, ($, e, next) => {
-      if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
-      const {
-        color,
-        error_color,
-        icon,
-        side,
-        fold_lines: foldLines,
-      } = config[rune];
-      const { Box, Text, Button } = $.ui.resolve(e);
-      const { isRunning, isErrored, isInterrupted, output } = e.props;
-      const { file_path = "" } = (e.props.input ?? {}) as {
-        file_path?: string;
-      };
-      const id = e.requestId;
-      const inner = innerWidth(e.viewport?.columns);
-      const isBad = isErrored || isInterrupted;
-      const flip = (key: string) => () => {
-        open.has(key) ? open.delete(key) : open.add(key);
-        $.ui.invalidate("ui.render");
-      };
-      const card = (title: string, glyph: string, rows: [string, unknown][]) =>
-        bubble(
-          { Box, Text },
-          {
-            key: rune,
-            color: isBad ? error_color : color,
-            icon: glyph,
-            title,
-            side,
+    on(
+      "ui.render",
+      { component: "ToolUse", surface: "terminal", props: { tool } },
+      ($, e, next) => {
+        if (!config.enabled.transcript || !config.enabled[rune]) return next(e);
+        const {
+          color,
+          error_color,
+          icon,
+          side,
+          fold_lines: foldLines,
+        } = config[rune];
+        const { Box, Text, Button } = $.ui.resolve(e);
+        const { isRunning, isErrored, isInterrupted, output } = e.props;
+        const { file_path = "" } = (e.props.input ?? {}) as {
+          file_path?: string;
+        };
+        const id = e.requestId;
+        const inner = innerWidth(e.viewport?.columns);
+        const isBad = isErrored || isInterrupted;
+        const flip = (key: string) => () => {
+          open.has(key) ? open.delete(key) : open.add(key);
+          $.ui.invalidate("ui.render");
+        };
+        const card = (
+          title: string,
+          glyph: string,
+          rows: [string, unknown][],
+        ) =>
+          bubble(
+            { Box, Text },
+            {
+              key: rune,
+              color: isBad ? error_color : color,
+              icon: glyph,
+              title,
+              side,
+              inner,
+              rows,
+              bar: false,
+            },
+          );
+        const path = shortPath(file_path);
+        const state = stateOf(e.props);
+        if (typeof output === "string")
+          return card(
+            `${path}${state}`,
+            icon,
+            errorRows(Text, output, inner, error_color),
+          );
+
+        const o = (output ?? {}) as {
+          type?: "create" | "update";
+          content?: string;
+          structuredPatch?: Hunk[];
+        };
+        // a Write that creates a file sends no hunks and has nothing to compare, so it shows its head like a folded diff
+        if (o.type === "create" && !o.structuredPatch?.length) {
+          const content = o.content ?? "";
+          if (!content)
+            return card(`${path} · new`, icon, [
+              ["empty", <Text color={palette().dim}>(empty file)</Text>],
+            ]);
+          const rows = codeRows(Text, {
+            id,
+            content,
+            start: 1,
+            path: file_path,
             inner,
-            rows,
-            bar: false,
+            divider: false,
+          });
+          const key = `${id}:diff`;
+          const isLong = rows.length > foldLines;
+          return card(`${path} · new`, icon, [
+            ...(isLong && !open.has(key) ? rows.slice(0, foldLines) : rows),
+            ...(isLong
+              ? foldRows(Button, {
+                  key: "diff",
+                  isOpen: open.has(key),
+                  hidden: rows.length - foldLines,
+                  width: inner,
+                  onPress: flip(key),
+                })
+              : []),
+          ]);
+        }
+
+        const hunks = o.structuredPatch ?? [];
+        const size = hunks.reduce((n, h) => n + h.lines.length, 0);
+        const { lines, codes, adds, dels, gutter } = remember(
+          `diff\0${id}\0${size}`,
+          () => diffOf(hunks),
+        );
+        const lang = languageOf(file_path);
+        const colored =
+          lang && !isBad
+            ? highlight(`${id}\0${codes.length}`, codes, lang)
+            : null;
+        const theme = isLight() ? "light" : "dark";
+        const { text: TEXT, dim: DIM } = palette();
+        const diff = DIFF[theme];
+
+        const rows = remember(
+          `rows\0${id}\0${inner}\0${theme}\0${size}\0${colored ? "glow" : "plain"}`,
+          () => {
+            let at = 0;
+            return lines.flatMap((l): (Run[] | null)[] => {
+              if (!l) return [null];
+              const bg =
+                l.sign === "+"
+                  ? diff.addBg
+                  : l.sign === "-"
+                    ? diff.delBg
+                    : undefined;
+              const fill = bg ? { backgroundColor: bg } : {};
+              const code =
+                colored?.[at++] ?? (l.code ? [{ text: l.code }] : []);
+              const head: Run = {
+                text: `${String(l.n).padStart(gutter)} ${l.sign} `,
+                color:
+                  l.sign === "+" ? diff.add : l.sign === "-" ? diff.del : DIM,
+                ...fill,
+              };
+              const runs = [
+                head,
+                ...code.map(({ backgroundColor: _, ...r }) => ({
+                  ...r,
+                  ...fill,
+                })),
+              ];
+              return wrapRuns(runs, inner, {
+                text: " ".repeat(gutter + 3),
+                ...fill,
+              }).map((w) => {
+                const room = inner - w.reduce((n, r) => n + cells(r.text), 0);
+                return bg && room > 0
+                  ? [...w, { text: " ".repeat(room), ...fill }]
+                  : w;
+              });
+            });
           },
         );
-      const path = shortPath(file_path);
-      const state = stateOf(e.props);
-      if (typeof output === "string")
-        return card(
-          `${path}${state}`,
-          icon,
-          errorRows(Text, output, inner, error_color),
-        );
 
-      const o = (output ?? {}) as {
-        type?: "create" | "update";
-        content?: string;
-        structuredPatch?: Hunk[];
-      };
-      // a Write that creates a file sends no hunks and has nothing to compare, so it shows its head like a folded diff
-      if (o.type === "create" && !o.structuredPatch?.length) {
-        const content = o.content ?? "";
-        if (!content)
-          return card(`${path} · new`, icon, [
-            ["empty", <Text color={palette().dim}>(empty file)</Text>],
-          ]);
-        const rows = codeRows(Text, {
-          id,
-          content,
-          start: 1,
-          path: file_path,
-          inner,
-          divider: false,
-        });
+        const counts = [adds && `+${adds}`, dels && `−${dels}`]
+          .filter(Boolean)
+          .join(" ");
+        const glyph = rune === "write" ? config.write.replace_icon : icon;
         const key = `${id}:diff`;
         const isLong = rows.length > foldLines;
-        return card(`${path} · new`, icon, [
-          ...(isLong && !open.has(key) ? rows.slice(0, foldLines) : rows),
+        const shown =
+          isLong && !open.has(key) ? rows.slice(0, foldLines) : rows;
+        return card(`${path}${counts ? `  ${counts}` : ""}${state}`, glyph, [
+          ...shown.map((runs, i): [string, unknown] =>
+            runs === null
+              ? [`hunk:${i}`, DIVIDER]
+              : [
+                  `diff:${i}`,
+                  runLine(Text, runs, ({ text: _, color: c, ...style }) => ({
+                    ...style,
+                    color: c ?? TEXT,
+                  })),
+                ],
+          ),
           ...(isLong
             ? foldRows(Button, {
                 key: "diff",
@@ -157,101 +252,16 @@ export const edit = (on: On) => {
                 onPress: flip(key),
               })
             : []),
+          ...(!isRunning && output !== undefined && !rows.length
+            ? [
+                ["empty", <Text color={DIM}>(no changes)</Text>] as [
+                  string,
+                  unknown,
+                ],
+              ]
+            : []),
         ]);
-      }
-
-      const hunks = o.structuredPatch ?? [];
-      const size = hunks.reduce((n, h) => n + h.lines.length, 0);
-      const { lines, codes, adds, dels, gutter } = remember(
-        `diff\0${id}\0${size}`,
-        () => diffOf(hunks),
-      );
-      const lang = languageOf(file_path);
-      const colored =
-        lang && !isBad
-          ? highlight(`${id}\0${codes.length}`, codes, lang)
-          : null;
-      const theme = isLight() ? "light" : "dark";
-      const { text: TEXT, dim: DIM } = palette();
-      const diff = DIFF[theme];
-
-      const rows = remember(
-        `rows\0${id}\0${inner}\0${theme}\0${size}\0${colored ? "glow" : "plain"}`,
-        () => {
-          let at = 0;
-          return lines.flatMap((l): (Run[] | null)[] => {
-            if (!l) return [null];
-            const bg =
-              l.sign === "+"
-                ? diff.addBg
-                : l.sign === "-"
-                  ? diff.delBg
-                  : undefined;
-            const fill = bg ? { backgroundColor: bg } : {};
-            const code = colored?.[at++] ?? (l.code ? [{ text: l.code }] : []);
-            const head: Run = {
-              text: `${String(l.n).padStart(gutter)} ${l.sign} `,
-              color:
-                l.sign === "+" ? diff.add : l.sign === "-" ? diff.del : DIM,
-              ...fill,
-            };
-            const runs = [
-              head,
-              ...code.map(({ backgroundColor: _, ...r }) => ({
-                ...r,
-                ...fill,
-              })),
-            ];
-            return wrapRuns(runs, inner, {
-              text: " ".repeat(gutter + 3),
-              ...fill,
-            }).map((w) => {
-              const room = inner - w.reduce((n, r) => n + cells(r.text), 0);
-              return bg && room > 0
-                ? [...w, { text: " ".repeat(room), ...fill }]
-                : w;
-            });
-          });
-        },
-      );
-
-      const counts = [adds && `+${adds}`, dels && `−${dels}`]
-        .filter(Boolean)
-        .join(" ");
-      const glyph = rune === "write" ? config.write.replace_icon : icon;
-      const key = `${id}:diff`;
-      const isLong = rows.length > foldLines;
-      const shown = isLong && !open.has(key) ? rows.slice(0, foldLines) : rows;
-      return card(`${path}${counts ? `  ${counts}` : ""}${state}`, glyph, [
-        ...shown.map((runs, i): [string, unknown] =>
-          runs === null
-            ? [`hunk:${i}`, DIVIDER]
-            : [
-                `diff:${i}`,
-                runLine(Text, runs, ({ text: _, color: c, ...style }) => ({
-                  ...style,
-                  color: c ?? TEXT,
-                })),
-              ],
-        ),
-        ...(isLong
-          ? foldRows(Button, {
-              key: "diff",
-              isOpen: open.has(key),
-              hidden: rows.length - foldLines,
-              width: inner,
-              onPress: flip(key),
-            })
-          : []),
-        ...(!isRunning && output !== undefined && !rows.length
-          ? [
-              ["empty", <Text color={DIM}>(no changes)</Text>] as [
-                string,
-                unknown,
-              ],
-            ]
-          : []),
-      ]);
-    });
+      },
+    );
   }
 };

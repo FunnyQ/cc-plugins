@@ -67,8 +67,8 @@ export const changes = (text: string, better: string) => {
           ? lcs[i + 1]![j + 1]! + 1
           : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
   const kept = new Set<number>();
-  for (let i = 0, j = 0; i < was.length && j < now.length; )
-    if (was[i] === now[j]) kept.add(j), i++, j++;
+  for (let i = 0, j = 0; i < was.length && j < now.length;)
+    if (was[i] === now[j]) (kept.add(j), i++, j++);
     else if (lcs[i + 1]![j]! >= lcs[i]![j + 1]!) i++;
     else j++;
   let word = -1;

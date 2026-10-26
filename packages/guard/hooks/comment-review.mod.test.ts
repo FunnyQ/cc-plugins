@@ -15,7 +15,12 @@ const end = {
 // Stands for the engine beneath the mod: the sweep script's answers, the agent runner, the prompt queue, and toasts. A noun answering a primitive answers `{ value }`.
 function world(
   on: On,
-  opts: { report?: string; settled?: string[]; bun?: false; agentFile?: false } = {},
+  opts: {
+    report?: string;
+    settled?: string[];
+    bun?: false;
+    agentFile?: false;
+  } = {},
 ) {
   const runs: { argv: readonly string[]; stdin?: string }[] = [];
   const spawns: { subagent_type?: string; prompt: string }[] = [];
@@ -50,11 +55,15 @@ function world(
     } as never;
   });
   on("fs.read", (_$, e) => {
-    if (opts.agentFile === false || !e.path.endsWith("/agents/comments-reaper.md")) {
+    if (
+      opts.agentFile === false ||
+      !e.path.endsWith("/agents/comments-reaper.md")
+    ) {
       throw new Error("ENOENT");
     }
     return {
-      value: "---\nname: comments-reaper\ntools: [\"Read\"]\n---\n\nJudge each + line.\n",
+      value:
+        '---\nname: comments-reaper\ntools: ["Read"]\n---\n\nJudge each + line.\n',
     } as never;
   });
   on("agent.register", (_$, e) => {
@@ -168,7 +177,9 @@ test("a report Jev settled skips the reviewer and delivers its DELETEs", async (
   expect(w.spawns).toHaveLength(0);
   expect(w.submitted).toHaveLength(1);
   expect(w.submitted[0]).toStartWith(MARK);
-  expect(w.submitted[0]).toContain("app.ts:2 DELETE — Jev p=0.90: restates the code");
+  expect(w.submitted[0]).toContain(
+    "app.ts:2 DELETE — Jev p=0.90: restates the code",
+  );
   expect(w.statuses).toEqual([]);
 });
 

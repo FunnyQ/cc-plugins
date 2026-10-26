@@ -58,7 +58,7 @@ const extended = (
 const apply = (style: Style, params: string): Style => {
   const codes = params === "" ? [0] : params.split(";").map(Number);
   let s: Style = { ...style };
-  for (let i = 0; i < codes.length; ) {
+  for (let i = 0; i < codes.length;) {
     const c = codes[i];
     if (c === 38 || c === 48) {
       const [color, used] = extended(codes, i);

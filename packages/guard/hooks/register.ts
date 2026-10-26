@@ -125,7 +125,8 @@ export const register: Register = (on) => {
     }
 
     const { value: review } = await $.state.get(REVIEW);
-    const busy = review && (await $.clock.now()) - review.since < MAX_REVIEW_HOLD_MS;
+    const busy =
+      review && (await $.clock.now()) - review.since < MAX_REVIEW_HOLD_MS;
     if (e.reason !== "answer" || busy) {
       await $.state.set(CARRY, true);
       return ran;

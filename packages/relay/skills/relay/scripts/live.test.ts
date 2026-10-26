@@ -960,7 +960,9 @@ describe("runLive", () => {
 
     await run();
 
-    const recovery = timeline.findIndex((e) => e.includes("recover if this call is interrupted"));
+    const recovery = timeline.findIndex((e) =>
+      e.includes("recover if this call is interrupted"),
+    );
     expect(recovery).toBeGreaterThanOrEqual(0);
     expect(timeline[recovery]).toContain("/tmp/relay/run/result.md");
     expect(recovery).toBeLessThan(timeline.indexOf("sleep"));
@@ -975,7 +977,9 @@ describe("runLive", () => {
     const result = await run();
 
     expect(result.ok).toBe(false);
-    expect(String("error" in result ? result.error : "")).toContain("failed to send bootstrap");
+    expect(String("error" in result ? result.error : "")).toContain(
+      "failed to send bootstrap",
+    );
   });
 
   it("treats agent_prompt_stalled as a warning, not a failed run", async () => {
@@ -1230,7 +1234,11 @@ describe("relay's portability without herdr", () => {
     for await (const file of new Bun.Glob("*.ts").scan(import.meta.dir)) {
       if (file.endsWith(".test.ts")) continue;
       const source = await Bun.file(join(import.meta.dir, file)).text();
-      if (/^\s*(import|export)\b[^;]*?\bfrom\s*["'][^"']*herd(\.ts)?["']/m.test(source)) {
+      if (
+        /^\s*(import|export)\b[^;]*?\bfrom\s*["'][^"']*herd(\.ts)?["']/m.test(
+          source,
+        )
+      ) {
         offenders.push(file);
       }
     }

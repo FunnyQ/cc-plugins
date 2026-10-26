@@ -108,5 +108,7 @@ test("lineDiff past the cap removes everything, then adds everything", () => {
 
 test("hasDiagram finds a mermaid pre and nothing else", () => {
   expect(hasDiagram(`<pre class="x mermaid">A</pre>`)).toBe(true);
-  expect(hasDiagram(`<pre class="code">mermaid</pre><p class="mermaid">x</p>`)).toBe(false);
+  expect(
+    hasDiagram(`<pre class="code">mermaid</pre><p class="mermaid">x</p>`),
+  ).toBe(false);
 });

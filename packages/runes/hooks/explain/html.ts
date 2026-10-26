@@ -36,7 +36,7 @@ const cleanOnce = (main: string): string =>
 
 // regex passes repeated until nothing changes, so a tag spliced across a removed one (`<me<base>ta …>`) is caught on the next pass; a parser if an explainer is still seen to load or navigate
 export const cleanMain = (main: string): string => {
-  for (let prev = ""; prev !== main; ) [prev, main] = [main, cleanOnce(main)];
+  for (let prev = ""; prev !== main;) [prev, main] = [main, cleanOnce(main)];
   return main;
 };
 

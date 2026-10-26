@@ -139,10 +139,10 @@ test("enabled.skill: false hands the row to the engine", async ($, on) => {
 
 test("a skill that failed says so", async ($, on) => {
   await startSession($, on);
-  const card = CALL({ output: { ...INLINE, success: false, allowedTools: [] } });
-  expect(
-    await find($, card, { type: "Text", text: "failed" }),
-  ).toBeDefined();
+  const card = CALL({
+    output: { ...INLINE, success: false, allowedTools: [] },
+  });
+  expect(await find($, card, { type: "Text", text: "failed" })).toBeDefined();
 });
 
 class Reads extends Map<string, string> {
@@ -197,7 +197,15 @@ test("a plugin installed for another project is not this project's skill", async
         PLUGINS,
         JSON.stringify({
           version: 2,
-          plugins: { "chronicle@q-lab": [{ scope: "project", projectPath: "/elsewhere", installPath: ROOT }] },
+          plugins: {
+            "chronicle@q-lab": [
+              {
+                scope: "project",
+                projectPath: "/elsewhere",
+                installPath: ROOT,
+              },
+            ],
+          },
         }),
       ],
       [`${ROOT}/skills/commit/SKILL.md`, "# Chronicle Commit\nOne agent."],

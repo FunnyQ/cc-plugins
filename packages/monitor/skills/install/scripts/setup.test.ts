@@ -597,18 +597,32 @@ describe("--session-check drift watch (every session, read-only)", () => {
 });
 
 describe("--session-check stale usage dashboard (every session, read-only)", () => {
-  const atlasJson = () => join(home, ".local", "share", "q-lab", "cockpit", "atlas.json");
+  const atlasJson = () =>
+    join(home, ".local", "share", "q-lab", "cockpit", "atlas.json");
   const rootOf = (version: string) =>
     `/cache/q-lab-marketplace/monitor/${version}/skills/usage-dashboard/scripts`;
   function dashboard(root: string, pid = process.pid, rollupSchema?: number) {
-    mkdirSync(join(home, ".local", "share", "q-lab", "cockpit"), { recursive: true });
-    writeFileSync(atlasJson(), JSON.stringify({ pid, port: 5938, root, rollupSchema }));
+    mkdirSync(join(home, ".local", "share", "q-lab", "cockpit"), {
+      recursive: true,
+    });
+    writeFileSync(
+      atlasJson(),
+      JSON.stringify({ pid, port: 5938, root, rollupSchema }),
+    );
   }
-  function rollupAt(version: number, path = join(home, ".local", "share", "q-lab", "token-atlas", "rollup.db")) {
+  function rollupAt(
+    version: number,
+    path = join(home, ".local", "share", "q-lab", "token-atlas", "rollup.db"),
+  ) {
     mkdirSync(join(path, ".."), { recursive: true });
     const db = new Database(path);
-    db.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)");
-    db.run("INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)", [String(version)]);
+    db.run(
+      "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)",
+    );
+    db.run(
+      "INSERT OR REPLACE INTO meta (key, value) VALUES ('schema_version', ?)",
+      [String(version)],
+    );
     db.close();
   }
   function quiet() {
@@ -649,7 +663,9 @@ describe("--session-check stale usage dashboard (every session, read-only)", () 
     expect(run(["--session-check"]).out.trim()).toBe("");
     dashboard(rootOf("999.0.0"));
     expect(run(["--session-check"]).out.trim()).toBe("");
-    dashboard("/Users/q/src/cc-plugins/packages/monitor/skills/usage-dashboard/scripts");
+    dashboard(
+      "/Users/q/src/cc-plugins/packages/monitor/skills/usage-dashboard/scripts",
+    );
     expect(run(["--session-check"]).out.trim()).toBe("");
   });
 
@@ -677,7 +693,8 @@ describe("--session-check stale usage dashboard (every session, read-only)", () 
   test("a dashboard whose rollup schema is behind the database gets one notice per schema pair", () => {
     dashboard(rootOf("999.0.0"), process.pid, 3);
     rollupAt(4);
-    const message = JSON.parse(run(["--session-check"]).out.trim()).systemMessage as string;
+    const message = JSON.parse(run(["--session-check"]).out.trim())
+      .systemMessage as string;
     expect(message).toContain("/monitor:usage-dashboard");
     expect(message).toContain("4");
     expect(run(["--session-check"]).out.trim()).toBe("");
@@ -691,7 +708,14 @@ describe("--session-check stale usage dashboard (every session, read-only)", () 
     const db = join(home, "custom", "rollup.db");
     rollupAt(4, db);
     const proc = Bun.spawnSync(["bun", SCRIPT, "--session-check"], {
-      env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir, COCKPIT_HOME: "", XDG_DATA_HOME: "", TOKEN_ATLAS_ROLLUP_DB: db },
+      env: {
+        ...process.env,
+        HOME: home,
+        CLAUDE_PLUGIN_DATA: dataDir,
+        COCKPIT_HOME: "",
+        XDG_DATA_HOME: "",
+        TOKEN_ATLAS_ROLLUP_DB: db,
+      },
     });
     expect(proc.stdout.toString()).toContain("/monitor:usage-dashboard");
   });
@@ -704,7 +728,12 @@ describe("--session-check stale usage dashboard (every session, read-only)", () 
       JSON.stringify({ pid: process.pid, port: 5938, root: rootOf("0.0.1") }),
     );
     const proc = Bun.spawnSync(["bun", SCRIPT, "--session-check"], {
-      env: { ...process.env, HOME: home, CLAUDE_PLUGIN_DATA: dataDir, COCKPIT_HOME: cockpitHome },
+      env: {
+        ...process.env,
+        HOME: home,
+        CLAUDE_PLUGIN_DATA: dataDir,
+        COCKPIT_HOME: cockpitHome,
+      },
     });
     expect(proc.stdout.toString()).toContain("0.0.1");
   });

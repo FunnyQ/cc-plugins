@@ -6,7 +6,8 @@
 
 export const DEFAULT_STATE_DIR = "/tmp/q-lab/guard";
 
-export const fileNameSafeSessionId = (sessionId: string) => sessionId.replace(/[^\w.-]/g, "_");
+export const fileNameSafeSessionId = (sessionId: string) =>
+  sessionId.replace(/[^\w.-]/g, "_");
 
 export const reportedFile = (dir: string, sessionId: string) =>
   `${dir}/${fileNameSafeSessionId(sessionId)}.reported.jsonl`;

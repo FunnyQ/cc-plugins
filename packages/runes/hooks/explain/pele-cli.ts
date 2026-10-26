@@ -4,7 +4,8 @@ import { render } from "./vendor/pele.js";
 
 const page = process.argv[2]!;
 const html = await Bun.file(page).text();
-const upgraded = upgradeDiagrams(html, (source, idPrefix) =>
-  render(source, { idPrefix }).svg,
+const upgraded = upgradeDiagrams(
+  html,
+  (source, idPrefix) => render(source, { idPrefix }).svg,
 );
 if (upgraded !== html) await Bun.write(page, upgraded);

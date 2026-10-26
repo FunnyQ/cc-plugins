@@ -1,9 +1,5 @@
 export type DeckState =
-  | "done"
-  | "in-progress"
-  | "ready"
-  | "blocked"
-  | "invalid";
+  "done" | "in-progress" | "ready" | "blocked" | "invalid";
 
 export type DeckTask = {
   ref: string; // "bucket/NN", or the graph node id

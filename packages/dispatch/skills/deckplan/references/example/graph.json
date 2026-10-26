@@ -2,11 +2,7 @@
   "version": 1,
   "title": "Repository tour",
   "repoRoot": "/absolute/path/to/working-repository",
-  "lanes": [
-    "scout",
-    "build",
-    "audit"
-  ],
+  "lanes": ["scout", "build", "audit"],
   "nodes": [
     {
       "ref": "scout/01",
@@ -24,17 +20,13 @@
       "ref": "build/01",
       "lane": "build",
       "title": "Draft repository guide",
-      "dependsOn": [
-        "scout/01"
-      ]
+      "dependsOn": ["scout/01"]
     },
     {
       "ref": "build/02",
       "lane": "build",
       "title": "Review repository guide",
-      "dependsOn": [
-        "build/01"
-      ]
+      "dependsOn": ["build/01"]
     },
     {
       "ref": "audit/01",

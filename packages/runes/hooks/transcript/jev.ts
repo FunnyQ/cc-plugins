@@ -27,7 +27,9 @@ export type Next = { done: true; lang: string | undefined } | { done: false };
 
 const fenceOf = (kind: Probs, language: Probs): string | undefined => {
   const kinds = ["markdown", "json", "diff", "code"] as const;
-  const best = kinds.reduce((a, b) => ((kind[b] ?? 0) > (kind[a] ?? 0) ? b : a));
+  const best = kinds.reduce((a, b) =>
+    (kind[b] ?? 0) > (kind[a] ?? 0) ? b : a,
+  );
   if (best !== "code") return best;
   const [top] = Object.entries(language).sort((a, b) => b[1] - a[1]);
   return top && top[0] !== "other" ? top[0] : undefined;
@@ -35,26 +37,38 @@ const fenceOf = (kind: Probs, language: Probs): string | undefined => {
 
 export const afterCommand = ({ kind, language, risk }: Answers): Next => {
   const plain = kind.plain ?? 0;
-  if (risk >= RISK_BLOCK || plain >= SURE_PLAIN) return { done: true, lang: undefined };
-  if (plain <= SURE_RENDER) return { done: true, lang: fenceOf(kind, language) };
+  if (risk >= RISK_BLOCK || plain >= SURE_PLAIN)
+    return { done: true, lang: undefined };
+  if (plain <= SURE_RENDER)
+    return { done: true, lang: fenceOf(kind, language) };
   return { done: false };
 };
 
-export const afterOutput = ({ kind, language }: Pick<Answers, "kind" | "language">): string | undefined =>
+export const afterOutput = ({
+  kind,
+  language,
+}: Pick<Answers, "kind" | "language">): string | undefined =>
   (kind.plain ?? 0) <= OUTPUT_RENDER ? fenceOf(kind, language) : undefined;
 
 // what a command or an output sample may carry that must not leave the machine; patterns, so not a guarantee
 const SECRETS: [RegExp, string][] = [
-  [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g, "[private key]"],
+  [
+    /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(-----END [A-Z ]*PRIVATE KEY-----|$)/g,
+    "[private key]",
+  ],
   [/\b(sk|pk|rk)-[A-Za-z0-9_-]{16,}/g, "[key]"],
   [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[token]"],
   [/\bAKIA[0-9A-Z]{16}\b/g, "[key]"],
   [/\bBearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, "Bearer [token]"],
   [/(:\/\/[^\s:/@]+:)[^\s@/]+(@)/g, "$1[password]$2"],
-  [/\b((?:password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[:=]\s*)\S{6,}/gi, "$1[secret]"],
+  [
+    /\b((?:password|passwd|secret|token|api[_-]?key|access[_-]?key)\s*[:=]\s*)\S{6,}/gi,
+    "$1[secret]",
+  ],
   [/[\w.+-]+@[\w-]+\.[\w.]+/g, "[email]"],
 ];
-export const scrub = (text: string): string => SECRETS.reduce((t, [re, to]) => t.replace(re, to), text);
+export const scrub = (text: string): string =>
+  SECRETS.reduce((t, [re, to]) => t.replace(re, to), text);
 
 const DENIED: RegExp[] = [
   /^(env|printenv)\b(?!\s*\|\s*wc\b)/,
@@ -71,7 +85,9 @@ const DENIED: RegExp[] = [
   /\bmaster\.key\b|\bcredentials\.yml\b/,
 ];
 export const isDenied = (command: string): boolean =>
-  command.split(/&&|\|\||;|\n/).some((part) => DENIED.some((re) => re.test(part.trim())));
+  command
+    .split(/&&|\|\||;|\n/)
+    .some((part) => DENIED.some((re) => re.test(part.trim())));
 
 export type Post = (
   url: string,
@@ -79,20 +95,41 @@ export type Post = (
 ) => Promise<{ ok: boolean; text: string }>;
 
 const KIND = {
-  markdown: "A document written in Markdown: headings, bullet lists, bold, links or fenced blocks, prose a Markdown renderer would improve",
+  markdown:
+    "A document written in Markdown: headings, bullet lists, bold, links or fenced blocks, prose a Markdown renderer would improve",
   json: "The whole output is JSON",
   diff: "A unified diff or patch",
   code: "Mostly one source file or config snippet to syntax-highlight, not code appearing inside grep hits or logs",
   plain:
     "Tool output rather than a document: log lines, test runner output, file listings, grep hits with file:line prefixes, git status or log, tables a tool printed, progress, errors, shell session text, key-value dumps",
 };
-const LANGS = ["typescript", "tsx", "javascript", "ruby", "python", "rust", "go", "bash", "yaml", "toml", "css", "html", "sql", "xml", "other"];
+const LANGS = [
+  "typescript",
+  "tsx",
+  "javascript",
+  "ruby",
+  "python",
+  "rust",
+  "go",
+  "bash",
+  "yaml",
+  "toml",
+  "css",
+  "html",
+  "sql",
+  "xml",
+  "other",
+];
 const LANGUAGE = Object.fromEntries(
-  LANGS.map((l) => [l, l === "other" ? "Not code, or none of the listed languages" : `${l} source`]),
+  LANGS.map((l) => [
+    l,
+    l === "other" ? "Not code, or none of the listed languages" : `${l} source`,
+  ]),
 );
 const RISK = {
   true: "Likely or possibly prints a secret or personal data: environment dumps, credential or key files, auth tokens, secret stores, database rows of users, remote URLs, config listings, shell history",
-  false: "Prints build output, test results, source code, file listings, version numbers, or repository status that holds no secrets or personal data",
+  false:
+    "Prints build output, test results, source code, file listings, version numbers, or repository status that holds no secrets or personal data",
 };
 
 const byCommand = (command: string) => ({
@@ -100,12 +137,14 @@ const byCommand = (command: string) => ({
   questions: {
     kind: {
       type: "choice",
-      instructions: "How should the output of this `command` be rendered in a terminal card? You see only the command, not its output: judge what it most likely prints.",
+      instructions:
+        "How should the output of this `command` be rendered in a terminal card? You see only the command, not its output: judge what it most likely prints.",
       criteria: KIND,
     },
     language: {
       type: "choice",
-      instructions: "If the output of `command` is most likely source code or config, which language is it? Pick other when it is not code.",
+      instructions:
+        "If the output of `command` is most likely source code or config, which language is it? Pick other when it is not code.",
       criteria: LANGUAGE,
     },
     risk: {
@@ -122,12 +161,14 @@ const byOutput = (command: string, output: string) => ({
   questions: {
     kind: {
       type: "choice",
-      instructions: "How should this command's `output` be rendered in a terminal card? Judge the content first, the `command` second.",
+      instructions:
+        "How should this command's `output` be rendered in a terminal card? Judge the content first, the `command` second.",
       criteria: KIND,
     },
     language: {
       type: "choice",
-      instructions: "If `output` is source code or config, which language is it? Pick other when it is not code.",
+      instructions:
+        "If `output` is source code or config, which language is it? Pick other when it is not code.",
       criteria: LANGUAGE,
     },
   },
@@ -141,17 +182,28 @@ const asked = new Set<string>();
 const remember = (key: string, lang: string | undefined) => {
   fenceByKey.delete(key);
   fenceByKey.set(key, lang);
-  if (fenceByKey.size > CACHE_SIZE) fenceByKey.delete(fenceByKey.keys().next().value!);
+  if (fenceByKey.size > CACHE_SIZE)
+    fenceByKey.delete(fenceByKey.keys().next().value!);
 };
 
-export const systemOne = async (t: { post: Post; apiKey: string }, body: object) => {
+export const systemOne = async (
+  t: { post: Post; apiKey: string },
+  body: object,
+) => {
   const r = await t.post(ENDPOINT, {
     method: "POST",
-    headers: { Authorization: `Bearer ${t.apiKey}`, "Content-Type": "application/json" },
+    headers: {
+      Authorization: `Bearer ${t.apiKey}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ model: MODEL, ...body }),
   });
   if (!r.ok) throw new Error("jev refused");
-  return (JSON.parse(r.text) as { answers: Record<string, { probabilities?: Probs; noul?: number }> }).answers;
+  return (
+    JSON.parse(r.text) as {
+      answers: Record<string, { probabilities?: Probs; noul?: number }>;
+    }
+  ).answers;
 };
 
 const ask = async (t: Transport, body: object) => {
@@ -166,7 +218,9 @@ const ask = async (t: Transport, body: object) => {
 const decide = async (t: Transport, command: string, head: string) => {
   const cmd = scrub(command).slice(0, COMMAND_CHARS);
   const first = afterCommand(await ask(t, byCommand(cmd)));
-  return first.done ? first.lang : afterOutput(await ask(t, byOutput(cmd, scrub(head))));
+  return first.done
+    ? first.lang
+    : afterOutput(await ask(t, byOutput(cmd, scrub(head))));
 };
 
 export const jev = {
@@ -188,6 +242,8 @@ export const jev = {
     return undefined;
   },
   work(next: { apiKey: string | undefined; post: Post; redraw: () => void }) {
-    transport = next.apiKey ? { post: next.post, apiKey: next.apiKey, redraw: next.redraw } : undefined;
+    transport = next.apiKey
+      ? { post: next.post, apiKey: next.apiKey, redraw: next.redraw }
+      : undefined;
   },
 };

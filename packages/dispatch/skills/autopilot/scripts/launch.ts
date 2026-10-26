@@ -192,10 +192,7 @@ export async function main(): Promise<void> {
     isProcessAlive,
   );
 
-  if (
-    decision.action === "supersede" &&
-    !(await supersede(decision.info))
-  ) {
+  if (decision.action === "supersede" && !(await supersede(decision.info))) {
     process.exitCode = 1;
     return;
   }

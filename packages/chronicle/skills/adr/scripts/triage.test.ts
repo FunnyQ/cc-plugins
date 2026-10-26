@@ -201,7 +201,10 @@ describe("buildTriage", () => {
     );
 
     expect(
-      triage.clusters.map((cluster) => [cluster.decision, cluster.pulledFromWatch]),
+      triage.clusters.map((cluster) => [
+        cluster.decision,
+        cluster.pulledFromWatch,
+      ]),
     ).toEqual([
       ["F", false],
       ["Q", true],

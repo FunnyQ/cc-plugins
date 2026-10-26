@@ -23,8 +23,12 @@ const READ = (
     viewport: { columns: 60, rows: 40 },
   }) as never;
 
-
-const TEXT = (startLine: number, numLines: number, totalLines: number, content = "") => ({
+const TEXT = (
+  startLine: number,
+  numLines: number,
+  totalLines: number,
+  content = "",
+) => ({
   type: "text",
   file: { filePath: "/src/a.ts", content, numLines, startLine, totalLines },
 });
@@ -105,12 +109,34 @@ test("enabled.read: false hands the row to the engine", async ($, on) => {
 
 test("a text read folds its content away, and the detail row unfolds it, numbered from startLine", async ($, on) => {
   const stdins: string[] = [];
-  await startSession($, on, { run: (e) => (stdins.push(e.init?.stdin ?? ""), { value: { exitCode: 1, stdout: "", stderr: "", isStdoutTruncated: false, isStderrTruncated: false } }) });
-  const row = await $.ui.mount(READ({ file_path: "/a.txt" }, { output: TEXT(9, 2, 40, "alpha\n\tbeta\n") }));
+  await startSession($, on, {
+    run: (e) => (
+      stdins.push(e.init?.stdin ?? ""),
+      {
+        value: {
+          exitCode: 1,
+          stdout: "",
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      }
+    ),
+  });
+  const row = await $.ui.mount(
+    READ(
+      { file_path: "/a.txt" },
+      { output: TEXT(9, 2, 40, "alpha\n\tbeta\n") },
+    ),
+  );
   expect(await row.find({ type: "Text", text: "alpha" })).toBeUndefined();
-  expect((await row.find({ key: "read:toggle" }))?.text.trim()).toBe("▸ lines 9–10 of 40");
+  expect((await row.find({ key: "read:toggle" }))?.text.trim()).toBe(
+    "▸ lines 9–10 of 40",
+  );
   await row.press({ key: "read:toggle" });
-  expect((await row.find({ key: "read:toggle" }))?.text.trim()).toBe("▾ lines 9–10 of 40");
+  expect((await row.find({ key: "read:toggle" }))?.text.trim()).toBe(
+    "▾ lines 9–10 of 40",
+  );
   expect(await row.find({ type: "Text", text: " 9  " })).toBeDefined();
   expect(await row.find({ type: "Text", text: "alpha" })).toBeDefined();
   expect(await row.find({ type: "Text", text: "    beta" })).toBeDefined();
@@ -123,15 +149,21 @@ test("a text read folds its content away, and the detail row unfolds it, numbere
 test("the card draws at full colour, with no muted rest", async ($, on) => {
   await startSession($, on);
   const read = READ({ file_path: "/a" }, { output: TEXT(1, 1, 1) });
-  expect(await find($, read, { type: "Text", text: /^╰─+╯$/ })).toMatchObject({ props: { color: "#6b8fb3" } });
+  expect(await find($, read, { type: "Text", text: /^╰─+╯$/ })).toMatchObject({
+    props: { color: "#6b8fb3" },
+  });
 });
 
 test("an unfolded card ends in a fold row that folds it again", async ($, on) => {
   await startSession($, on);
-  const row = await $.ui.mount(READ({ file_path: "/a.txt" }, { output: TEXT(1, 2, 2, "alpha\nbeta\n") }));
+  const row = await $.ui.mount(
+    READ({ file_path: "/a.txt" }, { output: TEXT(1, 2, 2, "alpha\nbeta\n") }),
+  );
   expect(await row.find({ key: "read:end:more" })).toBeUndefined();
   await row.press({ key: "read:toggle" });
-  expect((await row.find({ key: "read:end:more" }))?.text.trim()).toBe("▾ fold");
+  expect((await row.find({ key: "read:end:more" }))?.text.trim()).toBe(
+    "▾ fold",
+  );
   await row.press({ key: "read:end:more" });
   expect(await row.find({ type: "Text", text: "alpha" })).toBeUndefined();
   await row.unmount();

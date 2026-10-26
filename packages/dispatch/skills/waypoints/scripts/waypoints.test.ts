@@ -483,7 +483,7 @@ describe("planLegScaffold", () => {
         proj: "demo",
         nnSlug: "01-auth",
         buckets: ["bad-bucket"],
-        }),
+      }),
     ).toThrow(/bucket/);
   });
 });

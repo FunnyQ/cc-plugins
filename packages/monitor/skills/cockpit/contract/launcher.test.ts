@@ -3,17 +3,44 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { command, PLUGIN_ROOT, SCRIPTS_DIR } from "./launcher";
 import {
-  baseEnv, cleanup, fixtureEnv, makeHomes, makeProviderFixtures,
-  startDaemon, stopDaemon,
+  baseEnv,
+  cleanup,
+  fixtureEnv,
+  makeHomes,
+  makeProviderFixtures,
+  startDaemon,
+  stopDaemon,
 } from "./fixtures";
 
 describe("harness: launcher", () => {
   test("maps every process and CLI subcommand to the binary", () => {
     expect(SCRIPTS_DIR).toBe(join(PLUGIN_ROOT, "skills/cockpit/scripts"));
-    const binary = process.env.COCKPIT_BIN || join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
-    expect(command("server", ["--port", "1"])).toEqual([binary, "server", "--port", "1"]);
-    for (const subcommand of ["log", "scribe", "prep", "config", "wait", "send", "restart", "nudge", "find-session", "ensure-daemon"]) {
-      expect(command("cli", [subcommand, "argument"])).toEqual([binary, subcommand, "argument"]);
+    const binary =
+      process.env.COCKPIT_BIN ||
+      join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
+    expect(command("server", ["--port", "1"])).toEqual([
+      binary,
+      "server",
+      "--port",
+      "1",
+    ]);
+    for (const subcommand of [
+      "log",
+      "scribe",
+      "prep",
+      "config",
+      "wait",
+      "send",
+      "restart",
+      "nudge",
+      "find-session",
+      "ensure-daemon",
+    ]) {
+      expect(command("cli", [subcommand, "argument"])).toEqual([
+        binary,
+        subcommand,
+        "argument",
+      ]);
     }
     for (const hook of ["session-start", "stop"]) {
       expect(command("hook", [hook])).toEqual([binary, "hook", hook]);
@@ -22,7 +49,10 @@ describe("harness: launcher", () => {
 
   test("selects the default and explicit binaries in fresh processes", () => {
     const source = `const { command } = await import(${JSON.stringify(join(import.meta.dir, "launcher.ts"))}); console.log(JSON.stringify({ argv: command("server", ["--port", "1"]), binary: process.env.COCKPIT_BIN }));`;
-    const defaultBinary = join(PLUGIN_ROOT, "cockpit-rs/target/release/cockpit");
+    const defaultBinary = join(
+      PLUGIN_ROOT,
+      "cockpit-rs/target/release/cockpit",
+    );
     for (const override of [undefined, process.execPath]) {
       const env = { ...process.env };
       if (override) env.COCKPIT_BIN = override;
@@ -46,7 +76,9 @@ describe("harness: launcher", () => {
       delete env.COCKPIT_BIN;
       const child = Bun.spawnSync([process.execPath, isolated], { env });
       expect(child.exitCode).not.toBe(0);
-      expect(child.stderr.toString()).toContain("contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN");
+      expect(child.stderr.toString()).toContain(
+        "contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN",
+      );
     } finally {
       cleanup(homes.root);
     }
@@ -54,12 +86,22 @@ describe("harness: launcher", () => {
 
   test("removes parent session and delegation variables before spawning", () => {
     const homes = makeHomes();
-    const keys = ["CLAUDE_CODE_SESSION_ID", "RELAY_DELEGATED", "OPENCODE_SESSION_ID", "COCKPIT_HOME"];
+    const keys = [
+      "CLAUDE_CODE_SESSION_ID",
+      "RELAY_DELEGATED",
+      "OPENCODE_SESSION_ID",
+      "COCKPIT_HOME",
+    ];
     const saved = keys.map((key) => process.env[key]);
     try {
-      keys.forEach((key) => { process.env[key] = key === "RELAY_DELEGATED" ? "1" : "parent-value"; });
+      keys.forEach((key) => {
+        process.env[key] = key === "RELAY_DELEGATED" ? "1" : "parent-value";
+      });
       const env = baseEnv(homes);
-      const child = Bun.spawnSync(["bun", "-e", "console.log(JSON.stringify(process.env))"], { env });
+      const child = Bun.spawnSync(
+        ["bun", "-e", "console.log(JSON.stringify(process.env))"],
+        { env },
+      );
       expect(child.exitCode).toBe(0);
       const received = JSON.parse(child.stdout.toString());
       for (const key of keys.slice(0, 3)) expect(received[key]).toBeUndefined();
@@ -67,7 +109,9 @@ describe("harness: launcher", () => {
       expect(received.HOME).toBe(homes.root);
       expect(received.XDG_CONFIG_HOME).toBe(homes.configHome);
       expect(received.XDG_DATA_HOME).toBe(homes.dataHome);
-      expect(baseEnv(homes, { RELAY_DELEGATED: "case-value" }).RELAY_DELEGATED).toBe("case-value");
+      expect(
+        baseEnv(homes, { RELAY_DELEGATED: "case-value" }).RELAY_DELEGATED,
+      ).toBe("case-value");
     } finally {
       keys.forEach((key, i) => {
         if (saved[i] === undefined) delete process.env[key];
@@ -83,8 +127,20 @@ describe("harness: launcher", () => {
       const f = makeProviderFixtures(homes);
       expect(existsSync(join(f.projectDir, ".git"))).toBe(true);
       const env = baseEnv(homes, fixtureEnv(f));
-      for (const [provider, id] of [["claude", f.claudeSessionId], ["codex", f.codexThreadId], ["opencode", f.opencodeSessionId]]) {
-        const result = Bun.spawnSync(command("cli", ["find-session", "--provider", provider, f.projectDir]), { env, cwd: f.projectDir });
+      for (const [provider, id] of [
+        ["claude", f.claudeSessionId],
+        ["codex", f.codexThreadId],
+        ["opencode", f.opencodeSessionId],
+      ]) {
+        const result = Bun.spawnSync(
+          command("cli", [
+            "find-session",
+            "--provider",
+            provider,
+            f.projectDir,
+          ]),
+          { env, cwd: f.projectDir },
+        );
         expect(result.stderr.toString()).toBe("");
         expect(result.exitCode).toBe(0);
         expect(result.stdout.toString().trim()).toBe(id);

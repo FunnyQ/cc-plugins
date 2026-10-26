@@ -220,9 +220,11 @@ function expandHome(path: string): string {
   return path;
 }
 
-function readChronicleTemplateOverride(settings: {
-  skills?: { chronicle?: { commit?: { templatePath?: unknown } } };
-} | null): string | undefined {
+function readChronicleTemplateOverride(
+  settings: {
+    skills?: { chronicle?: { commit?: { templatePath?: unknown } } };
+  } | null,
+): string | undefined {
   const path = settings?.skills?.chronicle?.commit?.templatePath;
   return typeof path === "string" ? path : undefined;
 }

@@ -102,7 +102,13 @@ test("slugOf", () => {
 
 test("explainerPath files a page under its project, then its day and session, zero-padded and slugged", () => {
   expect(
-    explainerPath("/h", "My Project", "94e739d6-4f3e-4ab7-8896-2a0aebe5aac2", new Date(2026, 0, 5, 7, 3), "Hi there"),
+    explainerPath(
+      "/h",
+      "My Project",
+      "94e739d6-4f3e-4ab7-8896-2a0aebe5aac2",
+      new Date(2026, 0, 5, 7, 3),
+      "Hi there",
+    ),
   ).toBe(
     "/h/.local/share/q-lab/runes/explain/my-project/20260105-94e739d6/0703-hi-there.html",
   );
@@ -138,19 +144,26 @@ test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async
   );
 
   files.set(`${dir}/1402-t.html`, "keep");
-  expect(await writeExplainer(io, ...args)).toBe(
-    `${dir}/1402-t-2.html`,
-  );
-  expect(await writeExplainer(io, ...args)).toBe(
-    `${dir}/1402-t-3.html`,
-  );
+  expect(await writeExplainer(io, ...args)).toBe(`${dir}/1402-t-2.html`);
+  expect(await writeExplainer(io, ...args)).toBe(`${dir}/1402-t-3.html`);
   expect(files.get(`${dir}/1402-t.html`)).toBe("keep");
 });
 
 test("assemble writes a language tag into {{lang}}, and leaves it empty for a name that is not one", () => {
-  expect(assemble('<html lang="{{lang}}">', { ...page, lang: "zh-TW" })).toBe('<html lang="zh-TW">');
-  expect(assemble('<html lang="{{lang}}">', { ...page, lang: " ja " })).toBe('<html lang="ja">');
-  expect(assemble('<html lang="{{lang}}">', { ...page, lang: "Traditional Chinese" })).toBe('<html lang="">');
-  expect(assemble('<html lang="{{lang}}">', { ...page, lang: 'en" onload="x' })).toBe('<html lang="">');
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: "zh-TW" })).toBe(
+    '<html lang="zh-TW">',
+  );
+  expect(assemble('<html lang="{{lang}}">', { ...page, lang: " ja " })).toBe(
+    '<html lang="ja">',
+  );
+  expect(
+    assemble('<html lang="{{lang}}">', {
+      ...page,
+      lang: "Traditional Chinese",
+    }),
+  ).toBe('<html lang="">');
+  expect(
+    assemble('<html lang="{{lang}}">', { ...page, lang: 'en" onload="x' }),
+  ).toBe('<html lang="">');
   expect(assemble('<html lang="{{lang}}">', page)).toBe('<html lang="">');
 });

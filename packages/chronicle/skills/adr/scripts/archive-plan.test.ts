@@ -321,7 +321,9 @@ describe("CLI", () => {
     const result = run(directory, [{ sessionId: "a", target: "done" }]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().startsWith("/tmp/q-lab/chronicle/adr/")).toBe(true);
+    expect(result.stdout.trim().startsWith("/tmp/q-lab/chronicle/adr/")).toBe(
+      true,
+    );
   });
 });
 

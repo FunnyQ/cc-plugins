@@ -369,7 +369,9 @@ describe("worktree lifecycle", () => {
     git(options.repo, "add", ".");
     git(options.repo, "commit", "-qm", "nested plan");
     const wt = create(options);
-    expect(lstatSync(join(wt.path, options.planDir)).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(wt.path, options.planDir)).isSymbolicLink()).toBe(
+      true,
+    );
     const baseline = fingerprint(options).fingerprint;
     put(options.repo, task, "> **Status**: in-progress\n");
     put(wt.path, "a.txt", "task\n");
@@ -633,7 +635,9 @@ describe("worktree lifecycle", () => {
     put(options.repo, ".gitignore", "docs/\n");
     put(options.repo, "docs/other/guide.md", "keep\n");
     const wt = create(options);
-    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(
+      true,
+    );
     expect(readFileSync(join(wt.path, "docs/other/guide.md"), "utf8")).toBe(
       "keep\n",
     );
@@ -818,7 +822,9 @@ describe("reset", () => {
     expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe(markers);
     expect(existsSync(join(wt.path, "scratch/new.txt"))).toBe(false);
     expect(existsSync(join(wt.path, "node_modules/dep/index.js"))).toBe(true);
-    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(wt.path, "docs/test-plan")).isSymbolicLink()).toBe(
+      true,
+    );
     expect(git(wt.path, "rev-parse", "HEAD")).toBe(rebased.base);
     expect(git(wt.path, "write-tree")).toBe(rebased.tree);
   });
@@ -826,7 +832,11 @@ describe("reset", () => {
   test("rejects a recorded op that is not a rebase and records nothing", () => {
     const { options, wt } = conflicted();
     unland;
-    land({ ...options, expect: fingerprint(options).fingerprint, op: "a1-land" });
+    land({
+      ...options,
+      expect: fingerprint(options).fingerprint,
+      op: "a1-land",
+    });
     const before = JSON.stringify(state(options));
     expect(() => reset({ ...options, op: "a1-land" })).toThrow(/not a rebase/);
     expect(JSON.stringify(state(options))).toBe(before);

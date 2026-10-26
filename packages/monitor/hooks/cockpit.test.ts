@@ -12,7 +12,14 @@ const deferred = <T>(): Deferred<T> => {
 
 const ran = { result: {}, text: "ran" };
 
-function world(on: On, opts: { isAnsweredBeneath?: boolean; checkBeneath?: "ask" | "deny"; isInboxFailingOnce?: boolean } = {}) {
+function world(
+  on: On,
+  opts: {
+    isAnsweredBeneath?: boolean;
+    checkBeneath?: "ask" | "deny";
+    isInboxFailingOnce?: boolean;
+  } = {},
+) {
   const posts: { path: string; body: Record<string, unknown> }[] = [];
   const submitted: string[] = [];
   const verdict = deferred<Record<string, unknown>>();
@@ -27,29 +34,28 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean; checkBeneath?: "ask"
   const inboxSessions: string[] = [];
   let sessionId = "11111111-1111-4111-8111-111111111111";
 
-  on(
-    "process.run",
-    (_$, e) => {
-      if (e.argv.includes("ensure-daemon")) ensureRuns++;
-      return ({
-        value: {
-          exitCode: 0,
-          stdout: '{"port":5858,"token":"t"}\n',
-          stderr: "",
-          isStdoutTruncated: false,
-          isStderrTruncated: false,
-        },
-      }) as never;
-    },
-  );
-  on(
-    "session.id",
-    () => ({ value: sessionId }) as never,
-  );
+  on("process.run", (_$, e) => {
+    if (e.argv.includes("ensure-daemon")) ensureRuns++;
+    return {
+      value: {
+        exitCode: 0,
+        stdout: '{"port":5858,"token":"t"}\n',
+        stderr: "",
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
+    } as never;
+  });
+  on("session.id", () => ({ value: sessionId }) as never);
   on("session.start", (_$, e) => e as never);
-  on("session.end", () => ({ sessionId: "11111111-1111-4111-8111-111111111111" }) as never);
+  on(
+    "session.end",
+    () => ({ sessionId: "11111111-1111-4111-8111-111111111111" }) as never,
+  );
   on("prompt.submit", (_$, e) => {
-    submitted.push(`${e.origin.kind === "plugin" && e.origin.asUser ? "asUser:" : ""}${e.text}`);
+    submitted.push(
+      `${e.origin.kind === "plugin" && e.origin.asUser ? "asUser:" : ""}${e.text}`,
+    );
     return e as never;
   });
   on("http.fetch", async (_$, e) => {
@@ -58,7 +64,8 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean; checkBeneath?: "ask"
     if (path === "/api/inbox") {
       inboxCalls++;
       inboxTokens.push(new URL(e.url).searchParams.get("token"));
-      if (opts.isInboxFailingOnce && inboxCalls === 1) throw new Error("connection refused");
+      if (opts.isInboxFailingOnce && inboxCalls === 1)
+        throw new Error("connection refused");
       inboxSessions.push(new URL(e.url).searchParams.get("session")!);
       if (inboxCalls === 1) answer = { message: "from the dashboard" };
       else {
@@ -81,7 +88,9 @@ function world(on: On, opts: { isAnsweredBeneath?: boolean; checkBeneath?: "ask"
       },
     } as never;
   });
-  on("classic.PermissionRequest", () => (opts.isAnsweredBeneath ? { decision: { behavior: "allow" as const } } : {}));
+  on("classic.PermissionRequest", () =>
+    opts.isAnsweredBeneath ? { decision: { behavior: "allow" as const } } : {},
+  );
   on("tool.check", () => ({ decision: opts.checkBeneath ?? "ask" }));
   on(
     "tool.call",
@@ -209,11 +218,15 @@ for (const reason of ["resume", "clear"] as const) {
     const w = world(on);
     await $.session.start({ cwd: "/repo", surface: null } as never);
     while (w.inboxCalls() < 2) await tick();
-    await $.session.end({ reason, sessionId: "11111111-1111-4111-8111-111111111111" } as never);
+    await $.session.end({
+      reason,
+      sessionId: "11111111-1111-4111-8111-111111111111",
+    } as never);
     // The engine switches the id only after session.end resolves.
     await w.clock.advance(300);
     w.useSession("22222222-2222-4222-8222-222222222222");
-    while (!w.inboxSessions.some((s) => s.startsWith("2222"))) await w.clock.advance(100);
+    while (!w.inboxSessions.some((s) => s.startsWith("2222")))
+      await w.clock.advance(100);
     w.inboxDone.resolve();
     for (let i = 0; i < 10; i++) await tick();
     expect(w.inboxSessions.filter((s) => s.startsWith("1111")).length).toBe(2);
@@ -231,7 +244,13 @@ test("a deny beneath still stands on a dashboard-approved call's second pass", a
   w.verdict.resolve({ request_id: id, behavior: "allow" });
   while (w.coreRuns() < 2) await tick();
   expect(
-    (await $.tool.check({ tool: "Bash", input: asked.tool_input, tool_use_id: id })).decision,
+    (
+      await $.tool.check({
+        tool: "Bash",
+        input: asked.tool_input,
+        tool_use_id: id,
+      })
+    ).decision,
   ).toBe("deny");
   w.rerun.resolve(ran);
   await call;

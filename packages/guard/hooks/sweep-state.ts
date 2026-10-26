@@ -6,7 +6,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_STATE_DIR, reportedFile, reportedLine, fileNameSafeSessionId } from "./ledger.ts";
+import {
+  DEFAULT_STATE_DIR,
+  reportedFile,
+  reportedLine,
+  fileNameSafeSessionId,
+} from "./ledger.ts";
 
 export type Baseline = { root: string; tree: string };
 
@@ -16,7 +21,8 @@ function dir(): string {
   return path;
 }
 
-const baselinePath = (id: string) => join(dir(), `${fileNameSafeSessionId(id)}.baseline.json`);
+const baselinePath = (id: string) =>
+  join(dir(), `${fileNameSafeSessionId(id)}.baseline.json`);
 const reportedPath = (id: string) => reportedFile(dir(), id);
 
 export function writeBaseline(sessionId: string, baseline: Baseline): void {
@@ -44,10 +50,7 @@ export function recordReported(
   file: string,
   texts: string[],
 ): void {
-  appendFileSync(
-    reportedPath(sessionId),
-    reportedLine(file, texts),
-  );
+  appendFileSync(reportedPath(sessionId), reportedLine(file, texts));
 }
 
 export function readReported(

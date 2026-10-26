@@ -35,8 +35,7 @@ export type AdrIndex = {
 };
 
 type ParseResult =
-  | { adr: AdrMeta; reason: null }
-  | { adr: null; reason: "no-h1" | "bad-h1" };
+  { adr: AdrMeta; reason: null } | { adr: null; reason: "no-h1" | "bad-h1" };
 
 const ADR_STATUSES: AdrStatus[] = [
   "Proposed",

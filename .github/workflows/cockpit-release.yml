@@ -2,7 +2,7 @@ name: Cockpit release
 
 on:
   push:
-    tags: ['monitor-v*']
+    tags: ["monitor-v*"]
   workflow_dispatch:
     inputs:
       tag:
@@ -36,16 +36,16 @@ jobs:
           # Apple's linker adds the ad-hoc signature required by arm64 macOS.
           - runner: macos-14
             target: aarch64-apple-darwin
-            flags: ''
+            flags: ""
           - runner: macos-14
             target: x86_64-apple-darwin
-            flags: ''
+            flags: ""
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            flags: '--zig'
+            flags: "--zig"
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            flags: '--zig'
+            flags: "--zig"
     steps:
       - uses: actions/checkout@v4
         with:

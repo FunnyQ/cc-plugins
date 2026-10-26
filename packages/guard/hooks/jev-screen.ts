@@ -75,7 +75,11 @@ async function allWhy(
   }
 }
 
-export type Screen = { kept: CommentBlock[]; withdrawn: number; slowestMs?: number };
+export type Screen = {
+  kept: CommentBlock[];
+  withdrawn: number;
+  slowestMs?: number;
+};
 
 export async function screenBlocks(
   file: string,

@@ -230,7 +230,9 @@ test("buildPrompt names the configured language for the whole reply, and keeps t
   expect(set.startsWith(RULES)).toBe(true);
   expect(set).toContain("Write the whole reply, the title included, in zh-TW.");
   expect(buildPrompt({ kind: "press" })).not.toContain("Write the whole reply");
-  expect(buildPrompt({ kind: "press" }, "  ")).not.toContain("Write the whole reply");
+  expect(buildPrompt({ kind: "press" }, "  ")).not.toContain(
+    "Write the whole reply",
+  );
 });
 
 test("drawBrief takes one option per axis from the random draw", () => {

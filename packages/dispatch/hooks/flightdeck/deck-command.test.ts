@@ -43,7 +43,9 @@ describe("planArg", () => {
 
   test("reads the --plan of the flightdeck.ts call, not an earlier command's", () => {
     expect(
-      planArg("bun prepare.ts --plan /abs/a && bun flightdeck.ts --plan /abs/b"),
+      planArg(
+        "bun prepare.ts --plan /abs/a && bun flightdeck.ts --plan /abs/b",
+      ),
     ).toBe("/abs/b");
     expect(
       planArg("bun flightdeck.ts --no-open; bun other.ts --plan /abs/a"),

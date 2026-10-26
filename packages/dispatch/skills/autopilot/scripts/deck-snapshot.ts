@@ -50,7 +50,11 @@ function timeOf(rows: FleetRow[]): DeckTask["time"] {
   const startMs = Math.min(...started.map((row) => Date.parse(row.startedAt!)));
   const endMs = started.some((row) => row.status === "in-flight")
     ? null
-    : Math.max(...started.map((row) => Date.parse(row.startedAt!) + (row.elapsedMs ?? 0)));
+    : Math.max(
+        ...started.map(
+          (row) => Date.parse(row.startedAt!) + (row.elapsedMs ?? 0),
+        ),
+      );
   return {
     startedAt: new Date(startMs).toISOString(),
     endedAt: endMs === null ? null : new Date(endMs).toISOString(),
@@ -84,7 +88,8 @@ export function buildDeckSnapshot(input: {
         passed: score.passed,
       },
       time: timeOf(rowsByRef.get(view.ref) ?? []),
-      tokens: view.state === "done" ? (input.usage?.get(view.ref) ?? null) : null,
+      tokens:
+        view.state === "done" ? (input.usage?.get(view.ref) ?? null) : null,
     };
   }
 
@@ -116,7 +121,11 @@ export function buildDeckSnapshot(input: {
     }));
   const crew: DeckCrew[] = input.fleet
     .filter((row) => !row.ref || !tasks[row.ref])
-    .sort((a, b) => (Date.parse(b.startedAt ?? "") || 0) - (Date.parse(a.startedAt ?? "") || 0))
+    .sort(
+      (a, b) =>
+        (Date.parse(b.startedAt ?? "") || 0) -
+        (Date.parse(a.startedAt ?? "") || 0),
+    )
     .slice(0, 3)
     .map((row) => ({
       role: row.role,
@@ -175,12 +184,19 @@ function readClaudeUsage(
   fleet: FleetRow[],
 ): { usage: Map<string, DeckTokens>; runTokens: DeckTokens } {
   const runId = deckSource === "graph" ? readRunId(plan) : undefined;
-  const agents = createTranscriptSource(plan, undefined, repoRootOf(plan) ?? undefined).read(runId);
+  const agents = createTranscriptSource(
+    plan,
+    undefined,
+    repoRootOf(plan) ?? undefined,
+  ).read(runId);
   return tokenUsage(attributeUsage(fleet, agents).rows);
 }
 
 // fresh is the web fleet's freshTokens(): cache writes alone, matching Claude Code's own panel
-export function tokenUsage(rows: FleetRow[]): { usage: Map<string, DeckTokens>; runTokens: DeckTokens } {
+export function tokenUsage(rows: FleetRow[]): {
+  usage: Map<string, DeckTokens>;
+  runTokens: DeckTokens;
+} {
   const usage = new Map<string, DeckTokens>();
   const runTokens = { fresh: 0, billed: 0 };
   for (const row of rows) {
@@ -215,7 +231,9 @@ async function main(): Promise<void> {
   const withUsage = args.includes("--usage");
   const planArg = args.find((arg) => arg !== "--usage");
   if (planArg === undefined) {
-    console.error("usage: deck-snapshot.ts <planDir> [--usage] | --latest <dir>");
+    console.error(
+      "usage: deck-snapshot.ts <planDir> [--usage] | --latest <dir>",
+    );
     process.exit(1);
   }
   const plan = resolve(planArg);
@@ -231,7 +249,9 @@ async function main(): Promise<void> {
   const fleet = aggregateFleet(loaded.entries);
   // a cold transcript read costs ~500 ms, so the pane asks for it only when a task newly lands
   const read = withUsage ? readClaudeUsage(plan, deckSource, fleet) : {};
-  console.log(JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, ...read })));
+  console.log(
+    JSON.stringify(buildDeckSnapshot({ plan, payload, fleet, ...read })),
+  );
 }
 
 if (import.meta.main) {

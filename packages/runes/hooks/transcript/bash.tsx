@@ -141,7 +141,12 @@ export const bash = (on: On) => {
           rows: [
             ...visible("cmd", lines).map((line, i): [string, unknown] => [
               `cmd:${i}`,
-              runLine(Text, line, tokenStyle, callScope ? { hover: { scope: callScope } } : {}),
+              runLine(
+                Text,
+                line,
+                tokenStyle,
+                callScope ? { hover: { scope: callScope } } : {},
+              ),
             ]),
             ...fold("cmd", lines.length, callScope, callInner),
           ],
@@ -207,7 +212,8 @@ export const bash = (on: On) => {
         ),
       ];
       const isFolded = out.length > foldLines && !open.has(`${id}:out`);
-      const tail = isFolded && isBad ? Math.max(1, Math.floor(foldLines / 2)) : 0;
+      const tail =
+        isFolded && isBad ? Math.max(1, Math.floor(foldLines / 2)) : 0;
       const tailRows: [string, unknown][] = tail
         ? [
             ["out:after", DIVIDER],

@@ -1,4 +1,13 @@
-import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, spyOn, test } from "bun:test";
+import {
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  describe,
+  expect,
+  spyOn,
+  test,
+} from "bun:test";
 import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -9,28 +18,34 @@ const realSpawn = Bun.spawn;
 let spawnWithBinary: ReturnType<typeof spyOn<typeof Bun, "spawn">>;
 beforeEach(() => {
   // Bun's default spawn environment does not pick up test-time env changes.
-  spawnWithBinary = spyOn(Bun, "spawn").mockImplementation(
-    ((...args: Parameters<typeof Bun.spawn>) => {
-      const [command, options] = args;
-      return realSpawn(command, { ...options, env: { ...process.env } });
-    }) as typeof Bun.spawn,
-  );
+  spawnWithBinary = spyOn(Bun, "spawn").mockImplementation(((
+    ...args: Parameters<typeof Bun.spawn>
+  ) => {
+    const [command, options] = args;
+    return realSpawn(command, { ...options, env: { ...process.env } });
+  }) as typeof Bun.spawn);
 });
 afterEach(() => spawnWithBinary.mockRestore());
 
 let stubDir: string;
 const originalBinary = process.env.COCKPIT_BIN;
 beforeAll(async () => {
-  stubDir = await mkdtemp(join(dirname(import.meta.dir), ".cockpit-hook-test-"));
+  stubDir = await mkdtemp(
+    join(dirname(import.meta.dir), ".cockpit-hook-test-"),
+  );
   const binary = join(stubDir, "cockpit");
-  await writeFile(binary, `#!/bin/sh
+  await writeFile(
+    binary,
+    `#!/bin/sh
 payload=$(cat)
 case "$1 $2" in
   "hook session-start") printf '%s' 'DECISION LOG ACTIVE' ;;
   "hook stop") printf '%s' '{"hookSpecificOutput":{"additionalContext":"Log the decision."}}' ;;
   *) exit 2 ;;
 esac
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   process.env.COCKPIT_BIN = binary;
 });
 afterAll(async () => {
@@ -392,9 +407,8 @@ describe("COMMENT_GUARDED", () => {
 
   // Enumerate from the tables, never a hand-listed sample: a sample is a third copy that drifts the same silent way, missing exactly the entry nobody remembered.
   test("agrees with the hook's own lookup, entry for entry", async () => {
-    const { BY_EXT, BY_NAME, syntaxFor } = await import(
-      "../packages/guard/hooks/comment-core.ts"
-    );
+    const { BY_EXT, BY_NAME, syntaxFor } =
+      await import("../packages/guard/hooks/comment-core.ts");
     const covered = [
       ...Object.keys(BY_EXT).map((ext) => `src/a${ext}`),
       ...Object.keys(BY_NAME).map((name) => `src/${name}`),
@@ -523,11 +537,14 @@ describe("experimental.chat.system.transform", () => {
       expect(spawn).toHaveBeenCalledTimes(1);
       expect(spawn.mock.calls[0]?.[0]).toEqual([
         join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
-        "hook", "session-start",
+        "hook",
+        "session-start",
       ]);
       const stdin = spawn.mock.calls[0]?.[1]?.stdin as Blob;
       expect(JSON.parse(await stdin.text())).toEqual({
-        session_id: sessionID, cwd: root, provider: "opencode",
+        session_id: sessionID,
+        cwd: root,
+        provider: "opencode",
       });
       for (const output of outputs) {
         expect(output.system[1]).toContain("DECISION LOG ACTIVE");
@@ -584,15 +601,21 @@ describe("experimental.chat.system.transform", () => {
   test("runs the stop hook through the shim with the OpenCode payload", async () => {
     const hooks = await QLabPlugin({ directory: root });
     const sessionID = "ses_stop_argv";
-    await hooks.event({ event: { type: "session.idle", properties: { sessionID } } });
+    await hooks.event({
+      event: { type: "session.idle", properties: { sessionID } },
+    });
     const output = { system: ["base"] };
     await hooks["experimental.chat.system.transform"]({ sessionID }, output);
     expect(spawnWithBinary.mock.calls[0]?.[0]).toEqual([
-      join(root, "packages/monitor/skills/cockpit/bin/cockpit"), "hook", "stop",
+      join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
+      "hook",
+      "stop",
     ]);
     const stdin = spawnWithBinary.mock.calls[0]?.[1]?.stdin as Blob;
     expect(JSON.parse(await stdin.text())).toEqual({
-      session_id: sessionID, cwd: root, provider: "opencode",
+      session_id: sessionID,
+      cwd: root,
+      provider: "opencode",
     });
     expect(output.system[1]).toContain("Log the decision.");
   });

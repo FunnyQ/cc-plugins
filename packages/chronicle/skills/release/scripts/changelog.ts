@@ -82,10 +82,9 @@ export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
     units.map(async (unit) => {
       const range = unit.lastTag ? [`${unit.lastTag}..HEAD`] : ["HEAD"];
       const scope = unit.pathScope ? ["--", unit.pathScope] : [];
-      const log =
-        await $`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`
-          .quiet()
-          .nothrow();
+      const log = await $`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`
+        .quiet()
+        .nothrow();
       if (log.exitCode !== 0) {
         throw new Error(
           `git log ${range.join(" ")} failed: ${log.stderr.toString().trim()}`,

@@ -41,10 +41,11 @@ describe("settle", () => {
   });
 
   test("passes the driver message through, so start can tell its causes apart", () => {
-    const message = "Could not create a session: The Safari instance is already paired with another WebDriver session.";
-    expect(() => settle(500, { value: { error: "session not created", message } })).toThrow(
-      `session not created: ${message}`,
-    );
+    const message =
+      "Could not create a session: The Safari instance is already paired with another WebDriver session.";
+    expect(() =>
+      settle(500, { value: { error: "session not created", message } }),
+    ).toThrow(`session not created: ${message}`);
   });
 
   test("fails on a non-2xx status that carries no error object", () => {

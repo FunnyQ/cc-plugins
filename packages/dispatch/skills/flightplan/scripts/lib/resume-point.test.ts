@@ -140,10 +140,13 @@ describe("resumePoint", () => {
   });
 
   test("a failed drift re-verify supersedes a passing verdict", () => {
-    const point = resumePoint([
-      score(REF, 2, true, 4.6),
-      ...ran(REF, "reverify", 2, "FAIL — merged tests are red"),
-    ], REF)!;
+    const point = resumePoint(
+      [
+        score(REF, 2, true, 4.6),
+        ...ran(REF, "reverify", 2, "FAIL — merged tests are red"),
+      ],
+      REF,
+    )!;
     expect(point.from).toBe("dev");
     expect(point.gateRejected).toBe(true);
     expect(point.attempt).toBe(3);
@@ -153,10 +156,10 @@ describe("resumePoint", () => {
   });
 
   test("a land that ended CONFLICT restarts from dev even after a passing verdict", () => {
-    const point = resumePoint([
-      score(REF, 2, true, 4.6),
-      ...ran(REF, "land", 2, "CONFLICT — src/a.ts"),
-    ], REF)!;
+    const point = resumePoint(
+      [score(REF, 2, true, 4.6), ...ran(REF, "land", 2, "CONFLICT — src/a.ts")],
+      REF,
+    )!;
     expect(point.from).toBe("dev");
     expect(point.gateRejected).toBe(false);
     expect(point.attempt).toBe(3);
@@ -164,21 +167,33 @@ describe("resumePoint", () => {
   });
 
   test("a land that ended CLEAN changes nothing", () => {
-    const point = resumePoint([
-      score(REF, 2, true, 4.6),
-      ...ran(REF, "land", 2, "CLEAN — src/a.ts"),
-    ], REF)!;
+    const point = resumePoint(
+      [score(REF, 2, true, 4.6), ...ran(REF, "land", 2, "CLEAN — src/a.ts")],
+      REF,
+    )!;
     expect(point.from).toBe("verify");
   });
 
   test.each(["PASS — merged tests are green", null])(
-    "a passing or unfinished re-verify leaves the verdict intact: %s", (message) => {
-      const point = resumePoint([
-        score(REF, 2, true, 4.6),
-        ...(message === null
-          ? [note(REF, "reverify", 2, "start", "FAIL is not a completed result")]
-          : ran(REF, "reverify", 2, message)),
-      ], REF)!;
+    "a passing or unfinished re-verify leaves the verdict intact: %s",
+    (message) => {
+      const point = resumePoint(
+        [
+          score(REF, 2, true, 4.6),
+          ...(message === null
+            ? [
+                note(
+                  REF,
+                  "reverify",
+                  2,
+                  "start",
+                  "FAIL is not a completed result",
+                ),
+              ]
+            : ran(REF, "reverify", 2, message)),
+        ],
+        REF,
+      )!;
       expect(point.from).toBe("verify");
       expect(point.gateRejected).toBe(false);
       expect(point.attempt).toBe(3);
@@ -217,7 +232,11 @@ describe("resumePoint", () => {
 
   test("a re-scored attempt is decided by its LAST score row", () => {
     const point = resumePoint(
-      [...ran(REF, "verify", 1, "PASS — green"), score(REF, 1, false, 2.1), score(REF, 1, true, 4.6)],
+      [
+        ...ran(REF, "verify", 1, "PASS — green"),
+        score(REF, 1, false, 2.1),
+        score(REF, 1, true, 4.6),
+      ],
       REF,
     )!;
 

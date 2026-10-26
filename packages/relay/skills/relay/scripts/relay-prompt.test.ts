@@ -237,8 +237,7 @@ describe("buildPromptFile", () => {
       if (existsSync(TMP_ROOT)) {
         rmSync(TMP_ROOT, { recursive: true, force: true });
       }
-    } catch {
-    }
+    } catch {}
   });
 
   afterEach(() => {
@@ -246,8 +245,7 @@ describe("buildPromptFile", () => {
       if (existsSync(TMP_ROOT)) {
         rmSync(TMP_ROOT, { recursive: true, force: true });
       }
-    } catch {
-    }
+    } catch {}
   });
 
   it("should create a prompt file for review", () => {
@@ -307,8 +305,7 @@ describe("buildPromptFile", () => {
         gitScope: "none",
         noProject: true,
       });
-    } catch {
-    }
+    } catch {}
 
     expect(exitCode).toBe(1);
     expect(errorMsg).toContain("task");

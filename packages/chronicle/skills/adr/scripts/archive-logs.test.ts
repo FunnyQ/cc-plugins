@@ -85,8 +85,14 @@ describe("validatePlan", () => {
       const tampered = move(item.root, "escape");
       tampered.from = join(item.logs, "..", "..", "..", "etc", "passwd");
 
-      expect(validatePlan(plan(item.root, [tampered]), item.root)).not.toEqual([]);
-      await expectStructuralRejection(item, plan(item.root, [tampered]), source);
+      expect(validatePlan(plan(item.root, [tampered]), item.root)).not.toEqual(
+        [],
+      );
+      await expectStructuralRejection(
+        item,
+        plan(item.root, [tampered]),
+        source,
+      );
     } finally {
       item.cleanup();
     }
@@ -99,7 +105,11 @@ describe("validatePlan", () => {
       stale(source);
       const tampered = move(item.root, "outside");
       tampered.to = join(item.root, "outside.jsonl");
-      await expectStructuralRejection(item, plan(item.root, [tampered]), source);
+      await expectStructuralRejection(
+        item,
+        plan(item.root, [tampered]),
+        source,
+      );
     } finally {
       item.cleanup();
     }
@@ -112,7 +122,11 @@ describe("validatePlan", () => {
       stale(source);
       const tampered = move(item.root, "terminal");
       tampered.fromBucket = "done" as Move["fromBucket"];
-      await expectStructuralRejection(item, plan(item.root, [tampered]), source);
+      await expectStructuralRejection(
+        item,
+        plan(item.root, [tampered]),
+        source,
+      );
     } finally {
       item.cleanup();
     }
@@ -127,12 +141,22 @@ describe("validatePlan", () => {
       stale(source);
       const tampered: Move = {
         from: source,
-        to: join(item.root, ".cockpit", "archive", "inbox", "wrong-target.jsonl"),
+        to: join(
+          item.root,
+          ".cockpit",
+          "archive",
+          "inbox",
+          "wrong-target.jsonl",
+        ),
         fromBucket: "watch",
         target: "inbox" as Move["target"],
       };
 
-      await expectStructuralRejection(item, plan(item.root, [tampered]), source);
+      await expectStructuralRejection(
+        item,
+        plan(item.root, [tampered]),
+        source,
+      );
     } finally {
       item.cleanup();
     }
@@ -157,14 +181,21 @@ describe("validatePlan", () => {
             symlinkSync(targetRoot, join(item.root, ".cockpit", "archive"));
           } else {
             mkdirSync(join(item.root, ".cockpit", "archive"));
-            symlinkSync(targetRoot, join(item.root, ".cockpit", "archive", "done"));
+            symlinkSync(
+              targetRoot,
+              join(item.root, ".cockpit", "archive", "done"),
+            );
           }
         }
         stale(source);
         const archivePlan = plan(item.root, [move(item.root, "linked")]);
 
-        expect(validatePlan(archivePlan, item.root).join("\n")).toContain("symlink");
-        await expect(applyArchive(archivePlan, item.root)).rejects.toThrow("symlink");
+        expect(validatePlan(archivePlan, item.root).join("\n")).toContain(
+          "symlink",
+        );
+        await expect(applyArchive(archivePlan, item.root)).rejects.toThrow(
+          "symlink",
+        );
         expect(existsSync(source)).toBe(true);
       } finally {
         item.cleanup();
@@ -190,7 +221,9 @@ describe("applyArchive", () => {
 
       expect(result).toEqual({
         moved: [staleMove],
-        failed: [expect.objectContaining({ sessionId: "live", reason: "live" })],
+        failed: [
+          expect.objectContaining({ sessionId: "live", reason: "live" }),
+        ],
       });
       expect(existsSync(liveMove.from)).toBe(true);
       expect(readFileSync(staleMove.to, "utf8")).toBe("preserved bytes\n");
@@ -224,7 +257,10 @@ describe("applyArchive", () => {
       stale(target);
       symlinkSync(target, linkedMove.from);
 
-      const result = await applyArchive(plan(item.root, [linkedMove]), item.root);
+      const result = await applyArchive(
+        plan(item.root, [linkedMove]),
+        item.root,
+      );
 
       expect(result).toEqual({
         moved: [],
@@ -330,16 +366,19 @@ describe("applyArchive", () => {
     try {
       const oldMove = move(item.root, "old");
       const freshMove = move(item.root, "fresh");
-      stale(oldMove.from, "{\"decision\":\"kept\"}\n");
+      stale(oldMove.from, '{"decision":"kept"}\n');
       writeFileSync(freshMove.from, "fresh\n");
 
-      const result = await applyArchive(plan(item.root, [oldMove, freshMove]), item.root);
+      const result = await applyArchive(
+        plan(item.root, [oldMove, freshMove]),
+        item.root,
+      );
 
       expect(result.moved).toHaveLength(1);
       expect(result.failed[0]).toEqual(
         expect.objectContaining({ sessionId: "fresh", reason: "live" }),
       );
-      expect(readFileSync(oldMove.to, "utf8")).toBe("{\"decision\":\"kept\"}\n");
+      expect(readFileSync(oldMove.to, "utf8")).toBe('{"decision":"kept"}\n');
       expect(existsSync(oldMove.from)).toBe(false);
       expect(existsSync(freshMove.from)).toBe(true);
     } finally {

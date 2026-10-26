@@ -73,7 +73,10 @@ const loadConfig = async ($: $): Promise<Loaded> => {
       const keys = RUNES.map((r) => `rune:${r}`);
       const stored = await Promise.all(keys.map((k) => $.store.get(k)));
       const enabled = Object.fromEntries(
-        RUNES.map((r, i) => [r, stored[i] === undefined ? DEFAULTS.enabled[r] : stored[i] !== false]),
+        RUNES.map((r, i) => [
+          r,
+          stored[i] === undefined ? DEFAULTS.enabled[r] : stored[i] !== false,
+        ]),
       ) as Record<Rune, boolean>;
       const text = TEMPLATE(enabled);
       await $.fs.write(path, text);
@@ -131,7 +134,9 @@ export const register: Register = (on) => {
     // `$.http.fetch` takes no signal, so the timeout abandons the request rather than cancelling it
     const post: Post = (url, init) =>
       new Promise((resolve, reject) => {
-        const timer = $.clock.after(5_000, () => reject(new Error("jev timeout")));
+        const timer = $.clock.after(5_000, () =>
+          reject(new Error("jev timeout")),
+        );
         $.http.fetch(url, init).then((r) => {
           timer.cancel();
           resolve({ ok: r.ok, text: r.text });
@@ -142,7 +147,13 @@ export const register: Register = (on) => {
       apiKey,
       post,
       complete: async (text, system) => {
-        const r = await $.model.complete({ model: "haiku", prompt: text, system, effort: "low", timeoutMs: 15_000 });
+        const r = await $.model.complete({
+          model: "haiku",
+          prompt: text,
+          system,
+          effort: "low",
+          timeoutMs: 15_000,
+        });
         return r.isAnswered ? r.text : undefined;
       },
       redraw,
@@ -170,7 +181,9 @@ export const register: Register = (on) => {
     if (loaded.text === undefined)
       return answer("Runes — config.yaml did not parse, so nothing written");
 
-    const value = state ? state === "on" : targets.some((r) => !config.enabled[r]);
+    const value = state
+      ? state === "on"
+      : targets.some((r) => !config.enabled[r]);
     const text = targets.reduce((t, r) => setSwitch(t, r, value), loaded.text);
     const want = { ...config.enabled };
     for (const r of targets) want[r] = value;

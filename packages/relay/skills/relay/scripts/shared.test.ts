@@ -28,8 +28,12 @@ describe("resolveModel", () => {
 
   it("returns undefined when flag and config are absent, so the CLI picks its own model", () => {
     for (const backend of ["opencode", "codex", "claude"]) {
-      expect(resolveModel(backend, "delegate", undefined, () => ({}))).toBeUndefined();
-      expect(resolveModel(backend, "review", undefined, () => ({}))).toBeUndefined();
+      expect(
+        resolveModel(backend, "delegate", undefined, () => ({})),
+      ).toBeUndefined();
+      expect(
+        resolveModel(backend, "review", undefined, () => ({})),
+      ).toBeUndefined();
     }
   });
 
@@ -47,7 +51,9 @@ describe("resolveModel", () => {
   });
 
   it("maps cli-default to undefined, from the flag or the config", () => {
-    expect(resolveModel("opencode", "delegate", CLI_DEFAULT, () => ({}))).toBeUndefined();
+    expect(
+      resolveModel("opencode", "delegate", CLI_DEFAULT, () => ({})),
+    ).toBeUndefined();
     expect(
       resolveModel("opencode", "review", undefined, () => ({
         models: { opencode: { review: CLI_DEFAULT } },

@@ -506,10 +506,22 @@ describe("verifyPlanLanded", () => {
 describe("mustPairs", () => {
   test("pairs a same-directory test with its implementation", () => {
     expect(
-      mustPairs(["src/a.ts", "src/a.test.ts", "src/b.spec.js", "src/b.js", "src/c.ts"]),
+      mustPairs([
+        "src/a.ts",
+        "src/a.test.ts",
+        "src/b.spec.js",
+        "src/b.js",
+        "src/c.ts",
+      ]),
     ).toEqual([
-      { files: ["src/a.test.ts", "src/a.ts"], reason: "test with its implementation" },
-      { files: ["src/b.spec.js", "src/b.js"], reason: "test with its implementation" },
+      {
+        files: ["src/a.test.ts", "src/a.ts"],
+        reason: "test with its implementation",
+      },
+      {
+        files: ["src/b.spec.js", "src/b.js"],
+        reason: "test with its implementation",
+      },
     ]);
   });
 
@@ -522,24 +534,50 @@ describe("mustPairs", () => {
         "test/tasks/sync_test.rb",
       ]),
     ).toEqual([
-      { files: ["spec/models/user_spec.rb", "app/models/user.rb"], reason: "test with its implementation" },
-      { files: ["test/tasks/sync_test.rb", "lib/tasks/sync.rb"], reason: "test with its implementation" },
+      {
+        files: ["spec/models/user_spec.rb", "app/models/user.rb"],
+        reason: "test with its implementation",
+      },
+      {
+        files: ["test/tasks/sync_test.rb", "lib/tasks/sync.rb"],
+        reason: "test with its implementation",
+      },
     ]);
   });
 
   test("pairs Go and Python test naming", () => {
-    expect(mustPairs(["pkg/x.go", "pkg/x_test.go", "m/test_y.py", "m/y.py"])).toEqual([
-      { files: ["pkg/x_test.go", "pkg/x.go"], reason: "test with its implementation" },
-      { files: ["m/test_y.py", "m/y.py"], reason: "test with its implementation" },
+    expect(
+      mustPairs(["pkg/x.go", "pkg/x_test.go", "m/test_y.py", "m/y.py"]),
+    ).toEqual([
+      {
+        files: ["pkg/x_test.go", "pkg/x.go"],
+        reason: "test with its implementation",
+      },
+      {
+        files: ["m/test_y.py", "m/y.py"],
+        reason: "test with its implementation",
+      },
     ]);
   });
 
   test("pairs a lock file with its manifest in the same directory", () => {
     expect(
-      mustPairs(["package.json", "bun.lock", "web/Gemfile", "web/Gemfile.lock", "Cargo.lock"]),
+      mustPairs([
+        "package.json",
+        "bun.lock",
+        "web/Gemfile",
+        "web/Gemfile.lock",
+        "Cargo.lock",
+      ]),
     ).toEqual([
-      { files: ["bun.lock", "package.json"], reason: "lock file with its manifest" },
-      { files: ["web/Gemfile.lock", "web/Gemfile"], reason: "lock file with its manifest" },
+      {
+        files: ["bun.lock", "package.json"],
+        reason: "lock file with its manifest",
+      },
+      {
+        files: ["web/Gemfile.lock", "web/Gemfile"],
+        reason: "lock file with its manifest",
+      },
     ]);
   });
 

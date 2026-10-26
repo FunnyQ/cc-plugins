@@ -76,12 +76,16 @@ test("deltaClass emits .compare-block plus the one state modifier the stylesheet
   const app = App();
   const css = (
     await Promise.all(
-      [...new Bun.Glob("styles/*.css").scanSync(`${import.meta.dir}/dist`)].map((f) => Bun.file(`${import.meta.dir}/dist/${f}`).text()),
+      [...new Bun.Glob("styles/*.css").scanSync(`${import.meta.dir}/dist`)].map(
+        (f) => Bun.file(`${import.meta.dir}/dist/${f}`).text(),
+      ),
     )
   ).join("\n");
   expect(css).toContain(".hero-band .compare-block");
   for (const state of ["increase", "decrease", "neutral", "unavailable"]) {
-    const on = Object.entries(app.deltaClass.call({ summaryDeltas: { cost: { state } } }, "cost"))
+    const on = Object.entries(
+      app.deltaClass.call({ summaryDeltas: { cost: { state } } }, "cost"),
+    )
       .filter(([, v]) => v)
       .map(([k]) => k);
     expect(on).toEqual(["compare-block", `compare-block--${state}`]);
@@ -94,12 +98,20 @@ test("the data-health panel shows the newer-rollup alert only when the payload c
   app.stats = { dataHealth: { sources: [], counts: {} } };
   expect(app.dataHealthAlert).toBeNull();
 
-  app.stats = { dataHealth: { sources: [], counts: {}, rollupSchemaNewer: { database: 5, build: 4 } } };
+  app.stats = {
+    dataHealth: {
+      sources: [],
+      counts: {},
+      rollupSchemaNewer: { database: 5, build: 4 },
+    },
+  };
   expect(app.dataHealthAlert).toBe(
     "Rollup database is newer than this monitor build — update monitor and restart the dashboard.",
   );
 
-  const partial = await Bun.file(`${import.meta.dir}/dist/partials/dashboard/data-health.html`).text();
+  const partial = await Bun.file(
+    `${import.meta.dir}/dist/partials/dashboard/data-health.html`,
+  ).text();
   const details = partial.indexOf("<details");
   const alert = partial.indexOf('v-if="dataHealthAlert"');
   expect(alert).toBeGreaterThan(-1);

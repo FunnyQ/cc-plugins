@@ -5,9 +5,18 @@ import { baseEnv, cleanup, freePort, makeHomes, run } from "./fixtures";
 
 let h: ReturnType<typeof makeHomes>;
 let pid: number | undefined;
-beforeEach(() => { h = makeHomes(); pid = undefined; });
+beforeEach(() => {
+  h = makeHomes();
+  pid = undefined;
+});
 afterEach(() => {
-  if (pid) { try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ } }
+  if (pid) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      /* already gone */
+    }
+  }
   cleanup(h.root);
 });
 
@@ -24,7 +33,9 @@ describe("cockpit ensure-daemon", () => {
     const { port, token } = JSON.parse(first.stdout);
     expect(port).toBe(want);
     expect(typeof token).toBe("string");
-    pid = JSON.parse(readFileSync(join(h.cockpitHome, "daemon.json"), "utf8")).pid;
+    pid = JSON.parse(
+      readFileSync(join(h.cockpitHome, "daemon.json"), "utf8"),
+    ).pid;
 
     const res = await fetch(`http://127.0.0.1:${port}/api/token`);
     expect(res.ok).toBe(true);

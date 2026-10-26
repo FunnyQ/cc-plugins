@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { GraphNode, NodeValidity } from "../../flightplan/scripts/lib/graph-node";
+import type {
+  GraphNode,
+  NodeValidity,
+} from "../../flightplan/scripts/lib/graph-node";
 import type {
   FlightlogEntry,
   ScoreEntry,
@@ -49,7 +52,8 @@ const score = (task: string, attempt: number, ts: string): ScoreEntry => ({
 const INVALID_COMPLETION: NodeValidity = {
   kind: "invalid",
   rule: "completion-state",
-  reason: "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
+  reason:
+    "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
 };
 
 const task = (
@@ -100,7 +104,12 @@ describe("parseAgentLabel", () => {
     ],
     [
       "reverify:ui/main#2",
-      { role: "reverify", ref: "ui/main", attempt: 2, raw: "reverify:ui/main#2" },
+      {
+        role: "reverify",
+        ref: "ui/main",
+        attempt: 2,
+        raw: "reverify:ui/main#2",
+      },
     ],
     [
       "judge:ui/03#2",
@@ -464,11 +473,27 @@ describe("aggregateFleet", () => {
 
   test("reverify starts after judge within the same attempt", () => {
     const rows = aggregateFleet([
-      note("ui/01", "judge", 2, "2026-01-01T00:00:00Z", "start", "judge:ui/01#2"),
-      note("ui/01", "reverify", 2, "2026-01-01T00:05:00Z", "start", "reverify:ui/01#2"),
+      note(
+        "ui/01",
+        "judge",
+        2,
+        "2026-01-01T00:00:00Z",
+        "start",
+        "judge:ui/01#2",
+      ),
+      note(
+        "ui/01",
+        "reverify",
+        2,
+        "2026-01-01T00:05:00Z",
+        "start",
+        "reverify:ui/01#2",
+      ),
     ]);
     expect(rows.find((row) => row.role === "judge")?.status).toBe("abandoned");
-    expect(rows.find((row) => row.role === "reverify")?.status).toBe("in-flight");
+    expect(rows.find((row) => row.role === "reverify")?.status).toBe(
+      "in-flight",
+    );
   });
 
   test("abandons an open row once a later attempt for the same ref starts", () => {
@@ -823,15 +848,31 @@ describe("state declarations are inert in fleet", () => {
     const byRef = { "ui/03": task("ui/03"), "ui/04": task("ui/04") };
     expect(aggregateFleet(states)).toEqual([]);
     expect(aggregateFleet(mixed)).toEqual(aggregateFleet(entries));
-    expect(deriveTaskViews(byRef, mixed)).toEqual(deriveTaskViews(byRef, entries));
-    expect(deriveTaskViews(byRef, mixed)[0]).toMatchObject({ attempts: 2, state: "in-progress" });
-    expect(deriveTaskViews(byRef, states)[0]).toMatchObject({ attempts: 0, latestScore: null, state: "ready" });
+    expect(deriveTaskViews(byRef, mixed)).toEqual(
+      deriveTaskViews(byRef, entries),
+    );
+    expect(deriveTaskViews(byRef, mixed)[0]).toMatchObject({
+      attempts: 2,
+      state: "in-progress",
+    });
+    expect(deriveTaskViews(byRef, states)[0]).toMatchObject({
+      attempts: 0,
+      latestScore: null,
+      state: "ready",
+    });
   });
 });
 
 test("row identity pairs on the raw logged task, role and attempt, not on the parsed label", () => {
   const [row] = aggregateFleet([
-    note("core/03", "dev", 1, "2026-01-01T00:00:00Z", "start", "dev:other/09#4"),
+    note(
+      "core/03",
+      "dev",
+      1,
+      "2026-01-01T00:00:00Z",
+      "start",
+      "dev:other/09#4",
+    ),
   ]);
   expect(row).toMatchObject({ ref: "other/09", attempt: 4 });
   expect(row!.identity).toBe("core/03|dev|1");

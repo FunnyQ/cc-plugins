@@ -272,7 +272,6 @@ describe("POST /api/pricing/refresh", () => {
     expect(Object.keys(body).sort()).toEqual(REFRESH_KEYS);
     expect(body.ok).toBe(true);
   });
-
 });
 
 describe("POST /api/pricing/refresh with OpenRouter failing", () => {
@@ -289,7 +288,6 @@ describe("POST /api/pricing/refresh with OpenRouter failing", () => {
     expect(body.ok).toBe(true);
     expect(body.openRouterError).toBe("HTTP 500");
   });
-
 });
 
 describe("POST /api/pricing/refresh with a corrupt override", () => {

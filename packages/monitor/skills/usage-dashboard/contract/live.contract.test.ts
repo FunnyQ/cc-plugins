@@ -17,8 +17,15 @@ afterAll(async () => {
 });
 
 test("Rust atlas live deep-equals golden/live.json", async () => {
-  const proc = Bun.spawn(atlasCommand("live"), { env: f.env, stdout: "pipe", stderr: "pipe" });
-  const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+  const proc = Bun.spawn(atlasCommand("live"), {
+    env: f.env,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const [out, code] = await Promise.all([
+    new Response(proc.stdout).text(),
+    proc.exited,
+  ]);
   expect(code).toBe(0);
   expect(out.endsWith("\n")).toBe(false);
   const golden = await readGolden<{
@@ -26,13 +33,18 @@ test("Rust atlas live deep-equals golden/live.json", async () => {
     cockpitUp: boolean;
     cockpitPort: number;
   }>("live.json");
-  expect(normalizeFixturePaths(JSON.parse(out), fixtureRoot(f))).toEqual(golden);
+  expect(normalizeFixturePaths(JSON.parse(out), fixtureRoot(f))).toEqual(
+    golden,
+  );
 
   const statuses = new Set(golden.sessions.map((s) => s.status));
   for (const s of ["busy", "idle", "waiting", "active-inferred", "recent"]) {
     expect(statuses.has(s)).toBe(true);
   }
-  const tagged = golden.sessions.filter((s) => s.cockpit).map((s) => s.provider).sort();
+  const tagged = golden.sessions
+    .filter((s) => s.cockpit)
+    .map((s) => s.provider)
+    .sort();
   expect(tagged).toEqual(["claude", "codex", "opencode"]);
   expect(golden.cockpitUp).toBe(true);
   expect(golden.cockpitPort).toBe(5999);

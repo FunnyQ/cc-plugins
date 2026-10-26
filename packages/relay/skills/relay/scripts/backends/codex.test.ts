@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync, statSync, utimesSync } from "fs";
+import {
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  statSync,
+  utimesSync,
+} from "fs";
 import { join } from "path";
 import * as os from "os";
 import {
@@ -197,16 +203,12 @@ describe("codexBackend", () => {
   describe("buildImagePrompt", () => {
     it("should format prompt without naming a model", () => {
       const result = buildImagePrompt("a blue ocean");
-      expect(result).toBe(
-        "Generate an image of: a blue ocean.",
-      );
+      expect(result).toBe("Generate an image of: a blue ocean.");
     });
 
     it("should handle prompts with special characters", () => {
       const result = buildImagePrompt("a cat & dog on a beach");
-      expect(result).toBe(
-        "Generate an image of: a cat & dog on a beach.",
-      );
+      expect(result).toBe("Generate an image of: a cat & dog on a beach.");
     });
 
     it("should handle empty prompt", () => {

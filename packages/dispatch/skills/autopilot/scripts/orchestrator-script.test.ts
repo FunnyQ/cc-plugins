@@ -2665,7 +2665,9 @@ describe("task worktree isolation", () => {
         "--repo /abs/repo --slug my-plan",
       );
       expect(promptFor(log, label)).toContain("StructuredOutput");
-      expect(modelFor(log, label)).toBe(label.startsWith("wt-land:") ? "opus" : "haiku");
+      expect(modelFor(log, label)).toBe(
+        label.startsWith("wt-land:") ? "opus" : "haiku",
+      );
       expect(effortFor(log, label)).toBe("low");
     }
   });
@@ -3873,7 +3875,9 @@ describe("worktree contract boundaries", () => {
       expect(schema.type).toBe("object");
       expect(schema.required).toEqual(fields[label.split(":")[0]]);
       expect(Object.keys(schema.properties!)).toEqual(
-        label.startsWith("wt-create:") ? [...schema.required!, "drained"] : schema.required!,
+        label.startsWith("wt-create:")
+          ? [...schema.required!, "drained"]
+          : schema.required!,
       );
       if (label.startsWith("wt-land:")) {
         expect(schema.properties!.status.enum).toEqual([
@@ -4026,16 +4030,27 @@ describe("cockpit-rust flight fixes", () => {
   test("a dev-reported plan defect parks at once without verifying", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), parkedEnd()],
-      devReply: { [ref]: ["PLAN DEFECT: the gate needs the daemon the task forbids\nrest of summary"] },
+      devReply: {
+        [ref]: [
+          "PLAN DEFECT: the gate needs the daemon the task forbids\nrest of summary",
+        ],
+      },
     });
     expect(callsTo(log.labels, `dev:${ref}#1`)).toBe(1);
     expect(log.labels).not.toContain(`verify:${ref}#1`);
     expect(log.labels).not.toContain(`dev:${ref}#2`);
-    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, parked: true, infrastructure: false });
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      attempt: 1,
+      parked: true,
+      infrastructure: false,
+    });
     expect(log.result.escalations[0].reason).toStartWith(
       "PLAN DEFECT reported by dev on attempt 1: the gate needs the daemon the task forbids",
     );
-    expect(promptFor(log, `block:${ref}`)).toContain("the gate needs the daemon the task forbids");
+    expect(promptFor(log, `block:${ref}`)).toContain(
+      "the gate needs the daemon the task forbids",
+    );
     expect(promptFor(log, `dev:${ref}#1`)).toContain("PLAN DEFECT:");
     expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
   });
@@ -4043,11 +4058,24 @@ describe("cockpit-rust flight fixes", () => {
   test("a verifier-reported plan defect parks at once without another attempt", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), parkedEnd()],
-      gate: { [ref]: [{ passed: false, summary: "red", planDefect: "pgrep -f matches live sessions" } as never] },
+      gate: {
+        [ref]: [
+          {
+            passed: false,
+            summary: "red",
+            planDefect: "pgrep -f matches live sessions",
+          } as never,
+        ],
+      },
     });
     expect(log.labels).not.toContain(`dev:${ref}#2`);
     expect(log.labels).not.toContain(`judge:${ref}#1`);
-    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, parked: true, infrastructure: false });
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      attempt: 1,
+      parked: true,
+      infrastructure: false,
+    });
     expect(log.result.escalations[0].reason).toStartWith(
       "PLAN DEFECT reported by verify on attempt 1: pgrep -f matches live sessions",
     );
@@ -4070,11 +4098,12 @@ describe("cockpit-rust flight fixes", () => {
     expect(land).toContain("--role land --attempt 1");
     expect(land).not.toContain(" reset ");
     const labels = log.labels;
-    expect(labels.slice(labels.indexOf(`wt-land:${ref}`), labels.indexOf(`wt-land:${ref}`) + 3)).toEqual([
-      `wt-land:${ref}`,
-      `reverify:${ref}#1`,
-      `done:${ref}`,
-    ]);
+    expect(
+      labels.slice(
+        labels.indexOf(`wt-land:${ref}`),
+        labels.indexOf(`wt-land:${ref}`) + 3,
+      ),
+    ).toEqual([`wt-land:${ref}`, `reverify:${ref}#1`, `done:${ref}`]);
     const schema = log.schemas[labels.indexOf(`wt-land:${ref}`)]!;
     expect(schema.properties!.resolved.type).toBe("boolean");
     expect(log.result.completed).toEqual([ref]);
@@ -4085,7 +4114,9 @@ describe("cockpit-rust flight fixes", () => {
       scouts: [wave(ref, 1, 0), complete(1)],
       worktree: { [`wt-land:${ref}`]: [THROWS, cleanLand] },
     });
-    const lands = log.prompts.filter((_, i) => log.labels[i] === `wt-land:${ref}`);
+    const lands = log.prompts.filter(
+      (_, i) => log.labels[i] === `wt-land:${ref}`,
+    );
     expect(lands).toHaveLength(2);
     expect(lands[0]).not.toContain(`reset ${ref}`);
     expect(lands[1]).toContain(`reset ${ref} --op a1-land-rebase `);
@@ -4095,19 +4126,32 @@ describe("cockpit-rust flight fixes", () => {
   test("an unresolved land conflict parks at once and never costs an attempt", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), parkedEnd()],
-      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, status: "conflict", files: ["Cargo.toml"] }] },
+      worktree: {
+        [`wt-land:${ref}`]: [
+          { ...cleanLand, status: "conflict", files: ["Cargo.toml"] },
+        ],
+      },
     });
     expect(log.labels).not.toContain(`dev:${ref}#2`);
     expect(log.labels).not.toContain(`wt-rebase:${ref}`);
-    expect(log.result.escalations[0]).toMatchObject({ task: ref, attempt: 1, parked: true, infrastructure: true });
-    expect(log.result.escalations[0].reason).toStartWith("the land agent could not resolve a land conflict on attempt 1: Cargo.toml");
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      attempt: 1,
+      parked: true,
+      infrastructure: true,
+    });
+    expect(log.result.escalations[0].reason).toStartWith(
+      "the land agent could not resolve a land conflict on attempt 1: Cargo.toml",
+    );
     expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
   });
 
   test("a failed reverify after a resolved land still costs an attempt", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), complete(1)],
-      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, resolved: true }, cleanLand] },
+      worktree: {
+        [`wt-land:${ref}`]: [{ ...cleanLand, resolved: true }, cleanLand],
+      },
       reverify: { [ref]: [{ passed: false, summary: "merged build red" }] },
     });
     const labels = log.labels;
@@ -4119,13 +4163,18 @@ describe("cockpit-rust flight fixes", () => {
       `dev:${ref}#2`,
     ]);
     expect(promptFor(log, `wt-rebase:${ref}`)).toContain("--op a1-rebase ");
-    expect(promptFor(log, `dev:${ref}#2`)).toContain("REVERIFY FAIL:\nmerged build red");
+    expect(promptFor(log, `dev:${ref}#2`)).toContain(
+      "REVERIFY FAIL:\nmerged build red",
+    );
     expect(log.result.completed).toEqual([ref]);
   });
 
   test("a drain file seen by the scout dispatches nothing and still commits", async () => {
     const log = await runOrchestrator({
-      scouts: [wave(ref, 2, 0), { ...wave("ui/02", 2, 1)!, drain: true } as ScoutResult],
+      scouts: [
+        wave(ref, 2, 0),
+        { ...wave("ui/02", 2, 1)!, drain: true } as ScoutResult,
+      ],
     });
     expect(log.labels).not.toContain("wt-create:ui/02");
     expect(log.labels).not.toContain("commit-wave-2");
@@ -4135,7 +4184,9 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.drained).toEqual(["ui/02"]);
     const scout = log.schemas[log.labels.indexOf("scout-wave-1")]!;
     expect(scout.required).toContain("drain");
-    expect(promptFor(log, "scout-wave-1")).toContain("/abs/repo/docs/my-plan/.flightlog/drain");
+    expect(promptFor(log, "scout-wave-1")).toContain(
+      "/abs/repo/docs/my-plan/.flightlog/drain",
+    );
   });
 
   test("a drain file seen before a queued task's dispatch leaves it todo", async () => {
@@ -4144,13 +4195,18 @@ describe("cockpit-rust flight fixes", () => {
         snapshot({
           ready: [ready(ref), ready("ui/02")],
           counts: counts({ total: 2, todo: 2 }),
-          unfinished: [{ ref, state: "todo" }, { ref: "ui/02", state: "todo" }],
+          unfinished: [
+            { ref, state: "todo" },
+            { ref: "ui/02", state: "todo" },
+          ],
           maxParallel: 1,
         }),
       ],
       worktree: { "wt-create:ui/02": [{ drained: true, path: "", base: "" }] },
     });
-    expect(promptFor(log, "wt-create:ui/02")).toContain("test -e /abs/repo/docs/my-plan/.flightlog/drain");
+    expect(promptFor(log, "wt-create:ui/02")).toContain(
+      "test -e /abs/repo/docs/my-plan/.flightlog/drain",
+    );
     expect(log.labels).not.toContain("dev:ui/02#1");
     expect(log.labels).not.toContain("block:ui/02");
     expect(log.labels).not.toContain("scout-wave-2");

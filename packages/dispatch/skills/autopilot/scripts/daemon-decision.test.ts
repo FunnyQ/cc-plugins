@@ -8,7 +8,9 @@ const matching: DaemonInfo = { pid: 42, ...me };
 describe("decideStartup", () => {
   test("starts without a record or with a dead pid", () => {
     expect(decideStartup(null, me, () => false)).toEqual({ action: "start" });
-    expect(decideStartup(matching, me, () => false)).toEqual({ action: "start" });
+    expect(decideStartup(matching, me, () => false)).toEqual({
+      action: "start",
+    });
   });
 
   test("supersedes a server from a moved install", () => {

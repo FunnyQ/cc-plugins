@@ -7,12 +7,5 @@
     "name": "Q"
   },
   "license": "MIT",
-  "keywords": [
-    "runes",
-    "clawd",
-    "mascot",
-    "mod",
-    "function-hooks",
-    "animation"
-  ]
+  "keywords": ["runes", "clawd", "mascot", "mod", "function-hooks", "animation"]
 }

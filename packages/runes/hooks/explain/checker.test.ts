@@ -377,14 +377,22 @@ test("a geometry check that fails, cannot start, or prints no verdict leaves the
 });
 
 test("settling removes the page's screenshots, whichever way it settles", async () => {
-  const shots = ["rm", "-f", PAGE.replace(/\.html$/, ".check.png"), PAGE.replace(/\.html$/, ".check-narrow.png")];
+  const shots = [
+    "rm",
+    "-f",
+    PAGE.replace(/\.html$/, ".check.png"),
+    PAGE.replace(/\.html$/, ".check-narrow.png"),
+  ];
   const clean = await rig({ geometry: '{"faults":[]}' });
   await startCheck(clean.$, "a", PAGE);
   expect(clean.removed).toEqual([shots]);
   const answered = await rig();
   await startCheck(answered.$, "a", PAGE);
   expect(answered.removed).toEqual([]);
-  await answered.turnEnd({ agentId: "k1", answer: `${answered.token(0)} FIXED 1` });
+  await answered.turnEnd({
+    agentId: "k1",
+    answer: `${answered.token(0)} FIXED 1`,
+  });
   expect(answered.removed).toEqual([shots]);
 });
 

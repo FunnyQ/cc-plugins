@@ -160,47 +160,104 @@ test("an errored Bash result taller than fold_lines folds to its head and its ta
     await row.press({ key: "out:more" });
     await row.unmount();
   };
-  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+  expect(await outLines($, result)).toEqual([
+    "1",
+    "2",
+    "—",
+    "▸ 4 more lines",
+    "—",
+    "7",
+  ]);
   await toggle();
-  expect(await outLines($, result)).toEqual(["1", "2", "3", "4", "5", "6", "7", "—", "▾ fold"]);
+  expect(await outLines($, result)).toEqual([
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "—",
+    "▾ fold",
+  ]);
   await toggle();
-  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+  expect(await outLines($, result)).toEqual([
+    "1",
+    "2",
+    "—",
+    "▸ 4 more lines",
+    "—",
+    "7",
+  ]);
 });
 
 test("an errored Bash result with fold_lines 1 keeps only its last line", async ($, on) => {
   await startSession($, on, fold(1));
-  expect(await outLines($, RESULT(SEVEN, true))).toEqual(["▸ 6 more lines", "—", "7"]);
+  expect(await outLines($, RESULT(SEVEN, true))).toEqual([
+    "▸ 6 more lines",
+    "—",
+    "7",
+  ]);
 });
 
 test("an errored Bash result with fold_lines 2 keeps one head and one tail line", async ($, on) => {
   await startSession($, on, fold(2));
-  expect(await outLines($, RESULT(SEVEN, true))).toEqual(["1", "—", "▸ 5 more lines", "—", "7"]);
+  expect(await outLines($, RESULT(SEVEN, true))).toEqual([
+    "1",
+    "—",
+    "▸ 5 more lines",
+    "—",
+    "7",
+  ]);
 });
 
 test("an errored Bash result at fold_lines draws whole, and one past it folds", async ($, on) => {
   await startSession($, on, fold(3));
-  expect(await outLines($, RESULT(OUT("1\n2\n3\n"), true))).toEqual(["1", "2", "3"]);
-  expect(await outLines($, RESULT(OUT("1\n2\n3\n4\n"), true))).toEqual(["1", "2", "—", "▸ 1 more lines", "—", "4"]);
+  expect(await outLines($, RESULT(OUT("1\n2\n3\n"), true))).toEqual([
+    "1",
+    "2",
+    "3",
+  ]);
+  expect(await outLines($, RESULT(OUT("1\n2\n3\n4\n"), true))).toEqual([
+    "1",
+    "2",
+    "—",
+    "▸ 1 more lines",
+    "—",
+    "4",
+  ]);
 });
 
 test("an interrupted Bash result keeps its tail too", async ($, on) => {
   await startSession($, on, fold(3));
-  const result = CALL({ command: "ls" }, { output: SEVEN, isInterrupted: true });
-  expect(await outLines($, result)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "7"]);
+  const result = CALL(
+    { command: "ls" },
+    { output: SEVEN, isInterrupted: true },
+  );
+  expect(await outLines($, result)).toEqual([
+    "1",
+    "2",
+    "—",
+    "▸ 4 more lines",
+    "—",
+    "7",
+  ]);
 });
 
 test("the tail of an errored result is the text the model read, stderr last", async ($, on) => {
   await startSession($, on, fold(3));
-  expect(await outLines($, RESULT("Exit code 1\na\nb\nc\nfatal: boom", true))).toEqual([
-    "Exit code 1",
-    "a",
-    "—",
-    "▸ 2 more lines",
-    "—",
-    "fatal: boom",
-  ]);
+  expect(
+    await outLines($, RESULT("Exit code 1\na\nb\nc\nfatal: boom", true)),
+  ).toEqual(["Exit code 1", "a", "—", "▸ 2 more lines", "—", "fatal: boom"]);
   const both = RESULT(OUT("1\n2\n3\n4\n5\n", "warn: x\nerror: y"), true);
-  expect(await outLines($, both)).toEqual(["1", "2", "—", "▸ 4 more lines", "—", "error: y"]);
+  expect(await outLines($, both)).toEqual([
+    "1",
+    "2",
+    "—",
+    "▸ 4 more lines",
+    "—",
+    "error: y",
+  ]);
   expect(await within($, both, "bash:output", /^error: y$/)).toMatchObject({
     props: { color: mute("#c94f4f") },
   });
@@ -208,12 +265,18 @@ test("the tail of an errored result is the text the model read, stderr last", as
 
 test("a successful Bash result at fold_lines 1 still folds to its head alone", async ($, on) => {
   await startSession($, on, fold(1));
-  expect(await outLines($, RESULT(SEVEN))).toEqual(["1", "—", "▸ 6 more lines"]);
+  expect(await outLines($, RESULT(SEVEN))).toEqual([
+    "1",
+    "—",
+    "▸ 6 more lines",
+  ]);
 });
 
 test("a card drawn before its result lands redraws with the output", async ($, on) => {
   await startSession($, on);
-  expect(await find($, RESULT(OUT("")), { type: "Text", text: "42 pass" })).toBeUndefined();
+  expect(
+    await find($, RESULT(OUT("")), { type: "Text", text: "42 pass" }),
+  ).toBeUndefined();
   expect(
     await find($, RESULT(OUT("42 pass\n")), { type: "Text", text: "42 pass" }),
   ).toBeDefined();
@@ -271,7 +334,9 @@ test("Bash cards draw no bar, and the link runs down the middle column", async (
     props: { marginLeft: outputIndent },
   });
   const elbow = await find($, result, { type: "Text", text: /┴/ });
-  expect(String(elbow?.text).indexOf("┴")).toBe(callMiddle - outputIndent - outputRuleStart);
+  expect(String(elbow?.text).indexOf("┴")).toBe(
+    callMiddle - outputIndent - outputRuleStart,
+  );
 });
 
 test("an empty Bash result says so", async ($, on) => {

@@ -54,8 +54,12 @@ const statusLook = (e: Html) =>
 
 // Text in a bordered Box does not wrap to the border, so a note is wrapped here and cut at `lines`
 const clip = (text: string, width: number, lines: number) => {
-  const rows = wrapWords([{ text: text.replace(/\s+/g, " ") }], width).map((runs) =>
-    runs.map((r) => r.text).join("").trimEnd(),
+  const rows = wrapWords([{ text: text.replace(/\s+/g, " ") }], width).map(
+    (runs) =>
+      runs
+        .map((r) => r.text)
+        .join("")
+        .trimEnd(),
   );
   if (rows.length <= lines) return rows;
   const last = wrap(rows[lines - 1]!, width - 1)[0]!.trimEnd();
@@ -82,13 +86,22 @@ export const explainPane = (on: On) => {
       return (
         <Box key="explain-page" flexDirection="column" marginTop={1}>
           <Text>
-            <Text color={look.color} dimColor={!look.color}>{`${look.glyph} `}</Text>
-            <Text color={look.color} dimColor={!look.color}>{statusOf(entry)}</Text>
+            <Text
+              color={look.color}
+              dimColor={!look.color}
+            >{`${look.glyph} `}</Text>
+            <Text color={look.color} dimColor={!look.color}>
+              {statusOf(entry)}
+            </Text>
           </Text>
           {entry.check !== "ok" && entry.check !== "fixed" && entry.note
-            ? clip(entry.note, inner, NOTE_LINES).map((line) => <Text dimColor>{line}</Text>)
+            ? clip(entry.note, inner, NOTE_LINES).map((line) => (
+                <Text dimColor>{line}</Text>
+              ))
             : null}
-          <Text dimColor wrap="truncate-middle">{entry.path}</Text>
+          <Text dimColor wrap="truncate-middle">
+            {entry.path}
+          </Text>
           <Box marginTop={1} gap={2}>
             <Button
               key={`explain-open:${entry.id}`}
@@ -142,7 +155,11 @@ export const explainPane = (on: On) => {
         borderDimColor={!status.color}
         paddingX={1}
       >
-        {clip(status.text, inner - (status.spins ? SPINNER_CELLS : 0), NOTE_LINES).map((line, i) => (
+        {clip(
+          status.text,
+          inner - (status.spins ? SPINNER_CELLS : 0),
+          NOTE_LINES,
+        ).map((line, i) => (
           <Box key={`explain-status:${i}`}>
             {status.spins && i === 0 ? (
               <Client
@@ -161,8 +178,16 @@ export const explainPane = (on: On) => {
     ) : null;
 
     const askBox = (label: string) => (
-      <Box key="explain-ask-box" flexDirection="column" borderStyle="round" borderDimColor paddingX={1}>
-        <Text dimColor bold>{label}</Text>
+      <Box
+        key="explain-ask-box"
+        flexDirection="column"
+        borderStyle="round"
+        borderDimColor
+        paddingX={1}
+      >
+        <Text dimColor bold>
+          {label}
+        </Text>
         <Input
           key="explain-ask"
           placeholder="ask a follow-up, or name what to explain"
@@ -181,7 +206,12 @@ export const explainPane = (on: On) => {
           {banner}
           {askBox(NEW_LABEL)}
           <Box justifyContent="flex-end">
-            <Button key="explain-show-history" label="history" dimColor onPress={() => explainShowHistory($)} />
+            <Button
+              key="explain-show-history"
+              label="history"
+              dimColor
+              onPress={() => explainShowHistory($)}
+            />
           </Box>
         </Box>
       );
@@ -217,7 +247,10 @@ export const explainPane = (on: On) => {
           paddingX={1}
         >
           <Box justifyContent="space-between">
-            <Text dimColor bold>{`HISTORY · ${v.entries.length + (v.isRunning ? 1 : 0)}`}</Text>
+            <Text
+              dimColor
+              bold
+            >{`HISTORY · ${v.entries.length + (v.isRunning ? 1 : 0)}`}</Text>
             <Button
               key="explain-clear"
               label="clear"
@@ -232,7 +265,10 @@ export const explainPane = (on: On) => {
           )}
           {v.entries.map((entry) => {
             const isSelected = entry.id === current?.id;
-            const label = wrap(`${isSelected ? "●" : "○"} ${entry.title}`, inner)[0]!;
+            const label = wrap(
+              `${isSelected ? "●" : "○"} ${entry.title}`,
+              inner,
+            )[0]!;
             return (
               <Button
                 key={`explain-entry:${entry.id}`}
@@ -240,7 +276,11 @@ export const explainPane = (on: On) => {
                 label={label}
                 onPress={() => explainSelect($, entry.id)}
               >
-                <Text color={isSelected ? ACCENT : undefined} bold={isSelected} dimColor={!isSelected}>
+                <Text
+                  color={isSelected ? ACCENT : undefined}
+                  bold={isSelected}
+                  dimColor={!isSelected}
+                >
                   {label}
                 </Text>
               </Button>
@@ -255,7 +295,9 @@ export const explainPane = (on: On) => {
             borderColor={ACCENT}
             paddingX={1}
           >
-            <Text bold color={ACCENT}>{current?.title ?? PENDING}</Text>
+            <Text bold color={ACCENT}>
+              {current?.title ?? PENDING}
+            </Text>
             <Box flexDirection="column" marginTop={1}>
               {current ? body(current) : <Text dimColor>{WRITING}</Text>}
             </Box>

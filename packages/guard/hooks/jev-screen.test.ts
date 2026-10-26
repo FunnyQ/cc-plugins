@@ -128,7 +128,11 @@ describe("screenBlocks", () => {
 
   test("stays silent when it withdrew nothing", () => {
     expect(
-      screenNote("💬 comment-guard", { kept: [WHY], withdrawn: 0, slowestMs: 200 }),
+      screenNote("💬 comment-guard", {
+        kept: [WHY],
+        withdrawn: 0,
+        slowestMs: 200,
+      }),
     ).toBeNull();
   });
 });

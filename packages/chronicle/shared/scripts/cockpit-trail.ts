@@ -124,9 +124,7 @@ export function isDecisionRecord(value: unknown): value is DecisionRecord {
   );
 }
 
-export async function readDecisionLog(
-  path: string,
-): Promise<DecisionRecord[]> {
+export async function readDecisionLog(path: string): Promise<DecisionRecord[]> {
   const text = await Bun.file(path).text();
   const records: DecisionRecord[] = [];
 

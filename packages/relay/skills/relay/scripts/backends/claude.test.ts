@@ -285,7 +285,9 @@ describe("claudeBackend.parseError", () => {
   });
 
   it("returns undefined for a successful result, non-JSON, or empty output", () => {
-    const ok = JSON.stringify([{ type: "result", is_error: false, result: "done" }]);
+    const ok = JSON.stringify([
+      { type: "result", is_error: false, result: "done" },
+    ]);
 
     expect(claudeBackend.parseError!(ok)).toBeUndefined();
     expect(claudeBackend.parseError!("not json")).toBeUndefined();

@@ -30,7 +30,11 @@ export const peer = (on: On) => {
 
   on(
     "ui.render",
-    { component: "UserMessage", surface: "terminal", props: { origin: { kind: "peer" } } },
+    {
+      component: "UserMessage",
+      surface: "terminal",
+      props: { origin: { kind: "peer" } },
+    },
     ($, e, next) => {
       if (!config.enabled.transcript || !config.enabled.peer) return next(e);
       const { color, icon, side, fold_lines: foldLines } = config.peer;

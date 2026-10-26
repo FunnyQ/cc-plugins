@@ -16,9 +16,7 @@ test("a diagram that renders replaces its fallback with the cleaned svg", () => 
     return `<svg class="pele" viewBox="0 0 1 1" style="--_fg:red"><a href="https://x"><text>A</text></a></svg>`;
   });
   expect(seen).toEqual(["A --> B"]);
-  expect(out).toBe(
-    `<svg class="pele" viewBox="0 0 1 1"><text>A</text></svg>`,
-  );
+  expect(out).toBe(`<svg class="pele" viewBox="0 0 1 1"><text>A</text></svg>`);
 });
 
 test("a diagram that throws keeps its fallback, and the others still render", () => {

@@ -114,7 +114,8 @@ const rig = async (
     },
     clock: { now: async () => now },
     settings: {
-      read: async () => (opts.language === undefined ? {} : { language: opts.language }),
+      read: async () =>
+        opts.language === undefined ? {} : { language: opts.language },
     },
     fs: {
       read: async (p: string) => files.get(p),
@@ -149,8 +150,13 @@ const rig = async (
     },
     state: {
       get: async () => ({ value: explain, version }),
-      set: async (_ref: unknown, value: ExplainView, o?: { ifVersion?: number }) => {
-        if (o?.ifVersion !== undefined && o.ifVersion !== version) return { isSet: false, version };
+      set: async (
+        _ref: unknown,
+        value: ExplainView,
+        o?: { ifVersion?: number },
+      ) => {
+        if (o?.ifVersion !== undefined && o.ifVersion !== version)
+          return { isSet: false, version };
         explain = value;
         version++;
         return { isSet: true, version };
@@ -271,12 +277,18 @@ test("press with an html reply writes the file, stores pending, and the checker'
 test("an html reply with a diagram renders it in a bun child, after the entry lands and before the geometry check", async () => {
   const r = await rig();
   r.replies.push(
-    answered(htmlReply.replace("</main>", '<pre class="mermaid">A --> B</pre></main>')),
+    answered(
+      htmlReply.replace("</main>", '<pre class="mermaid">A --> B</pre></main>'),
+    ),
   );
   await explainPress(r.$);
   const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
   const bun = r.runs.filter((a) => a[0] === "bun");
-  expect(bun[0]).toEqual(["bun", "/plugin/hooks/explain/pele-cli.ts", entry.path]);
+  expect(bun[0]).toEqual([
+    "bun",
+    "/plugin/hooks/explain/pele-cli.ts",
+    entry.path,
+  ]);
   expect(bun[1]![1]).toBe("/plugin/hooks/explain/geometry-cli.ts");
 });
 
@@ -322,10 +334,14 @@ test("a press forks in the language settings name, and an html page carries it a
   const r = await rig({ language: "ja" });
   r.replies.push(answered(textReply));
   await explainPress(r.$);
-  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "press" }, "ja")]);
+  expect(r.forks.map(briefless)).toEqual([
+    buildPrompt({ kind: "press" }, "ja"),
+  ]);
   r.replies.push(answered(htmlReply));
   await explainPress(r.$);
-  const page = [...r.files.entries()].find(([p]) => p.endsWith(".html") && p !== TEMPLATE_PATH);
+  const page = [...r.files.entries()].find(
+    ([p]) => p.endsWith(".html") && p !== TEMPLATE_PATH,
+  );
   expect(page?.[1]).toContain('lang="ja"');
 });
 
@@ -402,7 +418,9 @@ test("[Tell me…] opens ask mode; a submit there asks fresh past the selected e
   expect(r.forks).toEqual([]);
   r.replies.push(answered(textReply));
   await explainAsk(r.$, "why?");
-  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
+  expect(r.forks.map(briefless)).toEqual([
+    buildPrompt({ kind: "free", question: "why?" }),
+  ]);
   expect(r.view().isAsking).toBeFalsy();
 });
 
@@ -424,7 +442,9 @@ test("ask follows the selected entry, asks free with none, and ignores blank tex
   await explainAsk(none.$, "   ");
   expect(none.forks).toEqual([]);
   await explainAsk(none.$, " why? ");
-  expect(none.forks.map(briefless)).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
+  expect(none.forks.map(briefless)).toEqual([
+    buildPrompt({ kind: "free", question: "why?" }),
+  ]);
   none.replies.push(answered(textReply));
   await explainAsk(none.$, "why?");
   expect(briefless(none.forks[1]!)).toBe(
@@ -461,7 +481,9 @@ test("pick forks on the topic", async () => {
   const r = await rig();
   r.replies.push(answered(textReply));
   await explainPick(r.$, "the parser");
-  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "pick", topic: "the parser" })]);
+  expect(r.forks.map(briefless)).toEqual([
+    buildPrompt({ kind: "pick", topic: "the parser" }),
+  ]);
 });
 
 test("two entries in one millisecond get x<at> and x<at>-2", async () => {
@@ -497,9 +519,25 @@ test("select sets selected; reopen opens an html entry and nothing else", async 
 });
 
 const pages: ExplainEntry[] = [
-  { id: "h2", at: 3, title: "h2", kind: "html", summary: "", path: "/p/h2.html", check: "ok" },
+  {
+    id: "h2",
+    at: 3,
+    title: "h2",
+    kind: "html",
+    summary: "",
+    path: "/p/h2.html",
+    check: "ok",
+  },
   { id: "t", at: 2, title: "t", kind: "text", body: "" },
-  { id: "h1", at: 1, title: "h1", kind: "html", summary: "", path: "/p/h1.html", check: "ok" },
+  {
+    id: "h1",
+    at: 1,
+    title: "h1",
+    kind: "html",
+    summary: "",
+    path: "/p/h1.html",
+    check: "ok",
+  },
 ];
 
 test("explainDelete moves an html entry's page to the Trash and drops the entry; a text entry just drops", async () => {
@@ -518,7 +556,9 @@ test("a failed trash keeps the entry and names the page in the error", async () 
   const r = await rig({ entries: pages, trashFails: true });
   await explainDelete(r.$, "h1");
   expect(r.view().entries).toHaveLength(3);
-  expect(r.view().error).toBe("could not move h1.html to the Trash: trash: no such file");
+  expect(r.view().error).toBe(
+    "could not move h1.html to the Trash: trash: no such file",
+  );
 });
 
 test("explainClear trashes every html page in one call and empties the history", async () => {
@@ -530,7 +570,9 @@ test("explainClear trashes every html page in one call and empties the history",
   const failing = await rig({ entries: pages, trashFails: true });
   await explainClear(failing.$);
   expect(failing.view().entries).toHaveLength(3);
-  expect(failing.view().error).toBe("could not move 2 pages to the Trash: trash: no such file");
+  expect(failing.view().error).toBe(
+    "could not move 2 pages to the Trash: trash: no such file",
+  );
 });
 
 test("explainHooks hooks the checker, the three presses, the ask draft and the follow-up submit", async () => {

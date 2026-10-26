@@ -1,4 +1,11 @@
-import type { DeckAgent, DeckCrew, DeckSnapshot, DeckState, DeckTask, DeckTokens } from "./types.ts";
+import type {
+  DeckAgent,
+  DeckCrew,
+  DeckSnapshot,
+  DeckState,
+  DeckTask,
+  DeckTokens,
+} from "./types.ts";
 
 export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
 export type Line = Seg[];
@@ -63,13 +70,18 @@ function bar(done: number, total: number, cells: number): Line {
   const filled = total > 0 ? Math.round((done / total) * cells) : 0;
   const line: Line = [];
   if (filled > 0) line.push({ text: BAR.repeat(filled), color: COLOR.done });
-  if (cells - filled > 0) line.push({ text: BAR.repeat(cells - filled), dim: true });
+  if (cells - filled > 0)
+    line.push({ text: BAR.repeat(cells - filled), dim: true });
   return line;
 }
 
 export type TokenMode = keyof DeckTokens;
 
-export function runTotals(s: DeckSnapshot, now: number, mode: TokenMode): { time: string; tokens: string | null } | null {
+export function runTotals(
+  s: DeckSnapshot,
+  now: number,
+  mode: TokenMode,
+): { time: string; tokens: string | null } | null {
   if (!s.time) return null;
   const end = s.time.endedAt === null ? now : Date.parse(s.time.endedAt);
   return {
@@ -85,7 +97,10 @@ export function summary(s: DeckSnapshot, stale: boolean): Line[] {
       ? { text: `wave ${s.currentWave}/${s.waves.length}` }
       : state === "done"
         ? { text: "all done" }
-        : { text: `stuck · ${stuckRefs(s).length} unschedulable`, color: COLOR.invalid },
+        : {
+            text: `stuck · ${stuckRefs(s).length} unschedulable`,
+            color: COLOR.invalid,
+          },
   ];
 
   const c = s.counts;
@@ -175,13 +190,24 @@ function timeOf(t: DeckTask, now: number): string | null {
   return formatElapsed(end - Date.parse(t.time.startedAt));
 }
 
-export function waveCards(s: DeckSnapshot, w: number, now: number, mode: TokenMode): WaveCards {
+export function waveCards(
+  s: DeckSnapshot,
+  w: number,
+  now: number,
+  mode: TokenMode,
+): WaveCards {
   const groups = s.waves.map((refs, i) => ({ label: `W${i + 1}`, refs }));
   if (s.unschedulable.length > 0)
     groups.push({ label: "W?", refs: s.unschedulable });
   const labelW = Math.max(0, ...groups.map((g) => g.label.length)) + 1;
-  const longest = Math.max(0, ...groups.flatMap((g) => g.refs.map((r) => r.length)));
-  const inner = Math.max(1, Math.min(Math.max(MIN_INNER, longest + 2 + SLACK), w - labelW - 2));
+  const longest = Math.max(
+    0,
+    ...groups.flatMap((g) => g.refs.map((r) => r.length)),
+  );
+  const inner = Math.max(
+    1,
+    Math.min(Math.max(MIN_INNER, longest + 2 + SLACK), w - labelW - 2),
+  );
 
   const model = (t: DeckTask): CardModel => {
     const meta = [
@@ -194,14 +220,26 @@ export function waveCards(s: DeckSnapshot, w: number, now: number, mode: TokenMo
     const time = timeOf(t, now);
     return {
       ref: t.ref,
-      head: fit(`${GLYPH[t.state]} ${t.ref}`, time ? inner - time.length - 1 : inner),
+      head: fit(
+        `${GLYPH[t.state]} ${t.ref}`,
+        time ? inner - time.length - 1 : inner,
+      ),
       time,
-      tokens: t.tokens === null ? null : `${formatTokens(t.tokens[mode])} tok`.padStart(inner),
-      sub: meta ? spread(t.title, meta, inner) : fit(t.title, inner).padEnd(inner),
+      tokens:
+        t.tokens === null
+          ? null
+          : `${formatTokens(t.tokens[mode])} tok`.padStart(inner),
+      sub: meta
+        ? spread(t.title, meta, inner)
+        : fit(t.title, inner).padEnd(inner),
       agents: s.agents
         .filter((a) => a.ref === t.ref)
         .map((a) =>
-          spread(`${a.role}${a.attempt === null ? "" : ` #${a.attempt}`}`, elapsedOf(a, now), inner),
+          spread(
+            `${a.role}${a.attempt === null ? "" : ` #${a.attempt}`}`,
+            elapsedOf(a, now),
+            inner,
+          ),
         ),
       ...(color && { color }),
       ...(dim && { dim }),
@@ -224,7 +262,11 @@ export function formatElapsed(ms: number): string {
   return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
 }
 
-const CREW_GLYPH = { "in-flight": GLYPH["in-progress"], finished: GLYPH.done, abandoned: GLYPH.invalid };
+const CREW_GLYPH = {
+  "in-flight": GLYPH["in-progress"],
+  finished: GLYPH.done,
+  abandoned: GLYPH.invalid,
+};
 
 export function crewLines(s: DeckSnapshot, now: number): Line[] {
   const roleW = Math.max(0, ...s.crew.map((c) => c.role.length));
@@ -232,10 +274,18 @@ export function crewLines(s: DeckSnapshot, now: number): Line[] {
   return s.crew.map((c: DeckCrew) => {
     const elapsed =
       c.status === "in-flight"
-        ? c.startedAt === null ? "—" : formatElapsed(now - Date.parse(c.startedAt))
-        : c.elapsedMs === null ? "—" : formatElapsed(c.elapsedMs);
+        ? c.startedAt === null
+          ? "—"
+          : formatElapsed(now - Date.parse(c.startedAt))
+        : c.elapsedMs === null
+          ? "—"
+          : formatElapsed(c.elapsedMs);
     const text = `${CREW_GLYPH[c.status]} ${c.role.padEnd(roleW)} ${c.label.padEnd(labelW)}  ${elapsed}`;
-    return [c.status === "in-flight" ? { text, color: COLOR["in-progress"] } : { text, dim: true }];
+    return [
+      c.status === "in-flight"
+        ? { text, color: COLOR["in-progress"] }
+        : { text, dim: true },
+    ];
   });
 }
 

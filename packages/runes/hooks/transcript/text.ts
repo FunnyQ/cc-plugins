@@ -4,7 +4,8 @@ const WIDE = /[ᄀ-ᅟ⺀-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦\u{1F300}-\u{1FA
 
 const cellWidth = (ch: string) => (WIDE.test(ch) ? 2 : 1);
 
-export const innerWidth = (columns = 80) => Math.max(10, columns - BUBBLE_CHROME_COLUMNS);
+export const innerWidth = (columns = 80) =>
+  Math.max(10, columns - BUBBLE_CHROME_COLUMNS);
 
 export const cells = (text: string): number =>
   [...text].reduce((n, ch) => n + cellWidth(ch), 0);
@@ -38,7 +39,11 @@ export const sameStyle = (a: object, b: object) => {
   return true;
 };
 
-export const wrapRuns = <R extends Styled>(runs: R[], width: number, lead?: R): R[][] => {
+export const wrapRuns = <R extends Styled>(
+  runs: R[],
+  width: number,
+  lead?: R,
+): R[][] => {
   const indent = lead ? cells(lead.text) : 0;
   const lines: R[][] = [[]];
   let used = 0;
@@ -63,7 +68,10 @@ export const plural = (n: number, one: string, many = `${one}s`) =>
 
 // styled runs wrapped between words: wrapRuns cuts at any character, which split "remove" across two lines; a
 // newline starts a line, and only a word wider than the whole line is cut
-export const wrapWords = <R extends { text: string }>(runs: R[], width: number): R[][] => {
+export const wrapWords = <R extends { text: string }>(
+  runs: R[],
+  width: number,
+): R[][] => {
   const lines: R[][] = [[]];
   let used = 0;
   let space: R | undefined;

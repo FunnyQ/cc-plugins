@@ -81,9 +81,9 @@ describe("opencodeBackend", () => {
 
     it("never passes --variant", () => {
       for (const mode of ["delegate", "review"] as const) {
-        expect(opencodeBackend.invoke(mode, { promptText: "p" }).argv).not.toContain(
-          "--variant",
-        );
+        expect(
+          opencodeBackend.invoke(mode, { promptText: "p" }).argv,
+        ).not.toContain("--variant");
       }
     });
 
@@ -272,7 +272,10 @@ describe("parseError", () => {
       JSON.stringify({ type: "step_start" }),
       JSON.stringify({
         type: "error",
-        error: { name: "UnknownError", data: { message: "Model not found: x/y" } },
+        error: {
+          name: "UnknownError",
+          data: { message: "Model not found: x/y" },
+        },
       }),
     ].join("\n");
 
@@ -280,13 +283,18 @@ describe("parseError", () => {
   });
 
   it("falls back to the error name when there is no message", () => {
-    const raw = JSON.stringify({ type: "error", error: { name: "UnknownError" } });
+    const raw = JSON.stringify({
+      type: "error",
+      error: { name: "UnknownError" },
+    });
 
     expect(parseError(raw)).toBe("UnknownError");
   });
 
   it("returns undefined without an error event, skipping malformed lines", () => {
-    expect(parseError("not json\n" + JSON.stringify({ type: "text" }))).toBeUndefined();
+    expect(
+      parseError("not json\n" + JSON.stringify({ type: "text" })),
+    ).toBeUndefined();
     expect(parseError("")).toBeUndefined();
   });
 

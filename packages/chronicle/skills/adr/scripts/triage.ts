@@ -417,8 +417,8 @@ export function validateJudgment(
   return {
     result: {
       batch: batch.batch,
-      candidates: batch.clusters.map(
-        ({ clusterId }) => recorded.get(clusterId)!,
+      candidates: batch.clusters.map(({ clusterId }) =>
+        recorded.get(clusterId)!,
       ),
       conflicts,
     },

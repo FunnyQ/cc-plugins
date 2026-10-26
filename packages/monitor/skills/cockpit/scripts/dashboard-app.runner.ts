@@ -2,7 +2,8 @@ type Stub = Record<string, any>;
 const g = globalThis as Stub;
 const appPath = `${import.meta.dir}/../dashboard/dist/app.js`;
 const UUID = "11111111-2222-3333-4444-555555555555";
-const STUBBED = /dashboard\/dist\/modules\/(transcript|decision-log|starfield|lead|permission-modal)\.js$/;
+const STUBBED =
+  /dashboard\/dist\/modules\/(transcript|decision-log|starfield|lead|permission-modal)\.js$/;
 const INITS: Record<string, string> = {
   transcript: "initTranscript",
   "decision-log": "initDecisionLog",

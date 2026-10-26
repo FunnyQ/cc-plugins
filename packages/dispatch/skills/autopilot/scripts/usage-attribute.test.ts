@@ -569,28 +569,51 @@ describe("attributeUsage — identity comes from aggregateFleet", () => {
 
 describe("attributeUsage — edge shapes", () => {
   test("an unparseable start time pairs last, never as 1970", () => {
-    const rows = [row({ key: "r", ref: "work/01", attempt: 1, startedAt: "1970-01-01T00:00:00.000Z" })];
+    const rows = [
+      row({
+        key: "r",
+        ref: "work/01",
+        attempt: 1,
+        startedAt: "1970-01-01T00:00:00.000Z",
+      }),
+    ];
     const agents = [
       agent({ file: "a.jsonl", startedAt: "not-a-date", counts: counts(1, 1) }),
-      agent({ file: "b.jsonl", startedAt: "1970-01-01T01:00:00.000Z", counts: counts(2, 2) }),
+      agent({
+        file: "b.jsonl",
+        startedAt: "1970-01-01T01:00:00.000Z",
+        counts: counts(2, 2),
+      }),
     ];
 
     expect(attributeUsage(rows, agents).rows[0]!.usage).toEqual(counts(2, 2));
   });
 
   test("codexByTask has no key for a task codex never ran, and a zero entry for one where it cost nothing", () => {
-    const { rollup } = attributeUsage([], [
-      agent({ file: "a.jsonl", task: "work/01" }),
-      agent({ file: "b.jsonl", task: "work/02", codexCounts: counts(0, 0) }),
-    ]);
+    const { rollup } = attributeUsage(
+      [],
+      [
+        agent({ file: "a.jsonl", task: "work/01" }),
+        agent({ file: "b.jsonl", task: "work/02", codexCounts: counts(0, 0) }),
+      ],
+    );
 
     expect("work/01" in rollup.codexByTask).toBe(false);
     expect(rollup.codexByTask["work/02"]).toEqual(counts(0, 0));
   });
 
   test("a paired row that drove no external engine carries usage but no codexUsage or codexModels key", () => {
-    const rows = [row({ key: "r", ref: "work/01", attempt: 1, startedAt: "2026-08-28T00:00:00.000Z" })];
-    const outRow = attributeUsage(rows, [agent({ file: "a.jsonl", codexModels: [] })]).rows[0]!;
+    const rows = [
+      row({
+        key: "r",
+        ref: "work/01",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+      }),
+    ];
+    const outRow = attributeUsage(rows, [
+      agent({ file: "a.jsonl", codexModels: [] }),
+    ]).rows[0]!;
 
     expect(outRow.usage).toEqual(counts(1, 1));
     expect("codexUsage" in outRow).toBe(false);
@@ -599,7 +622,13 @@ describe("attributeUsage — edge shapes", () => {
 
   test("an agent with a null task or role never pairs, even with a row logged under the string null, but still counts in the rollup", () => {
     const rows = [
-      row({ key: "null-task", ref: "null", role: "dev", attempt: 1, startedAt: "2026-08-28T00:00:00.000Z" }),
+      row({
+        key: "null-task",
+        ref: "null",
+        role: "dev",
+        attempt: 1,
+        startedAt: "2026-08-28T00:00:00.000Z",
+      }),
       row({
         key: "null-role",
         ref: "work/03",
@@ -610,7 +639,12 @@ describe("attributeUsage — edge shapes", () => {
     ];
     const { rows: outRows, rollup } = attributeUsage(rows, [
       agent({ file: "a.jsonl", task: null, role: "dev", counts: counts(1, 2) }),
-      agent({ file: "b.jsonl", task: "work/03", role: null, counts: counts(3, 4) }),
+      agent({
+        file: "b.jsonl",
+        task: "work/03",
+        role: null,
+        counts: counts(3, 4),
+      }),
     ]);
 
     expect(outRows.every((r) => !("usage" in r))).toBe(true);
@@ -626,7 +660,9 @@ describe("attributeUsage — edge shapes", () => {
       const agents = createTranscriptSource(planDir, projectsRoot).read();
       const { rows, rollup } = attributeUsage(fleet, agents);
 
-      expect(rows.filter((r) => r.usage === undefined)).toHaveLength(expected.rowsWithoutUsage);
+      expect(rows.filter((r) => r.usage === undefined)).toHaveLength(
+        expected.rowsWithoutUsage,
+      );
       expect(rollup.agentCount).toBe(expected.agentCount);
     } finally {
       rmSync(dir, { recursive: true, force: true });

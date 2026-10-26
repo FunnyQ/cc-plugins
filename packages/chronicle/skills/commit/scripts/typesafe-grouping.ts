@@ -39,8 +39,7 @@ export type GroupInput = {
 
 export type Group = { files: string[]; types: string[] };
 export type Suggestion =
-  | { groups: Group[]; ms: number }
-  | { skipped: string; ms?: number };
+  { groups: Group[]; ms: number } | { skipped: string; ms?: number };
 
 export function buildRequest(input: GroupInput[]) {
   const seen = new Set<string>();

@@ -213,7 +213,8 @@ async function trashPages(
     .run(["trash", ...paths])
     .catch((err: unknown) => ({ exitCode: 1, stderr: String(err) }));
   if (exitCode === 0) return undefined;
-  const what = paths.length === 1 ? basename(paths[0]!) : `${paths.length} pages`;
+  const what =
+    paths.length === 1 ? basename(paths[0]!) : `${paths.length} pages`;
   return `could not move ${what} to the Trash: ${stderr.trim()}`;
 }
 
@@ -250,37 +251,55 @@ export function explainHooks(on: On): void {
 
   // a spawn raised from a closure leaves out every runes hook, the checker's Agent allow too; from a hook, only that hook.
   // next runs first: the redraw a run starts drops the pressed element's handler
-  on("ui.press", { plugin: "runes", element: "explain" }, async ($, e, next) => {
-    const pressed = await next(e);
-    await explainPress($);
-    return pressed;
-  });
+  on(
+    "ui.press",
+    { plugin: "runes", element: "explain" },
+    async ($, e, next) => {
+      const pressed = await next(e);
+      await explainPress($);
+      return pressed;
+    },
+  );
 
-  on("ui.press", { plugin: "runes", element: "explain-open" }, async ($, e, next) => {
-    const pressed = await next(e);
-    await explainOpen($);
-    return pressed;
-  });
+  on(
+    "ui.press",
+    { plugin: "runes", element: "explain-open" },
+    async ($, e, next) => {
+      const pressed = await next(e);
+      await explainOpen($);
+      return pressed;
+    },
+  );
 
   on("ui.press", { plugin: "runes", requestId: PANE }, async ($, e, next) => {
     const pressed = await next(e);
     const pick = e.element.match(/^explain-pick:(.+):(\d+)$/);
-    const entry = pick && (await read($, view)).entries.find((x) => x.id === pick[1]);
-    const option = entry?.kind === "ask" ? entry.options[Number(pick![2])] : undefined;
+    const entry =
+      pick && (await read($, view)).entries.find((x) => x.id === pick[1]);
+    const option =
+      entry?.kind === "ask" ? entry.options[Number(pick![2])] : undefined;
     if (option !== undefined) await explainPick($, option);
     return pressed;
   });
 
-  on("ui.input", { plugin: "runes", element: "explain-ask", kind: "change" }, async ($, e, next) => {
-    const changed = await next(e);
-    await update($, view, (v) => ({ ...v, draft: e.value }));
-    return changed;
-  });
+  on(
+    "ui.input",
+    { plugin: "runes", element: "explain-ask", kind: "change" },
+    async ($, e, next) => {
+      const changed = await next(e);
+      await update($, view, (v) => ({ ...v, draft: e.value }));
+      return changed;
+    },
+  );
 
-  on("ui.input", { plugin: "runes", element: "explain-ask", kind: "submit" }, async ($, e, next) => {
-    const submitted = await next(e);
-    await update($, view, (v) => ({ ...v, draft: "" }));
-    await explainAsk($, e.value);
-    return submitted;
-  });
+  on(
+    "ui.input",
+    { plugin: "runes", element: "explain-ask", kind: "submit" },
+    async ($, e, next) => {
+      const submitted = await next(e);
+      await update($, view, (v) => ({ ...v, draft: "" }));
+      await explainAsk($, e.value);
+      return submitted;
+    },
+  );
 }

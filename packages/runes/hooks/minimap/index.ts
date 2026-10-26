@@ -12,6 +12,8 @@ console.log(
   JSON.stringify({
     path: file,
     // TextDecoderStream holds back a character cut by a chunk edge
-    rows: await rowsOfStream(Bun.file(file).stream().pipeThrough(new TextDecoderStream())),
+    rows: await rowsOfStream(
+      Bun.file(file).stream().pipeThrough(new TextDecoderStream()),
+    ),
   }),
 );

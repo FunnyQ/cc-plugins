@@ -76,7 +76,12 @@ async function settle(
   );
   await $.process.run(["open", path]);
   const shot = path.replace(/\.html$/, "");
-  await $.process.run(["rm", "-f", `${shot}.check.png`, `${shot}.check-narrow.png`]);
+  await $.process.run([
+    "rm",
+    "-f",
+    `${shot}.check.png`,
+    `${shot}.check-narrow.png`,
+  ]);
 }
 
 async function expire($: EngineInterface) {

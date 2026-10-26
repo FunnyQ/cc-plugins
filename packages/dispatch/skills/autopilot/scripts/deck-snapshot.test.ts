@@ -3,7 +3,12 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DeckSnapshot } from "../../../hooks/flightdeck/types.ts";
-import { buildDeckSnapshot, latestPlan, layerByDepth, tokenUsage } from "./deck-snapshot";
+import {
+  buildDeckSnapshot,
+  latestPlan,
+  layerByDepth,
+  tokenUsage,
+} from "./deck-snapshot";
 import type { FleetRow, TaskView } from "./fleet";
 import type { TreePayload } from "./tree-api";
 
@@ -352,50 +357,139 @@ describe("buildDeckSnapshot", () => {
     const deck = snapshot(
       [view("a/01", "in-progress")],
       [
-        row({ label: "scout-wave-1", role: "scout", ref: "scout", status: "finished", startedAt: "2026-10-04T10:00:00Z", elapsedMs: 8000 }),
+        row({
+          label: "scout-wave-1",
+          role: "scout",
+          ref: "scout",
+          status: "finished",
+          startedAt: "2026-10-04T10:00:00Z",
+          elapsedMs: 8000,
+        }),
         row({ label: "dev-a", ref: "a/01", startedAt: "2026-10-04T10:00:05Z" }),
-        row({ label: "commit-wave-1", role: "commit", ref: "commit", status: "finished", startedAt: "2026-10-04T10:01:00Z", elapsedMs: 12000 }),
-        row({ label: "scout-wave-2", role: "scout", ref: "scout", status: "abandoned", startedAt: "2026-10-04T10:02:00Z" }),
-        row({ label: "scout-wave-3", role: "scout", ref: "scout", startedAt: "2026-10-04T10:03:00Z" }),
+        row({
+          label: "commit-wave-1",
+          role: "commit",
+          ref: "commit",
+          status: "finished",
+          startedAt: "2026-10-04T10:01:00Z",
+          elapsedMs: 12000,
+        }),
+        row({
+          label: "scout-wave-2",
+          role: "scout",
+          ref: "scout",
+          status: "abandoned",
+          startedAt: "2026-10-04T10:02:00Z",
+        }),
+        row({
+          label: "scout-wave-3",
+          role: "scout",
+          ref: "scout",
+          startedAt: "2026-10-04T10:03:00Z",
+        }),
       ],
     );
     expect(deck.crew).toEqual([
-      { role: "scout", label: "scout-wave-3", status: "in-flight", startedAt: "2026-10-04T10:03:00Z", elapsedMs: null },
-      { role: "scout", label: "scout-wave-2", status: "abandoned", startedAt: "2026-10-04T10:02:00Z", elapsedMs: null },
-      { role: "commit", label: "commit-wave-1", status: "finished", startedAt: "2026-10-04T10:01:00Z", elapsedMs: 12000 },
+      {
+        role: "scout",
+        label: "scout-wave-3",
+        status: "in-flight",
+        startedAt: "2026-10-04T10:03:00Z",
+        elapsedMs: null,
+      },
+      {
+        role: "scout",
+        label: "scout-wave-2",
+        status: "abandoned",
+        startedAt: "2026-10-04T10:02:00Z",
+        elapsedMs: null,
+      },
+      {
+        role: "commit",
+        label: "commit-wave-1",
+        status: "finished",
+        startedAt: "2026-10-04T10:01:00Z",
+        elapsedMs: 12000,
+      },
     ]);
   });
 
   test("task time spans its first start to its last finish, open while an agent runs", () => {
     const deck = snapshot(
-      [view("a/01", "done"), view("a/02", "in-progress"), view("a/03", "ready")],
       [
-        row({ ref: "a/01", status: "finished", startedAt: "2026-10-04T10:00:00Z", elapsedMs: 60_000 }),
-        row({ ref: "a/01", status: "finished", startedAt: "2026-10-04T10:00:30Z", elapsedMs: 90_000 }),
-        row({ ref: "a/02", status: "finished", startedAt: "2026-10-04T10:05:00Z", elapsedMs: 5_000 }),
+        view("a/01", "done"),
+        view("a/02", "in-progress"),
+        view("a/03", "ready"),
+      ],
+      [
+        row({
+          ref: "a/01",
+          status: "finished",
+          startedAt: "2026-10-04T10:00:00Z",
+          elapsedMs: 60_000,
+        }),
+        row({
+          ref: "a/01",
+          status: "finished",
+          startedAt: "2026-10-04T10:00:30Z",
+          elapsedMs: 90_000,
+        }),
+        row({
+          ref: "a/02",
+          status: "finished",
+          startedAt: "2026-10-04T10:05:00Z",
+          elapsedMs: 5_000,
+        }),
         row({ ref: "a/02", startedAt: "2026-10-04T10:06:00Z" }),
       ],
     );
-    expect(deck.tasks["a/01"].time).toEqual({ startedAt: "2026-10-04T10:00:00.000Z", endedAt: "2026-10-04T10:02:00.000Z" });
-    expect(deck.tasks["a/02"].time).toEqual({ startedAt: "2026-10-04T10:05:00.000Z", endedAt: null });
+    expect(deck.tasks["a/01"].time).toEqual({
+      startedAt: "2026-10-04T10:00:00.000Z",
+      endedAt: "2026-10-04T10:02:00.000Z",
+    });
+    expect(deck.tasks["a/02"].time).toEqual({
+      startedAt: "2026-10-04T10:05:00.000Z",
+      endedAt: null,
+    });
     expect(deck.tasks["a/03"].time).toBeNull();
   });
 
   test("tokens ride only done tasks, and only when usage was read", () => {
     const tasks = [view("a/01", "done"), view("a/02", "in-progress")];
-    const usage = new Map([["a/01", { fresh: 1234, billed: 9000 }], ["a/02", { fresh: 99, billed: 990 }]]);
-    const read = buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage });
+    const usage = new Map([
+      ["a/01", { fresh: 1234, billed: 9000 }],
+      ["a/02", { fresh: 99, billed: 990 }],
+    ]);
+    const read = buildDeckSnapshot({
+      plan: "/plan",
+      payload: payload(tasks),
+      fleet: [],
+      usage,
+    });
     expect(read.tasks["a/01"].tokens).toEqual({ fresh: 1234, billed: 9000 });
     expect(read.tasks["a/02"].tokens).toBeNull();
     expect(snapshot(tasks).tasks["a/01"].tokens).toBeNull();
-    expect(buildDeckSnapshot({ plan: "/plan", payload: payload(tasks), fleet: [], usage, runTokens: { fresh: 5000, billed: 50_000 } }).tokens).toEqual({ fresh: 5000, billed: 50_000 });
+    expect(
+      buildDeckSnapshot({
+        plan: "/plan",
+        payload: payload(tasks),
+        fleet: [],
+        usage,
+        runTokens: { fresh: 5000, billed: 50_000 },
+      }).tokens,
+    ).toEqual({ fresh: 5000, billed: 50_000 });
     expect(read.tokens).toBeNull();
   });
 });
 
 describe("tokenUsage", () => {
   test("sums fresh tokens, the figure the web fleet prints, beside the billed total", () => {
-    const counts = { input: 10, output: 2_000, cacheRead: 900_000, cacheWrite: 44_920 };
+    const counts = {
+      input: 10,
+      output: 2_000,
+      cacheRead: 900_000,
+      cacheWrite: 44_920,
+    };
     const { usage, runTokens } = tokenUsage([
       row({ ref: "a/01", usage: counts }),
       row({ ref: "a/01", usage: { ...counts, cacheWrite: 80 } }),
@@ -411,11 +505,25 @@ describe("tokenUsage", () => {
     const deck = snapshot(
       [view("a/01", "done")],
       [
-        row({ ref: "scout", role: "scout", status: "finished", startedAt: "2026-10-04T10:00:00Z", elapsedMs: 1_000 }),
-        row({ ref: "a/01", status: "finished", startedAt: "2026-10-04T10:00:05Z", elapsedMs: 60_000 }),
+        row({
+          ref: "scout",
+          role: "scout",
+          status: "finished",
+          startedAt: "2026-10-04T10:00:00Z",
+          elapsedMs: 1_000,
+        }),
+        row({
+          ref: "a/01",
+          status: "finished",
+          startedAt: "2026-10-04T10:00:05Z",
+          elapsedMs: 60_000,
+        }),
       ],
     );
-    expect(deck.time).toEqual({ startedAt: "2026-10-04T10:00:00.000Z", endedAt: "2026-10-04T10:01:05.000Z" });
+    expect(deck.time).toEqual({
+      startedAt: "2026-10-04T10:00:00.000Z",
+      endedAt: "2026-10-04T10:01:05.000Z",
+    });
     expect(snapshot([view("a/01", "ready")]).time).toBeNull();
   });
 });

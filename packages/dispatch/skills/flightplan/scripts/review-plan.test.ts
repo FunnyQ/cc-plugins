@@ -327,9 +327,9 @@ describe("parseArgs", () => {
   });
 
   test("rejects a non-positive-integer --prior-passes", () => {
-    expect(() => parseArgs(["docs/p", "--narrow", "--prior-passes", "0"])).toThrow(
-      /positive integer/,
-    );
+    expect(() =>
+      parseArgs(["docs/p", "--narrow", "--prior-passes", "0"]),
+    ).toThrow(/positive integer/);
     expect(() =>
       parseArgs(["docs/p", "--narrow", "--prior-passes", "two"]),
     ).toThrow(/positive integer/);
@@ -477,7 +477,14 @@ describe("review-plan CLI exit codes", () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n");
     const res = Bun.spawnSync(
-      ["bun", SCRIPT, root, "--print", "--prior-findings", join(root, "nope.md")],
+      [
+        "bun",
+        SCRIPT,
+        root,
+        "--print",
+        "--prior-findings",
+        join(root, "nope.md"),
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     expect(res.exitCode).toBe(2);

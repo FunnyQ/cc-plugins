@@ -183,8 +183,7 @@ export function collectProjectInfo(): string {
         sections.push(
           `## ${file}\n\`\`\`json\n${JSON.stringify(summary, null, 2)}\n\`\`\`\n`,
         );
-      } catch {
-      }
+      } catch {}
     } else {
       sections.push(`## ${file}\n\`\`\`\n${content}\n\`\`\`\n`);
     }

@@ -534,8 +534,17 @@ test("the inline seat draws two lines: the summary and the current wave's cards"
 });
 
 test("a tick whose snapshot did not change still redraws while an agent is in flight, so elapsed times keep moving", async ($, on) => {
-  const dev = { role: "dev", ref: "api/02", attempt: 2, label: "dev-a", startedAt: "2026-01-01T00:00:00Z" };
-  const w = world(on, (argv) => ({ exitCode: 0, stdout: JSON.stringify(snap(argv[2]!, { agents: [dev] })) }));
+  const dev = {
+    role: "dev",
+    ref: "api/02",
+    attempt: 2,
+    label: "dev-a",
+    startedAt: "2026-01-01T00:00:00Z",
+  };
+  const w = world(on, (argv) => ({
+    exitCode: 0,
+    stdout: JSON.stringify(snap(argv[2]!, { agents: [dev] })),
+  }));
   await run($, "/abs/docs/x");
   const first = w.invalidates.length;
   await w.clock.advance(4000);
@@ -547,7 +556,10 @@ test("a tick that finds the pane closed by hand leaves the ticker alone when a n
   const panesDelay = { ms: 0 };
   const w = world(
     on,
-    (argv) => (argv[2] === "/abs/b" ? { ...good("/abs/b"), delay: 1000 } : good(argv[2]!)),
+    (argv) =>
+      argv[2] === "/abs/b"
+        ? { ...good("/abs/b"), delay: 1000 }
+        : good(argv[2]!),
     {},
     { next: true },
     panesDelay,

@@ -35,8 +35,8 @@ const questionsOf = (input: Record<string, unknown>) =>
 const answersOf = (input: Record<string, unknown>, result: unknown) => {
   const given =
     (result as
-      | { answers?: Record<string, unknown>; response?: unknown }
-      | undefined) ?? {};
+      { answers?: Record<string, unknown>; response?: unknown } | undefined) ??
+    {};
   const qs = questionsOf(input);
   const answers = qs.flatMap((q) => {
     const a = given.answers?.[String(q.question)];
@@ -320,15 +320,13 @@ export const fold = (on: On) => {
                   {`${"│\n".repeat(RAIL_MAX_CARD_LINES)}╰`}
                 </Text>
               </Box>
-              {
-                await next({
-                  ...e,
-                  viewport: e.viewport && {
-                    ...e.viewport,
-                    columns: e.viewport.columns - 1,
-                  },
-                })
-              }
+              {await next({
+                ...e,
+                viewport: e.viewport && {
+                  ...e.viewport,
+                  columns: e.viewport.columns - 1,
+                },
+              })}
             </Box>
           ) : null}
           {m.isLast ? summary($, e, m) : null}

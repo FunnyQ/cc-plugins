@@ -100,8 +100,19 @@ test("a bucket with more rows than cells keeps only what fits", () => {
 });
 
 test("kindAt reads a line's segments as one strip, top to bottom when the map lies sideways", () => {
-  const line = { target: "a", isHere: false, segments: [{ kind: "prompt", cells: 2 }, { kind: "bash", cells: 1 }] };
-  expect([0, 1, 2].map((i) => kindAt(line, i))).toEqual(["prompt", "prompt", "bash"]);
+  const line = {
+    target: "a",
+    isHere: false,
+    segments: [
+      { kind: "prompt", cells: 2 },
+      { kind: "bash", cells: 1 },
+    ],
+  };
+  expect([0, 1, 2].map((i) => kindAt(line, i))).toEqual([
+    "prompt",
+    "prompt",
+    "bash",
+  ]);
   expect(kindAt(line, 3)).toBeUndefined();
 });
 

@@ -19,7 +19,9 @@ const linesMemo = memo(50);
 const betterLines = (text: string, better: string, width: number) =>
   linesMemo(`${width}\0${keyOf(text)}\0${better}`, () =>
     wrapWords(
-      changes(keyOf(text), better).map(({ text, isChanged }): Run => (isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text })),
+      changes(keyOf(text), better).map(({ text, isChanged }): Run =>
+        isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
+      ),
       width,
     ),
   );
@@ -44,7 +46,16 @@ for (const [row, col, c] of EDITS) grid[row * 20 + col] = c;
 const SMOKER = octantsOf(grid.join(""));
 const SMOKER_COLUMNS = 10;
 const [[tailSlot, ...smoke] = [], ...body] = SMOKER;
-const TALKER = [[{ text: "     \\".padEnd(tailSlot?.text.length ?? 0), color: TEACHER_COLOR }, ...smoke], ...body];
+const TALKER = [
+  [
+    {
+      text: "     \\".padEnd(tailSlot?.text.length ?? 0),
+      color: TEACHER_COLOR,
+    },
+    ...smoke,
+  ],
+  ...body,
+];
 
 export const lessonRows = (
   { Box, Text }: Pick<Elements["terminal"], "Box" | "Text">,
@@ -53,8 +64,13 @@ export const lessonRows = (
   inner: number,
 ): [string, unknown][] => {
   const title = teacher.title(text);
-  const say = (key: string, line: string): [string, unknown] => [key, <Text color={TEACHER_COLOR}>{line}</Text>];
-  const lines = betterLines(text, better, inner - SMOKER_COLUMNS - 1).map((line) => runLine(Text, line));
+  const say = (key: string, line: string): [string, unknown] => [
+    key,
+    <Text color={TEACHER_COLOR}>{line}</Text>,
+  ];
+  const lines = betterLines(text, better, inner - SMOKER_COLUMNS - 1).map(
+    (line) => runLine(Text, line),
+  );
   const height = Math.max(lines.length, TALKER.length);
   return [
     ["teacher:divider", DIVIDER],
@@ -71,7 +87,11 @@ export const lessonRows = (
     ...Array.from({ length: height }, (_, j): [string, unknown] => [
       `teacher:${j}`,
       <Box flexDirection="row">
-        {TALKER[j] ? runLine(Text, TALKER[j]) : <Text>{" ".repeat(SMOKER_COLUMNS)}</Text>}
+        {TALKER[j] ? (
+          runLine(Text, TALKER[j])
+        ) : (
+          <Text>{" ".repeat(SMOKER_COLUMNS)}</Text>
+        )}
         <Text> </Text>
         {lines[j] ?? <Text> </Text>}
       </Box>,
@@ -96,6 +116,8 @@ export const lessonBubble = (
       title: teacher.title(text),
       side,
       inner,
-      rows: betterLines(text, better, inner).map((line, j): [string, unknown] => [`teacher:${j}`, runLine(Text, line)]),
+      rows: betterLines(text, better, inner).map(
+        (line, j): [string, unknown] => [`teacher:${j}`, runLine(Text, line)],
+      ),
     },
   );

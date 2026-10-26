@@ -3,14 +3,18 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { FlightlogEntry } from "../../flightplan/scripts/lib/flightlog";
-import type { GraphNode, NodeValidity } from "../../flightplan/scripts/lib/graph-node";
+import type {
+  GraphNode,
+  NodeValidity,
+} from "../../flightplan/scripts/lib/graph-node";
 import { buildTreePayload, type Loaded, loadPlan, repoName } from "./tree-api";
 import { buildFixture } from "./usage-fixture";
 
 const INVALID_COMPLETION: NodeValidity = {
   kind: "invalid",
   rule: "completion-state",
-  reason: "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
+  reason:
+    "Status is done but a gate checkbox is still unticked. Do NOT tick the boxes by hand",
 };
 
 function task(
@@ -305,16 +309,20 @@ describe("repoName", () => {
   });
 });
 
-
 describe("source bucket ordering", () => {
   for (const deckSource of ["tasks", "graph"] as const) {
     test(`${deckSource} carries its source: graph keeps the declared lane order, tasks sorts directory order`, () => {
       const bucketDirs = ["z-build", "a-review", "m-empty"];
-      const payload = buildTreePayload({ ...input({}, bucketDirs), deckSource });
+      const payload = buildTreePayload({
+        ...input({}, bucketDirs),
+        deckSource,
+      });
       expect(payload.deckSource).toBe(deckSource);
-      expect(payload.buckets).toEqual(deckSource === "graph"
-        ? ["z-build", "a-review", "m-empty"]
-        : ["a-review", "m-empty", "z-build"]);
+      expect(payload.buckets).toEqual(
+        deckSource === "graph"
+          ? ["z-build", "a-review", "m-empty"]
+          : ["a-review", "m-empty", "z-build"],
+      );
       expect(bucketDirs).toEqual(["z-build", "a-review", "m-empty"]);
     });
   }
@@ -326,7 +334,10 @@ describe("loadPlan", () => {
     try {
       mkdirSync(join(planDir, "tasks", "empty"), { recursive: true });
       mkdirSync(join(planDir, "tasks", "broken"), { recursive: true });
-      writeFileSync(join(planDir, "tasks", "broken", "01-bad.md"), "no heading\n");
+      writeFileSync(
+        join(planDir, "tasks", "broken", "01-bad.md"),
+        "no heading\n",
+      );
 
       const { bucketDirs } = await loadPlan(planDir);
 
@@ -339,7 +350,9 @@ describe("loadPlan", () => {
   test("the usage fixture's plan renders its work/01 task", async () => {
     const dir = mkdtempSync(join(tmpdir(), "tree-api-fixture-"));
     try {
-      const payload = buildTreePayload(await loadPlan(buildFixture(dir).planDir));
+      const payload = buildTreePayload(
+        await loadPlan(buildFixture(dir).planDir),
+      );
 
       expect(payload.tasks.map((view) => view.ref)).toContain("work/01");
     } finally {

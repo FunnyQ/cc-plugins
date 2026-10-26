@@ -35,7 +35,11 @@ export const prompt = (on: On) => {
 
   on(
     "ui.render",
-    { component: "UserMessage", surface: "terminal", props: { origin: { kind: "composer" } } },
+    {
+      component: "UserMessage",
+      surface: "terminal",
+      props: { origin: { kind: "composer" } },
+    },
     async ($, e, next) => {
       noteRow(e.requestId, Boolean(e.props.onScreen));
       teacher.seen(e.props.text, e.requestId);
@@ -46,7 +50,13 @@ export const prompt = (on: On) => {
         return (
           <Box flexDirection="column">
             {await next(e)}
-            {lessonBubble({ Box, Text }, e.props.text, better, innerWidth(e.viewport?.columns), "left")}
+            {lessonBubble(
+              { Box, Text },
+              e.props.text,
+              better,
+              innerWidth(e.viewport?.columns),
+              "left",
+            )}
           </Box>
         );
       }
@@ -152,7 +162,13 @@ export const prompt = (on: On) => {
           icon,
           side,
           inner,
-          rows: [...rows, ...images, ...(better ? lessonRows({ Box, Text }, e.props.text, better, inner) : [])],
+          rows: [
+            ...rows,
+            ...images,
+            ...(better
+              ? lessonRows({ Box, Text }, e.props.text, better, inner)
+              : []),
+          ],
         },
       );
     },

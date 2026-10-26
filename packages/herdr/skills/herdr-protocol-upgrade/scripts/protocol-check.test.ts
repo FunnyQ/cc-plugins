@@ -166,7 +166,7 @@ describe("extractLiterals", () => {
     tempRepos.push(repo);
     execFileSync("git", ["init", "-q", repo]);
     const source =
-      'call("ping"); call(\'client.window_title.set\'); call(`a.b.c_d`);\n';
+      "call(\"ping\"); call('client.window_title.set'); call(`a.b.c_d`);\n";
     writeFileSync(join(repo, "client.ts"), source);
     execFileSync("git", ["-C", repo, "add", "."]);
 

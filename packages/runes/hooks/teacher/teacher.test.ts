@@ -264,7 +264,8 @@ test("teach keys the lesson on the prompt that entered, not the one typed", asyn
   teacher.work({
     apiKey: "k",
     post: async (_url, init) => (
-      bodies.push(init.body), { ok: true, text: flagged("") }
+      bodies.push(init.body),
+      { ok: true, text: flagged("") }
     ),
     complete: async () => "Rewritten by the teacher.",
     redraw: () => {},

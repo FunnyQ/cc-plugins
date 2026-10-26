@@ -76,7 +76,10 @@ export const inlineMap = (
   jump: (target: string) => () => void,
 ) => {
   const drawn = lines(list, here, Math.max(1, width - 1), barRows);
-  const cellsTopDown = Array.from({ length: barRows }, (_, i) => barRows - 1 - i);
+  const cellsTopDown = Array.from(
+    { length: barRows },
+    (_, i) => barRows - 1 - i,
+  );
   return (
     <Box flexDirection="column">
       {cellsTopDown.map((cell) => (

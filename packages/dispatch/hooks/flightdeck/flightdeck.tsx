@@ -3,7 +3,14 @@ import type { EngineInterface, On, Timer } from "claude-code";
 
 import type { FlightdeckDeck } from "../../types";
 import { FLIGHTDECK_COMMAND, planArg, planFromOutput } from "./deck-command.ts";
-import { type CardModel, clip, COLOR, docked, inline, type Line } from "./rows.ts";
+import {
+  type CardModel,
+  clip,
+  COLOR,
+  docked,
+  inline,
+  type Line,
+} from "./rows.ts";
 import type { DeckSnapshot, DeckTask, DeckTokens } from "./types.ts";
 
 const PANE = "flightdeck";
@@ -52,7 +59,9 @@ const toastText = (t: DeckTask) => {
 const tokens = new Map<string, DeckTokens | null>();
 let runTokens: DeckTokens | null = null;
 const unread = (s: DeckSnapshot | null) =>
-  Object.values(s?.tasks ?? {}).some((t) => t.state === "done" && !tokens.has(t.ref));
+  Object.values(s?.tasks ?? {}).some(
+    (t) => t.state === "done" && !tokens.has(t.ref),
+  );
 
 const refresh = async ($: EngineInterface, gen: number, plan: string) => {
   const withUsage = unread(view.snapshot as DeckSnapshot | null);
@@ -186,7 +195,9 @@ export const flightdeck = (on: On) => {
         planFromOutput((ran.result as { stdout?: string }).stdout ?? "") ??
         planArg(e.command);
       if (plan && !(await openOn($, plan)).isPlaced)
-        $.ui.toast("Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.");
+        $.ui.toast(
+          "Flightdeck is waiting for a wider terminal. Type /flightdeck to show it.",
+        );
       return ran;
     },
   );
@@ -241,9 +252,18 @@ export const flightdeck = (on: On) => {
       const r = await runScript($, "flightdeck.ts", "--plan", s.plan, "--open");
       if (r.exitCode !== 0) $.ui.toast(firstLine(r.stderr));
     };
-    const { title, totals, bars, wave, states, cards, crew } = docked(s, width, Date.now(), stale, tokenMode);
+    const { title, totals, bars, wave, states, cards, crew } = docked(
+      s,
+      width,
+      Date.now(),
+      stale,
+      tokenMode,
+    );
     const toggleTokens = async () => {
-      view = { ...view, tokenMode: view.tokenMode === "fresh" ? "billed" : "fresh" };
+      view = {
+        ...view,
+        tokenMode: view.tokenMode === "fresh" ? "billed" : "fresh",
+      };
       await publish($);
     };
     // a Button takes no colour, so the glyph is coloured Text and the ref beside it is the pressable part
@@ -282,7 +302,12 @@ export const flightdeck = (on: On) => {
     return (
       // the top row clears the pane's close mark, which sits over the body's first line
       <Box flexDirection="column" paddingTop={1}>
-        <Box key="title" justifyContent="center" borderStyle="round" borderDimColor>
+        <Box
+          key="title"
+          justifyContent="center"
+          borderStyle="round"
+          borderDimColor
+        >
           <Text bold>{title}</Text>
         </Box>
         {totals && (
@@ -328,7 +353,12 @@ export const flightdeck = (on: On) => {
         {cards.groups.map((g) => (
           <Box flexDirection="row">
             <Text>{g.label}</Text>
-            <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={1}>
+            <Box
+              flexDirection="row"
+              flexWrap="wrap"
+              flexShrink={1}
+              columnGap={1}
+            >
               {g.cards.map(cardBox)}
             </Box>
           </Box>

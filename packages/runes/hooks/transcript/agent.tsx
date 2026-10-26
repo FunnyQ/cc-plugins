@@ -60,7 +60,8 @@ const statsLine = (t: NonNullable<Output["toolStats"]>) =>
 
 const remember = memo();
 
-const family = (model: string) => model.match(/^claude-([a-z]+)-/)?.[1] ?? model;
+const family = (model: string) =>
+  model.match(/^claude-([a-z]+)-/)?.[1] ?? model;
 
 export const agent = (on: On) => {
   const open = new Set<string>();
@@ -127,7 +128,10 @@ export const agent = (on: On) => {
       const { prompt, report } = remember(
         `texts\0${id}\0${o.status ?? ""}`,
         () => {
-          const lines = (text: string) => ({ text, count: text.split("\n").length });
+          const lines = (text: string) => ({
+            text,
+            count: text.split("\n").length,
+          });
           const report =
             o.handbackReport?.text ??
             (o.content ?? [])
@@ -159,9 +163,12 @@ export const agent = (on: On) => {
                     color: c ?? TEXT,
                   })),
                 ])
-              : remember(`wrap\0${key}\0${inner}`, () => wrap(text.text, inner)).map(
-                  (line, i) => [`${name}:${i}`, <Text color={TEXT}>{line}</Text>],
-                );
+              : remember(`wrap\0${key}\0${inner}`, () =>
+                  wrap(text.text, inner),
+                ).map((line, i) => [
+                  `${name}:${i}`,
+                  <Text color={TEXT}>{line}</Text>,
+                ]);
           },
         });
       };
@@ -177,7 +184,9 @@ export const agent = (on: On) => {
             )),
         ["divider", DIVIDER],
         ...(prompt.text ? section("prompt", prompt) : []),
-        ...(o.status === "completed" && report.text ? section("report", report) : []),
+        ...(o.status === "completed" && report.text
+          ? section("report", report)
+          : []),
       ];
       return bubble(
         { Box, Text },

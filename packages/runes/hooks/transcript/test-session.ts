@@ -8,9 +8,12 @@ export const CONFIG = `${HOME}/.config/q-lab/cc-plugins/runes/config.yaml`;
 // and a line it cannot read fails the way bun's parser does
 const fakeYaml = (text: string) => {
   const root: Record<string, unknown> = {};
-  const stack: { indent: number; map: Record<string, unknown>; parent?: Record<string, unknown>; key?: string }[] = [
-    { indent: -1, map: root },
-  ];
+  const stack: {
+    indent: number;
+    map: Record<string, unknown>;
+    parent?: Record<string, unknown>;
+    key?: string;
+  }[] = [{ indent: -1, map: root }];
   for (const raw of text.split("\n")) {
     const line = raw.replace(/\s+#.*$|^\s*#.*$/, "");
     if (!line.trim()) continue;
@@ -27,10 +30,13 @@ const fakeYaml = (text: string) => {
       continue;
     }
     top.map[key!] =
-      rest === "true" ? true
-      : rest === "false" ? false
-      : /^\d+$/.test(rest!) ? Number(rest)
-      : rest!.replace(/^"(.*)"$/, "$1");
+      rest === "true"
+        ? true
+        : rest === "false"
+          ? false
+          : /^\d+$/.test(rest!)
+            ? Number(rest)
+            : rest!.replace(/^"(.*)"$/, "$1");
   }
   return root;
 };
@@ -45,7 +51,12 @@ export const fakeHost = (
     run,
     env = {},
     messages = [],
-  }: { files?: Map<string, string>; run?: (e: Run[1]) => unknown; env?: Record<string, string>; messages?: unknown[] } = {},
+  }: {
+    files?: Map<string, string>;
+    run?: (e: Run[1]) => unknown;
+    env?: Record<string, string>;
+    messages?: unknown[];
+  } = {},
 ) => {
   const store = new Map<string, unknown>();
   const toasts: string[] = [];
@@ -63,7 +74,13 @@ export const fakeHost = (
     store.delete(e.key);
     return { value: undefined } as never;
   });
-  on("env.get", (_$, e) => ({ value: env[e.name] ?? (e.name === "HOME" ? HOME : undefined) }) as never);
+  on(
+    "env.get",
+    (_$, e) =>
+      ({
+        value: env[e.name] ?? (e.name === "HOME" ? HOME : undefined),
+      }) as never,
+  );
   on("fs.exists", (_$, e) => ({ value: files.has(e.path) }) as never);
   on("fs.read", (_$, e) => ({ value: files.get(e.path) }) as never);
   on("fs.write", (_$, e) => {
@@ -75,7 +92,8 @@ export const fakeHost = (
     return { value: undefined } as never;
   });
   on("process.run", (_$, e, next) => {
-    if (e.argv[0] !== "bun" || e.argv[1] !== "-e") return (run ? run(e) : next(e)) as never;
+    if (e.argv[0] !== "bun" || e.argv[1] !== "-e")
+      return (run ? run(e) : next(e)) as never;
     const parsed = fakeYaml(e.init?.stdin ?? "");
     return {
       value: {
@@ -93,7 +111,11 @@ export const fakeHost = (
   return { files, store, toasts, registered };
 };
 
-export const startSession = async ($: Engine, on: On, opts?: Parameters<typeof fakeHost>[1]) => {
+export const startSession = async (
+  $: Engine,
+  on: On,
+  opts?: Parameters<typeof fakeHost>[1],
+) => {
   const host = fakeHost(on, opts);
   on("session.start", (_$, e) => e as never);
   const beneath: string[] = [];
@@ -133,11 +155,18 @@ export const find = async (
 
 type Node = { children?: unknown[] };
 // find() drops an element's own hover, which sits beside its props; its children keep theirs
-export const within = async ($: Engine, event: never, key: string, text: RegExp) => {
+export const within = async (
+  $: Engine,
+  event: never,
+  key: string,
+  text: RegExp,
+) => {
   const walk = (n: Node): Node | undefined => {
     for (const c of n.children ?? []) {
       if (typeof c !== "object" || c === null) continue;
-      const own = ((c as Node).children ?? []).filter((x) => typeof x === "string");
+      const own = ((c as Node).children ?? []).filter(
+        (x) => typeof x === "string",
+      );
       if (own.length && text.test(own.join(""))) return c as Node;
       const hit = walk(c as Node);
       if (hit) return hit;
@@ -149,5 +178,11 @@ export const within = async ($: Engine, event: never, key: string, text: RegExp)
 };
 
 export const ran = (stdout: string) => ({
-  value: { exitCode: 0, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
+  value: {
+    exitCode: 0,
+    stdout,
+    stderr: "",
+    isStdoutTruncated: false,
+    isStderrTruncated: false,
+  },
 });

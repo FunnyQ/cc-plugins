@@ -35,11 +35,7 @@ export type ParsedLabel = {
 };
 
 export type TaskState =
-  | "done"
-  | "in-progress"
-  | "ready"
-  | "blocked"
-  | "invalid";
+  "done" | "in-progress" | "ready" | "blocked" | "invalid";
 
 export type TaskView = {
   ref: string;
@@ -116,7 +112,8 @@ export function parseAgentLabel(label: string): ParsedLabel {
   match = REF_ATTEMPT.exec(label);
   if (match) {
     return {
-      role: match[1] as "verify" | "requalify" | "reverify" | "judge" | "land" | "fix",
+      role: match[1] as
+        "verify" | "requalify" | "reverify" | "judge" | "land" | "fix",
       ref: match[2],
       attempt: Number(match[3]),
       raw: label,
@@ -277,7 +274,12 @@ function gateOutcome(row: FleetRow): GateOutcome | undefined {
     if (!row.score) return undefined;
     return row.score.passed ? "passed" : "failed";
   }
-  if (row.role !== "verify" && row.role !== "requalify" && row.role !== "reverify") return undefined;
+  if (
+    row.role !== "verify" &&
+    row.role !== "requalify" &&
+    row.role !== "reverify"
+  )
+    return undefined;
 
   const message = row.message?.trim();
   if (!message) return undefined;

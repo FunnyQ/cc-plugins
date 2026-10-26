@@ -466,7 +466,8 @@ async function main() {
         const planPath = join("docs", proj, "legs", activeLeg.slug, "PLAN.md");
         const runlog = (await readFileOrNull(runlogPath)) ?? "";
         const plan = await readFileOrNull(planPath);
-        const planOverview = (plan === null ? null : overviewFirstLine(plan)) || "";
+        const planOverview =
+          (plan === null ? null : overviewFirstLine(plan)) || "";
 
         const draftedOutcome = draftOutcome(runlog, planOverview);
         if (dryRun || !outcome) {

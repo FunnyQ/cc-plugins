@@ -81,7 +81,9 @@ describe("package boundaries", () => {
 
   test("only createAskRunDir creates a result dir, so no caller bypasses its seam", async () => {
     const callers = [];
-    for (const path of sources.filter((p) => p.startsWith("skills/herdr/scripts/") && !p.endsWith(".test.ts"))) {
+    for (const path of sources.filter(
+      (p) => p.startsWith("skills/herdr/scripts/") && !p.endsWith(".test.ts"),
+    )) {
       if ((await read(path)).includes("mkdirSync")) callers.push(path);
     }
     expect(callers).toEqual(["skills/herdr/scripts/ask-contract.ts"]);

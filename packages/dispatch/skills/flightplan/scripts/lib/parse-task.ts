@@ -75,7 +75,10 @@ export function parseStatusValue(raw: string): TaskStatus | null {
     : null;
 }
 
-export function parseModels(value: string): { models: TaskModels; errors: string[] } {
+export function parseModels(value: string): {
+  models: TaskModels;
+  errors: string[];
+} {
   const models: TaskModels = {};
   const errors: string[] = [];
   const roles: readonly string[] = MODEL_ROLES;
@@ -85,7 +88,10 @@ export function parseModels(value: string): { models: TaskModels; errors: string
     return { models, errors: ['Models entry "": malformed empty value'] };
   }
 
-  for (const entry of value.split(",").map((piece) => piece.trim()).filter(Boolean)) {
+  for (const entry of value
+    .split(",")
+    .map((piece) => piece.trim())
+    .filter(Boolean)) {
     const match = /^([a-z]+)\s*=\s*([a-z]+)(?:\s*\/\s*([a-z]+))?$/.exec(entry);
     const prefix = `Models entry "${entry}": `;
     if (!match) {
@@ -94,15 +100,21 @@ export function parseModels(value: string): { models: TaskModels; errors: string
     }
     const [, role, model, effort] = match;
     if (!roles.includes(role)) {
-      errors.push(`${prefix}unknown role "${role}" (expected ${roles.join(", ")})`);
+      errors.push(
+        `${prefix}unknown role "${role}" (expected ${roles.join(", ")})`,
+      );
       continue;
     }
     if (!names.includes(model)) {
-      errors.push(`${prefix}unknown model "${model}" (expected ${names.join(", ")})`);
+      errors.push(
+        `${prefix}unknown model "${model}" (expected ${names.join(", ")})`,
+      );
       continue;
     }
     if (effort !== undefined && !efforts.includes(effort)) {
-      errors.push(`${prefix}unknown effort "${effort}" (expected ${efforts.join(", ")})`);
+      errors.push(
+        `${prefix}unknown effort "${effort}" (expected ${efforts.join(", ")})`,
+      );
       continue;
     }
     const key = role as ModelRole;
@@ -110,7 +122,10 @@ export function parseModels(value: string): { models: TaskModels; errors: string
       errors.push(`${prefix}duplicate role "${role}"`);
       continue;
     }
-    models[key] = { model: model as ModelName, effort: (effort as Effort | undefined) ?? null };
+    models[key] = {
+      model: model as ModelName,
+      effort: (effort as Effort | undefined) ?? null,
+    };
   }
   return { models, errors };
 }

@@ -28,12 +28,17 @@ type Output = {
 
 const remember = memo();
 
-type Fs = { exists: (path: string) => Promise<boolean>; read: (path: string) => Promise<unknown> };
+type Fs = {
+  exists: (path: string) => Promise<boolean>;
+  read: (path: string) => Promise<unknown>;
+};
 type Install = { installPath: string; projectPath?: string };
 
 // a plugin skill resolves through installed_plugins.json, so the version read is the one installed, not the newest in the cache
 const skillFile = async (fs: Fs, name: string): Promise<string | undefined> => {
-  const [plugin, skill] = name.includes(":") ? name.split(":", 2) : [undefined, name];
+  const [plugin, skill] = name.includes(":")
+    ? name.split(":", 2)
+    : [undefined, name];
   const paths: string[] = [];
   if (plugin) {
     const index = `${where.home}/.claude/plugins/installed_plugins.json`;
@@ -45,18 +50,28 @@ const skillFile = async (fs: Fs, name: string): Promise<string | undefined> => {
         if (!key.startsWith(`${plugin}@`)) continue;
         for (const i of installs) {
           if (i.projectPath && i.projectPath !== where.cwd) continue;
-          paths.push(`${i.installPath}/skills/${skill}/SKILL.md`, `${i.installPath}/commands/${skill}.md`);
+          paths.push(
+            `${i.installPath}/skills/${skill}/SKILL.md`,
+            `${i.installPath}/commands/${skill}.md`,
+          );
         }
       }
     }
   } else
-    paths.push(`${where.cwd}/.claude/skills/${skill}/SKILL.md`, `${where.home}/.claude/skills/${skill}/SKILL.md`);
-  for (const path of paths) if (await fs.exists(path)) return String(await fs.read(path));
+    paths.push(
+      `${where.cwd}/.claude/skills/${skill}/SKILL.md`,
+      `${where.home}/.claude/skills/${skill}/SKILL.md`,
+    );
+  for (const path of paths)
+    if (await fs.exists(path)) return String(await fs.read(path));
   return undefined;
 };
 
 type Doc = { text: string; count: number };
-const docOf = (text: string): Doc => ({ text, count: text.replace(/\n$/, "").split("\n").length });
+const docOf = (text: string): Doc => ({
+  text,
+  count: text.replace(/\n$/, "").split("\n").length,
+});
 
 export const skill = (on: On) => {
   // module state, so a hot reload folds every card again
@@ -85,7 +100,8 @@ export const skill = (on: On) => {
       const title = `${input.skill ?? o.commandName ?? "Skill"}${o.model ? ` · ${o.model}` : ""}${state}`;
 
       const name = input.skill ?? o.commandName ?? "";
-      const meta = o.success === undefined ? "" : o.success ? "success" : "failed";
+      const meta =
+        o.success === undefined ? "" : o.success ? "success" : "failed";
       const info = [input.args?.trim() ?? "", meta].filter(Boolean);
 
       const result =
@@ -104,9 +120,12 @@ export const skill = (on: On) => {
                 color: c ?? TEXT,
               })),
             ])
-          : remember(`wrap\0${key}\0${text.length}\0${inner}`, () => wrap(text, inner)).map(
-              (line, i) => [`${key}:${i}`, <Text color={TEXT}>{line}</Text>],
-            );
+          : remember(`wrap\0${key}\0${text.length}\0${inner}`, () =>
+              wrap(text, inner),
+            ).map((line, i) => [
+              `${key}:${i}`,
+              <Text color={TEXT}>{line}</Text>,
+            ]);
       };
       const flip = (key: string) => {
         open.has(key) ? open.delete(key) : open.add(key);
@@ -140,9 +159,26 @@ export const skill = (on: On) => {
               flip(docKey);
               if (docs.has(name)) return;
               docs.set(name, "loading");
-              skillFile({ exists: (path) => $.fs.exists(path), read: (path) => $.fs.read(path) }, name)
-                .then((text) => docs.set(name, text === undefined ? { missing: "(no SKILL.md found)" } : docOf(text)))
-                .catch((err: unknown) => docs.set(name, { missing: `(SKILL.md could not be read: ${String(err)})` }))
+              skillFile(
+                {
+                  exists: (path) => $.fs.exists(path),
+                  read: (path) => $.fs.read(path),
+                },
+                name,
+              )
+                .then((text) =>
+                  docs.set(
+                    name,
+                    text === undefined
+                      ? { missing: "(no SKILL.md found)" }
+                      : docOf(text),
+                  ),
+                )
+                .catch((err: unknown) =>
+                  docs.set(name, {
+                    missing: `(SKILL.md could not be read: ${String(err)})`,
+                  }),
+                )
                 .finally(() => $.ui.invalidate("ui.render"));
             },
           }),
@@ -154,7 +190,12 @@ export const skill = (on: On) => {
             : "missing" in doc
               ? [["skill.md:missing", <Text color={DIM}>{doc.missing}</Text>]]
               : textRows(`skill.md\0${name}`, doc.text);
-        return [["skill.md:divider", DIVIDER], ...body, ["skill.md:end", DIVIDER], toggle];
+        return [
+          ["skill.md:divider", DIVIDER],
+          ...body,
+          ["skill.md:end", DIVIDER],
+          toggle,
+        ];
       };
 
       const rows: [string, unknown][] = [

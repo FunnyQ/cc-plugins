@@ -1,4 +1,3 @@
-
 type Block = {
   type: string;
   text?: string;

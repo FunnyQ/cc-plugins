@@ -9,8 +9,7 @@ type Reply = {
 };
 
 export function settle(method: string, reply: Reply): any {
-  if (reply.error)
-    throw new Error(`${method}: ${reply.error.message}`);
+  if (reply.error) throw new Error(`${method}: ${reply.error.message}`);
   return reply.result ?? {};
 }
 

@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, access, realpath, rm, stat, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  access,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkCollision, scaffold, validateInput } from "./scaffold";
@@ -224,12 +232,14 @@ describe("bucket names and the task H1 parser", () => {
   test("every accepted bucket parses as a task H1, and a dashed one does not", () => {
     const h1Parses = (bucket: string) =>
       !/H1 does not match/.test(
-        (r => (r.ok ? "" : r.reason))(
+        ((r) => (r.ok ? "" : r.reason))(
           parseTask(`# ${bucket.toUpperCase()}-01: Title\n`),
         ),
       );
     for (const bucket of ["ui", "backend", "api", "work", "v2"]) {
-      expect(validateInput({ slug: "ok", buckets: [bucket], docsRoot: "docs" })).toBeNull();
+      expect(
+        validateInput({ slug: "ok", buckets: [bucket], docsRoot: "docs" }),
+      ).toBeNull();
       expect(h1Parses(bucket)).toBe(true);
     }
     expect(h1Parses("my-bucket")).toBe(false);
@@ -240,7 +250,14 @@ describe("scaffold CLI", () => {
   test("prints an absolute path when --docs-root is relative", async () => {
     const root = await newRoot();
     const res = Bun.spawnSync(
-      ["bun", join(import.meta.dir, "scaffold.ts"), "course-player", "ui", "--docs-root", "docs"],
+      [
+        "bun",
+        join(import.meta.dir, "scaffold.ts"),
+        "course-player",
+        "ui",
+        "--docs-root",
+        "docs",
+      ],
       { cwd: root, stdout: "pipe", stderr: "pipe" },
     );
     expect(res.exitCode).toBe(0);

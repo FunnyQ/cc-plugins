@@ -48,7 +48,15 @@ test("findImage falls back to position without imagePasteIds, and skips bad line
 });
 
 test("findImage finds nothing for an id the message's imagePasteIds lacks", () => {
-  const jsonl = line("[Image #2] [Image #6] [Image #7]", ["SIX", "SEVEN"], [6, 7]);
-  expect(findImage(jsonl, "[Image #2] [Image #6] [Image #7]", 2)).toBeUndefined();
-  expect(findImage(jsonl, "[Image #2] [Image #6] [Image #7]", 7)?.data).toBe("SEVEN");
+  const jsonl = line(
+    "[Image #2] [Image #6] [Image #7]",
+    ["SIX", "SEVEN"],
+    [6, 7],
+  );
+  expect(
+    findImage(jsonl, "[Image #2] [Image #6] [Image #7]", 2),
+  ).toBeUndefined();
+  expect(findImage(jsonl, "[Image #2] [Image #6] [Image #7]", 7)?.data).toBe(
+    "SEVEN",
+  );
 });

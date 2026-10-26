@@ -94,7 +94,7 @@ test("an empty view draws the hint and the follow-up Input", async ($, on) => {
   await session($, on, { entries: [], isRunning: false });
   const root = await tree($);
   expect(texts(root)).toContain(
-    'Press [Explain plz!] under Clawd, or type below.',
+    "Press [Explain plz!] under Clawd, or type below.",
   );
   const ui = await $.ui.mount(PANE);
   expect(await ui.find({ key: "explain-ask" })).toBeDefined();
@@ -124,18 +124,29 @@ test("history and the selected entry each sit in a rounded border, the answer's 
   await session($, on, { entries: [text("x2"), text("x1")], isRunning: false });
   const root = await tree($);
   const box = (key: string) => flat(root).find((n) => n.props?.key === key);
-  expect(box("explain-history")?.props).toMatchObject({ borderStyle: "round", borderDimColor: true });
-  expect(box("explain-answer")?.props).toMatchObject({ borderStyle: "round", borderColor: "#d97757" });
+  expect(box("explain-history")?.props).toMatchObject({
+    borderStyle: "round",
+    borderDimColor: true,
+  });
+  expect(box("explain-answer")?.props).toMatchObject({
+    borderStyle: "round",
+    borderColor: "#d97757",
+  });
 });
 
 // without it the previous answer stays in the box while a new one is written, and reads as the result
 test("a running fork tops the history with a marked new row and fills the answer box with its placeholder", async ($, on) => {
-  const old: ExplainEntry = { ...text("x1", "old title", "old body"), usage: { input: 1, cacheRead: 2, output: 3 } };
+  const old: ExplainEntry = {
+    ...text("x1", "old title", "old body"),
+    usage: { input: 1, cacheRead: 2, output: 3 },
+  };
   await session($, on, { entries: [old], isRunning: true });
   const root = await tree($);
   const all = texts(root);
   expect(all.indexOf("● new explanation…")).toBeGreaterThanOrEqual(0);
-  expect(all.indexOf("● new explanation…")).toBeLessThan(all.indexOf("○ old title"));
+  expect(all.indexOf("● new explanation…")).toBeLessThan(
+    all.indexOf("○ old title"),
+  );
   expect(all).toContain("HISTORY · 2");
   expect(texts(root)).toContain("Writing the answer…");
   expect(texts(root).join("\n")).not.toContain("old body");
@@ -155,7 +166,10 @@ test("the follow-up Input sits in a dim rounded border under its label, with or 
     seeded.view = { entries, isRunning: false };
     const root = await tree($);
     const box = flat(root).find((n) => n.props?.key === "explain-ask-box");
-    expect(box?.props).toMatchObject({ borderStyle: "round", borderDimColor: true });
+    expect(box?.props).toMatchObject({
+      borderStyle: "round",
+      borderDimColor: true,
+    });
     const inside = flat(box);
     expect(texts(box!)[0]).toBe("ASK · type below");
     expect(inside.some((n) => n.props?.key === "explain-ask")).toBe(true);
@@ -163,10 +177,20 @@ test("the follow-up Input sits in a dim rounded border under its label, with or 
 });
 
 test("the banner turns a spinner while explaining or checking, and none on an error", async ($, on) => {
-  const page: ExplainEntry = { id: "p", at: 1, title: "p", kind: "html", summary: "", path: "/p.html", check: "pending" };
+  const page: ExplainEntry = {
+    id: "p",
+    at: 1,
+    title: "p",
+    kind: "html",
+    summary: "",
+    path: "/p.html",
+    check: "pending",
+  };
   const seeded = await session($, on, { entries: [], isRunning: true });
   const spinner = async () => {
-    const node = flat(await tree($)).find((n) => n.props?.key === "explain-spinner");
+    const node = flat(await tree($)).find(
+      (n) => n.props?.key === "explain-spinner",
+    );
     return node?.props?.module;
   };
   expect(await spinner()).toBe("hooks/transcript/spinner.tsx");
@@ -180,13 +204,19 @@ test("the banner turns a spinner while explaining or checking, and none on an er
 });
 
 test("ask mode draws only the new-question box and a [history] button", async ($, on) => {
-  await session($, on, { entries: [text("x1", "old title", "old body")], isRunning: false, isAsking: true });
+  await session($, on, {
+    entries: [text("x1", "old title", "old body")],
+    isRunning: false,
+    isAsking: true,
+  });
   const root = await tree($);
   const all = texts(root).join("\n");
   expect(all).toContain("NEW QUESTION · type below");
   expect(all).not.toContain("old title");
   expect(all).not.toContain("HISTORY");
-  expect(buttons(root).map((b) => b.props?.key)).toContain("explain-show-history");
+  expect(buttons(root).map((b) => b.props?.key)).toContain(
+    "explain-show-history",
+  );
   expect(flat(root).some((n) => n.props?.key === "explain-ask")).toBe(true);
 });
 
@@ -300,14 +330,26 @@ test("an html entry draws summary, dim path, each check's status line, and open 
 });
 
 test("a long check note wraps inside the answer box and stops at two lines", async ($, on) => {
-  const note = "The server-side auto mode classifier gave no verdict for Agent: the request that produced this action did not ask for one. Issue the action again once, as-is.";
+  const note =
+    "The server-side auto mode classifier gave no verdict for Agent: the request that produced this action did not ask for one. Issue the action again once, as-is.";
   await session($, on, {
     entries: [
-      { id: "x1", at: 1, title: "Flow", kind: "html", summary: "It flows.", path: "/p/flow.html", check: "failed", note } as ExplainEntry,
+      {
+        id: "x1",
+        at: 1,
+        title: "Flow",
+        kind: "html",
+        summary: "It flows.",
+        path: "/p/flow.html",
+        check: "failed",
+        note,
+      } as ExplainEntry,
     ],
     isRunning: false,
   });
-  const noteLines = texts(await tree($)).filter((t) => t.trim() && note.includes(t.replace(/…$/, "")) && t !== "It flows.");
+  const noteLines = texts(await tree($)).filter(
+    (t) => t.trim() && note.includes(t.replace(/…$/, "")) && t !== "It flows.",
+  );
   expect(noteLines.length).toBeGreaterThan(0);
   expect(noteLines.length).toBeLessThanOrEqual(2);
   for (const line of noteLines) expect(line.length).toBeLessThanOrEqual(64 - 4);
@@ -345,12 +387,26 @@ test("an error draws in #cc6666, and no error draws no error line", async ($, on
 });
 
 test("the status banner tops the pane: running, then an error, then a pending check; none when idle", async ($, on) => {
-  const page = { id: "h1", at: 1, title: "P", kind: "html", summary: "s", path: "/p/p.html", check: "pending" } as ExplainEntry;
-  const box = await session($, on, { entries: [text("x1")], isRunning: true, error: "boom" });
+  const page = {
+    id: "h1",
+    at: 1,
+    title: "P",
+    kind: "html",
+    summary: "s",
+    path: "/p/p.html",
+    check: "pending",
+  } as ExplainEntry;
+  const box = await session($, on, {
+    entries: [text("x1")],
+    isRunning: true,
+    error: "boom",
+  });
   const first = async () => ((await tree($)).children as Node[])[0]!;
   const banner = async () => {
     const top = await first();
-    return top.props?.key === "explain-status" ? texts({ children: [top] }).join("") : undefined;
+    return top.props?.key === "explain-status"
+      ? texts({ children: [top] }).join("")
+      : undefined;
   };
   expect(await banner()).toContain("explaining…");
   box.view = { entries: [text("x1")], isRunning: false, error: "boom" };
@@ -359,12 +415,26 @@ test("the status banner tops the pane: running, then an error, then a pending ch
   expect(await banner()).toContain("checking layout…");
   box.view = { entries: [text("x1")], isRunning: false };
   expect(await banner()).toBeUndefined();
-  expect(((await tree($)).children as Node[]).at(-1)?.props?.key).toBe("explain-ask-box");
+  expect(((await tree($)).children as Node[]).at(-1)?.props?.key).toBe(
+    "explain-ask-box",
+  );
 });
 
 test("an html entry has a delete button and the history a clear button, each moving pages to the Trash", async ($, on) => {
-  const page = (id: string) => ({ id, at: 1, title: id, kind: "html", summary: "s", path: `/p/${id}.html`, check: "ok" }) as ExplainEntry;
-  const box = await session($, on, { entries: [page("h2"), page("h1")], isRunning: false });
+  const page = (id: string) =>
+    ({
+      id,
+      at: 1,
+      title: id,
+      kind: "html",
+      summary: "s",
+      path: `/p/${id}.html`,
+      check: "ok",
+    }) as ExplainEntry;
+  const box = await session($, on, {
+    entries: [page("h2"), page("h1")],
+    isRunning: false,
+  });
   const ui = await $.ui.mount(PANE);
   await ui.press({ key: "explain-delete:h2" });
   await ui.unmount();
@@ -431,7 +501,14 @@ test("a pick and a follow-up fork from runes' own hooks once the press and submi
   });
   const box = await session($, on, {
     entries: [
-      { id: "x1", at: 1, title: "Which?", kind: "ask", question: "What next?", options: ["the parser", "the fork"] },
+      {
+        id: "x1",
+        at: 1,
+        title: "Which?",
+        kind: "ask",
+        question: "What next?",
+        options: ["the parser", "the fork"],
+      },
     ],
     isRunning: false,
   });
@@ -440,6 +517,9 @@ test("a pick and a follow-up fork from runes' own hooks once the press and submi
   await ui.press({ key: "explain-pick:x1:1" });
   await ui.input({ key: "explain-ask", text: "why?" });
   await ui.unmount();
-  expect(box.forks).toEqual([expect.stringContaining("the fork"), expect.stringContaining("why?")]);
+  expect(box.forks).toEqual([
+    expect.stringContaining("the fork"),
+    expect.stringContaining("why?"),
+  ]);
   expect(forksPastBottom).toEqual([0, 1]);
 });

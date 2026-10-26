@@ -197,24 +197,51 @@ const STATE: StateEntry = {
 describe("state entries", () => {
   test("round-trips state while dropping foreign and malformed lines", () => {
     const unknownState = { ...STATE, state: "future-state" };
-    expect<unknown[]>(parseLog([
-      formatEntry(STATE), '{"kind":"future"}', "{broken",
-      JSON.stringify(unknownState), formatEntry(NOTE),
-    ].join("\n"))).toEqual([STATE, unknownState, NOTE]);
+    expect<unknown[]>(
+      parseLog(
+        [
+          formatEntry(STATE),
+          '{"kind":"future"}',
+          "{broken",
+          JSON.stringify(unknownState),
+          formatEntry(NOTE),
+        ].join("\n"),
+      ),
+    ).toEqual([STATE, unknownState, NOTE]);
   });
 
   test("renders declarations under their task and preserves legacy output", () => {
-    const legacy = "# Run log — demo\n\n## ui/03\n\n" +
+    const legacy =
+      "# Run log — demo\n\n## ui/03\n\n" +
       "- attempt 2 · dev — Fixed the boundary case the judge flagged. _(agent: dev-ui-03-a2)_\n" +
       "- attempt 2 · judge — score 4.40 > 4 → PASS ✅ _(agent: judge-ui-03-a2)_\n";
-    expect(renderRunlog([SCORE, NOTE, { ...NOTE, phase: "start" }], { slug: "demo" })).toBe(legacy);
+    expect(
+      renderRunlog([SCORE, NOTE, { ...NOTE, phase: "start" }], {
+        slug: "demo",
+      }),
+    ).toBe(legacy);
     expect(renderRunlog([STATE, SCORE, NOTE], { slug: "demo" })).toBe(
-      legacy + "- state — blocked: Waiting for credentials _(agent: workflow)_\n",
+      legacy +
+        "- state — blocked: Waiting for credentials _(agent: workflow)_\n",
     );
-    expect(renderRunlog([{ ...STATE, task: "api/01", state: "done", message: undefined, agentLabel: undefined }, NOTE], { slug: "demo" })).toBe(
+    expect(
+      renderRunlog(
+        [
+          {
+            ...STATE,
+            task: "api/01",
+            state: "done",
+            message: undefined,
+            agentLabel: undefined,
+          },
+          NOTE,
+        ],
+        { slug: "demo" },
+      ),
+    ).toBe(
       "# Run log — demo\n\n## ui/03\n\n" +
-      "- attempt 2 · dev — Fixed the boundary case the judge flagged. _(agent: dev-ui-03-a2)_\n\n" +
-      "## api/01\n\n- state — done\n",
+        "- attempt 2 · dev — Fixed the boundary case the judge flagged. _(agent: dev-ui-03-a2)_\n\n" +
+        "## api/01\n\n- state — done\n",
     );
   });
 
@@ -225,7 +252,11 @@ describe("state entries", () => {
       await appendEntry(logFile, NOTE);
       await appendEntry(logFile, STATE);
       await appendEntry(logFile, SCORE);
-      expect(parseLog(await readFile(logFile, "utf-8"))).toEqual([NOTE, STATE, SCORE]);
+      expect(parseLog(await readFile(logFile, "utf-8"))).toEqual([
+        NOTE,
+        STATE,
+        SCORE,
+      ]);
     } finally {
       await rm(root, { recursive: true });
     }

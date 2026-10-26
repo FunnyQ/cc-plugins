@@ -476,7 +476,9 @@ async function execute(
         throw new Error(
           `the CHANGELOG entry is missing for ${p.units
             .map((u) => u.headerLabel)
-            .join(", ")} — run \`release.ts facts\`, spawn chronicle:annalist, then re-run with --entries-file`,
+            .join(
+              ", ",
+            )} — run \`release.ts facts\`, spawn chronicle:annalist, then re-run with --entries-file`,
         );
       }
       const path = resolve(ctx.root, p.changelogPath);

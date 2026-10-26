@@ -35,12 +35,14 @@ describe("pickInstance", () => {
 
 describe("resolveBinary", () => {
   test("takes the first candidate that exists", () => {
-    expect(resolveBinary("firefox", ["/a", "/b"], (path) => path === "/b")).toBe("/b");
+    expect(
+      resolveBinary("firefox", ["/a", "/b"], (path) => path === "/b"),
+    ).toBe("/b");
   });
 
   test("names every path it looked for when none exists", () => {
-    expect(() => resolveBinary("zen", ["/Applications/Zen.app/x"], () => false)).toThrow(
-      "no zen found; looked for /Applications/Zen.app/x",
-    );
+    expect(() =>
+      resolveBinary("zen", ["/Applications/Zen.app/x"], () => false),
+    ).toThrow("no zen found; looked for /Applications/Zen.app/x");
   });
 });

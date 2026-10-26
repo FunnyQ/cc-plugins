@@ -386,8 +386,16 @@ describe("attachCodexUsage", () => {
   test("a relay directory two agents name goes to the first, which created it", () => {
     const attached = attachCodexUsage(
       [
-        agent({ file: "/a1.jsonl", relayDirs: ["dir-1"], externalDriver: true }),
-        agent({ file: "/a2.jsonl", relayDirs: ["dir-1"], externalDriver: true }),
+        agent({
+          file: "/a1.jsonl",
+          relayDirs: ["dir-1"],
+          externalDriver: true,
+        }),
+        agent({
+          file: "/a2.jsonl",
+          relayDirs: ["dir-1"],
+          externalDriver: true,
+        }),
       ],
       [run({ relayDir: "dir-1" })],
       "/repo",

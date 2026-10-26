@@ -262,7 +262,12 @@ describe("codex-run errors", () => {
       stdin: Buffer.from("   \n"),
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, TMPDIR: tmp, CODEX_BIN: codexBin, ARGS_LOG: argsLog },
+      env: {
+        ...process.env,
+        TMPDIR: tmp,
+        CODEX_BIN: codexBin,
+        ARGS_LOG: argsLog,
+      },
     });
     expect(res.exitCode).toBe(2);
     expect(await readdir(tmp)).toEqual([]);

@@ -1066,8 +1066,12 @@ describe("verify", () => {
       changelog: "CHANGELOG.md",
       branches: { main: "main" },
       versionFiles: [],
-      components: [{ name: "chronicle", path: "packages/chronicle", versionFiles: [] }],
+      components: [
+        { name: "chronicle", path: "packages/chronicle", versionFiles: [] },
+      ],
     };
-    expect(() => filesFor(config, "ghost")).toThrow(/unknown component "ghost"/);
+    expect(() => filesFor(config, "ghost")).toThrow(
+      /unknown component "ghost"/,
+    );
   });
 });

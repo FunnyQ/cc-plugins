@@ -26,14 +26,11 @@ const agents = [
 ];
 
 describe("opencode agents track their chronicle sources", () => {
-  test.each(agents)(
-    "%s is byte-identical to the chronicle agent",
-    (name) => {
-      expect(body(join(repoRoot, "opencode", "agents", `${name}.md`))).toBe(
-        body(join(repoRoot, "packages", "chronicle", "agents", `${name}.md`)),
-      );
-    },
-  );
+  test.each(agents)("%s is byte-identical to the chronicle agent", (name) => {
+    expect(body(join(repoRoot, "opencode", "agents", `${name}.md`))).toBe(
+      body(join(repoRoot, "packages", "chronicle", "agents", `${name}.md`)),
+    );
+  });
 
   test("covers every shipped OpenCode agent", () => {
     const shipped = readdirSync(join(repoRoot, "opencode", "agents"))
