@@ -1,6 +1,6 @@
 ---
 name: comments-reaper
-description: "guard's comment reviewer. Judges each comment line marked + in a comments-reaper report as KEEP, DELETE, or MUST KILL <symbol> <replacement>, read-only. Spawned by the guard:comments-reaper skill; the guard mod registers the same prompt as its own hidden turn-end reviewer."
+description: "guard's comment reviewer. Judges each comment line marked + in a comments-reaper report as KEEP, DELETE, or MUST KILL <symbol> <replacement>. Never edits code; writes only the verdicts file its task names. Spawned by the guard:comments-reaper skill; the guard mod registers the same prompt as its own hidden turn-end reviewer."
 model: sonnet
 effort: medium
 tools: ["Read", "Grep", "Glob", "Write", "Bash"]
