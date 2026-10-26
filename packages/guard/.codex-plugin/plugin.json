@@ -1,9 +1,10 @@
 {
   "name": "guard",
   "version": "0.9.1",
-  "description": "Turn coding rules into harness-enforced ones. comment-guard (each Edit/Write) and comment-sweep (at Stop, for writes that bypassed them) hand back the comment blocks of three or more lines the agent added or grew, with one question: is this why, or is this what?",
+  "description": "Turn coding rules into harness-enforced ones. comment-sweep (at Stop) hands back the comment blocks of three or more lines the agent added or grew, with one question: is this why, or is this what?",
   "author": { "name": "Q" },
   "license": "MIT",
+  "hooks": "./.codex-plugin/hooks.json",
   "keywords": [
     "guard",
     "hook",
