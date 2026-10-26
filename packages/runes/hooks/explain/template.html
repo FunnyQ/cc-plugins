@@ -5,6 +5,16 @@
     <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Victor+Mono:ital,wght@0,100..700;1,100..700&display=swap"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/400" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/500" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/600" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/700" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/ChironSungHK/700" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/ChironSungHK/900" />
     <style>
       * {
         box-sizing: border-box;
@@ -58,7 +68,8 @@
         background-blend-mode: normal, multiply;
         color: var(--ink);
         font:
-          18px/1.62 -apple-system,
+          18px/1.62 "IBMPlexSansTC",
+          -apple-system,
           BlinkMacSystemFont,
           "Hiragino Sans",
           "PingFang TC",
@@ -78,6 +89,7 @@
         margin-bottom: 32px;
       }
       .sheet > h1 {
+        font-family: "ChironSungHK", serif;
         font-size: clamp(32px, 4.2cqi, 52px);
         line-height: 1.08;
         font-weight: 800;
@@ -95,6 +107,7 @@
         max-width: 64ch;
       }
       main h2 {
+        font-family: "ChironSungHK", serif;
         font-size: 28px;
         line-height: 1.2;
         letter-spacing: -0.01em;
@@ -107,7 +120,9 @@
       }
       main code {
         font:
-          0.88em ui-monospace,
+          0.88em "Victor Mono",
+          "IBMPlexSansTC",
+          ui-monospace,
           SFMono-Regular,
           Menlo,
           monospace;
@@ -396,7 +411,9 @@
         max-width: 100%;
         overflow-x: auto;
         font:
-          14px/1.6 ui-monospace,
+          14px/1.6 "Victor Mono",
+          "IBMPlexSansTC",
+          ui-monospace,
           SFMono-Regular,
           Menlo,
           monospace;
@@ -422,7 +439,9 @@
         top: 8px;
         left: 24px;
         font:
-          600 11px/1 -apple-system,
+          600 11px/1 "Victor Mono",
+          "IBMPlexSansTC",
+          -apple-system,
           BlinkMacSystemFont,
           sans-serif;
         letter-spacing: 0.12em;
@@ -547,7 +566,8 @@
         --_r: 6px;
         color: var(--ink);
         font:
-          16px -apple-system,
+          16px "IBMPlexSansTC",
+          -apple-system,
           BlinkMacSystemFont,
           "Hiragino Sans",
           "PingFang TC",

@@ -46,7 +46,7 @@ test("every placeholder of the template is replaced and the CSP lands", () => {
   expect(out.split("Twice").length - 1).toBe(2);
   expect(
     out.includes(
-      `content="default-src 'none'; style-src 'unsafe-inline'; img-src data:"`,
+      `content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com https://font.emtech.cc; font-src https://fonts.gstatic.com https://font.emtech.cc; img-src data:"`,
     ),
   ).toBe(true);
 });

@@ -1,7 +1,7 @@
 import { escapeHtml, prepareBlocks } from "./blocks";
 
 export const CSP =
-  "default-src 'none'; style-src 'unsafe-inline'; img-src data:";
+  "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com https://font.emtech.cc; font-src https://fonts.gstatic.com https://font.emtech.cc; img-src data:";
 
 export type Page = {
   title: string;
