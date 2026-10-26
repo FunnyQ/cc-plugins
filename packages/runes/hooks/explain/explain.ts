@@ -23,16 +23,21 @@ const messageOf = (err: unknown) =>
 
 const basename = (path: string) => path.split("/").filter(Boolean).at(-1) ?? "";
 
-async function openPane($: EngineInterface): Promise<void> {
+async function openPane(
+  $: EngineInterface,
+  focus = false,
+): Promise<boolean> {
   const { isPlaced } = await $.ui.open({
     id: PANE,
     title: "Explain plz!",
     columns: COLUMNS,
+    ...(focus ? { focus } : {}),
   });
   if (!isPlaced)
     $.ui.toast(
       "Explain plz! needs a wider terminal; the answer is in the pane once it fits",
     );
+  return isPlaced;
 }
 
 async function run($: EngineInterface, ask: Ask): Promise<void> {
@@ -150,7 +155,8 @@ export async function explainPress($: EngineInterface): Promise<void> {
 
 export async function explainOpen($: EngineInterface): Promise<void> {
   await update($, view, (v) => ({ ...v, isAsking: true }));
-  await openPane($);
+  if (await openPane($, true))
+    await $.ui.focus({ requestId: PANE, key: "explain-ask" });
 }
 
 export async function explainShowHistory($: EngineInterface): Promise<void> {

@@ -88,6 +88,7 @@ const rig = async (
   const forks: string[] = [];
   const replies: (Fork | Promise<Fork> | Error)[] = [];
   const opens: unknown[] = [];
+  const focuses: unknown[] = [];
   const toasts: string[] = [];
   const runs: string[][] = [];
   const spawns: { prompt: string }[] = [];
@@ -102,6 +103,10 @@ const rig = async (
       },
       toast: (text: string) => {
         toasts.push(text);
+      },
+      focus: async (e: unknown) => {
+        focuses.push(e);
+        return {};
       },
     },
     model: {
@@ -188,6 +193,7 @@ const rig = async (
     replies,
     forks,
     opens,
+    focuses,
     toasts,
     runs,
     spawns,
@@ -416,6 +422,10 @@ test("[Tell me…] opens ask mode; a submit there asks fresh past the selected e
   await explainOpen(r.$);
   expect(r.view().isAsking).toBe(true);
   expect(r.forks).toEqual([]);
+  expect(r.opens).toEqual([
+    { id: "runes-explain", title: "Explain plz!", columns: 64, focus: true },
+  ]);
+  expect(r.focuses).toEqual([{ requestId: "runes-explain", key: "explain-ask" }]);
   r.replies.push(answered(textReply));
   await explainAsk(r.$, "why?");
   expect(r.forks.map(briefless)).toEqual([

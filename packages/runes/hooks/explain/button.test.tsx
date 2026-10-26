@@ -32,7 +32,7 @@ const setup = async (
 ) => {
   fakeHost(on, { files: new Map([[CONFIG, yaml]]) });
   const forks: unknown[] = [];
-  const opens: { id: string }[] = [];
+  const opens: { id: string; focus?: boolean }[] = [];
   let release = () => {};
   let gate: Promise<void> = Promise.resolve();
   on("ui.render", ($, e) => {
@@ -40,7 +40,7 @@ const setup = async (
     return <Text key="engine">engine</Text>;
   });
   on("ui.open", (_$, e) => {
-    opens.push(e as { id: string });
+    opens.push(e as { id: string; focus?: boolean });
     return { value: { isPlaced: true } } as never;
   });
   on("model.fork", async (_$, e) => {
@@ -115,6 +115,8 @@ test("a press forks once and opens the runes-explain pane", async ($, on) => {
   await ui.press({ key: "explain" });
   expect(forks).toHaveLength(1);
   expect(opens[0]?.id).toBe("runes-explain");
+  // the answer is read, not typed into, so the prompt keeps the keyboard
+  expect(opens[0]?.focus).toBeFalsy();
   await ui.unmount();
 });
 
@@ -126,6 +128,7 @@ test("[Tell me…] opens the runes-explain pane and forks nothing", async ($, on
   await ui.press({ key: "explain-open" });
   expect(forks).toHaveLength(0);
   expect(opens.map((o) => o.id)).toEqual(["runes-explain"]);
+  expect(opens[0]?.focus).toBe(true);
   await ui.unmount();
 });
 
