@@ -1,5 +1,30 @@
 # Changelog
 
+## [runes 0.11.1] - 2026-10-26
+
+_tracks tag `runes-v0.11.1`_
+
+### Added
+- Explain pages now load fixed web fonts, so they look the same on every device, and fall back to system fonts offline.
+
+### Fixed
+- The explain page's analogy brief now reliably wins over the "analogy only when clearer" rule, so requested analogies are drawn instead of a mechanism diagram.
+- The explain page's layout check waits for web fonts to load before measuring, so labels that only overlap after the font swap are no longer passed as fine.
+
+## [guard 0.9.2] - 2026-10-26
+
+_tracks tag `guard-v0.9.2`_
+
+### Fixed
+- guard's hooks now load on Codex, which previously ignored them; the no-op comment-guard hook is removed and the Stop sweep covers Codex edits a turn later.
+
+## [monitor 8.3.3] - 2026-10-26
+
+_tracks tag `monitor-v8.3.3`_
+
+### Fixed
+- Default pricing now includes the Claude 5 models, so they are no longer billed at the fallback rate when the live price fetch fails.
+
 ## [runes 0.11.0] - 2026-10-26
 
 _tracks tag `runes-v0.11.0`_
