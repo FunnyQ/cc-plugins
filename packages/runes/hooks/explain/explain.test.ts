@@ -21,6 +21,12 @@ import {
 import { buildPrompt } from "./protocol";
 import { usageOf } from "./state";
 
+const BRIEF = "\n\nIf you reply in html";
+const briefless = (prompt: string): string => {
+  expect(prompt).toContain(BRIEF);
+  return prompt.slice(0, prompt.indexOf(BRIEF));
+};
+
 const USAGE = {
   input_tokens: 10,
   output_tokens: 20,
@@ -203,7 +209,7 @@ test("press with a text reply opens the pane, forks once, and stores a selected 
     { id: "runes-explain", title: "Explain plz!", columns: 64 },
   ]);
   expect(PANE).toBe("runes-explain");
-  expect(r.forks).toEqual([buildPrompt({ kind: "press" })]);
+  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "press" })]);
   const v = r.view();
   expect(v.entries).toHaveLength(1);
   expect(v.entries[0]).toEqual(
@@ -316,7 +322,7 @@ test("a press forks in the language settings name, and an html page carries it a
   const r = await rig({ language: "ja" });
   r.replies.push(answered(textReply));
   await explainPress(r.$);
-  expect(r.forks).toEqual([buildPrompt({ kind: "press" }, "ja")]);
+  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "press" }, "ja")]);
   r.replies.push(answered(htmlReply));
   await explainPress(r.$);
   const page = [...r.files.entries()].find(([p]) => p.endsWith(".html") && p !== TEMPLATE_PATH);
@@ -396,7 +402,7 @@ test("[Tell me…] opens ask mode; a submit there asks fresh past the selected e
   expect(r.forks).toEqual([]);
   r.replies.push(answered(textReply));
   await explainAsk(r.$, "why?");
-  expect(r.forks).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
+  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
   expect(r.view().isAsking).toBeFalsy();
 });
 
@@ -418,10 +424,10 @@ test("ask follows the selected entry, asks free with none, and ignores blank tex
   await explainAsk(none.$, "   ");
   expect(none.forks).toEqual([]);
   await explainAsk(none.$, " why? ");
-  expect(none.forks).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
+  expect(none.forks.map(briefless)).toEqual([buildPrompt({ kind: "free", question: "why?" })]);
   none.replies.push(answered(textReply));
   await explainAsk(none.$, "why?");
-  expect(none.forks[1]).toBe(
+  expect(briefless(none.forks[1]!)).toBe(
     buildPrompt({
       kind: "follow",
       previous: { title: "Forks", text: "a fork copies" },
@@ -442,7 +448,7 @@ test("ask follows the selected entry, asks free with none, and ignores blank tex
   });
   asked.replies.push(answered(textReply));
   await explainAsk(asked.$, "why?");
-  expect(asked.forks[0]).toBe(
+  expect(briefless(asked.forks[0]!)).toBe(
     buildPrompt({
       kind: "follow",
       previous: { title: "Which?", text: "What next?\na\nb" },
@@ -455,7 +461,7 @@ test("pick forks on the topic", async () => {
   const r = await rig();
   r.replies.push(answered(textReply));
   await explainPick(r.$, "the parser");
-  expect(r.forks).toEqual([buildPrompt({ kind: "pick", topic: "the parser" })]);
+  expect(r.forks.map(briefless)).toEqual([buildPrompt({ kind: "pick", topic: "the parser" })]);
 });
 
 test("two entries in one millisecond get x<at> and x<at>-2", async () => {

@@ -62,8 +62,64 @@ const taskOf = (ask: Ask): string => {
   }
 };
 
-export const buildPrompt = (ask: Ask, language?: string): string =>
-  [RULES, taskOf(ask), language?.trim() && `Write the whole reply, the title included, in ${language.trim()}.`]
+export const BRIEF_AXES = {
+  opening: [
+    "a plain statement of the answer",
+    "the reader's question restated in a few words, then its answer",
+    "the answer framed as not this, but that",
+  ],
+  analogy: [
+    'no analogy and no <p class="analogy">',
+    'one <p class="analogy"> right after the answer',
+    'no <p class="analogy">; draw the analogy instead, as a hand-drawn SVG plate in a spread',
+  ],
+  lead: [
+    "a spread with a plate",
+    'a full-width <section> holding a Mermaid flowchart LR in a <figure class="plate">',
+    'a <section> with a <div class="compare">, or a spread when the content has no two things to compare',
+    "a <section> of prose only, with the page's first picture further down",
+  ],
+  ending: [
+    'a <p class="takeaway">',
+    'an <aside class="warn"> in the last section, and no takeaway',
+    "the last section itself, with no takeaway and no <aside> in the last section",
+  ],
+} as const;
+
+export type Brief = { [K in keyof typeof BRIEF_AXES]: string };
+
+export const drawBrief = (rand: () => number): Brief => {
+  const pick = (options: readonly string[]): string =>
+    options[Math.floor(rand() * options.length)]!;
+  return {
+    opening: pick(BRIEF_AXES.opening),
+    analogy: pick(BRIEF_AXES.analogy),
+    lead: pick(BRIEF_AXES.lead),
+    ending: pick(BRIEF_AXES.ending),
+  };
+};
+
+const briefOf = (brief: Brief): string =>
+  [
+    "If you reply in html, lay this page out as follows. This brief narrows rule 6 and never overrides it.",
+    `- The answer: ${brief.opening}.`,
+    `- Analogy: ${brief.analogy}.`,
+    `- The first section: ${brief.lead}.`,
+    `- The page ends with ${brief.ending}.`,
+  ].join("\n");
+
+export const buildPrompt = (
+  ask: Ask,
+  language?: string,
+  brief?: Brief,
+): string =>
+  [
+    RULES,
+    taskOf(ask),
+    language?.trim() &&
+      `Write the whole reply, the title included, in ${language.trim()}.`,
+    brief && briefOf(brief),
+  ]
     .filter(Boolean)
     .join("\n\n");
 

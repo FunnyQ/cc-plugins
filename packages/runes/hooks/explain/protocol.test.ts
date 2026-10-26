@@ -1,6 +1,13 @@
 import { expect, test } from "claude-code/testing";
 
-import { buildPrompt, FRAGMENT_RULES, parseReply, RULES } from "./protocol";
+import {
+  BRIEF_AXES,
+  buildPrompt,
+  drawBrief,
+  FRAGMENT_RULES,
+  parseReply,
+  RULES,
+} from "./protocol";
 
 test("RULES carries its six items in order", () => {
   const phrases = [
@@ -224,4 +231,25 @@ test("buildPrompt names the configured language for the whole reply, and keeps t
   expect(set).toContain("Write the whole reply, the title included, in zh-TW.");
   expect(buildPrompt({ kind: "press" })).not.toContain("Write the whole reply");
   expect(buildPrompt({ kind: "press" }, "  ")).not.toContain("Write the whole reply");
+});
+
+test("drawBrief takes one option per axis from the random draw", () => {
+  const axes = Object.keys(BRIEF_AXES) as (keyof typeof BRIEF_AXES)[];
+  const first = drawBrief(() => 0);
+  const last = drawBrief(() => 0.999);
+  for (const axis of axes) {
+    expect(first[axis]).toBe(BRIEF_AXES[axis][0]);
+    expect(last[axis]).toBe(BRIEF_AXES[axis].at(-1)!);
+  }
+});
+
+test("buildPrompt appends the brief after everything else, scoped to html", () => {
+  const brief = drawBrief(() => 0.5);
+  const plain = buildPrompt({ kind: "press" }, "zh-TW");
+  const out = buildPrompt({ kind: "press" }, "zh-TW", brief);
+  expect(out.startsWith(`${plain}\n\n`)).toBe(true);
+  const tail = out.slice(plain.length);
+  expect(tail).toContain("If you reply in html");
+  expect(tail).toContain("never overrides");
+  for (const option of Object.values(brief)) expect(tail).toContain(option);
 });

@@ -5,7 +5,7 @@ import { where } from "../transcript/where";
 import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
 import { writeExplainer } from "./html";
-import { buildPrompt, parseReply, type Ask } from "./protocol";
+import { buildPrompt, drawBrief, parseReply, type Ask } from "./protocol";
 import { selectedOf, usageOf, withEntry } from "./state";
 
 export const PANE = "runes-explain";
@@ -49,7 +49,9 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
   try {
     await openPane($);
     const { language } = (await $.settings.read()) as { language?: string };
-    const r = await $.model.fork({ prompt: buildPrompt(ask, language) });
+    const r = await $.model.fork({
+      prompt: buildPrompt(ask, language, drawBrief(Math.random)),
+    });
     if (!r.isAnswered) {
       const status =
         "status" in r && r.status !== undefined ? ` ${r.status}` : "";
