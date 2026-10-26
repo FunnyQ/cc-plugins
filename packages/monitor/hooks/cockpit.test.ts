@@ -91,7 +91,10 @@ function world(
   on("classic.PermissionRequest", () =>
     opts.isAnsweredBeneath ? { decision: { behavior: "allow" as const } } : {},
   );
-  on("tool.check", () => ({ decision: opts.checkBeneath ?? "ask" }));
+  // The kit answers an ask on $.tool.call at once, as a dialog-less subagent; the first pass allows so the core call stands for the open dialog.
+  on("tool.check", () => ({
+    decision: coreRuns === 0 ? "allow" : (opts.checkBeneath ?? "ask"),
+  }));
   on(
     "tool.call",
     () => (++coreRuns === 1 ? terminal.promise : rerun.promise) as never,
@@ -242,18 +245,8 @@ test("a deny beneath still stands on a dashboard-approved call's second pass", a
   while (!w.posts.length) await tick();
   const id = w.posts[0]!.body.request_id as string;
   w.verdict.resolve({ request_id: id, behavior: "allow" });
-  while (w.coreRuns() < 2) await tick();
-  expect(
-    (
-      await $.tool.check({
-        tool: "Bash",
-        input: asked.tool_input,
-        tool_use_id: id,
-      })
-    ).decision,
-  ).toBe("deny");
-  w.rerun.resolve(ran);
-  await call;
+  expect((await call).isError).toBe(true);
+  expect(w.coreRuns()).toBe(1);
 });
 
 test("a failed request re-reads the daemon's port and token on the next call", async ($, on) => {
