@@ -2,6 +2,7 @@ import { expect, test } from "claude-code/testing";
 
 import {
   changes,
+  isFullRewrite,
   isRewrite,
   isWorthAsking,
   keyOf,
@@ -14,6 +15,7 @@ import {
   TITLES,
 } from "./teacher";
 import { wrapWords } from "../transcript/text";
+import { lessonLines } from "./lesson";
 import type { Attempt } from "./attempt";
 
 test("a short prompt, a slash command, a shell escape, or a wall of text is never asked about", () => {
@@ -55,6 +57,7 @@ test("a flagged prompt gets the rewrite, the latest lesson clears on the next su
       "<quip>Checking? Bold tense.</quip>\nCan you check why the test is failing?",
     redraw: () => redraws++,
     record: () => {},
+    language: async () => undefined,
   });
   teacher.submit("can you checking why test is fail", Promise.resolve("s1"));
   for (let i = 0; i < 50 && !teacher.latest(); i++)
@@ -87,6 +90,7 @@ test("no key asks nothing", async () => {
     complete: async () => "x",
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   });
   teacher.submit("could you making this more faster please", Promise.resolve("s1"));
   await new Promise((r) => setTimeout(r, 5));
@@ -109,6 +113,73 @@ test("changes marks the words the rewrite added or changed, keeping spaces and m
   expect(runs.map((r) => r.text).join("")).toBe(
     "Can you check why the test is failing?",
   );
+});
+
+test("parseReply takes the why after the quip, in either order, and drops an empty or too-long why", () => {
+  expect(
+    parseReply(
+      "<quip>RIP 'checking'</quip>\n<why>can + base verb: check, not checking</why>\nCan you check the logs?",
+    ),
+  ).toEqual({
+    better: "Can you check the logs?",
+    quip: "RIP 'checking'",
+    why: "can + base verb: check, not checking",
+  });
+  expect(
+    parseReply("<why>can + base verb</why>\n<quip>RIP</quip>\nCan you check?"),
+  ).toEqual({ better: "Can you check?", quip: "RIP", why: "can + base verb" });
+  expect(parseReply("<quip>RIP</quip>\nCan you check?").why).toBe(undefined);
+  expect(parseReply("<why> </why>\nCan you check?").why).toBe(undefined);
+  expect(
+    parseReply(`<why>${"rule ".repeat(40)}</why>\nCan you check?`),
+  ).toEqual({ better: "Can you check?", quip: undefined, why: undefined });
+});
+
+test("a rewrite that changes more than half its words is a full rewrite", () => {
+  expect(
+    isFullRewrite(
+      "so, are we added reason in teacher's ui?",
+      "Wait, did we ever add the reason to the teacher UI?",
+    ),
+  ).toBe(true);
+  expect(
+    isFullRewrite(
+      "can you checking the logs before we deploying",
+      "Can you check the logs before we deploy?",
+    ),
+  ).toBe(false);
+});
+
+test("a lesson draws the rewrite, then the why in the dim colour, and a full rewrite in one colour with no bold", () => {
+  const text = (line: { text: string }[]) => line.map((r) => r.text).join("");
+  const partial = lessonLines(
+    "can you checking the logs before we deploying",
+    "Can you check the logs before we deploy?",
+    "can + base verb",
+    80,
+  );
+  expect(partial.map(text)).toEqual([
+    "Can you check the logs before we deploy?",
+    "─".repeat(80),
+    "can + base verb",
+  ]);
+  expect(partial[0]!.some((r) => r.bold)).toBe(true);
+  const dim = partial[2]![0]!.color;
+  expect(partial[1]![0]!.color).toBe(dim);
+  expect(dim).toBeDefined();
+  expect(partial[0]!.some((r) => r.color === dim)).toBe(false);
+
+  const full = lessonLines(
+    "so, are we added reason in teacher's ui?",
+    "Wait, did we ever add the reason to the teacher UI?",
+    undefined,
+    80,
+  );
+  expect(full).toHaveLength(1);
+  expect(full[0]!.some((r) => r.bold)).toBe(false);
+  expect(new Set(full[0]!.map((r) => r.color)).size).toBe(1);
+  expect(full[0]![0]!.color).toBeDefined();
+  expect(full[0]![0]!.color).not.toBe(dim);
 });
 
 test("parseReply splits the quip off the rewrite, takes a reply without the quip tag as all rewrite, and drops an empty or too-long quip", () => {
@@ -145,6 +216,7 @@ test("a lesson without a quip falls back to a stock title", async () => {
     complete: async () => "Please make this faster.",
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   });
   teacher.submit("please making this more faster", Promise.resolve("s1"));
   for (let i = 0; i < 50 && !teacher.latest(); i++)
@@ -223,6 +295,7 @@ test("a prompt that was fine as written is never sent again", async () => {
     complete: async () => (completes++, prompt),
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   });
   teacher.submit(prompt, Promise.resolve("s1"));
   await settle();
@@ -240,6 +313,7 @@ test("two identical prompts share a lesson and the latest requestId wins", async
     complete: async () => "Please make rows with the same text.",
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   });
   teacher.submit(prompt, Promise.resolve("s1"));
   for (let i = 0; i < 50 && !teacher.latest(); i++) await settle();
@@ -256,6 +330,7 @@ test("work called again leaves no latest lesson, though the lesson itself stays"
     complete: async () => "Please make the latest go away.",
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   };
   teacher.work(transport);
   teacher.submit(prompt, Promise.resolve("s1"));
@@ -277,6 +352,7 @@ test("teach keys the lesson on the prompt that entered, not the one typed", asyn
     complete: async () => "Rewritten by the teacher.",
     redraw: () => {},
     record: () => {},
+    language: async () => undefined,
   });
   let handler: any;
   const stub = { session: { id: () => Promise.resolve("s1") } };
@@ -305,7 +381,8 @@ const scored = (answers: unknown) => async () => ({
 });
 const recording = (
   post: () => Promise<{ ok: boolean; text: string }>,
-  complete: () => Promise<string | undefined>,
+  complete: (prompt: string, system: string) => Promise<string | undefined>,
+  language?: string,
 ) => {
   const seen: Seen[] = [];
   teacher.work({
@@ -314,6 +391,7 @@ const recording = (
     complete,
     redraw: () => {},
     record: (a, session) => seen.push({ a, session }),
+    language: async () => language,
   });
   return seen;
 };
@@ -378,6 +456,27 @@ test("an empty reply records empty", async () => {
   const a = await recorded(seen);
   expect(a.outcome).toBe("empty");
   expect(a.better).toBe("");
+});
+
+test("the why is asked in the settings language, and the logged system is the one sent", async () => {
+  let sent = "";
+  const seen = recording(
+    both,
+    async (_, system) => ((sent = system), "Please check it."),
+    "zh-TW",
+  );
+  teacher.submit("please checking the language one", Promise.resolve("s1"));
+  const a = await recorded(seen);
+  expect(sent).toContain("Write the why in zh-TW");
+  expect(a.system).toBe(sent);
+});
+
+test("no settings language asks the why in English", async () => {
+  let sent = "";
+  const seen = recording(both, async (_, system) => ((sent = system), "Please check it."));
+  teacher.submit("please checking the default language", Promise.resolve("s1"));
+  await recorded(seen);
+  expect(sent).not.toContain("Write the why in");
 });
 
 test("a reply with only a quip records empty", async () => {

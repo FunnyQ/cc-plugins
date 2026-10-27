@@ -35,7 +35,7 @@ import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
 
-const MODEL = "haiku";
+const MODEL = "sonnet";
 const EFFORT = "low";
 
 const USAGE = `[on|off|status|reload] or <${RUNES.join("|")}> [on|off]; bare toggles`;
@@ -161,6 +161,8 @@ export const register: Register = (on) => {
         return r.isAnswered ? r.text : undefined;
       },
       redraw,
+      language: async () =>
+        ((await $.settings.read()) as { language?: string }).language,
       record: (a, session) => {
         const home = where.home;
         if (!home) return;

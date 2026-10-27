@@ -1,11 +1,18 @@
 import type { Elements } from "claude-code";
 
 import type { Side } from "../config";
-import { bubble, DIVIDER, memo, runLine } from "../transcript/bubble";
+import {
+  bubble,
+  DIVIDER,
+  isLight,
+  memo,
+  palette,
+  runLine,
+} from "../transcript/bubble";
 import { cells, wrapWords } from "../transcript/text";
 import { octantsOf } from "../clawd/encode";
 import { CLIPS } from "../clawd/frames";
-import { changes, keyOf, teacher } from "./teacher";
+import { changes, isFullRewrite, keyOf, teacher } from "./teacher";
 
 export const TEACHER_COLOR = "#4f9a6a";
 // nf-md U+F0890, needs a Nerd Font
@@ -13,17 +20,32 @@ export const TEACHER_ICON = "\u{F0890}";
 
 type Run = { text: string; bold?: boolean; color?: string };
 
-// the rewrite's wrapped lines, each word it changed bold in the teacher's colour; a lesson never changes, yet every
-// redraw of its prompt re-ran the word diff
+// a lesson never changes, yet every redraw of its prompt re-ran the word diff
 const linesMemo = memo(50);
-const betterLines = (text: string, better: string, width: number) =>
-  linesMemo(`${width}\0${keyOf(text)}\0${better}`, () =>
-    wrapWords(
-      changes(keyOf(text), better).map(({ text, isChanged }): Run =>
-        isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
+export const lessonLines = (
+  text: string,
+  better: string,
+  why: string | undefined,
+  width: number,
+) =>
+  linesMemo(
+    `${width}\0${isLight()}\0${keyOf(text)}\0${better}\0${why ?? ""}`,
+    (): Run[][] => [
+      ...wrapWords(
+        isFullRewrite(keyOf(text), better)
+          ? [{ text: better, color: palette().var }]
+          : changes(keyOf(text), better).map(({ text, isChanged }): Run =>
+              isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
+            ),
+        width,
       ),
-      width,
-    ),
+      ...(why
+        ? [
+            [{ text: "─".repeat(width), color: palette().dim }],
+            ...wrapWords([{ text: why, color: palette().dim }], width),
+          ]
+        : []),
+    ],
   );
 
 // octant text needs no blit, so it draws in any terminal; a cell with a gap draws every pixel in one colour,
@@ -68,7 +90,12 @@ export const lessonRows = (
     key,
     <Text color={TEACHER_COLOR}>{line}</Text>,
   ];
-  const lines = betterLines(text, better, inner - SMOKER_COLUMNS - 1).map(
+  const lines = lessonLines(
+    text,
+    better,
+    teacher.why(text),
+    inner - SMOKER_COLUMNS - 1,
+  ).map(
     (line) => runLine(Text, line),
   );
   const height = Math.max(lines.length, TALKER.length);
@@ -116,7 +143,7 @@ export const lessonBubble = (
       title: teacher.title(text),
       side,
       inner,
-      rows: betterLines(text, better, inner).map(
+      rows: lessonLines(text, better, teacher.why(text), inner).map(
         (line, j): [string, unknown] => [`teacher:${j}`, runLine(Text, line)],
       ),
     },
