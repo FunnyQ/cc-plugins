@@ -542,3 +542,21 @@ test("a pick and a follow-up fork from runes' own hooks once the press and submi
   ]);
   expect(forksPastBottom).toEqual([0, 1]);
 });
+
+// the desktop draws its own Markdown, so glow's terminal colours never reach it
+test("the desktop draws a text answer as Markdown, never through glow", async ($, on) => {
+  const box = await session(
+    $,
+    on,
+    { entries: [text("x1", "t", "**bold** words")], isRunning: false },
+    GLOW,
+  );
+  const ui = await $.ui.mount({
+    ...(PANE as object),
+    surface: "desktop",
+  } as never);
+  const md = (await ui.find({ type: "Markdown" })) as Node | undefined;
+  await ui.unmount();
+  expect(md?.props?.text).toBe("**bold** words");
+  expect(box.opens.some((argv) => argv[0] === "glow")).toBe(false);
+});

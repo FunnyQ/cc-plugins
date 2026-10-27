@@ -68,7 +68,8 @@ const clip = (text: string, width: number, lines: number) => {
 
 export const explainPane = (on: On) => {
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
-    const { Box, Text, Button, Input, Client } = $.ui.resolve(e);
+    const ui = $.ui.resolve(e);
+    const { Box, Text, Button, Input, Client } = ui;
     const width = e.props.bodyColumns ?? COLUMNS;
     const inner = Math.max(10, width - BORDER_AND_PADDING);
     const v = (await read($, VIEW)) as ExplainView;
@@ -76,6 +77,8 @@ export const explainPane = (on: On) => {
 
     // glow answers null while it renders in the background, and its worker redraws when the lines land
     const markdown = (id: string, text: string) => {
+      if (e.surface === "desktop" && "Markdown" in ui)
+        return [<ui.Markdown key={`explain-md:${id}`} text={text} />];
       const lines: Run[][] =
         glow.view(inner, text, `explain:${id}`) ?? wrapWords([{ text }], inner);
       return lines.map((runs) => runLine(Text, runs));
