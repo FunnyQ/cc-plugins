@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.8.1] - 2026-10-28
+
+_tracks tag `dispatch-v5.8.1`_
+
+### Changed
+- flightplan's grep-after-fix rule now applies whenever a rule, value, or name is added, changed, or removed (including P2 fixes), and covers PLAN.md, _context/, and tasks/; a new rule greps for what it forbids or requires, so an added rule is checked against the tasks it contradicts.
+
 ## [runes 0.12.2] - 2026-10-27
 
 _tracks tag `runes-v0.12.2`_
