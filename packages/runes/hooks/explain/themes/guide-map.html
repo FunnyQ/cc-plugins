@@ -7,11 +7,8 @@
     <title>{{title}}</title>
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400..900&family=Chiron+GoRound+TC:wght@400;700;900&family=JetBrains+Mono:wght@400;600&display=swap"
     />
-    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/400" />
-    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/700" />
-    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/900" />
     <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/400" />
     <style>
       *,
@@ -32,8 +29,8 @@
         --blue: #2ba0ff; /* --blue: info capsules, focus */
         --lilac: #ebc1ff; /* --lilac: the second area */
         --hair: rgba(44, 46, 42, 0.28);
-        --sans: "Bricolage Grotesque", "GenYoGothicTW", "PingFang TC", sans-serif;
-        --mono: "JetBrains Mono", "GenYoGothicTW", ui-monospace, Menlo, monospace;
+        --sans: "Nunito", "Chiron GoRound TC", "PingFang TC", sans-serif;
+        --mono: "JetBrains Mono", "Chiron GoRound TC", ui-monospace, Menlo, monospace;
         /* the round chips that ride one end of a capsule, all 26px */
         --chip-dot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3C/svg%3E");
         --chip-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Ccircle cx='13' cy='13' r='5' fill='%23F5F1E4'/%3E%3C/svg%3E");
@@ -122,8 +119,7 @@
       .titlebar h1 {
         max-width: 15em;
         font: 800 clamp(40px, 7cqi, 88px) / 0.95 var(--sans);
-        font-variation-settings: "opsz" 96;
-        letter-spacing: -0.06em;
+        letter-spacing: -0.03em;
         text-wrap: balance;
       }
       .titlebar .meta {
@@ -206,26 +202,24 @@
         line-height: 1.45;
         letter-spacing: -0.02em;
       }
-      /* the analogy is the map's info signboard: a lilac board in an ink outline, its name on a tab riding the top edge */
+      /* the analogy is the map's info signboard: a pale lilac board, its name on a lilac tab riding the top edge */
       .analogy {
         position: relative;
         max-width: calc(60ch + 64px);
         margin-top: 56px;
         padding: 34px 32px 26px;
-        border: 2px solid var(--ink);
         border-radius: 22px 48px 26px 54px / 22px 40px 26px 46px;
-        background: var(--lilac);
+        background: color-mix(in srgb, var(--lilac) 45%, var(--water));
         font-size: 19px;
         font-weight: 500;
         line-height: 1.7;
       }
       .analogy::before {
         content: "Think of it as";
-        --fill: var(--water);
+        --fill: var(--lilac);
         position: absolute;
         top: -19px;
         left: 26px;
-        box-shadow: inset 0 0 0 2px var(--ink);
       }
       main > section {
         margin-top: 88px;
@@ -239,8 +233,7 @@
         gap: 14px;
         margin-bottom: 24px;
         font: 800 clamp(28px, 3.6cqi, 40px) / 1.05 var(--sans);
-        font-variation-settings: "opsz" 96;
-        letter-spacing: -0.045em;
+        letter-spacing: -0.02em;
         text-wrap: balance;
       }
       main h2::before {
@@ -785,20 +778,25 @@
         font-family: var(--mono);
         font-size: 0.92em;
       }
-      /* asides are map signs: a capsule names the sign, the text sits beside it on the water */
+      /* asides are map signs: a pale board in the sign's colour, its name on a capsule riding the top edge */
       aside.note,
       aside.warn {
+        --tint: var(--blue);
         position: relative;
-        max-width: calc(196px + 18px + 62ch);
-        min-height: 36px;
-        padding: 4px 0 0 214px;
+        max-width: calc(62ch + 56px);
+        padding: 30px 28px 20px;
+        border-radius: 22px 48px 26px 54px / 22px 40px 26px 46px;
+        background: color-mix(in srgb, var(--tint) 22%, var(--water));
         font-size: 17px;
+      }
+      aside.warn {
+        --tint: var(--coral);
       }
       aside.note::before,
       aside.warn::before {
         position: absolute;
-        top: 0;
-        left: 0;
+        top: -18px;
+        left: 24px;
         background-position: 5px 50%, 0 0;
       }
       aside.note::before {
@@ -812,7 +810,7 @@
         --chip: var(--chip-barrier);
       }
       main aside:is(.note, .warn):not(:first-child) {
-        margin-top: 30px;
+        margin-top: 48px;
       }
       svg.pele {
         --_bg: var(--water);
@@ -916,9 +914,6 @@
         .analogy {
           padding: 30px 22px 22px;
         }
-        .titlebar h1 {
-          letter-spacing: -0.05em;
-        }
         main > section,
         main > section:first-of-type {
           margin-top: 64px;
@@ -965,7 +960,7 @@
         }
         aside.note,
         aside.warn {
-          padding: 48px 0 0 0;
+          padding: 30px 20px 18px;
         }
         .takeaway {
           padding: 66px 24px 28px;
