@@ -27,13 +27,18 @@ knows the actual files, decisions and dead ends of that session.
 ## Operating Context
 
 A desktop browser beside the terminal. The user opens the page right after the press, reads it once top to bottom,
-and sometimes revisits it later. The page has one light theme; dark mode is deferred.
+and sometimes revisits it later. Each page wears one of five light themes (`picture-book`, `blueprint`,
+`lab-notebook`, `editorial`, `card-table`), picked per page to fit its content; dark mode is deferred.
 
 ## Capabilities and Constraints
 
-- One self-contained HTML file per explainer, kept under `~/.local/share/q-lab/runes/explain/<project>/`.
-- A CSP (`default-src 'none'; style-src 'unsafe-inline'; img-src data:`) blocks scripts, network and fonts, so
-  the page uses system font stacks and no JavaScript.
+- One self-contained HTML file per explainer, kept under
+  `~/.local/share/q-lab/runes/explain/<project>/<YYYYMMDD>-<session>/`.
+- A CSP (`default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com https://font.emtech.cc;
+font-src https://fonts.gstatic.com https://font.emtech.cc; img-src data:`) blocks every other fetch. Web fonts
+  load from Google Fonts and emfont only; images are `data:` URIs only.
+- Scripts are blocked, except a theme's own inline script admitted by its sha256 (`SCRIPT_HASHES` in
+  `hooks/explain/html.ts`); only `card-table` has one, a pointer tilt for its option cards.
 - A language model fills only `<main>`, from a fixed component vocabulary and colour tokens the skeleton
   defines; the skeleton is fixed.
 - A hidden agent screenshots the page at 1280 and 420 wide and fixes overlapping or clipped diagram labels.
