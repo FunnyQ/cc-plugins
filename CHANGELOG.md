@@ -1,5 +1,17 @@
 # Changelog
 
+## [runes 0.12.1] - 2026-10-27
+
+_tracks tag `runes-v0.12.1`_
+
+### Added
+- Explain pages can now be drawn in five more themes: Blueprint, Lab Notebook, Editorial, Card Table for weighing options as trading cards, and Guide Map for step-by-step procedures, selected per page with the new explain.theme setting.
+- The default explain.theme is now auto: TypeSafe's Jev picks a theme from the page's title and headings when a key is set, otherwise the model's own pick or a random one is used.
+- Existing config.yaml files gain the theme line and a current options list when upgraded, leaving your chosen theme and your own notes alone.
+
+### Fixed
+- The English teacher rune now gives the rewrite first and the reason after it, so the reason no longer contradicts the rewrite, and it ignores pasted content so only what you typed is taught.
+
 ## [runes 0.12.0] - 2026-10-27
 
 _tracks tag `runes-v0.12.0`_
