@@ -7,7 +7,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: work/02, work/03
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -63,22 +63,22 @@ Hold the diff against `schema.md` line by line:
 
 ## Acceptance criteria
 
-- [ ] `git diff --name-only <baseRef> -- packages/runes/hooks CLAUDE.md` lists `attempt.ts`, `lessons-db.ts`, `lessons-cli.ts`, `lessons-db.spec.ts`, `teacher.ts`, `teacher.test.ts`, `register.tsx`, `config.ts`, and `CLAUDE.md`.
-- [ ] `grep -rn "lessons-db\|bun:sqlite" packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx` prints nothing.
-- [ ] `grep -rnE "const (ENGLISH|IMPROVE) =" packages/runes/hooks` prints only lines in `packages/runes/hooks/teacher/attempt.ts`.
-- [ ] `grep -n "lessons.db" packages/runes/hooks/config.ts CLAUDE.md` prints at least one line from each file.
-- [ ] `ls packages/runes/hooks/teacher/*.test.ts` lists no file that imports `bun:test` (`grep -l "bun:test" packages/runes/hooks/teacher/*.test.ts` prints nothing).
-- [ ] (reviewer) Every name, column, signature, and outcome in the diff matches `schema.md` (checked against the Contract match list above).
-- [ ] `git diff <baseRef> -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx packages/runes/hooks/config.ts` shows no reformatted untouched line, and `git diff -U0 <baseRef> -- packages/runes/hooks | grep -cE '^\+\s*(//|/\*)'` prints `0`.
-- [ ] (human) In a real Claude Code session with the teacher on and `TYPESAFE_API_KEY` set, Q submits `can you checking the logs before we deploying`, `thanks, that works fine for me`, and `fix it` (exactly two new rows; if Jev scores the thanks above both thresholds, pick another plain-English thanks and note it), then `/clear` and `please telling me why this test failing` (its row's `session` differs from the earlier rows'; any outcome counts, since Jev's scores vary), and `sqlite3 ~/.local/share/q-lab/runes/teacher/lessons.db 'select outcome, prompt, better from attempts order by id desc limit 5'` matches what the UI drew (a `shown` row for each lesson drawn).
-- [ ] (human) Q runs `bun packages/runes/hooks/teacher/lessons-cli.ts label` over the first three unlabeled rows: answers the first, skips the second with `s`, presses Ctrl-C at the third, and `sqlite3` shows the first two with `labeled_at` set and the third still unlabeled.
+- [x] `git diff --name-only <baseRef> -- packages/runes/hooks CLAUDE.md` lists `attempt.ts`, `lessons-db.ts`, `lessons-cli.ts`, `lessons-db.spec.ts`, `teacher.ts`, `teacher.test.ts`, `register.tsx`, `config.ts`, and `CLAUDE.md`.
+- [x] `grep -rn "lessons-db\|bun:sqlite" packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx` prints nothing.
+- [x] `grep -rnE "const (ENGLISH|IMPROVE) =" packages/runes/hooks` prints only lines in `packages/runes/hooks/teacher/attempt.ts`.
+- [x] `grep -n "lessons.db" packages/runes/hooks/config.ts CLAUDE.md` prints at least one line from each file.
+- [x] `ls packages/runes/hooks/teacher/*.test.ts` lists no file that imports `bun:test` (`grep -l "bun:test" packages/runes/hooks/teacher/*.test.ts` prints nothing).
+- [x] (reviewer) Every name, column, signature, and outcome in the diff matches `schema.md` (checked against the Contract match list above).
+- [x] `git diff <baseRef> -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx packages/runes/hooks/config.ts` shows no reformatted untouched line, and `git diff -U0 <baseRef> -- packages/runes/hooks | grep -cE '^\+\s*(//|/\*)'` prints `0`.
+- [x] (human) In a real Claude Code session with the teacher on and `TYPESAFE_API_KEY` set, Q submits `can you checking the logs before we deploying`, `thanks, that works fine for me`, and `fix it` (exactly two new rows; if Jev scores the thanks above both thresholds, pick another plain-English thanks and note it), then `/clear` and `please telling me why this test failing` (its row's `session` differs from the earlier rows'; any outcome counts, since Jev's scores vary), and `sqlite3 ~/.local/share/q-lab/runes/teacher/lessons.db 'select outcome, prompt, better from attempts order by id desc limit 5'` matches what the UI drew (a `shown` row for each lesson drawn).
+- [x] (human) Q runs `bun packages/runes/hooks/teacher/lessons-cli.ts label` over the first three unlabeled rows: answers the first, skips the second with `s`, presses Ctrl-C at the third, and `sqlite3` shows the first two with `labeled_at` set and the third still unlabeled.
 
 ## Verification
 
-- [ ] `claude plugin test packages/runes` reports 0 fail and at least 387 passing tests.
-- [ ] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` reports 0 fail.
-- [ ] `claude plugin validate packages/runes` passes.
-- [ ] End-to-end smoke under a temporary `HOME`:
+- [x] `claude plugin test packages/runes` reports 0 fail and at least 387 passing tests.
+- [x] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` reports 0 fail.
+- [x] `claude plugin validate packages/runes` passes.
+- [x] End-to-end smoke under a temporary `HOME`:
   ```bash
   h=$(mktemp -d)
   cli=packages/runes/hooks/teacher/lessons-cli.ts
@@ -101,7 +101,7 @@ Hold the diff against `schema.md` line by line:
 | Correctness    | ×3     | A gate fails, or a name, column, outcome, or signature diverges from `schema.md`                                                                | Pieces work alone, but one integration point drifts (session capture, HOME skip, scrub, shared thresholds) | Every Contract match item holds across the whole diff, and the smoke prints the expected rows                             |
 | Meets the goal | ×2     | Some asked prompt leaves no row, or the teacher's visible behaviour changed                                                                     | Rows land, but setup columns or labeling/stats miss part of the goal                                       | Exactly one row per Jev ask, with full setup columns, labelable and summarised, and the teacher draws what it drew before |
 | Consistency    | ×1     | Mod code imports `lessons-db.ts` or `bun:sqlite`, or thresholds are duplicated                                                                  | Style or naming differs between files; disclosure is missing in one place                                  | One source per constant, file boundaries as in `schema.md`, disclosure in both places, untouched lines unchanged          |
-| No regressions | ×1     | `claude plugin test packages/runes` fails                                                                                                       | Tests pass, but an existing test was weakened or deleted to get there                                      | All 373 earlier tests keep their assertions and pass, plus the new ones                                                             |
+| No regressions | ×1     | `claude plugin test packages/runes` fails                                                                                                       | Tests pass, but an existing test was weakened or deleted to get there                                      | All 373 earlier tests keep their assertions and pass, plus the new ones                                                   |
 | Leanness       | ×1     | Extra layers, options, or helpers `schema.md` does not require (a wrapper with one caller, an unused flag, a hand-rolled SQLite or JSON helper) | One or two needless helpers or indirections                                                                | Only what `schema.md` requires; stdlib and `bun:sqlite` used directly                                                     |
 
 ## Out of scope
