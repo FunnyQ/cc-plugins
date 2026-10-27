@@ -27,8 +27,8 @@ knows the actual files, decisions and dead ends of that session.
 ## Operating Context
 
 A desktop browser beside the terminal. The user opens the page right after the press, reads it once top to bottom,
-and sometimes revisits it later. Each page wears one of five light themes (`picture-book`, `blueprint`,
-`lab-notebook`, `editorial`, `card-table`), picked per page to fit its content; dark mode is deferred.
+and sometimes revisits it later. Each page wears one of six light themes (`picture-book`, `blueprint`,
+`lab-notebook`, `editorial`, `card-table`, `guide-map`), picked per page to fit its content; dark mode is deferred.
 
 ## Capabilities and Constraints
 
