@@ -1,0 +1,10 @@
+# Shared rubric
+
+Scale 0–5 per dimension. Pass: weighted average > 4.0. Correctness < 4 is an automatic veto.
+
+| Dimension               | Weight | 0–1 (fail)                                                                                | 2–3 (below bar)                                                                             | 4–5 (pass)                                                                                                            |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Diverges from `schema.md` (a name, column, outcome, or signature differs) or a gate fails | Happy path matches; an edge case in `schema.md` (null scores, newer schema, bad row) drifts | Every rule in `schema.md` holds, edge cases included                                                                  |
+| Test coverage           | ×2     | No new test                                                                               | Happy path only                                                                             | Each outcome, each refusal, and each failure path has a test                                                          |
+| Interface & readability | ×1     | Mod code imports `bun:sqlite` or `lessons-db.ts`; I/O mixed into pure logic               | Works, but names or types are unclear                                                       | Pure functions over a passed-in `Database`; types from `attempt.ts`; matches the surrounding style                    |
+| Assumptions & docs      | ×1     | Unmarked magic numbers or behaviour not in `schema.md`                                    | Assumptions made, not stated                                                                | Every deviation from `schema.md` is stated in the task's report; no new comment beyond a one-line external constraint |
