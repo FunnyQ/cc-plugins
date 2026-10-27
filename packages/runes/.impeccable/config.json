@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "hooks/explain/themes/guide-map.html"
+        ],
+        "createdAt": "2026-10-27T11:24:32.914Z",
+        "reason": "The cream ground is the zoo guide map's pinned water colour #F5F1E4, chosen with Q"
+      }
+    ]
+  }
+}

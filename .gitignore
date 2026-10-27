@@ -11,6 +11,10 @@ node_modules/
 
 # impeccable per-directory hook cache (generated, not source)
 **/.impeccable/hook.cache.json
+
+# impeccable decision-round scratch (direction sketches, payloads, served questions)
+**/.impeccable/mocks/
+**/.impeccable/questions/
 .handoffs/
 
 packages/monitor/cockpit-rs/target/
