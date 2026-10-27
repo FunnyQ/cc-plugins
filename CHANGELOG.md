@@ -1,5 +1,16 @@
 # Changelog
 
+## [runes 0.12.0] - 2026-10-27
+
+_tracks tag `runes-v0.12.0`_
+
+### Added
+- The English teacher rune now rewrites your prompt the way a native speaker would type it, and adds a dim "why" line under the rewrite explaining the rule behind the main fix, written in your Claude Code settings language.
+- The English teacher rune now uses a stronger model (sonnet at low effort instead of haiku), because haiku taught a wrong rule in 2 of 6 sampled explanations.
+
+### Fixed
+- The teacher lesson no longer fails in a very narrow terminal, and a multi-line why or quip no longer leaks raw tag text into the rewrite.
+
 ## [runes 0.11.3] - 2026-10-27
 
 _tracks tag `runes-v0.11.3`_
