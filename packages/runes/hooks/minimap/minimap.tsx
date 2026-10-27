@@ -3,7 +3,7 @@ import type { EngineInterface, On } from "claude-code";
 
 import { config } from "../config";
 import type { Ui } from "../ui";
-import { kindAt, lines, type Row } from "./rows";
+import { kindAt, lines, type Line, type Row } from "./rows";
 
 const TICK = 250;
 const REREAD = 12;
@@ -116,6 +116,61 @@ export const inlineMap = (
   );
 };
 
+// the desktop's native "─" button, measured; a column is the wider of the two, so bars this wide touch. Measure again if the desktop restyles its buttons
+const BAR_WIDTH = 34;
+const CELL_HEIGHT = 8;
+// a desktop column holds a native button, about three cells wide
+export const DESKTOP_COLUMN = 3;
+
+const barSvg = (line: Line, barRows: number) => {
+  const height = barRows * CELL_HEIGHT;
+  let top = height;
+  const rects = line.segments.map((s) => {
+    top -= s.cells * CELL_HEIGHT;
+    return `<rect x="0" y="${top}" width="${BAR_WIDTH}" height="${s.cells * CELL_HEIGHT}" fill="${colorOf(s.kind)}"/>`;
+  });
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH}" height="${height}" viewBox="0 0 ${BAR_WIDTH} ${height}">${rects.join("")}</svg>`;
+};
+
+// the desktop leaves a gap between text lines, so each bucket is one Svg bar over its button, aligned by their column
+export const desktopMap = (
+  { Box, Text, Button, Svg }: Ui,
+  list: Row[],
+  here: Set<string>,
+  width: number,
+  barRows: number,
+  jump: (target: string) => () => void,
+) => (
+  <Box flexDirection="row" alignItems="flex-end">
+    {lines(
+      list,
+      here,
+      Math.max(1, Math.floor(width / DESKTOP_COLUMN)),
+      barRows,
+    ).map((line, i) => (
+      <Box key={`col:${i}`} flexDirection="column" alignItems="center">
+        <Svg
+          source={barSvg(line, barRows)}
+          alt={line.segments.map((s) => s.kind).join(", ")}
+          width={BAR_WIDTH}
+          height={barRows * CELL_HEIGHT}
+        />
+        {line.isHere ? (
+          <Text color={config.minimap.marker_color}>━</Text>
+        ) : (
+          <Button
+            key={`line:${i}`}
+            plain
+            dimColor
+            label="─"
+            onPress={jump(line.target)}
+          />
+        )}
+      </Box>
+    ))}
+  </Box>
+);
+
 const forgetTranscript = () => {
   transcript = lastSeen = undefined;
   lastRows = "";
@@ -137,6 +192,12 @@ const startTicker = ($: EngineInterface) => {
 
 export const minimap = (on: On) => {
   on("session.start", { isInteractive: true }, async ($, e, next) => {
+    startTicker($);
+    return next(e);
+  });
+
+  // the desktop app runs Claude through the SDK, a non-interactive session; its first draw attaches it
+  on("session.attach", { surface: "desktop" }, async ($, e, next) => {
     startTicker($);
     return next(e);
   });

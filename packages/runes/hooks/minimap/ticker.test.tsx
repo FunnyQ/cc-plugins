@@ -101,3 +101,35 @@ test("a new session reads its own transcript even when the old one has not chang
   await clock.advance(3_000);
   expect(spawns).toBeGreaterThan(before);
 });
+
+// the desktop app runs Claude through the SDK, a non-interactive session the desktop attaches to
+test("a desktop attach starts reading the transcript", async ($, on) => {
+  const clock = mock.clock(on);
+  let spawns = 0;
+  fakeHost(on, {
+    files: new Map([[CONFIG, "minimap:\n  enabled: true\n"]]),
+    run: ({ argv }) => {
+      if (argv[0] !== "bun" || !argv[1]?.endsWith("minimap/index.ts"))
+        return undefined;
+      spawns += 1;
+      return {
+        value: {
+          exitCode: 0,
+          stdout: JSON.stringify({ path: "/t.jsonl", rows: [] }),
+          stderr: "",
+          isStdoutTruncated: false,
+          isStderrTruncated: false,
+        },
+      };
+    },
+  } as never);
+  on("session.id", () => ({ value: "s1" }) as never);
+  on("session.start", (_$, e) => e as never);
+  on("session.attach", (_$, e) => ({ clientId: e.clientId }) as never);
+  await $.session.start({ cwd: "/", surface: null, isInteractive: false });
+  await clock.advance(5_000);
+  expect(spawns).toBe(0);
+  await $.session.attach({ surface: "desktop", clientId: "desktop:default" });
+  await clock.advance(5_000);
+  expect(spawns).toBeGreaterThan(0);
+});

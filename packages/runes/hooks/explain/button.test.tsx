@@ -170,9 +170,34 @@ test("a survey draws the engine, no button", async ($, on) => {
   await ui.unmount();
 });
 
-test("the desktop draws no button", async ($, on) => {
-  const { ui } = await setup($, on, "", "desktop");
-  expect(await ui.find({ key: "explain" })).toBeUndefined();
+test("the desktop draws both buttons, and a press forks and opens the pane", async ($, on) => {
+  const { ui, forks, opens } = await setup($, on, "", "desktop");
+  // a desktop draws a native button, so the terminal's brackets would read as text
+  expect(await label(ui)).toBe("Explain plz!");
+  expect((await ui.find({ key: "explain-open" }))?.text).toBe("Tell me…");
+  // drawn as the desktop's own buttons, the first its primary
+  expect((await ui.find({ key: "explain" }))?.props).toMatchObject({
+    variant: "primary",
+  });
+  expect((await ui.find({ key: "explain" }))?.props.plain).toBeUndefined();
+  expect((await ui.find({ key: "explain-open" }))?.props.plain).toBeUndefined();
+  // a native button is taller than a text line, so the stack keeps a line between them or they overlap
+  type Node =
+    | {
+        props?: { key?: string; flexDirection?: string; gap?: number };
+        children?: Node[];
+      }
+    | undefined;
+  const pair = (await ui.find({ key: "explain-buttons" })) as Node;
+  expect(pair?.props).toMatchObject({ flexDirection: "column", gap: 2 });
+  expect(pair?.children?.map((c) => c?.props?.key)).toEqual([
+    "explain",
+    "explain-open",
+  ]);
+  expect(await ui.find({ key: "explain-open" })).toBeDefined();
+  await ui.press({ key: "explain" });
+  expect(forks).toHaveLength(1);
+  expect(opens[0]?.id).toBe("runes-explain");
   await ui.unmount();
 });
 

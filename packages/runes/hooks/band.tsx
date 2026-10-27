@@ -3,7 +3,7 @@ import type { On } from "claude-code";
 
 import { clawd, seen, sprite, spriteColumns } from "./clawd/mascot";
 import { config } from "./config";
-import { inlineMap } from "./minimap/minimap";
+import { desktopMap, inlineMap } from "./minimap/minimap";
 import { stem } from "./minimap/rows";
 import { TEACHER_COLOR, TEACHER_ICON } from "./teacher/lesson";
 import { teacher } from "./teacher/teacher";
@@ -21,9 +21,10 @@ const ASK = "[Tell me…]";
 
 export const band = (on: On) => {
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
-    const hasMap = config.enabled.minimap && e.surface === "terminal";
+    const isDrawn = e.surface === "terminal" || e.surface === "desktop";
+    const hasMap = config.enabled.minimap && isDrawn;
     const lesson = e.surface === "terminal" ? teacher.latest() : undefined;
-    const hasButton = config.enabled.explain && e.surface === "terminal";
+    const hasButton = config.enabled.explain && isDrawn;
     if (
       (!config.enabled.clawd && !hasMap && !lesson && !hasButton) ||
       e.props.hasSurvey
@@ -33,7 +34,10 @@ export const band = (on: On) => {
     seen(e.requestId, e.surface === "desktop");
     if (e.surface !== "desktop" && e.surface !== "terminal") return next(e);
     const ui = $.ui.resolve(e);
-    const { Box } = ui;
+    const { Box, Button } = ui;
+    // a desktop draws a native button, so the terminal's brackets would read as text
+    const isDesktop = e.surface === "desktop";
+    const tag = (label: string) => (isDesktop ? label.slice(1, -1) : label);
     const [
       { value: frame = { clip: clawd.clip, index: clawd.index } },
       list,
@@ -53,7 +57,7 @@ export const band = (on: On) => {
     const room = (e.props.bodyColumns ?? 0) - reserved;
     const map =
       list?.length && room > 4
-        ? inlineMap(
+        ? (e.surface === "desktop" ? desktopMap : inlineMap)(
             ui,
             list,
             new Set((shown ?? []).map(stem)),
@@ -130,36 +134,56 @@ export const band = (on: On) => {
       );
 
     const picture = sprite(ui, e.surface === "desktop", frame);
-    const button =
-      hasButton && term ? (
-        <Box key="explain-buttons" flexDirection="column" width={buttons}>
-          <Box
-            key="explain-line"
-            flexDirection="row"
-            justifyContent="flex-end"
-            width={buttons}
-          >
-            <term.Button key="explain" plain onPress={() => undefined}>
-              {view?.isRunning ? RUNNING : LABEL}
-            </term.Button>
-          </Box>
-          <Box
-            key="explain-open-line"
-            flexDirection="row"
-            justifyContent="flex-end"
-            width={buttons}
-          >
-            <term.Button
-              key="explain-open"
-              plain
-              dimColor
-              onPress={() => undefined}
-            >
-              {ASK}
-            </term.Button>
-          </Box>
+    const explain = (
+      <Button
+        key="explain"
+        {...(isDesktop ? { variant: "primary" } : { plain: true })}
+        onPress={() => undefined}
+      >
+        {tag(view?.isRunning ? RUNNING : LABEL)}
+      </Button>
+    );
+    const ask = (
+      <Button
+        key="explain-open"
+        {...(isDesktop ? {} : { plain: true })}
+        dimColor
+        onPress={() => undefined}
+      >
+        {tag(ASK)}
+      </Button>
+    );
+    // a native button is taller than a text line, so the desktop keeps a line between the two or they overlap
+    const button = !hasButton ? undefined : isDesktop ? (
+      <Box
+        key="explain-buttons"
+        flexDirection="column"
+        alignItems="flex-end"
+        gap={2}
+      >
+        {explain}
+        {ask}
+      </Box>
+    ) : (
+      <Box key="explain-buttons" flexDirection="column" width={buttons}>
+        <Box
+          key="explain-line"
+          flexDirection="row"
+          justifyContent="flex-end"
+          width={buttons}
+        >
+          {explain}
         </Box>
-      ) : undefined;
+        <Box
+          key="explain-open-line"
+          flexDirection="row"
+          justifyContent="flex-end"
+          width={buttons}
+        >
+          {ask}
+        </Box>
+      </Box>
+    );
     const clawdRow = config.enabled.clawd
       ? row(
           button ? (
@@ -168,7 +192,7 @@ export const band = (on: On) => {
               flexDirection="row"
               alignItems="flex-end"
               gap={1}
-              width={slot}
+              width={isDesktop ? undefined : slot}
             >
               {button}
               {picture}
@@ -199,7 +223,7 @@ export const band = (on: On) => {
             key="explain-under-clawd"
             flexDirection="row"
             justifyContent="center"
-            width={slot}
+            width={isDesktop ? undefined : slot}
           >
             {button}
           </Box>

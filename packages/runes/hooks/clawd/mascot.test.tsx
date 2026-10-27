@@ -60,11 +60,9 @@ test("Clawd sits at the right edge of the band, sized to bodyColumns rather than
       | undefined;
     const first = row?.children?.[0] as Node;
     const picture =
-      surface === "desktop"
-        ? first
-        : first?.props?.key === "clawd-slot"
-          ? (first.children?.at(-1) as Node)
-          : undefined;
+      first?.props?.key === "clawd-slot"
+        ? (first.children?.at(-1) as Node)
+        : undefined;
     expect(picture?.type).toBe(surface === "desktop" ? "Svg" : "Image");
     await ui.unmount();
   }
@@ -207,7 +205,7 @@ test("Clawd animates once the desktop attaches, and never ticks in a headless ru
   await desk.unmount();
 });
 
-test("the minimap fills the left of the band on the terminal and never on the desktop", async ($, on) => {
+test("the minimap fills the left of the band on the terminal and the desktop", async ($, on) => {
   const clock = mock.clock(on);
   const rows = JSON.stringify({
     path: "/t.jsonl",
@@ -254,12 +252,12 @@ test("the minimap fills the left of the band on the terminal and never on the de
     ...BAND,
   });
   expect((await desk.find({ key: "clawd-row" }))?.props).toMatchObject({
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
   });
   await desk.unmount();
 });
 
-test("with Clawd off, the minimap still draws in the band on the terminal, and the desktop has nothing", async ($, on) => {
+test("with Clawd off, the minimap still draws in the band on the terminal and the desktop", async ($, on) => {
   const clock = mock.clock(on);
   const rows = JSON.stringify({
     path: "/t.jsonl",
@@ -303,9 +301,18 @@ test("with Clawd off, the minimap still draws in the band on the terminal, and t
   expect(await term.find({ key: "clawd" })).toBeUndefined();
   expect(await term.find({ key: "line:0" })).toBeDefined();
   await term.unmount();
-  const desk = await $.ui
-    .mount({ plugin: "runes", surface: "desktop", ...BAND })
-    .catch(() => undefined);
-  expect(await desk?.find({ key: "clawd-row" })).toBeUndefined();
-  await desk?.unmount();
+  const desk = await $.ui.mount({
+    plugin: "runes",
+    surface: "desktop",
+    ...BAND,
+  });
+  expect((await desk.find({ key: "clawd-row" }))?.props).toMatchObject({
+    justifyContent: "flex-start",
+  });
+  expect(await desk.find({ key: "line:0" })).toBeDefined();
+  // the desktop leaves a gap between text lines, so each bucket is one Svg bar over its button, aligned by its column
+  // a bar as wide as its column's button, so neighbouring bars touch
+  expect((await desk.find({ type: "Svg" }))?.props.width).toBe(34);
+  expect(await desk.find({ text: "█" })).toBeUndefined();
+  await desk.unmount();
 });
