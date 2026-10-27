@@ -23,6 +23,7 @@ export const THEMES = [
   "lab-notebook",
   "editorial",
   "card-table",
+  "guide-map",
 ] as const;
 const THEME_SETTINGS = ["auto", "random", ...THEMES] as const;
 export type Theme = (typeof THEMES)[number];

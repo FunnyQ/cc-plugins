@@ -1,0 +1,1018 @@
+<!doctype html>
+<html lang="{{lang}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/400" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/700" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenYoGothicTW/900" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/IBMPlexSansTC/400" />
+    <style>
+      *,
+      ::before,
+      ::after {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      :root {
+        --water: #f5f1e4; /* --water: the page ground, the water between the land */
+        --land: #8ed462; /* --land: every green area */
+        --ink: #2c2e2a; /* --ink: type, the route, chips */
+        --ink-soft: #55574f; /* --ink-soft: captions on water */
+        --sun: #ffd23f; /* --sun: route capsules, sunny areas */
+        --sun-hi: #f5e211; /* --sun-hi: the gate */
+        --coral: #ff705d; /* --coral: closed paths, the pick */
+        --pond: #4fa6e3; /* --pond: ponds inside drawings */
+        --blue: #2ba0ff; /* --blue: info capsules, focus */
+        --lilac: #ebc1ff; /* --lilac: the second area */
+        --hair: rgba(44, 46, 42, 0.28);
+        --sans: "Bricolage Grotesque", "GenYoGothicTW", "PingFang TC", sans-serif;
+        --mono: "JetBrains Mono", "GenYoGothicTW", ui-monospace, Menlo, monospace;
+        /* the round chips that ride one end of a capsule, all 26px */
+        --chip-dot: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3C/svg%3E");
+        --chip-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Ccircle cx='13' cy='13' r='5' fill='%23F5F1E4'/%3E%3C/svg%3E");
+        --chip-gate: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Cpath d='M8 19V10.5a5 5 0 0 1 10 0V19' fill='none' stroke='%23F5F1E4' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E");
+        --chip-exit: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Cpath d='M7.5 13h10M13.5 8.5 18 13l-4.5 4.5' fill='none' stroke='%23F5F1E4' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --chip-barrier: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Crect x='5.5' y='10.5' width='15' height='5' rx='2.5' fill='%23F5F1E4'/%3E%3C/svg%3E");
+        --chip-info: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Ccircle cx='13' cy='8' r='1.8' fill='%23F5F1E4'/%3E%3Crect x='11.5' y='11' width='3' height='8.5' rx='1.5' fill='%23F5F1E4'/%3E%3C/svg%3E");
+        --chip-star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Cpath d='M13 6.5l1.9 4.2 4.6.5-3.4 3.1 1 4.5-4.1-2.4-4.1 2.4 1-4.5-3.4-3.1 4.6-.5z' fill='%23F5F1E4'/%3E%3C/svg%3E");
+        --chip-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Cpath d='M13 7.5V13l3.5 2.5' fill='none' stroke='%23F5F1E4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        --chip-sign: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='12' fill='%232C2E2A'/%3E%3Cpath d='M10.5 9 6.5 13l4 4M15.5 9l4 4-4 4' fill='none' stroke='%23F5F1E4' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+        /* the route: round ink dots, one every 16px */
+        --route: radial-gradient(circle, var(--ink) 0 3px, transparent 3.6px);
+        color-scheme: light;
+        scrollbar-color: var(--ink) var(--water);
+      }
+      html {
+        background: var(--water);
+      }
+      /* lobes that peek in from the side margins, lower down: never wider than the margin, so never behind text */
+      body {
+        --margin: max(0px, calc((100% - 1104px) / 2 - 10px));
+        position: relative;
+        min-height: 100vh;
+        overflow-x: hidden;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 300' preserveAspectRatio='none'%3E%3Cpath fill='%23EBC1FF' d='M0 0C38 6 70 40 78 92C86 140 100 176 84 224C70 266 34 296 0 300Z'/%3E%3C/svg%3E")
+            0 1180px / var(--margin) 360px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 300' preserveAspectRatio='none'%3E%3Cpath fill='%232BA0FF' d='M100 0C64 10 26 34 18 86C10 132 34 160 22 206C10 252 46 290 100 300Z'/%3E%3C/svg%3E")
+            100% 2500px / var(--margin) 320px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 300' preserveAspectRatio='none'%3E%3Cpath fill='%23FF705D' d='M0 0C30 8 66 30 74 78C82 120 64 150 76 196C88 244 52 284 0 300Z'/%3E%3C/svg%3E")
+            0 3700px / var(--margin) 300px no-repeat,
+          var(--water);
+        color: var(--ink);
+        font: 400 18px/1.7 var(--sans);
+        font-optical-sizing: auto;
+        font-kerning: normal;
+      }
+      ::selection {
+        background: var(--sun-hi);
+        color: var(--ink);
+      }
+      :focus-visible {
+        outline: 3px solid var(--blue);
+        outline-offset: 3px;
+        border-radius: 6px;
+      }
+      .page {
+        position: relative;
+        z-index: 0;
+        container-type: inline-size;
+      }
+      .titlebar,
+      main,
+      .colophon > div {
+        width: min(100% - 48px, 1040px);
+        margin-inline: auto;
+      }
+      /* the masthead: a green lobe swelling off the top and right edges, its coast doing the dividing */
+      .masthead {
+        position: relative;
+        padding: 92px 0 118px;
+      }
+      .masthead::before,
+      .masthead::after {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        top: 0;
+        pointer-events: none;
+      }
+      .masthead::before {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 100' preserveAspectRatio='none'%3E%3Cpath fill='%238ED462' d='M0 0H1200V100C1130 100 1090 88 1030 86C960 84 930 95 860 95C790 95 760 82 690 80C610 78 580 92 500 92C420 92 390 77 310 76C240 75 200 86 140 85C80 84 40 74 22 62C8 53 0 44 0 34Z'/%3E%3C/svg%3E")
+          0 0 / 100% 100% no-repeat;
+      }
+      /* the same land swelling further down the right edge, opening on a lake */
+      .masthead::after {
+        right: 0;
+        width: clamp(220px, 27%, 380px);
+        height: calc(100% + 210px);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 600' preserveAspectRatio='none'%3E%3Cpath fill='%238ED462' fill-rule='evenodd' d='M120 0H400V574C368 604 300 602 266 566C236 534 230 488 180 466C124 441 92 410 84 362C78 324 60 300 30 290C14 284 0 276 0 260V0ZM232 410C252 384 312 382 334 408C354 432 330 466 290 470C250 474 214 438 232 410Z'/%3E%3C/svg%3E")
+          0 0 / 100% 100% no-repeat;
+      }
+      .titlebar h1 {
+        max-width: 15em;
+        font: 800 clamp(40px, 7cqi, 88px) / 0.95 var(--sans);
+        font-variation-settings: "opsz" 96;
+        letter-spacing: -0.06em;
+        text-wrap: balance;
+      }
+      .titlebar .meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 18px;
+        margin-top: 26px;
+        font: 600 15px/1.4 var(--sans);
+      }
+      /* a capsule: a flat pill with a round chip riding its left end */
+      .cap,
+      .steps::before,
+      .steps::after,
+      .steps > li::before,
+      .analogy::before,
+      .takeaway::before,
+      aside.note::before,
+      aside.warn::before,
+      .card.pick::after,
+      .timeline time,
+      main .code::before,
+      main .diff::before {
+        --chip: var(--chip-dot);
+        --fill: var(--sun);
+        display: inline-flex;
+        align-items: center;
+        width: max-content;
+        height: 36px;
+        padding: 0 16px 0 40px;
+        border-radius: 999px;
+        background:
+          var(--chip) 5px 50% / 26px 26px no-repeat,
+          var(--fill);
+        color: var(--ink);
+        font: 700 14px/1 var(--sans);
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .cap.blue {
+        --fill: var(--blue);
+        text-transform: none;
+        letter-spacing: 0;
+        font-size: 15px;
+      }
+      main {
+        padding-top: 8px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 68ch;
+      }
+      main b {
+        font-weight: 700;
+      }
+      main a {
+        color: var(--ink);
+        text-decoration-color: var(--blue);
+        text-decoration-thickness: 2px;
+        text-underline-offset: 4px;
+      }
+      main code {
+        font: 0.84em var(--mono);
+        padding: 1px 6px;
+        border-radius: 7px;
+        background: color-mix(in srgb, var(--land) 42%, transparent);
+        overflow-wrap: anywhere;
+      }
+      main h3 {
+        font: 700 22px/1.15 var(--sans);
+        letter-spacing: -0.03em;
+      }
+      /* the answer sits on the water just off the coast: big, plain, first */
+      .answer {
+        max-width: 28em;
+        font-size: clamp(21px, 2.4cqi, 27px);
+        font-weight: 500;
+        line-height: 1.45;
+        letter-spacing: -0.02em;
+      }
+      /* the analogy is the map's info signboard: a lilac board in an ink outline, its name on a tab riding the top edge */
+      .analogy {
+        position: relative;
+        max-width: calc(60ch + 64px);
+        margin-top: 56px;
+        padding: 34px 32px 26px;
+        border: 2px solid var(--ink);
+        border-radius: 22px 48px 26px 54px / 22px 40px 26px 46px;
+        background: var(--lilac);
+        font-size: 19px;
+        font-weight: 500;
+        line-height: 1.7;
+      }
+      .analogy::before {
+        content: "Think of it as";
+        --fill: var(--water);
+        position: absolute;
+        top: -19px;
+        left: 26px;
+        box-shadow: inset 0 0 0 2px var(--ink);
+      }
+      main > section {
+        margin-top: 88px;
+      }
+      main > section:first-of-type {
+        margin-top: 72px;
+      }
+      main h2 {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 24px;
+        font: 800 clamp(28px, 3.6cqi, 40px) / 1.05 var(--sans);
+        font-variation-settings: "opsz" 96;
+        letter-spacing: -0.045em;
+        text-wrap: balance;
+      }
+      main h2::before {
+        content: "";
+        flex: none;
+        width: 30px;
+        height: 30px;
+        background: var(--chip-stop) center / contain no-repeat;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 24px;
+      }
+      main > section > h2 + *,
+      .spread > .text > h2 + * {
+        margin-top: 0;
+      }
+      /* the walking route: a dotted path down the left, the gate at its head, a numbered stop for every step, the exit at its foot */
+      .steps {
+        --stop: 17px;
+        list-style: none;
+        padding: 0;
+        margin-block: 34px !important;
+        counter-reset: step;
+        /* the gate's leg: five whole dots between the gate and the first stop */
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 58'%3E%3Cg fill='%232C2E2A'%3E%3Ccircle cx='4' cy='5' r='3'/%3E%3Ccircle cx='4' cy='17' r='3'/%3E%3Ccircle cx='4' cy='29' r='3'/%3E%3Ccircle cx='4' cy='41' r='3'/%3E%3Ccircle cx='4' cy='53' r='3'/%3E%3C/g%3E%3C/svg%3E")
+          calc(var(--stop) - 4px) 46px / 8px 58px no-repeat;
+      }
+      .steps::before {
+        content: "Gate";
+        --fill: var(--sun-hi);
+        --chip: var(--chip-gate);
+        display: flex;
+        height: 42px;
+        padding-right: 22px;
+        font-size: 16px;
+        background-position: 4px 50%, 0 0;
+        background-size: 26px 26px, auto;
+      }
+      .steps::after {
+        content: "Exit";
+        --chip: var(--chip-exit);
+        display: flex;
+        height: 42px;
+        padding-right: 22px;
+        font-size: 16px;
+        margin-top: 66px;
+        background-position: 4px 50%, 0 0;
+      }
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        max-width: none;
+        min-height: 104px;
+        padding: 70px 0 0 120px;
+      }
+      /* each leg leaves 4px under its stop and ends 4px above the next; space-repeat keeps every dot whole */
+      .steps > li::after {
+        content: "";
+        position: absolute;
+        left: calc(var(--stop) - 4px);
+        top: 108px;
+        bottom: -62px;
+        width: 8px;
+        background: radial-gradient(circle, var(--ink) 0 3px, transparent 3.6px) 0 0 / 8px 12px;
+        background-repeat: no-repeat space;
+      }
+      /* on a wide page the stops alternate between two x offsets and each leg swings between them as an S; dashes on a non-scaling stroke stay round dots 12px apart at any leg height */
+      @container (min-width: 761px) {
+        .steps {
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 100' preserveAspectRatio='none'%3E%3Cpath d='M8 4C8 58 36 42 36 96' fill='none' stroke='%232C2E2A' stroke-width='6' stroke-linecap='round' stroke-dasharray='0 12' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+            9px 46px / 44px 58px no-repeat;
+        }
+        .steps > li {
+          padding-left: 164px;
+        }
+        .steps > li::before {
+          min-width: 84px;
+        }
+        .steps > li:nth-child(odd)::before {
+          left: 28px;
+        }
+        .steps > li::after {
+          left: 9px;
+          width: 44px;
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 100' preserveAspectRatio='none'%3E%3Cpath d='M8 4C8 58 36 42 36 96' fill='none' stroke='%232C2E2A' stroke-width='6' stroke-linecap='round' stroke-dasharray='0 12' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+            0 0 / 100% 100% no-repeat;
+        }
+        .steps > li:nth-child(odd)::after {
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 100' preserveAspectRatio='none'%3E%3Cpath d='M36 4C36 58 8 42 8 96' fill='none' stroke='%232C2E2A' stroke-width='6' stroke-linecap='round' stroke-dasharray='0 12' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E");
+        }
+        .steps:has(> li:last-child:nth-child(even))::after {
+          margin-left: 28px;
+        }
+      }
+      .steps > li > * {
+        max-width: 68ch;
+      }
+      .steps > li::before {
+        content: counter(step, decimal-leading-zero);
+        --chip: var(--chip-stop);
+        position: absolute;
+        left: 0;
+        top: 66px;
+        min-width: 96px;
+        height: 38px;
+        padding-right: 20px;
+        font-size: 17px;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+        background-position: 4px 50%, 0 0;
+      }
+      /* two areas of land across a channel of water, a dotted footbridge between them */
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 72px;
+      }
+      .compare > div {
+        position: relative;
+        padding: 30px 30px 32px;
+        border-radius: 52px 26px 46px 30px / 40px 30px 52px 26px;
+        background: var(--land);
+      }
+      .compare > div + div {
+        background: var(--lilac);
+        border-radius: 28px 50px 30px 48px / 30px 44px 26px 52px;
+      }
+      .compare > div > * + * {
+        margin-top: 10px;
+      }
+      .compare > div + div::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: -72px;
+        width: 72px;
+        height: 8px;
+        transform: translateY(-50%);
+        background: var(--route) 0 50% / 16px 8px repeat-x;
+      }
+      /* the timeline walks a route too, each stop a lilac clock capsule */
+      .timeline {
+        --stop: 17px;
+        list-style: none;
+        padding: 0;
+        background: var(--route) calc(var(--stop) - 8px) 0 / 16px 16px repeat-y;
+      }
+      .timeline > li {
+        position: relative;
+        max-width: calc(144px + 66ch);
+        min-height: 60px;
+        padding: 12px 0 12px 144px;
+      }
+      /* water over the route above the first stop and below the last, so the path starts and ends at a capsule */
+      .timeline > li:first-child {
+        background: linear-gradient(var(--water), var(--water)) 0 0 / 40px 14px no-repeat;
+      }
+      .timeline > li:last-child {
+        background: linear-gradient(var(--water), var(--water)) 0 46px / 40px 100% no-repeat;
+      }
+      .timeline time {
+        --fill: var(--lilac);
+        --chip: var(--chip-clock);
+        position: absolute;
+        top: 12px;
+        left: 0;
+        font-size: 15px;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+        background-position: 4px 50%, 0 0;
+      }
+      .timeline b {
+        display: block;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+        line-height: 1.5;
+      }
+      /* attractions: each option a flat area with a lobed corner, its number in a map-key chip */
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 40px 26px;
+        padding-top: 18px;
+        counter-reset: card;
+      }
+      .card {
+        --area: var(--lilac);
+        counter-increment: card;
+        position: relative;
+        display: grid;
+        grid-row: span 3;
+        grid-template-rows: subgrid;
+        gap: 0;
+        padding: 28px 26px 26px;
+        border-radius: 56px 22px 44px 22px / 46px 22px 52px 22px;
+        background: var(--area);
+      }
+      .card:nth-child(2) {
+        --area: var(--land);
+        border-radius: 24px 58px 22px 46px / 22px 48px 22px 54px;
+      }
+      .card:nth-child(3) {
+        --area: var(--sun);
+        border-radius: 22px 24px 60px 30px / 22px 24px 46px 40px;
+      }
+      .card:nth-child(4) {
+        --area: #bfe3a6;
+      }
+      .card::before {
+        content: counter(card);
+        position: absolute;
+        top: 22px;
+        right: 22px;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--ink);
+        color: var(--water);
+        font: 700 16px/1 var(--sans);
+      }
+      .card h3 {
+        align-self: start;
+        padding-right: 46px;
+        font-size: 24px;
+        overflow-wrap: anywhere;
+      }
+      .card .stats {
+        list-style: none;
+        margin-top: 16px;
+        padding: 0;
+      }
+      .card .stats li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 0;
+        background: var(--route) 0 100% / 8px 3px repeat-x;
+        background-image: radial-gradient(circle, var(--hair) 0 1.2px, transparent 1.6px);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .card .stats li:last-child {
+        background: none;
+      }
+      /* five dots: open rings for the track, solid ink up to the value */
+      .card meter {
+        appearance: none;
+        flex: none;
+        width: 90px;
+        height: 18px;
+        border: 0;
+        background: radial-gradient(circle at 9px 9px, transparent 0 4.6px, var(--ink) 5.2px 6.6px, transparent 7.2px)
+          0 0 / 18px 18px repeat-x;
+      }
+      .card meter::-webkit-meter-bar {
+        height: 18px;
+        border: 0;
+        background: none;
+      }
+      .card meter::-webkit-meter-optimum-value,
+      .card meter::-webkit-meter-suboptimum-value,
+      .card meter::-webkit-meter-even-less-good-value {
+        background: radial-gradient(circle at 9px 9px, var(--ink) 0 6.6px, transparent 7.2px) 0 0 / 18px 18px repeat-x;
+      }
+      .card meter::-moz-meter-bar {
+        background: radial-gradient(circle at 9px 9px, var(--ink) 0 6.6px, transparent 7.2px) 0 0 / 18px 18px repeat-x;
+      }
+      .card > p {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 2px solid var(--ink);
+        font-size: 15.5px;
+        line-height: 1.6;
+      }
+      /* the pick wears the map's "don't miss" capsule, riding its top edge */
+      .card.pick::after {
+        content: "Don't miss";
+        --fill: var(--coral);
+        --chip: var(--chip-star);
+        position: absolute;
+        top: -18px;
+        left: 22px;
+      }
+      .card.pick {
+        padding-top: 36px;
+      }
+      /* plates are map insets: an ink frame round a patch of water */
+      .plate {
+        padding: 18px;
+        border: 3px solid var(--ink);
+        border-radius: 36px 36px 36px 12px;
+        background: var(--water);
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 44px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        margin-top: 14px;
+        padding: 12px 6px 0;
+        border-top: 2px solid var(--ink);
+        font-size: 15px;
+        line-height: 1.6;
+        color: var(--ink-soft);
+      }
+      .parts {
+        display: grid;
+        gap: 4px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 40px 1fr;
+        gap: 12px;
+        padding: 10px 14px 10px 8px;
+        border-radius: 22px;
+        transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        margin-top: 1px;
+        border-radius: 50%;
+        background: var(--sun);
+        box-shadow: inset 0 0 0 2.5px var(--ink);
+        font: 800 16px/1 var(--sans);
+      }
+      .parts dd b {
+        display: block;
+        font-size: 19px;
+        letter-spacing: -0.02em;
+      }
+      .parts > div:hover {
+        background: var(--lilac);
+      }
+      .plate .part {
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.2;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+      /* drawing vocabulary: flat land, sun and pond fills with a wobbling coast, ink lines over them */
+      .plate .ink {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--coral);
+        stroke-width: 3.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .dash {
+        stroke-dasharray: 0.1 8;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: var(--sun);
+      }
+      .plate .wash-cool {
+        fill: var(--pond);
+      }
+      .plate .wash-sage {
+        fill: var(--land);
+      }
+      .plate .label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+      .plate .label-soft {
+        fill: var(--ink-soft);
+        font-size: 14px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+      /* code is a sign panel: ink board, water lettering, a sun capsule naming it */
+      main .code,
+      main .diff {
+        position: relative;
+        max-width: 100%;
+        overflow-x: auto;
+        padding: 62px 0 22px;
+        border-radius: 26px;
+        background: var(--ink);
+        color: var(--water);
+        font: 14.5px/1.75 var(--mono);
+        tab-size: 2;
+        font-variant-ligatures: none;
+        scrollbar-color: var(--sun) var(--ink);
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 26px;
+        font: inherit;
+        background: none;
+        border-radius: 0;
+        overflow-wrap: normal;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        --chip: var(--chip-sign);
+        position: absolute;
+        top: 14px;
+        left: 14px;
+        height: 32px;
+        font-size: 13px;
+        background-position: 3px 50%, 0 0;
+      }
+      main .diff::before {
+        content: "Before and after";
+      }
+      main .diff span {
+        display: block;
+        position: relative;
+        padding: 0 26px 0 40px;
+        margin: 0 -26px;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 18px;
+      }
+      main .diff .del {
+        background: rgba(255, 112, 93, 0.24);
+        color: #ffcfc7;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: var(--coral);
+      }
+      main .diff .add {
+        background: rgba(142, 212, 98, 0.22);
+        color: #d6f3c2;
+      }
+      main .diff .add::before {
+        content: "+";
+        color: var(--land);
+      }
+      main .mermaid {
+        font: 14px/1.6 var(--mono);
+        white-space: pre;
+        overflow-x: auto;
+      }
+      main .render-note {
+        margin-top: 10px;
+        font-size: 15px;
+        color: var(--ink-soft);
+      }
+      /* the table is the opening-hours board: a green signboard holding a water face */
+      main .table {
+        overflow-x: auto;
+        padding: 6px 8px 8px;
+        border-radius: 28px;
+        background: var(--land);
+        scrollbar-color: var(--ink) var(--land);
+      }
+      main table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        font-size: 16px;
+        font-variant-numeric: lining-nums tabular-nums;
+      }
+      main caption {
+        text-align: left;
+        padding: 8px 16px;
+        font-size: 15px;
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 11px 18px;
+      }
+      main th {
+        padding-block: 12px 10px;
+        font: 800 13px/1.4 var(--sans);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      main td {
+        min-width: 6em;
+        background: var(--water);
+      }
+      main tbody tr + tr td {
+        background-image: radial-gradient(circle, var(--hair) 0 1.3px, transparent 1.7px);
+        background-size: 8px 3px;
+        background-repeat: repeat-x;
+      }
+      main tbody tr:first-child td:first-child {
+        border-top-left-radius: 20px;
+      }
+      main tbody tr:first-child td:last-child {
+        border-top-right-radius: 20px;
+      }
+      main tbody tr:last-child td:first-child {
+        border-bottom-left-radius: 20px;
+      }
+      main tbody tr:last-child td:last-child {
+        border-bottom-right-radius: 20px;
+      }
+      main :is(th, td).num {
+        text-align: right;
+        font-family: var(--mono);
+        font-size: 0.92em;
+      }
+      /* asides are map signs: a capsule names the sign, the text sits beside it on the water */
+      aside.note,
+      aside.warn {
+        position: relative;
+        max-width: calc(196px + 18px + 62ch);
+        min-height: 36px;
+        padding: 4px 0 0 214px;
+        font-size: 17px;
+      }
+      aside.note::before,
+      aside.warn::before {
+        position: absolute;
+        top: 0;
+        left: 0;
+        background-position: 5px 50%, 0 0;
+      }
+      aside.note::before {
+        content: "Good to know";
+        --fill: var(--blue);
+        --chip: var(--chip-info);
+      }
+      aside.warn::before {
+        content: "Closed path";
+        --fill: var(--coral);
+        --chip: var(--chip-barrier);
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 30px;
+      }
+      svg.pele {
+        --_bg: var(--water);
+        --_fg: var(--ink);
+        --_m: var(--ink-soft);
+        --_l: var(--ink);
+        --_s: var(--sun);
+        --_a: var(--pond);
+        --_b: var(--ink);
+        --_c: var(--coral);
+        --_r: 14px;
+        color: var(--ink);
+        font:
+          16px "IBMPlexSansTC",
+          "PingFang TC",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 2.5;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: none;
+        stroke-width: 2.5;
+      }
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: var(--land);
+        filter: url(#wash);
+      }
+      svg.pele .pele-node > rect:not([rx]) {
+        rx: var(--_r);
+      }
+      /* the takeaway is the exit sign: a green area with the way-out capsule */
+      .takeaway {
+        position: relative;
+        max-width: 44em;
+        margin-top: 96px;
+        padding: 70px 40px 36px;
+        border-radius: 60px 28px 54px 30px / 50px 30px 60px 28px;
+        background: var(--land);
+        font-size: clamp(20px, 2.2cqi, 25px);
+        font-weight: 700;
+        line-height: 1.45;
+        letter-spacing: -0.02em;
+        text-wrap: balance;
+      }
+      .takeaway::before {
+        content: "Way out";
+        --fill: var(--sun-hi);
+        --chip: var(--chip-exit);
+        position: absolute;
+        top: 22px;
+        left: 26px;
+      }
+      /* the footer: land rising from the bottom edge, the credits on it */
+      .colophon {
+        margin-top: 110px;
+        padding: 104px 0 40px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 100' preserveAspectRatio='none'%3E%3Cpath fill='%238ED462' d='M0 100V44C50 26 110 22 190 30C300 40 360 14 480 16C600 18 660 40 790 36C920 32 990 8 1100 10C1150 11 1180 18 1200 26V100Z'/%3E%3C/svg%3E")
+          0 0 / 100% 100% no-repeat;
+      }
+      .colophon > div {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 6px 28px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .colophon b {
+        margin-right: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .titlebar,
+        main,
+        .colophon > div {
+          width: min(100% - 36px, 1040px);
+        }
+        .masthead {
+          padding: 56px 0 84px;
+        }
+        .masthead::after {
+          display: none;
+        }
+        .analogy {
+          padding: 30px 22px 22px;
+        }
+        .titlebar h1 {
+          letter-spacing: -0.05em;
+        }
+        main > section,
+        main > section:first-of-type {
+          margin-top: 64px;
+        }
+        .steps > li {
+          padding-left: 98px;
+        }
+        .steps > li::before {
+          min-width: 80px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 26px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .plate {
+          padding: 12px;
+          border-radius: 26px 26px 26px 10px;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 44px;
+        }
+        .compare > div + div::before {
+          top: -44px;
+          left: 50%;
+          width: 8px;
+          height: 44px;
+          transform: translateX(-50%);
+          background: var(--route) 50% 0 / 8px 16px repeat-y;
+        }
+        .cards {
+          grid-template-columns: 1fr;
+          gap: 44px;
+        }
+        .card {
+          grid-row: auto;
+          grid-template-rows: auto;
+        }
+        .timeline > li {
+          padding: 58px 0 12px 42px;
+        }
+        aside.note,
+        aside.warn {
+          padding: 48px 0 0 0;
+        }
+        .takeaway {
+          padding: 66px 24px 28px;
+        }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
+        .colophon {
+          padding-top: 72px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash" x="-6%" y="-6%" width="112%" height="112%">
+          <feTurbulence type="fractalNoise" baseFrequency=".012" numOctaves="2" seed="4" />
+          <feDisplacementMap in="SourceGraphic" scale="5" />
+        </filter>
+      </defs>
+    </svg>
+    <div class="page">
+      <header class="masthead">
+        <div class="titlebar">
+          <h1>{{title}}</h1>
+          <p class="meta"><span class="cap blue">{{project}}</span><time>{{generatedAt}}</time></p>
+        </div>
+      </header>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <div>
+          <span><b>Map of</b>{{project}}</span>
+          <span><b>Walked by</b>a fork of this session</span>
+          <span><b>Printed</b>{{generatedAt}}</span>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

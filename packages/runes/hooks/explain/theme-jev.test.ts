@@ -21,6 +21,7 @@ test("the inventory carries the scrubbed title, each h2's text and the structure
     table: true,
     code: true,
     cards: false,
+    steps: false,
   });
   expect(JSON.stringify(inv)).not.toContain("prose");
 });
@@ -49,6 +50,15 @@ test("the inventory sees a card comparison, single-quoted too, but not one quote
   expect(
     themeInventory("T", `<pre class="code">${cards}</pre>`).cards,
   ).toBe(false);
+});
+
+test("the inventory sees a procedure's steps, single-quoted too, but not steps quoted in code", () => {
+  const steps = '<ol class="steps"><li>back up</li><li>migrate</li></ol>';
+  expect(themeInventory("T", steps).steps).toBe(true);
+  expect(themeInventory("T", "<ol class='steps'></ol>").steps).toBe(true);
+  expect(themeInventory("T", `<pre class="code">${steps}</pre>`).steps).toBe(
+    false,
+  );
 });
 
 test("the inventory decodes character references before it masks, so an encoded secret is still masked", () => {
@@ -108,7 +118,7 @@ test("jevTheme sends the inventory as state and takes Jev's likeliest theme", as
     Object.keys(
       (bodies[0]!.questions as { theme: { criteria: object } }).theme.criteria,
     ),
-  ).toEqual(["picture-book", "blueprint", "lab-notebook", "editorial", "card-table"]);
+  ).toEqual(["picture-book", "blueprint", "lab-notebook", "editorial", "card-table", "guide-map"]);
 });
 
 test("jevTheme answers nothing when Jev throws, refuses, or names no theme", async () => {

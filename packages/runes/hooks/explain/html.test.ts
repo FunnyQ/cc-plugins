@@ -222,5 +222,6 @@ test("pickTheme keeps a named theme and draws one for random", () => {
   expect(pickTheme("random", () => 0.3)).toBe("blueprint");
   expect(pickTheme("random", () => 0.45)).toBe("lab-notebook");
   expect(pickTheme("random", () => 0.6)).toBe("editorial");
-  expect(pickTheme("random", () => 0.99)).toBe("card-table");
+  expect(pickTheme("random", () => 0.75)).toBe("card-table");
+  expect(pickTheme("random", () => 0.99)).toBe("guide-map");
 });

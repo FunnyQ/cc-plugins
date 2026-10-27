@@ -52,6 +52,8 @@ export const THEME_FIT: Record<Theme, string> = {
     "A recap or a story over time: what happened in a session, a timeline, the history of a change",
   "card-table":
     "A choice among options: two to four alternatives weighed on the same measures, their trade-offs, which one to pick",
+  "guide-map":
+    "A procedure to follow: the steps to set up, migrate, deploy or run something, in order, with the pitfalls along the way",
 };
 
 const GRAMMAR = [
