@@ -6,7 +6,15 @@ import { DatabaseSync } from "node:sqlite";
 import { dirname, join } from "node:path";
 
 import type { AttemptRow } from "./attempt";
-import { dbPath, insert, open, parseRow } from "./lessons-db";
+import {
+  dbPath,
+  insert,
+  label,
+  open,
+  parseRow,
+  stats,
+  unlabeled,
+} from "./lessons-db";
 
 const ROW: AttemptRow = {
   prompt: "can you checking the logs",
@@ -284,5 +292,312 @@ describe("lessons-cli.ts", () => {
     expect(
       await run(temp(), JSON.stringify({ ...ROW, outcome: "bogus" })),
     ).toEqual({ code: 1, stderr: "unknown outcome: bogus" });
+  });
+});
+
+const AT = "2026-10-27T11:00:00.000Z";
+
+const seed = () => {
+  const home = temp();
+  const db = open(dbPath(home));
+  const base = { ...ROW, model: "haiku", effort: "low", system: "S" };
+  const fixture: [
+    AttemptRow["outcome"],
+    number | null,
+    number | null,
+    number,
+    string | null,
+  ][] = [
+    ["gated", 0.4, 0.68, 0.7, null],
+    ["shown", 0.68, 0.88, 0.7, "B2"],
+    ["gated", 0.92, 0.52, 0.7, null],
+    ["gated", 0.62, 0.52, 0.7, null],
+    ["shown", 0.82, 0.68, 0.7, "B5"],
+    ["gated", 0.78, 0.97, 0.7, null],
+    ["jev-failed", null, null, 0.7, null],
+    ["gated", 0.9, 0.9, 0.75, null],
+    ["not-rewrite", 0.85, 0.75, 0.75, "B9"],
+  ];
+  for (const [outcome, english, improve, englishMin, better] of fixture)
+    insert(db, {
+      ...base,
+      outcome,
+      english,
+      improve,
+      englishMin,
+      improveMin: 0.6,
+      better,
+      quip: null,
+    });
+  const labels: [0 | 1 | null, "good" | "bad-gate" | null][] = [
+    [1, null],
+    [1, "good"],
+    [1, null],
+    [0, null],
+    [0, "bad-gate"],
+    [0, null],
+    [1, null],
+    [null, null],
+  ];
+  labels.forEach(([needs, verdict], k) =>
+    expect(label(db, k + 1, { needs, verdict, note: null }, AT)).toBe(true),
+  );
+  return { home, db };
+};
+
+const expectCut = (
+  c: Record<string, number> | null,
+  want: Record<string, number>,
+) => {
+  expect(c).not.toBeNull();
+  for (const [k, v] of Object.entries(want)) expect(c![k]).toBeCloseTo(v, 9);
+};
+
+describe("unlabeled and label", () => {
+  test("unlabeled returns only id 9 in the fixture", () => {
+    const { db } = seed();
+    expect(unlabeled(db).map((r) => r.id)).toEqual([9]);
+    expect(unlabeled(db)[0]).toEqual({
+      id: 9,
+      at: ROW.at,
+      project: ROW.project,
+      outcome: "not-rewrite",
+      english: 0.85,
+      improve: 0.75,
+      prompt: ROW.prompt,
+      better: "B9",
+      quip: null,
+    });
+    db.close();
+  });
+
+  test("unlabeled orders by id", () => {
+    const db = open(dbPath(temp()));
+    insert(db, ROW);
+    insert(db, ROW);
+    insert(db, ROW);
+    expect(unlabeled(db).map((r) => r.id)).toEqual([1, 2, 3]);
+    db.close();
+  });
+
+  test("label refuses an already-labeled row and changes nothing", () => {
+    const { db } = seed();
+    expect(
+      label(db, 2, { needs: 0, verdict: "bad-model", note: "x" }, "later"),
+    ).toBe(false);
+    expect(
+      db
+        .query("SELECT needs, verdict, note, labeled_at FROM attempts WHERE id = 2")
+        .get(),
+    ).toEqual({ needs: 1, verdict: "good", note: null, labeled_at: AT });
+    db.close();
+  });
+});
+
+describe("stats", () => {
+  test("fixed sample: sample, variants, current, sweep", () => {
+    const { db } = seed();
+    const s = stats(db, { english: 0.7, improve: 0.6 });
+    db.close();
+    const hash = createHash("sha256").update("S").digest("hex").slice(0, 12);
+    expect(s.sample).toBe(6);
+    expect(s.variants).toEqual([
+      {
+        model: "haiku",
+        effort: "low",
+        systemHash: hash,
+        englishMin: 0.7,
+        improveMin: 0.6,
+        rows: 7,
+        shown: 2,
+        labeled: 7,
+        good: 1,
+        judged: 2,
+      },
+      {
+        model: "haiku",
+        effort: "low",
+        systemHash: hash,
+        englishMin: 0.75,
+        improveMin: 0.6,
+        rows: 2,
+        shown: 0,
+        labeled: 1,
+        good: 0,
+        judged: 0,
+      },
+    ]);
+    expectCut(s.current, {
+      english: 0.7,
+      improve: 0.6,
+      tp: 0,
+      fp: 2,
+      fn: 3,
+      tn: 1,
+      accuracy: 1 / 6,
+      precision: 0,
+      recall: 0,
+    });
+    const want = [
+      [0.85, 0.5, 1, 0, 2, 3, 4 / 6, 1, 1 / 3],
+      [0.9, 0.5, 1, 0, 2, 3, 4 / 6, 1, 1 / 3],
+      [0.65, 0.5, 2, 2, 1, 1, 3 / 6, 2 / 4, 2 / 3],
+      [0.5, 0.7, 1, 1, 2, 2, 3 / 6, 1 / 2, 1 / 3],
+      [0.5, 0.75, 1, 1, 2, 2, 3 / 6, 1 / 2, 1 / 3],
+    ];
+    expect(s.sweep).toHaveLength(5);
+    want.forEach((w, k) => {
+      const [english, improve, tp, fp, fn, tn, accuracy, precision, recall] = w;
+      expectCut(s.sweep[k], {
+        english,
+        improve,
+        tp,
+        fp,
+        fn,
+        tn,
+        accuracy,
+        precision,
+        recall,
+      });
+    });
+  });
+
+  test("a cut predicting nothing gives zero precision and recall", () => {
+    const { db } = seed();
+    const s = stats(db, { english: 0.99, improve: 0.99 });
+    db.close();
+    expectCut(s.current, {
+      tp: 0,
+      fp: 0,
+      fn: 3,
+      tn: 3,
+      precision: 0,
+      recall: 0,
+      accuracy: 0.5,
+    });
+  });
+
+  test("an empty database", () => {
+    const db = open(dbPath(temp()));
+    expect(stats(db, { english: 0.7, improve: 0.6 })).toEqual({
+      variants: [],
+      sweep: [],
+      current: null,
+      sample: 0,
+    });
+    db.close();
+  });
+});
+
+const cli = async (home: string, stdin: string, args: string[]) => {
+  const p = record(home, stdin, args);
+  const [code, stdout] = await Promise.all([
+    p.exited,
+    new Response(p.stdout).text(),
+  ]);
+  return { code, stdout };
+};
+
+const labels = (home: string) => {
+  const db = open(dbPath(home));
+  const rows = db
+    .query(
+      "SELECT id, needs, verdict, note, labeled_at IS NOT NULL AS done FROM attempts ORDER BY id",
+    )
+    .all();
+  db.close();
+  return rows;
+};
+
+describe("lessons-cli.ts label", () => {
+  const three = () => {
+    const home = temp();
+    const db = open(dbPath(home));
+    insert(db, { ...ROW, outcome: "shown", better: "Fix it." });
+    insert(db, { ...ROW, outcome: "gated", better: null });
+    insert(db, { ...ROW, outcome: "shown" });
+    db.close();
+    return home;
+  };
+
+  test("re-asks, labels, skips, and quits without touching the current row", async () => {
+    const home = three();
+    const r = await cli(home, "x\ny\ng\nnice\ns\nq\n", ["label"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout.split("needs? ").length - 1).toBe(4);
+    expect(labels(home)).toEqual([
+      { id: 1, needs: 1, verdict: "good", note: "nice", done: 1 },
+      { id: 2, needs: null, verdict: null, note: null, done: 1 },
+      { id: 3, needs: null, verdict: null, note: null, done: 0 },
+    ]);
+  });
+
+  test("a row with no better is never asked for a verdict", async () => {
+    const home = temp();
+    const db = open(dbPath(home));
+    insert(db, { ...ROW, outcome: "gated", better: null, quip: null });
+    db.close();
+    const r = await cli(home, "n\n\n", ["label"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).not.toContain("verdict?");
+    expect(r.stdout).not.toContain("better:");
+    expect(labels(home)).toEqual([
+      { id: 1, needs: 0, verdict: null, note: null, done: 1 },
+    ]);
+  });
+
+  test("EOF exits 0 and leaves the current row untouched", async () => {
+    const home = three();
+    const r = await cli(home, "y\n", ["label"]);
+    expect(r.code).toBe(0);
+    expect(labels(home).map((x) => (x as { done: number }).done)).toEqual([
+      0, 0, 0,
+    ]);
+  });
+
+  test("control characters print escaped", async () => {
+    const home = temp();
+    const db = open(dbPath(home));
+    insert(db, { ...ROW, prompt: "\x1b]52;c;aGk=\x07" });
+    db.close();
+    const r = await cli(home, "q\n", ["label"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("prompt: \\x1b]52;c;aGk=\\x07");
+    expect(r.stdout).not.toContain("\x1b");
+  });
+
+  test("an empty database prints no unlabeled rows", async () => {
+    const home = temp();
+    open(dbPath(home)).close();
+    expect(await cli(home, "", ["label"])).toEqual({
+      code: 0,
+      stdout: "no unlabeled rows\n",
+    });
+  });
+});
+
+describe("lessons-cli.ts stats", () => {
+  test("prints the fixed sample", async () => {
+    const { home, db } = seed();
+    db.close();
+    const r = await cli(home, "", ["stats"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout.startsWith("sample\t6\n")).toBe(true);
+    const lines = r.stdout.split("\n");
+    const v = lines.indexOf("variants");
+    const s = lines.indexOf("sweep");
+    const c = lines.indexOf("current");
+    expect(0 < v && v < s && s < c).toBe(true);
+    expect(lines[s + 2]).toBe("0.85\t0.50\t1\t0\t2\t3\t0.667\t1.000\t0.333");
+    expect(lines[v + 2]).toBe(
+      `haiku\tlow\t${createHash("sha256").update("S").digest("hex").slice(0, 12)}\t0.70\t0.60\t7\t2\t7\t1/2`,
+    );
+    expect(lines[c + 2]).toBe("0.70\t0.60\t0\t2\t3\t1\t0.167\t0.000\t0.000");
+  });
+
+  test("an empty database prints current none", async () => {
+    const r = await cli(temp(), "", ["stats"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("current\tnone");
   });
 });

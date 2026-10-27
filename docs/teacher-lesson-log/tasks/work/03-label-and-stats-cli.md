@@ -8,7 +8,7 @@
 >
 > **Depends on**: work/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -201,26 +201,26 @@ Insert these rows through `insert()` into a fresh `mkdtemp` database, in this or
 
 ## Acceptance criteria
 
-- [ ] A row whose `prompt` holds `"\x1b]52;c;aGk=\x07"` prints `\x1b]52;c;aGk=\x07` as text in `label`'s output (a CLI spec test asserts stdout contains no raw `\x1b`).
+- [x] A row whose `prompt` holds `"\x1b]52;c;aGk=\x07"` prints `\x1b]52;c;aGk=\x07` as text in `label`'s output (a CLI spec test asserts stdout contains no raw `\x1b`).
 
-- [ ] `unlabeled()` returns unlabeled rows in `id` order and never a skipped row. In the fixture it returns only id 9.
-- [ ] `label()` on a row whose `labeled_at` is already set returns `false` and leaves `needs`, `verdict`, `note` and `labeled_at` unchanged.
-- [ ] `stats()` over the fixed sample returns exactly the `sample`, `variants`, `current` and `sweep` listed under Implementation notes. It also returns the zero-denominator and empty-database results listed there.
-- [ ] `label` CLI: a fresh database holds three rows.
+- [x] `unlabeled()` returns unlabeled rows in `id` order and never a skipped row. In the fixture it returns only id 9.
+- [x] `label()` on a row whose `labeled_at` is already set returns `false` and leaves `needs`, `verdict`, `note` and `labeled_at` unchanged.
+- [x] `stats()` over the fixed sample returns exactly the `sample`, `variants`, `current` and `sweep` listed under Implementation notes. It also returns the zero-denominator and empty-database results listed there.
+- [x] `label` CLI: a fresh database holds three rows.
   - Row 1 is `shown` with `better: "Fix it."`, row 2 is `gated` with no `better`, and row 3 is `shown`.
   - Pipe in `x\ny\ng\nnice\ns\nq\n` through `Bun.spawn` with `HOME` set to the temp directory. The run exits 0.
   - Row 1 ends as `needs 1, verdict good, note "nice"`. The `x` was re-asked.
   - Row 2 ends as `needs null, verdict null, labeled_at` set.
   - Row 3 has `labeled_at` still `NULL`.
-- [ ] `label` CLI: a row with no `better` is never asked for a verdict. A `n` answer followed by an empty note stores `needs 0, verdict null, note null`.
-- [ ] `stats` CLI over the fixed sample exits 0. Its stdout starts with `sample\t6`. It contains the `variants`, `sweep` and `current` headings in that order, and the first sweep line is `0.85\t0.50\t1\t0\t2\t3\t0.667\t1.000\t0.333`.
-- [ ] `lessons-db.ts` and `lessons-cli.ts` import only what `schema.md` allows: `bun:sqlite`, `node:fs`, `node:path`, `./attempt` and `./lessons-db`.
-- [ ] (human) In a temp `HOME` seeded with 4 rows by the smoke script's `record` command looped as `for o in shown same gated shown`, Q runs `label` by hand: answers row 1, skips row 2 with `s`, answers row 3, presses Ctrl-C at row 4. `sqlite3` shows rows 1–3 with `labeled_at` set and exactly the answers typed, and row 4 unlabeled.
+- [x] `label` CLI: a row with no `better` is never asked for a verdict. A `n` answer followed by an empty note stores `needs 0, verdict null, note null`.
+- [x] `stats` CLI over the fixed sample exits 0. Its stdout starts with `sample\t6`. It contains the `variants`, `sweep` and `current` headings in that order, and the first sweep line is `0.85\t0.50\t1\t0\t2\t3\t0.667\t1.000\t0.333`.
+- [x] `lessons-db.ts` and `lessons-cli.ts` import only what `schema.md` allows: `bun:sqlite`, `node:fs`, `node:path`, `./attempt` and `./lessons-db`.
+- [x] (human) In a temp `HOME` seeded with 4 rows by the smoke script's `record` command looped as `for o in shown same gated shown`, Q runs `label` by hand: answers row 1, skips row 2 with `s`, answers row 3, presses Ctrl-C at row 4. `sqlite3` shows rows 1–3 with `labeled_at` set and exactly the answers typed, and row 4 unlabeled.
 
 ## Verification
 
-- [ ] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` passes with 0 fail.
-- [ ] Smoke test with a temporary `HOME`:
+- [x] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` passes with 0 fail.
+- [x] Smoke test with a temporary `HOME`:
   ```sh
   set -e
   h=$(mktemp -d)
@@ -234,7 +234,7 @@ Insert these rows through `insert()` into a fresh `mkdtemp` database, in this or
   rm -rf "$h"
   ```
   Run it in a subshell; with `set -e` any step that exits non-zero stops the script before `sqlite3`. `sqlite3` prints `1|1|good||1` and `2|0|bad-gate|wrong gate|1`. `stats` prints `sample\t2`.
-- [ ] `claude plugin test packages/runes` reports 0 fail.
+- [x] `claude plugin test packages/runes` reports 0 fail.
 
 ## Eval rubric
 

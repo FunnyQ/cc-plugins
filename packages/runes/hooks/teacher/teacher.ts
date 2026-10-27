@@ -7,10 +7,8 @@ import type { On } from "claude-code";
 import { config } from "../config";
 import { type Post, scrub, systemOne } from "../transcript/jev";
 import { cells } from "../transcript/text";
+import { type Attempt, ENGLISH, IMPROVE } from "./attempt";
 
-// literals, so a boundary compares exactly; unmeasured, tune them against hand-labelled prompts
-const ENGLISH = 0.7;
-const IMPROVE = 0.6;
 const MIN_WORDS = 4;
 const MAX_CHARS = 1000;
 const CACHE_SIZE = 50;
@@ -141,6 +139,7 @@ type Transport = {
   apiKey: string;
   complete: Complete;
   redraw: () => void;
+  record: (a: Attempt, session: Promise<string | undefined>) => void;
 };
 let transport: Transport | undefined;
 
@@ -156,23 +155,68 @@ const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   if (map.size > CACHE_SIZE) map.delete(map.keys().next().value!);
 };
 
-const coach = async (t: Transport, text: string) => {
-  const answers = await systemOne(t, questions(scrub(text)));
-  if (
-    !needsLesson({
-      english: answers.english?.noul ?? 0,
-      improve: answers.improve?.noul ?? 0,
-    })
-  )
+const coach = async (
+  t: Transport,
+  text: string,
+  session: Promise<string | undefined>,
+) => {
+  const record = (
+    outcome: Attempt["outcome"],
+    scores: { english: number | null; improve: number | null },
+    lesson?: { better: string; quip: string | undefined },
+  ) =>
+    t.record(
+      {
+        prompt: scrub(text),
+        ...scores,
+        englishMin: ENGLISH,
+        improveMin: IMPROVE,
+        outcome,
+        better: lesson ? scrub(lesson.better) : null,
+        quip: lesson?.quip === undefined ? null : scrub(lesson.quip),
+        system: SYSTEM,
+      },
+      session,
+    );
+  let answers: Awaited<ReturnType<typeof systemOne>>;
+  try {
+    answers = await systemOne(t, questions(scrub(text)));
+  } catch {
+    record("jev-failed", { english: null, improve: null });
     return undefined;
-  const reply = await t.complete(`<message>\n${text}\n</message>`, SYSTEM);
-  if (!reply) return undefined;
+  }
+  const scores = {
+    english: answers.english?.noul ?? null,
+    improve: answers.improve?.noul ?? null,
+  };
+  if (
+    !needsLesson({ english: scores.english ?? 0, improve: scores.improve ?? 0 })
+  ) {
+    record("gated", scores);
+    return undefined;
+  }
+  const reply = await t
+    .complete(`<message>\n${text}\n</message>`, SYSTEM)
+    .catch(() => undefined);
+  if (!reply) {
+    record("no-reply", scores);
+    return undefined;
+  }
   const lesson = parseReply(reply);
-  return lesson.better &&
-    !same(lesson.better, text) &&
-    isRewrite(lesson.better, text)
-    ? lesson
-    : undefined;
+  if (!lesson.better) {
+    record("empty", scores, lesson);
+    return undefined;
+  }
+  if (same(lesson.better, text)) {
+    record("same", scores, lesson);
+    return undefined;
+  }
+  if (!isRewrite(lesson.better, text)) {
+    record("not-rewrite", scores, lesson);
+    return undefined;
+  }
+  record("shown", scores, lesson);
+  return lesson;
 };
 
 export const teacher = {
@@ -193,7 +237,7 @@ export const teacher = {
     const key = keyOf(text);
     if (rows.get(key) !== requestId) keep(rows, key, requestId);
   },
-  submit(text: string) {
+  submit(text: string, session: Promise<string | undefined>) {
     const key = keyOf(text);
     current = key;
     const t = transport;
@@ -206,7 +250,7 @@ export const teacher = {
     )
       return;
     asked.add(key);
-    void coach(t, key)
+    void coach(t, key, session)
       .catch(() => undefined)
       .then((lesson) => {
         asked.delete(key);
@@ -222,9 +266,10 @@ export const teacher = {
 
 export const teach = (on: On) => {
   // the matcher keeps a peer's or a plugin's prompt out, and separates this hook from Clawd's
-  on("prompt.submit", { origin: { kind: "composer" } }, async (_$, e, next) => {
+  on("prompt.submit", { origin: { kind: "composer" } }, async ($, e, next) => {
     const r = await next(e);
-    if (!("drop" in r)) teacher.submit(r.text);
+    if (!("drop" in r))
+      teacher.submit(r.text, $.session.id().catch(() => undefined));
     return r;
   });
 };

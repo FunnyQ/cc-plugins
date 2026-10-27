@@ -35,6 +35,9 @@ import { where } from "./transcript/where";
 
 type $ = Parameters<Hook<"session.start">>[0];
 
+const MODEL = "haiku";
+const EFFORT = "low";
+
 const USAGE = `[on|off|status|reload] or <${RUNES.join("|")}> [on|off]; bare toggles`;
 const status = () =>
   RUNES.map((r) => `${r}: ${config.enabled[r] ? "on" : "off"}`).join(", ");
@@ -115,6 +118,7 @@ const notice = (l: Loaded) =>
 export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     where.cwd = e.cwd;
+    const project = e.cwd.split("/").filter(Boolean).at(-1) ?? "";
     const [loaded] = await Promise.all([
       loadConfig($),
       $.command.register({
@@ -148,15 +152,37 @@ export const register: Register = (on) => {
       post,
       complete: async (text, system) => {
         const r = await $.model.complete({
-          model: "haiku",
+          model: MODEL,
           prompt: text,
           system,
-          effort: "low",
+          effort: EFFORT,
           timeoutMs: 15_000,
         });
         return r.isAnswered ? r.text : undefined;
       },
       redraw,
+      record: (a, session) => {
+        const home = where.home;
+        if (!home) return;
+        void session
+          .then((id) =>
+            $.process.run(
+              ["bun", `${$.plugin.root}/hooks/teacher/lessons-cli.ts`, "record"],
+              {
+                stdin: JSON.stringify({
+                  ...a,
+                  at: new Date().toISOString(),
+                  project,
+                  session: id ?? "",
+                  model: MODEL,
+                  effort: EFFORT,
+                }),
+                env: { HOME: home },
+              },
+            ),
+          )
+          .catch(() => {});
+      },
     });
     await registerChecker($);
     return next(e);

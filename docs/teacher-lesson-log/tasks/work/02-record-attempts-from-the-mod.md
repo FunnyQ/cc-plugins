@@ -8,7 +8,7 @@
 >
 > **Depends on**: work/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -128,25 +128,25 @@ Every prompt the teacher asks Jev about leaves exactly one attempt record, spawn
 
 ## Acceptance criteria
 
-- [ ] Each of the 7 outcomes has a kit test that sees exactly one `record` call with that outcome and the table's field shape.
-- [ ] The session promise passed to `submit` reaches `record` unchanged, and `teach()`'s hook does not `await` `$.session.id()`.
-- [ ] Recorded `prompt`, `better` and `quip` are scrubbed; the scrub test proves a masked token never appears raw.
-- [ ] A prompt rejected before Jev records nothing.
-- [ ] Every pre-existing teacher test still passes with its assertions unchanged.
-- [ ] `teacher.ts` holds no threshold literal and imports `ENGLISH` / `IMPROVE` from `./attempt`.
-- [ ] `register.tsx` uses `MODEL` / `EFFORT` for both `$.model.complete` and `record`, skips the spawn when `home` is `""`, and passes `env: { HOME: home }`.
-- [ ] (human) In a real session, with `TYPESAFE_API_KEY` set and the teacher on, submit `can you checking the logs before we deploying` (expect a lesson), `thanks, that works fine for me` (expect `gated`), and `fix it` (expect no row); exactly two new rows appear. If Jev scores the second above both thresholds, pick another plain-English thanks and note it. Then `sqlite3 ~/.local/share/q-lab/runes/teacher/lessons.db 'select outcome, better, session from attempts order by id desc limit 5'` matches what the UI showed. After `/clear`, submit `please telling me why this test failing` and confirm its row's `session` differs from the earlier rows'.
+- [x] Each of the 7 outcomes has a kit test that sees exactly one `record` call with that outcome and the table's field shape.
+- [x] The session promise passed to `submit` reaches `record` unchanged, and `teach()`'s hook does not `await` `$.session.id()`.
+- [x] Recorded `prompt`, `better` and `quip` are scrubbed; the scrub test proves a masked token never appears raw.
+- [x] A prompt rejected before Jev records nothing.
+- [x] Every pre-existing teacher test still passes with its assertions unchanged.
+- [x] `teacher.ts` holds no threshold literal and imports `ENGLISH` / `IMPROVE` from `./attempt`.
+- [x] `register.tsx` uses `MODEL` / `EFFORT` for both `$.model.complete` and `record`, skips the spawn when `home` is `""`, and passes `env: { HOME: home }`.
+- [x] (human) In a real session, with `TYPESAFE_API_KEY` set and the teacher on, submit `can you checking the logs before we deploying` (expect a lesson), `thanks, that works fine for me` (expect `gated`), and `fix it` (expect no row); exactly two new rows appear. If Jev scores the second above both thresholds, pick another plain-English thanks and note it. Then `sqlite3 ~/.local/share/q-lab/runes/teacher/lessons.db 'select outcome, better, session from attempts order by id desc limit 5'` matches what the UI showed. After `/clear`, submit `please telling me why this test failing` and confirm its row's `session` differs from the earlier rows'.
 
 ## Verification
 
-- [ ] `grep -nE '"(haiku|low)"' packages/runes/hooks/register.tsx` prints only the `MODEL` and `EFFORT` constant lines, and `grep -c 'env: { HOME: home }' packages/runes/hooks/register.tsx` prints `2` (the existing `PARSE` spawn plus the new `lessons-cli.ts` spawn).
-- [ ] `claude plugin test packages/runes` passes: at least 387 tests (373 + 14 new), 0 fail.
-- [ ] `grep -n 'session\.id()' packages/runes/hooks/teacher/teacher.ts` prints exactly one line, inside the `prompt.submit` hook, with no `await`.
-- [ ] `claude plugin validate packages/runes` passes.
-- [ ] `grep -nE "const (ENGLISH|IMPROVE) =" packages/runes/hooks/teacher/teacher.ts` prints nothing.
-- [ ] `grep -n "lessons-db\|bun:sqlite" packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx` prints nothing.
-- [ ] `grep -n "lessons.db" packages/runes/hooks/config.ts CLAUDE.md` prints at least one line from each file.
-- [ ] `git diff --name-only <baseRef> -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx packages/runes/hooks/teacher/teacher.test.ts packages/runes/hooks/config.ts CLAUDE.md` lists all five paths.
+- [x] `grep -nE '"(haiku|low)"' packages/runes/hooks/register.tsx` prints only the `MODEL` and `EFFORT` constant lines, and `grep -c 'env: { HOME: home }' packages/runes/hooks/register.tsx` prints `2` (the existing `PARSE` spawn plus the new `lessons-cli.ts` spawn).
+- [x] `claude plugin test packages/runes` passes: at least 387 tests (373 + 14 new), 0 fail.
+- [x] `grep -n 'session\.id()' packages/runes/hooks/teacher/teacher.ts` prints exactly one line, inside the `prompt.submit` hook, with no `await`.
+- [x] `claude plugin validate packages/runes` passes.
+- [x] `grep -nE "const (ENGLISH|IMPROVE) =" packages/runes/hooks/teacher/teacher.ts` prints nothing.
+- [x] `grep -n "lessons-db\|bun:sqlite" packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx` prints nothing.
+- [x] `grep -n "lessons.db" packages/runes/hooks/config.ts CLAUDE.md` prints at least one line from each file.
+- [x] `git diff --name-only <baseRef> -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx packages/runes/hooks/teacher/teacher.test.ts packages/runes/hooks/config.ts CLAUDE.md` lists all five paths.
 
 ## Eval rubric
 

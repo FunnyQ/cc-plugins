@@ -207,6 +207,7 @@ minimap:
   # marker_color: "${DEFAULTS.minimap.marker_color}"   # the mark for where you are
 teacher:
   enabled: ${enabled.teacher}    # the English teacher: a better phrasing under an English prompt that could read better; needs TYPESAFE_API_KEY, sends each (secret-masked) English-looking prompt to TypeSafe's Jev, and asks haiku for the rewrite
+  # with it on and TYPESAFE_API_KEY set, every asked prompt is logged (secret-masked) to ~/.local/share/q-lab/runes/teacher/lessons.db, kept until you trash the file
 explain:
   enabled: ${enabled.explain} # the [Explain plz!] button under Clawd; a press forks this session to explain it, ELI5
 `;
