@@ -135,6 +135,21 @@ test("parseReply takes the why after the quip, in either order, and drops an emp
   ).toEqual({ better: "Can you check?", quip: undefined, why: undefined });
 });
 
+test("parseReply reads a tag that spans lines and folds its whitespace", () => {
+  expect(
+    parseReply("<quip>RIP</quip>\n<why>\nUse the base verb\nafter can.\n</why>\nCan you check?"),
+  ).toEqual({ better: "Can you check?", quip: "RIP", why: "Use the base verb after can." });
+  expect(
+    parseReply(`<why>\n${"rule ".repeat(40)}\n</why>\nCan you check?`),
+  ).toEqual({ better: "Can you check?", quip: undefined, why: undefined });
+});
+
+test("a lesson with a why still draws in a column narrower than one cell", () => {
+  expect(() =>
+    lessonLines("can you checking it", "Can you check it?", "can + base verb", -1),
+  ).not.toThrow();
+});
+
 test("a rewrite that changes more than half its words is a full rewrite", () => {
   expect(
     isFullRewrite(

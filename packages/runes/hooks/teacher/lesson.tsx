@@ -41,7 +41,7 @@ export const lessonLines = (
       ),
       ...(why
         ? [
-            [{ text: "─".repeat(width), color: palette().dim }],
+            [{ text: "─".repeat(Math.max(width, 1)), color: palette().dim }],
             ...wrapWords([{ text: why, color: palette().dim }], width),
           ]
         : []),

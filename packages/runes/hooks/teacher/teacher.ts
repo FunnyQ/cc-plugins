@@ -87,7 +87,7 @@ export const isFullRewrite = (text: string, better: string) => {
   return words.filter((w) => w.isChanged).length * 2 > words.length;
 };
 
-const TAG = /^\s*<(quip|why)>(.*?)<\/\1>[ \t]*\n?/;
+const TAG = /^\s*<(quip|why)>([\s\S]*?)<\/\1>[ \t]*\n?/;
 const capped = (s: string | undefined, max: number) =>
   s && cells(s) <= max ? s : undefined;
 
@@ -95,7 +95,7 @@ export const parseReply = (reply: string) => {
   const tags: Record<string, string> = {};
   let rest = reply;
   for (let m; (m = TAG.exec(rest)); rest = rest.slice(m[0].length))
-    tags[m[1]!] = m[2]!.trim();
+    tags[m[1]!] = m[2]!.replace(/\s+/g, " ").trim();
   return {
     better: rest.trim(),
     quip: capped(tags.quip, MAX_QUIP_CELLS),
