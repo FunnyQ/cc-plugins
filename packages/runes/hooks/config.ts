@@ -580,5 +580,30 @@ export const upgrade = (text: string, raw: unknown): string => {
       lines = setSwitch(lines.join("\n"), s, carried[s]).split("\n");
     }
   }
+
+  const explain = locate(lines, ["explain"]);
+  if (explain?.isOpen) {
+    const options = ["random", ...THEMES].join(" | ");
+    const at = lines.findIndex(
+      (l, i) =>
+        i > explain.head &&
+        i < explain.end &&
+        indentOf(l) === explain.inner &&
+        /^\s*(#\s*)?theme\s*:/.test(l),
+    );
+    if (at === -1) {
+      const after = switchAt(lines, explain);
+      lines.splice(
+        after === -1 ? explain.head + 1 : after + 1,
+        0,
+        `${" ".repeat(explain.inner)}# theme: ${DEFAULTS.explain.theme}   # ${options}`,
+      );
+    } else {
+      lines[at] = lines[at]!.replace(
+        /(#\s*)random(\s*\|\s*[\w-]+)*\s*$/,
+        `$1${options}`,
+      );
+    }
+  }
   return lines.join("\n");
 };

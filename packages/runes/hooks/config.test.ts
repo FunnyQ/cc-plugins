@@ -216,6 +216,36 @@ test("a section left empty gets its switch back, and never throws", () => {
   expect(upgrade(text, raw)).toContain("clawd:\n  enabled: true\n");
 });
 
+test("upgrade gives an explain block written before themes its theme line, under the switch", () => {
+  const full = TEMPLATE(DEFAULTS.enabled);
+  const themeLine = full.split("\n").find((l) => l.includes("# theme:"))!;
+  const old = full.replace(`${themeLine}\n`, "");
+  expect(upgrade(old, CURRENT())).toBe(full);
+});
+
+test("upgrade refreshes a stale theme list and keeps the chosen theme", () => {
+  const list = "random | picture-book | blueprint | lab-notebook | editorial";
+  const full = TEMPLATE(DEFAULTS.enabled);
+  const stale = full.replace(list, "random | picture-book | blueprint");
+  expect(upgrade(stale, CURRENT())).toBe(full);
+  const chosen = full.replace(
+    "  # theme: random   #",
+    "  theme: blueprint   #",
+  );
+  expect(
+    upgrade(chosen.replace(list, "random | picture-book"), CURRENT()),
+  ).toBe(chosen);
+});
+
+test("upgrade leaves a theme line with a note of its own alone", () => {
+  const full = TEMPLATE(DEFAULTS.enabled);
+  const own = full.replace(
+    /  # theme: random {3}# .*\n/,
+    "  theme: editorial   # the newspaper one\n",
+  );
+  expect(upgrade(own, CURRENT())).toBe(own);
+});
+
 test("a section holding only comments reads as null, which is neither a problem nor incomplete", () => {
   expect(normalize(CURRENT()).problems).toEqual([]);
   expect(normalize(CURRENT()).config.glow).toEqual(DEFAULTS.glow);
