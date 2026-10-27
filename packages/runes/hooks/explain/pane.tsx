@@ -192,6 +192,7 @@ export const explainPane = (on: On) => {
           key="explain-ask"
           placeholder="ask a follow-up, or name what to explain"
           value={v.draft ?? ""}
+          rows={Math.min((v.draft ?? "").split("\n").length, 6)}
           submitLabel="ask"
           onSubmit={() => undefined}
         />
