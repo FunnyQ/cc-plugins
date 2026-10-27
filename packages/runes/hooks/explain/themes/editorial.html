@@ -1,0 +1,901 @@
+<!doctype html>
+<html lang="{{lang}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenRyuMinTW/400" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenRyuMinTW/700" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenRyuMinTW/900" />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/400"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/600"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        /* print has no tints: a tinted block is a halftone screen of --dot, two offset dot grids making the 45-degree lattice; declared on every element so a local --dot takes */
+        --screen:
+          radial-gradient(var(--dot) 0.85px, transparent 1.15px) 0 0 / 4px 4px,
+          radial-gradient(var(--dot) 0.85px, transparent 1.15px) 2px 2px / 4px
+            4px;
+      }
+      :root {
+        --paper: #fff1e5; /* --paper: salmon broadsheet */
+        --paper-deep: #f2dfce; /* --paper-deep: boxed sidebars, code, table head */
+        --ink: #262a33; /* --ink: blue-black type and rules */
+        --ink-soft: #5f574f; /* --ink-soft: captions, datelines, struck lines */
+        --hair: rgba(38, 42, 51, 0.26); /* --hair: hairlines between rows */
+        --spot: #b0201a; /* --spot: the one spot colour: warnings, numbers, the quote mark */
+        --dot: color-mix(in srgb, var(--ink) 26%, transparent);
+        --serif: "Newsreader", "GenRyuMinTW", "Songti TC", serif;
+        --mono: "IBM Plex Mono", "GenRyuMinTW", ui-monospace, Menlo, monospace;
+        color-scheme: light;
+      }
+      body {
+        background: color-mix(in srgb, var(--paper) 78%, var(--ink));
+        padding: 24px 24px 64px;
+      }
+      /* the sheet lies on a short stack of earlier pages, each a hair askew */
+      .stack {
+        position: relative;
+        isolation: isolate;
+        max-width: 1280px;
+        margin: 0 auto;
+      }
+      .stack > i {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: color-mix(in srgb, var(--paper) var(--tone), var(--ink));
+        /* only an edge line per sheet; the one soft drop shadow belongs to the whole stack, on the bottom sheet, so five sheets never darken five times */
+        box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.1);
+      }
+      .stack > i:nth-child(1) {
+        box-shadow:
+          0 0.5px 1px rgba(0, 0, 0, 0.1),
+          0 12px 28px -14px rgba(0, 0, 0, 0.22);
+        --tone: 84%;
+        transform: translate(10px, 30px) rotate(0.2deg);
+      }
+      .stack > i:nth-child(2) {
+        --tone: 87%;
+        transform: translate(-9px, 24px) rotate(-0.26deg);
+      }
+      .stack > i:nth-child(3) {
+        --tone: 90%;
+        transform: translate(6px, 18px) rotate(0.12deg);
+      }
+      .stack > i:nth-child(4) {
+        --tone: 92%;
+        transform: translate(-5px, 12px) rotate(-0.18deg);
+      }
+      .stack > i:nth-child(5) {
+        --tone: 95%;
+        transform: translate(4px, 6px) rotate(0.1deg);
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--spot) 24%, transparent);
+        color: var(--ink);
+      }
+      :focus-visible {
+        outline: 2px solid var(--spot);
+        outline-offset: 3px;
+      }
+      .sheet {
+        container-type: inline-size;
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        /* newsprint: stray ink specks from the press (two tiles of unequal size, so their repeat never lines up), a few faint smudges, a fine pulp grain, and the uneven tone of cheap stock (large gradients, which never tile a seam) */
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='430' height='430'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.09' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .16 0 0 0 0 .2 60 0 0 0 -51.4'/%3E%3C/filter%3E%3Crect width='430' height='430' filter='url(%23s)' opacity='.6'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='610' height='610'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.05' numOctaves='2' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .15 0 0 0 0 .16 0 0 0 0 .2 70 0 0 0 -62.3'/%3E%3C/filter%3E%3Crect width='610' height='610' filter='url(%23s)' opacity='.6'/%3E%3C/svg%3E"),
+          radial-gradient(
+            46px 22px at 71% 13%,
+            rgba(38, 42, 51, 0.07),
+            transparent
+          ),
+          radial-gradient(
+            30px 40px at 8% 47%,
+            rgba(38, 42, 51, 0.06),
+            transparent
+          ),
+          radial-gradient(
+            70px 26px at 58% 81%,
+            rgba(38, 42, 51, 0.05),
+            transparent
+          ),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .22 0 0 0 0 .17 0 0 0 0 .13 0 0 0 .5 -.18'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E"),
+          radial-gradient(
+            900px 700px at 14% 8%,
+            rgba(120, 80, 50, 0.06),
+            transparent 70%
+          ),
+          radial-gradient(
+            800px 1100px at 88% 34%,
+            rgba(255, 255, 255, 0.28),
+            transparent 70%
+          ),
+          radial-gradient(
+            1100px 800px at 30% 60%,
+            rgba(120, 80, 50, 0.05),
+            transparent 70%
+          ),
+          radial-gradient(
+            900px 900px at 80% 88%,
+            rgba(120, 80, 50, 0.07),
+            transparent 70%
+          ),
+          var(--paper);
+        color: var(--ink);
+        font: 19px/1.72 var(--serif);
+        font-optical-sizing: auto;
+        font-kerning: normal;
+        /* ink spreads into absorbent stock: a hair of bleed round every glyph */
+        text-shadow: 0 0 0.6px color-mix(in srgb, var(--ink) 45%, transparent);
+        padding: 40px 96px 48px;
+        box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.12);
+      }
+
+      /* the paper was folded: down the middle and across at the thirds; a thick broadsheet bends round rather than creasing sharp, so each fold is a wide shaded roll with a soft lit crown */
+      .sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(
+            90deg,
+            transparent calc(50% - 150px),
+            rgba(70, 40, 20, 0.014) calc(50% - 60px),
+            rgba(70, 40, 20, 0.028) calc(50% - 14px),
+            rgba(255, 255, 255, 0.088) calc(50% + 4px),
+            rgba(255, 255, 255, 0.028) calc(50% + 30px),
+            rgba(70, 40, 20, 0.011) calc(50% + 70px),
+            transparent calc(50% + 150px)
+          ),
+          linear-gradient(
+            transparent calc(33.3% - 130px),
+            rgba(70, 40, 20, 0.012) calc(33.3% - 50px),
+            rgba(70, 40, 20, 0.025) calc(33.3% - 12px),
+            rgba(255, 255, 255, 0.077) calc(33.3% + 4px),
+            rgba(255, 255, 255, 0.025) calc(33.3% + 26px),
+            rgba(70, 40, 20, 0.01) calc(33.3% + 60px),
+            transparent calc(33.3% + 130px)
+          ),
+          linear-gradient(
+            transparent calc(66.6% - 130px),
+            rgba(70, 40, 20, 0.01) calc(66.6% - 60px),
+            rgba(255, 255, 255, 0.025) calc(66.6% - 26px),
+            rgba(255, 255, 255, 0.077) calc(66.6% - 4px),
+            rgba(70, 40, 20, 0.025) calc(66.6% + 12px),
+            rgba(70, 40, 20, 0.012) calc(66.6% + 50px),
+            transparent calc(66.6% + 130px)
+          );
+      }
+      /* the nameplate: the project set as the paper's name, over a dateline between rules */
+      .masthead {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+      .nameplate {
+        font: 800 clamp(44px, 7.4cqi, 100px) / 1 var(--serif);
+        letter-spacing: -0.025em;
+        padding-bottom: 14px;
+      }
+      .dateline {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        gap: 16px;
+        align-items: baseline;
+        padding: 7px 0 6px;
+        border-top: 3px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+        box-shadow: 0 -6px 0 -5px var(--ink);
+        font: 600 13px/1.4 var(--serif);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-variant-numeric: lining-nums;
+      }
+      .dateline > :first-child {
+        text-align: left;
+      }
+      .dateline > :last-child {
+        text-align: right;
+      }
+      .dateline em {
+        font-style: italic;
+        text-transform: none;
+        letter-spacing: 0.02em;
+        font-size: 16px;
+      }
+
+      .sheet > h1 {
+        font: 900 clamp(32px, 4.4cqi, 58px) / 1.16 var(--serif);
+        letter-spacing: -0.01em;
+        max-width: 24ch;
+        text-wrap: balance;
+      }
+      .byline {
+        margin: 14px 0 30px;
+        font: italic 400 16px/1.4 var(--serif);
+        color: var(--ink-soft);
+      }
+      main > * + * {
+        margin-top: 22px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 66ch;
+      }
+      main h2 {
+        font: 700 28px/1.25 var(--serif);
+        margin: 0 0 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--ink);
+        text-wrap: balance;
+      }
+      main h3 {
+        font: 700 13px/1.4 var(--serif);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      main a {
+        color: var(--spot);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font: 0.8em var(--mono);
+        background: var(--screen);
+        padding: 1px 5px;
+      }
+
+      /* the answer is the lede, opened by a drop cap */
+      .answer {
+        font-size: 24px;
+        line-height: 1.55;
+        max-width: 44ch;
+      }
+      .answer::first-letter {
+        float: left;
+        font: 900 3.3em/0.82 var(--serif);
+        margin: 0.08em 0.1em 0 0;
+        color: var(--spot);
+      }
+      /* run-in heads: the label opens the paragraph, never sits above it */
+      .analogy::before,
+      aside.note::before,
+      aside.warn::before {
+        font: 700 0.78em/1 var(--serif);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        margin-right: 0.6em;
+      }
+      .analogy {
+        max-width: 60ch;
+        padding: 16px 0 16px 22px;
+        border-left: 1px solid var(--ink);
+        font-style: italic;
+      }
+      .analogy::before {
+        content: "In plain terms";
+        font-style: normal;
+      }
+      /* the takeaway is the pull quote */
+      .takeaway {
+        position: relative;
+        max-width: 34ch;
+        margin: 72px auto 0 !important;
+        padding: 26px 0 22px;
+        border-top: 3px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+        font: 700 27px/1.45 var(--serif);
+        text-align: center;
+        text-wrap: balance;
+      }
+      .takeaway::before {
+        content: "“";
+        position: absolute;
+        top: -46px;
+        left: 50%;
+        transform: translateX(-50%);
+        font:
+          800 76px/0.7 "Newsreader",
+          serif;
+        color: var(--spot);
+      }
+
+      main > section {
+        margin-top: 72px;
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 56px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 18px;
+      }
+      .plate {
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        font: italic 400 15px/1.5 var(--serif);
+        color: var(--ink-soft);
+        margin-top: 12px;
+        max-width: 56ch;
+      }
+
+      .parts {
+        display: grid;
+        gap: 2px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 32px 1fr;
+        gap: 10px;
+        padding: 8px 8px 8px 4px;
+        border-bottom: 1px solid var(--hair);
+        transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        font: 800 22px/1.2 var(--serif);
+        color: var(--spot);
+      }
+      .parts dd b {
+        display: block;
+      }
+      .parts > div:hover {
+        background: var(--screen);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.18;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 16px;
+      }
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 46px;
+      }
+      .steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -0.2em;
+        font: italic 800 34px/1 var(--serif);
+        color: var(--spot);
+      }
+
+      /* the two sides stand in two columns divided by a column rule */
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 49px 1fr;
+      }
+      .compare > div > * + * {
+        margin-top: 10px;
+      }
+      .compare h3 {
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--ink);
+        margin-bottom: 4px;
+      }
+      .compare::after {
+        content: "";
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: center;
+        width: 1px;
+        background: var(--ink);
+      }
+      .compare > div:last-child {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      /* the timeline is a chronology: the time set large in the left column, a spine rule with a stop mark per entry, the entry a wire item */
+      .timeline {
+        --time-col: 150px;
+        --gap: 40px;
+        list-style: none;
+        padding: 0;
+        display: grid;
+        border-top: 3px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+      }
+      .timeline > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: var(--time-col) minmax(0, 66ch);
+        column-gap: var(--gap);
+        max-width: none;
+        padding: 22px 0 20px;
+      }
+      .timeline > li + li {
+        border-top: 1px solid var(--hair);
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(var(--time-col) + var(--gap) / 2);
+        width: 1px;
+        background: var(--ink);
+      }
+      .timeline > li::after {
+        content: "";
+        position: absolute;
+        top: 34px;
+        left: calc(var(--time-col) + var(--gap) / 2 - 4px);
+        width: 9px;
+        height: 9px;
+        background: var(--spot);
+      }
+      .timeline time {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        text-align: right;
+        font: italic 700 36px/1.05 var(--serif);
+        letter-spacing: -0.01em;
+        font-variant-numeric: lining-nums tabular-nums;
+        color: var(--spot);
+      }
+      .timeline b {
+        grid-column: 2;
+        display: block;
+        font-size: 22px;
+        line-height: 1.35;
+        margin-bottom: 4px;
+      }
+
+      /* SVG vocabulary the fork draws with: an engraving's line and halftone */
+      .plate .ink {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 1.6;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--spot);
+        stroke-width: 2.2;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+      .plate .dash {
+        stroke-dasharray: 6 4;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: url(#hatch-warm);
+      }
+      .plate .wash-cool {
+        fill: url(#hatch-cool);
+      }
+      .plate .wash-sage {
+        fill: url(#hatch-sage);
+      }
+      .plate .label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+      .plate .label-soft {
+        fill: var(--ink-soft);
+        font-size: 14px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+      .hatch-warm circle {
+        fill: var(--spot);
+        opacity: 0.42;
+      }
+      .hatch-cool circle {
+        fill: var(--ink);
+        opacity: 0.4;
+      }
+      .hatch-sage circle {
+        fill: var(--ink);
+        opacity: 0.32;
+      }
+
+      main,
+      main .code,
+      main .diff,
+      main .table {
+        scrollbar-color: var(--ink-soft) var(--paper-deep);
+      }
+      main .code,
+      main .diff {
+        position: relative;
+        padding: 34px 0 14px;
+        max-width: 100%;
+        overflow-x: auto;
+        font: 14px/1.65 var(--mono);
+        tab-size: 2;
+        background: var(--screen);
+        --dot: color-mix(in srgb, var(--ink) 16%, transparent);
+        border-top: 2px solid var(--ink);
+        border-bottom: 1px solid var(--ink);
+      }
+      main .plate > .code {
+        border: 0;
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 22px;
+        font: inherit;
+        background: none;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 8px;
+        left: 22px;
+        font: 700 12px/1.4 var(--serif);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+      }
+      main .diff::before {
+        content: "Before and after";
+      }
+      main .diff span {
+        display: block;
+        padding: 0 22px 0 32px;
+        margin: 0 -22px;
+        position: relative;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 12px;
+      }
+      main .diff .del {
+        color: var(--ink-soft);
+        text-decoration: line-through;
+        text-decoration-color: var(--spot);
+        text-decoration-thickness: 1.5px;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: var(--spot);
+      }
+      main .diff .add {
+        background: var(--screen);
+        --dot: color-mix(in srgb, var(--ink) 26%, transparent);
+      }
+      main .diff .add::before {
+        content: "+";
+        font-weight: 500;
+      }
+
+      main .table {
+        overflow-x: auto;
+      }
+      main table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: lining-nums tabular-nums;
+        border-top: 2px solid var(--ink);
+        border-bottom: 2px solid var(--ink);
+        font-size: 17px;
+      }
+      main caption {
+        text-align: left;
+        font: italic 400 15px/1.5 var(--serif);
+        color: var(--ink-soft);
+        padding-bottom: 6px;
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 14px 8px 0;
+        border-bottom: 1px solid var(--hair);
+      }
+      main th {
+        font: 700 12px/1.4 var(--serif);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--ink);
+        white-space: nowrap;
+      }
+      main :is(th, td).num {
+        text-align: right;
+        padding-right: 0;
+      }
+
+      /* asides are boxed sidebars; a warning is a notice in the spot colour */
+      aside.note,
+      aside.warn {
+        max-width: 58ch;
+        padding: 14px 20px 16px;
+        background: var(--screen);
+        --dot: color-mix(in srgb, var(--ink) 20%, transparent);
+        border-top: 2px solid var(--ink);
+        font-size: 17px;
+      }
+      aside.note::before {
+        content: "Note";
+      }
+      aside.warn {
+        border-top-color: var(--spot);
+        --dot: color-mix(in srgb, var(--spot) 26%, transparent);
+        box-shadow: inset 0 -1px 0 var(--spot);
+      }
+      aside.warn::before {
+        content: "Caution";
+        color: var(--spot);
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 32px;
+      }
+
+      svg.pele {
+        --_bg: var(--paper);
+        --_fg: var(--ink);
+        --_m: var(--ink-soft);
+        --_l: var(--ink);
+        --_s: transparent;
+        --_a: transparent;
+        --_b: var(--ink);
+        --_c: var(--spot);
+        --_r: 0px;
+        color: var(--ink);
+        font:
+          16px "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "PingFang TC",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 1.4;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: none;
+        stroke-width: 1.2;
+        filter: url(#pen);
+      }
+      /* pele's wash copy becomes the box's halftone screen */
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: url(#hatch-sage);
+        filter: url(#wash);
+        opacity: 0.45;
+      }
+      main .render-note {
+        font: italic 400 15px/1.5 var(--serif);
+        color: var(--spot);
+        margin-top: 8px;
+      }
+
+      /* the colophon is the imprint at the foot of the last page */
+      .colophon {
+        margin-top: 80px;
+        padding-top: 10px;
+        border-top: 3px solid var(--ink);
+        box-shadow:
+          inset 0 5px 0 -4px var(--paper),
+          inset 0 6px 0 -4px var(--ink);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 6px 24px;
+        font: 400 14px/1.5 var(--serif);
+        color: var(--ink-soft);
+      }
+      .colophon b {
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: var(--ink);
+        margin-right: 6px;
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+        .compare::after {
+          display: none;
+        }
+        .compare > div:last-child {
+          grid-column: 1;
+          grid-row: 2;
+        }
+        .timeline {
+          --time-col: 66px;
+          --gap: 26px;
+        }
+        .timeline time {
+          font-size: 22px;
+          line-height: 1.3;
+        }
+        .timeline > li::after {
+          top: 31px;
+        }
+        .timeline b {
+          font-size: 19px;
+        }
+        .answer {
+          font-size: 21px;
+        }
+        .takeaway {
+          font-size: 23px;
+        }
+        main h2 {
+          font-size: 23px;
+        }
+        main > section {
+          margin-top: 52px;
+        }
+        .dateline {
+          grid-template-columns: 1fr 1fr;
+        }
+        .dateline > span:nth-child(2) {
+          display: none;
+        }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
+      }
+      @media (max-width: 760px) {
+        body {
+          padding: 0;
+        }
+        .stack > i {
+          display: none;
+        }
+        .sheet {
+          padding: 28px 22px 36px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash">
+          <feOffset dx="0" dy="0" />
+        </filter>
+        <filter id="pen">
+          <feOffset dx="0" dy="0" />
+        </filter>
+        <pattern
+          id="hatch-warm"
+          class="hatch-warm"
+          width="5"
+          height="5"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <circle cx="2.5" cy="2.5" r="1.3" />
+        </pattern>
+        <pattern
+          id="hatch-cool"
+          class="hatch-cool"
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <circle cx="2" cy="2" r="1.1" />
+        </pattern>
+        <pattern
+          id="hatch-sage"
+          class="hatch-sage"
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <circle cx="2" cy="2" r="0.9" />
+        </pattern>
+      </defs>
+    </svg>
+    <div class="stack">
+      <i></i><i></i><i></i><i></i><i></i>
+    <article class="sheet">
+      <header class="masthead">
+        <p class="nameplate">{{project}}</p>
+        <div class="dateline">
+          <time>{{generatedAt}}</time><span><em>The Explained Edition</em></span
+          ><span>Sheet 1 of 1</span>
+        </div>
+      </header>
+      <h1>{{title}}</h1>
+      <p class="byline">By a fork of this session</p>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <span><b>Printed for</b>{{project}}</span>
+        <span><b>Subject</b>{{title}}</span>
+        <span><b>Set</b>{{generatedAt}}</span>
+      </footer>
+    </article>
+    </div>
+  </body>
+</html>

@@ -333,10 +333,10 @@ test("explain.theme defaults to random, takes a theme name, and an invalid one f
   expect(config.explain.theme).toBe("random");
   expect(config.enabled.explain).toBe(false);
   expect(problems).toEqual([
-    'explain.theme: "neon" (random | picture-book | blueprint | lab-notebook)',
+    'explain.theme: "neon" (random | picture-book | blueprint | lab-notebook | editorial)',
   ]);
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
-    "\n  # theme: random   # random | picture-book | blueprint | lab-notebook",
+    "\n  # theme: random   # random | picture-book | blueprint | lab-notebook | editorial",
   );
 });
 
