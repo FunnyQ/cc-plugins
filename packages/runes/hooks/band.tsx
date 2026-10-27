@@ -15,15 +15,17 @@ const FRAME = { plugin: "runes", key: "frame" } as const;
 const MAP_ROWS = { plugin: "runes", key: "minimapRows" } as const;
 const MAP_SHOWN = { plugin: "runes", key: "minimapShown" } as const;
 const VIEW = { plugin: "runes", key: "explain" } as const;
-const LABEL = "[Explain plz!]";
-const RUNNING = "[explaining…]";
-const ASK = "[Tell me…]";
+const LABEL = "Explain plz!";
+const RUNNING = "explaining…";
+const ASK = "Tell me…";
 
 export const band = (on: On) => {
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
-    const isDrawn = e.surface === "terminal" || e.surface === "desktop";
+    const isDesktop = e.surface === "desktop";
+    const isDrawn = e.surface === "terminal" || isDesktop;
     const hasMap = config.enabled.minimap && isDrawn;
-    const lesson = isDrawn ? teacher.latest() : undefined;
+    // the desktop draws the lesson under its prompt alone; the band would only repeat it
+    const lesson = e.surface === "terminal" ? teacher.latest() : undefined;
     const hasButton = config.enabled.explain && isDrawn;
     if (
       (!config.enabled.clawd && !hasMap && !lesson && !hasButton) ||
@@ -31,13 +33,13 @@ export const band = (on: On) => {
     )
       return next(e);
 
-    seen(e.requestId, e.surface === "desktop");
-    if (e.surface !== "desktop" && e.surface !== "terminal") return next(e);
+    seen(e.requestId, isDesktop);
+    if (!isDrawn) return next(e);
     const ui = $.ui.resolve(e);
     const { Box, Button } = ui;
     // a desktop draws a native button, so the terminal's brackets would read as text
-    const isDesktop = e.surface === "desktop";
-    const tag = (label: string) => (isDesktop ? label.slice(1, -1) : label);
+    const bracket = (label: string) => `[${label}]`;
+    const tag = (label: string) => (isDesktop ? label : bracket(label));
     const [
       { value: frame = { clip: clawd.clip, index: clawd.index } },
       list,
@@ -51,18 +53,22 @@ export const band = (on: On) => {
     ]);
     // the columns Clawd and its gap take off the map's width; bodyColumns, not the viewport, since a docked pane narrows the band
     // the buttons stack left of Clawd in its slot, beside it rather than under it, so they take no line of their own
-    const buttons = Math.max(LABEL.length, RUNNING.length, ASK.length);
+    const buttons = Math.max(
+      ...[LABEL, RUNNING, ASK].map((l) => bracket(l).length),
+    );
     const slot = hasButton ? spriteColumns() + 1 + buttons : spriteColumns();
+    const slotWidth = isDesktop ? undefined : slot;
     const reserved = config.enabled.clawd ? slot + config.minimap.gap : 0;
     const room = (e.props.bodyColumns ?? 0) - reserved;
+    const here = new Set((shown ?? []).map(stem));
     const map =
       list?.length && room > 4
-        ? e.surface === "desktop"
-          ? desktopMap(ui, list, new Set((shown ?? []).map(stem)), room)
+        ? isDesktop
+          ? desktopMap(ui, list, here, room)
           : inlineMap(
               ui,
               list,
-              new Set((shown ?? []).map(stem)),
+              here,
               room,
               config.minimap.bar_rows,
               (target) => () =>
@@ -101,41 +107,31 @@ export const band = (on: On) => {
           block: "start",
         });
     };
-    // resolved on the terminal alone: the desktop's Button and Text are other types, so it draws its own notice below
+    // resolved on the terminal alone: the desktop's Button and Text are other types, and the notice never draws there
     const term = e.surface === "terminal" ? $.ui.resolve(e) : undefined;
-    const notice = !lesson
-      ? undefined
-      : !term
-        ? (
-            <Box key="teacher" flexDirection="row" gap={1} alignItems="center">
-              <ui.Text size="caption" weight="semibold" color={TEACHER_COLOR}>
-                Your English Teacher
-              </ui.Text>
-              <Button key="teacher:0" plain dimColor onPress={toLesson}>
-                {`${lesson.quip ?? lesson.better} ↑`}
-              </Button>
-            </Box>
-          )
+    const notice =
+      !lesson || !term
+        ? undefined
         : bubble(
-            { Box: term.Box, Text: term.Text },
-            {
-              key: "teacher",
-              color: TEACHER_COLOR,
-              icon: TEACHER_ICON,
-              title: "Your English Teacher",
-              side: "left",
-              bar: false,
-              inner,
-              rows: [
-                [
-                  "teacher:0",
-                  <term.Button plain onPress={toLesson}>
-                    {`${first.map((r) => r.text).join("")}${rest.length ? "…" : ""} ↑`}
-                  </term.Button>,
-                ],
-              ],
-            },
-          );
+        { Box: term.Box, Text: term.Text },
+        {
+          key: "teacher",
+          color: TEACHER_COLOR,
+          icon: TEACHER_ICON,
+          title: "Your English Teacher",
+          side: "left",
+          bar: false,
+          inner,
+          rows: [
+            [
+              "teacher:0",
+              <term.Button plain onPress={toLesson}>
+                {`${first.map((r) => r.text).join("")}${rest.length ? "…" : ""} ↑`}
+              </term.Button>,
+            ],
+          ],
+        },
+      );
     const withNotice = (node: ReturnType<typeof row>) =>
       notice ? (
         <Box key="teacher-band" flexDirection="column">
@@ -146,7 +142,7 @@ export const band = (on: On) => {
         node
       );
 
-    const picture = sprite(ui, e.surface === "desktop", frame);
+    const picture = sprite(ui, isDesktop, frame);
     const explain = (
       <Button
         key="explain"
@@ -205,7 +201,7 @@ export const band = (on: On) => {
               flexDirection="row"
               alignItems="flex-end"
               gap={1}
-              width={isDesktop ? undefined : slot}
+              width={slotWidth}
             >
               {button}
               {picture}
@@ -236,7 +232,7 @@ export const band = (on: On) => {
             key="explain-under-clawd"
             flexDirection="row"
             justifyContent="center"
-            width={isDesktop ? undefined : slot}
+            width={slotWidth}
           >
             {button}
           </Box>
