@@ -50,13 +50,38 @@
       }
       body {
         min-height: 100vh;
-        /* the table top: planks with their own tone and seams, a grain stretched along the boards, fine pale flecks, and a warm stain */
+        /* the table top: a candle's pool of light, planks with their own tone and seams, a grain stretched along the boards, fine pale flecks, and a warm stain */
         background:
+          radial-gradient(
+              1400px 900px at 50% 22%,
+              rgba(255, 196, 120, 0.16),
+              transparent 70%
+            ),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='180'%3E%3Crect x='0' y='0' width='620' height='60' fill='%23fff' opacity='0.05'/%3E%3Crect x='620' y='0' width='920' height='60' fill='%23000' opacity='0.05'/%3E%3Crect x='1540' y='0' width='860' height='60' fill='%23fff' opacity='0.08'/%3E%3Crect x='0' y='60' width='150' height='60' fill='%23000' opacity='0.04'/%3E%3Crect x='150' y='60' width='710' height='60' fill='%23000' opacity='0.1'/%3E%3Crect x='860' y='60' width='1040' height='60' fill='%23000' opacity='0.07'/%3E%3Crect x='1900' y='60' width='500' height='60' fill='%23fff' opacity='0.03'/%3E%3Crect x='0' y='120' width='380' height='60' fill='%233a1a00' opacity='0.06'/%3E%3Crect x='380' y='120' width='820' height='60' fill='%233a1a00' opacity='0.12'/%3E%3Crect x='1200' y='120' width='850' height='60' fill='%23fff' opacity='0.03'/%3E%3Crect x='2050' y='120' width='350' height='60' fill='%233a1a00' opacity='0.09'/%3E%3Cpath d='M0 .5H2400M0 60.5H2400M0 120.5H2400' stroke='%231a0d04' stroke-opacity='.75' stroke-width='1.6'/%3E%3Cpath d='M0 2H2400M0 62H2400M0 122H2400' stroke='%23fff' stroke-opacity='.08'/%3E%3Cpath d='M620.5 0V60M1540.5 0V60M150.5 60V120M860.5 60V120M1900.5 60V120M380.5 120V180M1200.5 120V180M2050.5 120V180' stroke='%231a0d04' stroke-opacity='.6' stroke-width='1.4'/%3E%3C/svg%3E"),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.005 .2' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .16 0 0 0 0 .08 0 0 0 0 .02 0 0 0 1.4 -.55'/%3E%3C/filter%3E%3Crect width='2400' height='180' filter='url(%23g)'/%3E%3C/svg%3E"),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='90'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .9' numOctaves='2' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .6 0 0 0 .6 -.3'/%3E%3C/filter%3E%3Crect width='2400' height='90' filter='url(%23f)'/%3E%3C/svg%3E"),
           linear-gradient(170deg, #75492a, #5a351c 60%, #4c2c17);
         padding: 40px 28px 72px;
+        position: relative;
+      }
+      /* dice left on the table around the mat: they rest on its rim, in the top band and below it, never over the mat's content */
+      body::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='19.1,-39.5 54.8,-4.9 42.7,43.7 -5.1,57.5 -40.8,22.9 -28.7,-25.7' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='14.1,-45.5 49.8,-10.9 37.7,37.7 -10.1,51.5 -45.8,16.9 -33.7,-31.7' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='6.8,-27.2 -29.3,10.2 21.1,22.8' fill='%23b58838'/%3E%3Cpolygon points='12.1,-48.5 -35.7,-34.7 6.8,-27.2' fill='%23ceb17c'/%3E%3Cpolygon points='12.1,-48.5 6.8,-27.2 47.8,-13.9' fill='%23ba9044'/%3E%3Cpolygon points='-35.7,-34.7 6.8,-27.2 -29.3,10.2' fill='%23d4bb8c'/%3E%3Cpolygon points='-35.7,-34.7 -29.3,10.2 -47.8,13.9' fill='%23cdaf79'/%3E%3Cpolygon points='47.8,-13.9 21.1,22.8 6.8,-27.2' fill='%23936b23'/%3E%3Cpolygon points='47.8,-13.9 35.7,34.7 21.1,22.8' fill='%2372531b'/%3E%3Cpolygon points='-47.8,13.9 -29.3,10.2 -12.1,48.5' fill='%23b88e41'/%3E%3Cpolygon points='-29.3,10.2 21.1,22.8 -12.1,48.5' fill='%23936b23'/%3E%3Cpolygon points='21.1,22.8 35.7,34.7 -12.1,48.5' fill='%2371521b'/%3E%3C/g%3E%3Cg transform='translate(-1 3.9) rotate(14)' font-family='Georgia, serif' font-weight='700' font-size='15' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E20%3C/text%3E%3Ctext fill='%23433110'%3E20%3C/text%3E%3C/g%3E%3Cpolygon points='12.1,-48.5 47.8,-13.9 35.7,34.7 -12.1,48.5 -47.8,13.9 -35.7,-34.7' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-24.3' cy='-21.8' rx='5' ry='2.2' transform='rotate(-35 -24.3 -21.8)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(min(100% - 28px, 50% + 640px) - 260px) -6px / 96px 96px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='-2,-42.2 62.8,37.7 -35.6,55.1' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='-7,-48.2 57.8,31.7 -40.6,49.1' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='-9,-51.2 -42.6,46.1 8.3,12.7' fill='%235888ae'/%3E%3Cpolygon points='-9,-51.2 8.3,12.7 55.8,28.7' fill='%23245880'/%3E%3Cpolygon points='-42.6,46.1 8.3,12.7 55.8,28.7' fill='%231c4666'/%3E%3C/g%3E%3Cg transform='translate(-11.8 8.2) rotate(-10)' font-family='Georgia, serif' font-weight='700' font-size='19' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E4%3C/text%3E%3Ctext fill='%23102739'%3E4%3C/text%3E%3C/g%3E%3Cpolygon points='-9,-51.2 55.8,28.7 -42.6,46.1' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-18.6' cy='0.9' rx='5' ry='2.2' transform='rotate(-35 -18.6 0.9)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(max(28px, 50% - 640px) - 24px) 4px / 70px 70px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='-3.4,-39.9 43.9,-24.4 54.3,24.5 17.4,57.9 -29.9,42.4 -40.3,-6.5' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='-8.4,-45.9 38.9,-30.4 49.3,18.5 12.4,51.9 -34.9,36.4 -45.3,-12.5' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='-10.4,-48.9 36.9,-33.4 0,0 -47.3,-15.5' fill='%23e8e2d2'/%3E%3Cpolygon points='-47.3,-15.5 0,0 10.4,48.9 -36.9,33.4' fill='%23dbd3ba'/%3E%3Cpolygon points='0,0 36.9,-33.4 47.3,15.5 10.4,48.9' fill='%238f8977'/%3E%3C/g%3E%3Cg transform='translate(-5.2 -24.5) rotate(-12) matrix(1 -.3 .6 .7 0 0)' font-family='Georgia, serif' font-weight='700' font-size='22' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E6%3C/text%3E%3Ctext fill='%233a2f22'%3E6%3C/text%3E%3C/g%3E%3Cpolygon points='-10.4,-48.9 36.9,-33.4 47.3,15.5 10.4,48.9 -36.9,33.4 -47.3,-15.5' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-8' cy='-30.1' rx='5' ry='2.2' transform='rotate(-35 -8 -30.1)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(max(28px, 50% - 640px) - 34px) 36% / 72px 72px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='27.6,-42 48.7,25.9 -13.6,60 -34.7,-7.9' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='22.6,-48 43.7,19.9 -18.6,54 -39.7,-13.9' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='20.6,-51 -41.7,-16.9 -11.2,6.3' fill='%2394ae90'/%3E%3Cpolygon points='20.6,-51 -11.2,6.3 41.7,16.9' fill='%233d6936'/%3E%3Cpolygon points='-41.7,-16.9 -11.2,6.3 -20.6,51' fill='%2361875b'/%3E%3Cpolygon points='-11.2,6.3 41.7,16.9 -20.6,51' fill='%232c4d28'/%3E%3C/g%3E%3Cg transform='translate(-12.2 -17.9) rotate(22)' font-family='Georgia, serif' font-weight='700' font-size='19' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E8%3C/text%3E%3Ctext fill='%23182915'%3E8%3C/text%3E%3C/g%3E%3Cpolygon points='20.6,-51 41.7,16.9 -20.6,51 -41.7,-16.9' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-14.4' cy='-25.6' rx='5' ry='2.2' transform='rotate(-35 -14.4 -25.6)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(min(100% - 28px, 50% + 640px) - 38px) 61% / 72px 72px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='14,-40.5 41.8,-27 56.3,0.3 52,31 30.5,53.2 0,58.5 -27.8,45 -42.3,17.7 -38,-13 -16.5,-35.2' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='9,-46.5 36.8,-33 51.3,-5.7 47,25 25.5,47.2 -5,52.5 -32.8,39 -47.3,11.7 -43,-19 -21.5,-41.2' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='3.8,-26.7 26.6,-4.6 12.7,23.8 -18.8,19.4 -24.3,-11.8' fill='%23ae3739' fill-opacity='.78'/%3E%3Cpolygon points='3.8,-26.7 7,-49.5 34.8,-36 49.3,-8.7 26.6,-4.6' fill='%23ae393a' fill-opacity='.78'/%3E%3Cpolygon points='26.6,-4.6 49.3,-8.7 45,22 23.5,44.2 12.7,23.8' fill='%236b1a1b' fill-opacity='.78'/%3E%3Cpolygon points='12.7,23.8 23.5,44.2 -7,49.5 -34.8,36 -18.8,19.4' fill='%23862122' fill-opacity='.78'/%3E%3Cpolygon points='-18.8,19.4 -34.8,36 -49.3,8.7 -45,-22 -24.3,-11.8' fill='%23c26869' fill-opacity='.78'/%3E%3Cpolygon points='-24.3,-11.8 -45,-22 -23.5,-44.2 7,-49.5 3.8,-26.7' fill='%23cf8889' fill-opacity='.78'/%3E%3C/g%3E%3Cellipse cx='-11.4' cy='-19.8' rx='9' ry='4' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3Cg transform='translate(-0.3 2) rotate(8)' font-family='Georgia, serif' font-weight='700' font-size='15' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E12%3C/text%3E%3Ctext fill='%23401010'%3E12%3C/text%3E%3C/g%3E%3Cpolygon points='7,-49.5 34.8,-36 49.3,-8.7 45,22 23.5,44.2 -7,49.5 -34.8,36 -49.3,8.7 -45,-22 -23.5,-44.2' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-20.9' cy='-37.5' rx='5' ry='2.2' transform='rotate(-35 -20.9 -37.5)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(50% + 130px) calc(100% + 2px) / 104px 104px no-repeat;
       }
       ::selection {
         background: color-mix(in srgb, var(--gold-hi) 55%, transparent);
@@ -79,12 +104,16 @@
         margin: 0 auto;
         padding: 40px 72px 52px;
         border-radius: 24px;
-        /* a cloth playmat: a basket weave of crossed threads, long fibres along the warp, and a shade darker toward the bottom */
+        /* a cloth playmat: arcane circles printed faint into the cloth down its length, a basket weave of crossed threads, long fibres along the warp, and a shade darker toward the bottom */
         background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 3300'%3E%3Cg fill='none' stroke='%23efe7d2' stroke-opacity='.075'%3E%3Cg transform='translate(90 117) scale(1.02)' stroke-width='2'%3E%3Ccircle cx='500' cy='500' r='488' stroke-width='3'/%3E%3Ccircle cx='500' cy='500' r='474'/%3E%3Ccircle cx='500' cy='500' r='426'/%3E%3Ccircle cx='500' cy='500' r='400' stroke-width='3'/%3E%3Cpath d='M500 100L500 76M520.9 100.5L521.6 88.6M541.8 102.2L543.1 90.3M562.6 104.9L564.5 93.1M583.2 108.7L585.7 97M603.5 113.6L609.7 90.4M623.6 119.6L627.3 108.2M643.3 126.6L647.6 115.4M662.7 134.6L667.6 123.6M681.6 143.6L687 132.9M700 153.6L712 132.8M717.9 164.5L724.4 154.5M735.1 176.4L742.2 166.7M751.7 189.1L759.3 179.8M767.7 202.7L775.7 193.8M782.8 217.2L799.8 200.2M797.3 232.3L806.2 224.3M810.9 248.3L820.2 240.7M823.6 264.9L833.3 257.8M835.5 282.1L845.5 275.6M846.4 300L867.2 288M856.4 318.4L867.1 313M865.4 337.3L876.4 332.4M873.4 356.7L884.6 352.4M880.4 376.4L891.8 372.7M886.4 396.5L909.6 390.3M891.3 416.8L903 414.3M895.1 437.4L906.9 435.5M897.8 458.2L909.7 456.9M899.5 479.1L911.4 478.4M900 500L924 500M899.5 520.9L911.4 521.6M897.8 541.8L909.7 543.1M895.1 562.6L906.9 564.5M891.3 583.2L903 585.7M886.4 603.5L909.6 609.7M880.4 623.6L891.8 627.3M873.4 643.3L884.6 647.6M865.4 662.7L876.4 667.6M856.4 681.6L867.1 687M846.4 700L867.2 712M835.5 717.9L845.5 724.4M823.6 735.1L833.3 742.2M810.9 751.7L820.2 759.3M797.3 767.7L806.2 775.7M782.8 782.8L799.8 799.8M767.7 797.3L775.7 806.2M751.7 810.9L759.3 820.2M735.1 823.6L742.2 833.3M717.9 835.5L724.4 845.5M700 846.4L712 867.2M681.6 856.4L687 867.1M662.7 865.4L667.6 876.4M643.3 873.4L647.6 884.6M623.6 880.4L627.3 891.8M603.5 886.4L609.7 909.6M583.2 891.3L585.7 903M562.6 895.1L564.5 906.9M541.8 897.8L543.1 909.7M520.9 899.5L521.6 911.4M500 900L500 924M479.1 899.5L478.4 911.4M458.2 897.8L456.9 909.7M437.4 895.1L435.5 906.9M416.8 891.3L414.3 903M396.5 886.4L390.3 909.6M376.4 880.4L372.7 891.8M356.7 873.4L352.4 884.6M337.3 865.4L332.4 876.4M318.4 856.4L313 867.1M300 846.4L288 867.2M282.1 835.5L275.6 845.5M264.9 823.6L257.8 833.3M248.3 810.9L240.7 820.2M232.3 797.3L224.3 806.2M217.2 782.8L200.2 799.8M202.7 767.7L193.8 775.7M189.1 751.7L179.8 759.3M176.4 735.1L166.7 742.2M164.5 717.9L154.5 724.4M153.6 700L132.8 712M143.6 681.6L132.9 687M134.6 662.7L123.6 667.6M126.6 643.3L115.4 647.6M119.6 623.6L108.2 627.3M113.6 603.5L90.4 609.7M108.7 583.2L97 585.7M104.9 562.6L93.1 564.5M102.2 541.8L90.3 543.1M100.5 520.9L88.6 521.6M100 500L76 500M100.5 479.1L88.6 478.4M102.2 458.2L90.3 456.9M104.9 437.4L93.1 435.5M108.7 416.8L97 414.3M113.6 396.5L90.4 390.3M119.6 376.4L108.2 372.7M126.6 356.7L115.4 352.4M134.6 337.3L123.6 332.4M143.6 318.4L132.9 313M153.6 300L132.8 288M164.5 282.1L154.5 275.6M176.4 264.9L166.7 257.8M189.1 248.3L179.8 240.7M202.7 232.3L193.8 224.3M217.2 217.2L200.2 200.2M232.3 202.7L224.3 193.8M248.3 189.1L240.7 179.8M264.9 176.4L257.8 166.7M282.1 164.5L275.6 154.5M300 153.6L288 132.8M318.4 143.6L313 132.9M337.3 134.6L332.4 123.6M356.7 126.6L352.4 115.4M376.4 119.6L372.7 108.2M396.5 113.6L390.3 90.4M416.8 108.7L414.3 97M437.4 104.9L435.5 93.1M458.2 102.2L456.9 90.3M479.1 100.5L478.4 88.6'/%3E%3Cpath d='M542 64L544.3 40.1M542 64L574.3 56.2L544.3 40.1M653.4 89.7L661.8 67.3M657.6 78.5L690.2 92.2M685.1 103L695.2 81.3M754.3 143.4L768.3 123.9M768.3 123.9L781.5 164.5M838 221.4L856.5 206.1M842.6 217.6L873.5 238.4M851.9 209.9L863.7 245.3M898.6 318.4L920.4 308.4M898.6 318.4L921.5 342.4L920.4 308.4M932 427.7L955.7 423.7M943.8 425.7L948.3 460.8M936.3 461.8L960.2 459.7M936 542L959.9 544.3M959.9 544.3L931.3 576.1M910.3 653.4L932.7 661.8M915.9 655.5L913.3 692.7M927.1 659.7L902.4 687.6M856.6 754.3L876.1 768.3M856.6 754.3L847.2 786.2L876.1 768.3M778.6 838L793.9 856.5M786.2 847.2L758.1 868.6M751.2 858.8L765 878.4M681.6 898.6L691.6 920.4M691.6 920.4L649.8 911.6M572.3 932L576.3 955.7M573.3 937.9L539.7 954.3M575.3 949.7L538.7 942.3M458 936L455.7 959.9M458 936L425.7 943.8L455.7 959.9M346.6 910.3L338.2 932.7M342.4 921.5L309.8 907.8M314.9 897L304.8 918.7M245.7 856.6L231.7 876.1M231.7 876.1L218.5 835.5M162 778.6L143.5 793.9M157.4 782.4L126.5 761.6M148.1 790.1L136.3 754.7M101.4 681.6L79.6 691.6M101.4 681.6L78.5 657.6L79.6 691.6M68 572.3L44.3 576.3M56.2 574.3L51.7 539.2M63.7 538.2L39.8 540.3M64 458L40.1 455.7M40.1 455.7L68.7 423.9M89.7 346.6L67.3 338.2M84.1 344.5L86.7 307.3M72.9 340.3L97.6 312.4M143.4 245.7L123.9 231.7M143.4 245.7L152.8 213.8L123.9 231.7M221.4 162L206.1 143.5M213.8 152.8L241.9 131.4M248.8 141.2L235 121.6M318.4 101.4L308.4 79.6M308.4 79.6L350.2 88.4M427.7 68L423.7 44.3M426.7 62.1L460.3 45.7M424.7 50.3L461.3 57.7' stroke-width='2.5' stroke-linecap='round'/%3E%3Cpath d='M500 104L842.9 698L157.1 698ZM842.9 302L500 896L157.1 302Z'/%3E%3Ccircle cx='500' cy='500' r='228'/%3E%3Ccircle cx='500' cy='500' r='214'/%3E%3Cpath d='M500 286L714 500L500 714L286 500ZM651.3 348.7L651.3 651.3L348.7 651.3L348.7 348.7Z'/%3E%3Ccircle cx='500' cy='104' r='16'/%3E%3Ccircle cx='842.9' cy='302' r='16'/%3E%3Ccircle cx='842.9' cy='698' r='16'/%3E%3Ccircle cx='500' cy='896' r='16'/%3E%3Ccircle cx='157.1' cy='698' r='16'/%3E%3Ccircle cx='157.1' cy='302' r='16'/%3E%3Ccircle cx='500' cy='500' r='60'/%3E%3Cpath d='M500 500L500 380M500 500L549.5 450.5M500 500L620 500M500 500L549.5 549.5M500 500L500 620M500 500L450.5 549.5M500 500L380 500M500 500L450.5 450.5'/%3E%3C/g%3E%3Cg transform='translate(130 1480) rotate(15) scale(0.62)' stroke-width='3.2'%3E%3Ccircle r='490'/%3E%3Ccircle r='470'/%3E%3Ccircle r='400'/%3E%3Cpath d='M43.1 -409.7L47.9 -455.5M43.1 -409.7L68.2 -430.6M127.3 -391.8L141.5 -435.6M131 -403.2L155.4 -394.5M137.8 -424.2L163.5 -415M206 -356.8L229 -396.6M195.2 -383.1L234.2 -360.6M275.7 -306.2L306.5 -340.4M291.7 -324L326.7 -321M291.7 -324L285.1 -358.4M333.3 -242.2L370.5 -269.2M370.5 -269.2L367.7 -234.3L333.3 -242.2M376.4 -167.6L418.4 -186.3M376.4 -167.6L407 -156.2M403 -85.7L448 -95.2M414.7 -88.2L419.3 -62.7M436.3 -92.7L441.1 -65.9M412 0L458 0M429.4 -22.5L429.4 22.5M403 85.7L448 95.2M426.5 90.6L441.3 122.4M426.5 90.6L453 67.7M376.4 167.6L418.4 186.3M418.4 186.3L386.7 201.3L376.4 167.6M333.3 242.2L370.5 269.2M333.3 242.2L338.8 274.4M275.7 306.2L306.5 340.4M283.7 315.1L263.9 331.8M298.4 331.4L277.6 349M206 356.8L229 396.6M234.2 360.6L195.2 383.1M127.3 391.8L141.5 435.6M134.7 414.7L114.7 443.4M134.7 414.7L167.9 426.1M43.1 409.7L47.9 455.5M47.9 455.5L19 435.6L43.1 409.7M-43.1 409.7L-47.9 455.5M-43.1 409.7L-68.2 430.6M-127.3 391.8L-141.5 435.6M-131 403.2L-155.4 394.5M-137.8 424.2L-163.5 415M-206 356.8L-229 396.6M-195.2 383.1L-234.2 360.6M-275.7 306.2L-306.5 340.4M-291.7 324L-326.7 321M-291.7 324L-285.1 358.4M-333.3 242.2L-370.5 269.2M-370.5 269.2L-367.7 234.3L-333.3 242.2M-376.4 167.6L-418.4 186.3M-376.4 167.6L-407 156.2M-403 85.7L-448 95.2M-414.7 88.2L-419.3 62.7M-436.3 92.7L-441.1 65.9M-412 0L-458 0M-429.4 22.5L-429.4 -22.5M-403 -85.7L-448 -95.2M-426.5 -90.6L-441.3 -122.4M-426.5 -90.6L-453 -67.7M-376.4 -167.6L-418.4 -186.3M-418.4 -186.3L-386.7 -201.3L-376.4 -167.6M-333.3 -242.2L-370.5 -269.2M-333.3 -242.2L-338.8 -274.4M-275.7 -306.2L-306.5 -340.4M-283.7 -315.1L-263.9 -331.8M-298.4 -331.4L-277.6 -349M-206 -356.8L-229 -396.6M-234.2 -360.6L-195.2 -383.1M-127.3 -391.8L-141.5 -435.6M-134.7 -414.7L-114.7 -443.4M-134.7 -414.7L-167.9 -426.1M-43.1 -409.7L-47.9 -455.5M-47.9 -455.5L-19 -435.6L-43.1 -409.7' stroke-linecap='round'/%3E%3Cpath d='M0 -400L346.4 200L-346.4 200ZM346.4 -200L0 400L-346.4 -200Z'/%3E%3Ccircle r='200'/%3E%3Cpath d='M100 -173.2L200 0L100 173.2L-100 173.2L-200 0L-100 -173.2Z'/%3E%3Ccircle r='80'/%3E%3Ccircle r='14'/%3E%3C/g%3E%3Cg transform='translate(1090 2000) rotate(-12) scale(0.86)' stroke-width='2.3'%3E%3Ccircle r='490' stroke-width='1.6'/%3E%3Ccircle r='476'/%3E%3Cpath d='M0 -490L0 -530M85.1 -482.6L88.9 -504.2M167.6 -460.4L175.1 -481.1M245 -424.4L265 -459M315 -375.4L329.1 -392.2M375.4 -315L392.2 -329.1M424.4 -245L459 -265M460.4 -167.6L481.1 -175.1M482.6 -85.1L504.2 -88.9M490 0L530 0M482.6 85.1L504.2 88.9M460.4 167.6L481.1 175.1M424.4 245L459 265M375.4 315L392.2 329.1M315 375.4L329.1 392.2M245 424.4L265 459M167.6 460.4L175.1 481.1M85.1 482.6L88.9 504.2M0 490L0 530M-85.1 482.6L-88.9 504.2M-167.6 460.4L-175.1 481.1M-245 424.4L-265 459M-315 375.4L-329.1 392.2M-375.4 315L-392.2 329.1M-424.4 245L-459 265M-460.4 167.6L-481.1 175.1M-482.6 85.1L-504.2 88.9M-490 0L-530 0M-482.6 -85.1L-504.2 -88.9M-460.4 -167.6L-481.1 -175.1M-424.4 -245L-459 -265M-375.4 -315L-392.2 -329.1M-315 -375.4L-329.1 -392.2M-245 -424.4L-265 -459M-167.6 -460.4L-175.1 -481.1M-85.1 -482.6L-88.9 -504.2'/%3E%3Cpath d='M0 -476L412.2 238L-412.2 238Z'/%3E%3Ccircle r='238'/%3E%3Cpath d='M-160 0A220 220 0 0 1 160 0A220 220 0 0 1 -160 0Z'/%3E%3Ccircle r='46'/%3E%3Ccircle r='12'/%3E%3Ccircle cx='0' cy='-476' r='38'/%3E%3Cpath transform='translate(0 -476)' d='M0 24L-20.8 -12L20.8 -12Z'/%3E%3Ccircle cx='412.2' cy='238' r='38'/%3E%3Cpath transform='translate(412.2 238)' d='M0 24L-20.8 -12L20.8 -12Z'/%3E%3Ccircle cx='-412.2' cy='238' r='38'/%3E%3Cpath transform='translate(-412.2 238)' d='M0 24L-20.8 -12L20.8 -12Z'/%3E%3C/g%3E%3Cg transform='translate(300 2560) rotate(-6) scale(0.24)' stroke-width='8.3'%3E%3Cg transform='translate(-560 0)'%3E%3Ccircle r='480' stroke-dasharray='26 18'/%3E%3Ccircle r='440'/%3E%3Crect x='-150' y='-210' width='300' height='420' rx='26'/%3E%3Crect x='-118' y='-178' width='236' height='356' rx='16'/%3E%3Crect x='-86' y='-146' width='236' height='356' rx='16'/%3E%3C/g%3E%3Cg transform='translate(560 0)'%3E%3Ccircle r='480' stroke-dasharray='26 18'/%3E%3Ccircle r='440'/%3E%3Crect x='-150' y='-210' width='300' height='420' rx='26'/%3E%3Cpath d='M0 -120V120M-70 -40H70'/%3E%3C/g%3E%3Cpath d='M-80 -24H80M-80 24H80M50 -60L96 0L50 60'/%3E%3C/g%3E%3Cg transform='translate(1010 2980) rotate(25) scale(0.5)' stroke-width='4'%3E%3Ccircle r='490'/%3E%3Ccircle r='460'/%3E%3Ccircle cx='0' cy='-475' r='9'/%3E%3Ccircle cx='237.5' cy='-411.4' r='9'/%3E%3Ccircle cx='411.4' cy='-237.5' r='9'/%3E%3Ccircle cx='475' cy='0' r='9'/%3E%3Ccircle cx='411.4' cy='237.5' r='9'/%3E%3Ccircle cx='237.5' cy='411.4' r='9'/%3E%3Ccircle cx='0' cy='475' r='9'/%3E%3Ccircle cx='-237.5' cy='411.4' r='9'/%3E%3Ccircle cx='-411.4' cy='237.5' r='9'/%3E%3Ccircle cx='-475' cy='0' r='9'/%3E%3Ccircle cx='-411.4' cy='-237.5' r='9'/%3E%3Ccircle cx='-237.5' cy='-411.4' r='9'/%3E%3Cpath d='M0 -340L0 -392M90.6 -338.1L96.3 -359.3M170 -294.4L196 -339.5M247.5 -247.5L263 -263M294.4 -170L339.5 -196M338.1 -90.6L359.3 -96.3M340 0L392 0M338.1 90.6L359.3 96.3M294.4 170L339.5 196M247.5 247.5L263 263M170 294.4L196 339.5M90.6 338.1L96.3 359.3M0 340L0 392M-90.6 338.1L-96.3 359.3M-170 294.4L-196 339.5M-247.5 247.5L-263 263M-294.4 170L-339.5 196M-338.1 90.6L-359.3 96.3M-340 0L-392 0M-338.1 -90.6L-359.3 -96.3M-294.4 -170L-339.5 -196M-247.5 -247.5L-263 -263M-170 -294.4L-196 -339.5M-90.6 -338.1L-96.3 -359.3'/%3E%3Cpath d='M0 -300A300 300 0 0 0 0 300A340 340 0 0 1 0 -300Z'/%3E%3Cpath d='M120 -80L132 -42L170 -30L132 -18L120 20L108 -18L70 -30L108 -42Z'/%3E%3Ccircle r='320'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") 50% 0 / max(100%, 760px) auto repeat-y,
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23000' opacity='.2'/%3E%3Crect y='.6' width='4' height='2.8' fill='%23fff' opacity='.09'/%3E%3Crect x='4' y='4.6' width='4' height='2.8' fill='%23fff' opacity='.09'/%3E%3Crect x='4.6' width='2.8' height='4' fill='%23fff' opacity='.05'/%3E%3Crect x='.6' y='4' width='2.8' height='4' fill='%23fff' opacity='.05'/%3E%3C/svg%3E"),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='200'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.01 .7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .38 -.17'/%3E%3C/filter%3E%3Crect width='1600' height='200' filter='url(%23f)'/%3E%3C/svg%3E"),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .45 -.1'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E"),
-          linear-gradient(var(--mat), color-mix(in srgb, var(--mat) 82%, black)),
+          linear-gradient(
+            var(--mat),
+            color-mix(in srgb, var(--mat) 82%, black)
+          ),
           var(--mat);
         color: var(--ink);
         font: 18px/1.8 var(--serif);
@@ -150,39 +179,15 @@
         text-wrap: balance;
         text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
       }
-      .card h3::after {
-        --pip: var(--gold);
-        display: block;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        background: radial-gradient(
-          circle at 35% 30%,
-          color-mix(in srgb, var(--pip) 35%, white),
-          var(--pip) 55%,
-          color-mix(in srgb, var(--pip) 60%, black)
-        );
-        box-shadow:
-          0 0 0 1.5px var(--frame),
-          1px 2px 0 1px rgba(0, 0, 0, 0.55);
-      }
 
-      /* the art box: a painted dusk over hills, framed in black */
+      /* the art box: a painted vista of ruined spires over a river valley under two moons */
       .art {
         height: 150px;
         margin: 22px 0 0;
         border: 10px solid var(--parchment-hi);
         border-bottom-width: 26px;
         transform: rotate(-0.4deg);
-        background:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 150' preserveAspectRatio='none'%3E%3Cpath d='M0 92 L120 60 L210 84 L330 38 L450 80 L560 52 L700 90 L820 44 L930 70 L1060 36 L1200 74 V150 H0Z' fill='%234b5a63' opacity='.55'/%3E%3Cpath d='M0 118 L160 92 L300 112 L470 86 L620 116 L780 94 L960 120 L1100 98 L1200 110 V150 H0Z' fill='%232c3a2f'/%3E%3Cpath d='M0 138 L240 124 L520 140 L800 126 L1200 140 V150 H0Z' fill='%23182219'/%3E%3C/svg%3E")
-            bottom / 100% 100% no-repeat,
-          radial-gradient(
-            260px 120px at 72% 70%,
-            rgba(255, 214, 140, 0.9),
-            transparent 70%
-          ),
-          linear-gradient(#3d5873, #a7766a 62%, #e2b27a);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 150' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23141c38'/%3E%3Cstop offset='.45' stop-color='%233d3a64'/%3E%3Cstop offset='.75' stop-color='%23a46f6c'/%3E%3Cstop offset='.95' stop-color='%23e2aa7a'/%3E%3C/linearGradient%3E%3CradialGradient id='h' cx='.5' cy='.85' r='.35'%3E%3Cstop offset='0' stop-color='%23ffd08c' stop-opacity='.7'/%3E%3Cstop offset='1' stop-color='%23ffd08c' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='m' cx='.4' cy='.4' r='.6'%3E%3Cstop offset='0' stop-color='%23fbf3dc'/%3E%3Cstop offset='1' stop-color='%23d9cba8'/%3E%3C/radialGradient%3E%3ClinearGradient id='r' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f2d3b0'/%3E%3Cstop offset='1' stop-color='%239a8cb8'/%3E%3C/linearGradient%3E%3ClinearGradient id='f' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23d9b8c0' stop-opacity='0'/%3E%3Cstop offset='.5' stop-color='%23d9b8c0' stop-opacity='.28'/%3E%3Cstop offset='1' stop-color='%23d9b8c0' stop-opacity='0'/%3E%3C/linearGradient%3E%3Cfilter id='b'%3E%3CfeGaussianBlur stdDeviation='6'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1200' height='150' fill='url(%23s)'/%3E%3Crect width='1200' height='150' fill='url(%23h)'/%3E%3Cg fill='%23fff'%3E%3Ccircle cx='948.7' cy='50.9' r='1.2' opacity='0.9'/%3E%3Ccircle cx='228.3' cy='50.4' r='0.5' opacity='0.5'/%3E%3Ccircle cx='1138.4' cy='66.8' r='0.4' opacity='0.4'/%3E%3Ccircle cx='314.4' cy='65.9' r='1.2' opacity='1'/%3E%3Ccircle cx='332.4' cy='13.9' r='0.3' opacity='0.7'/%3E%3Ccircle cx='671.3' cy='9.9' r='0.6' opacity='0.7'/%3E%3Ccircle cx='272.1' cy='3.8' r='0.3' opacity='0.5'/%3E%3Ccircle cx='755.2' cy='32.8' r='1.1' opacity='0.8'/%3E%3Ccircle cx='612.9' cy='49' r='0.7' opacity='0.8'/%3E%3Ccircle cx='1158.3' cy='53.9' r='1.3' opacity='0.8'/%3E%3Ccircle cx='724' cy='56.2' r='0.5' opacity='0.4'/%3E%3Ccircle cx='871.9' cy='45.3' r='0.7' opacity='0.7'/%3E%3Ccircle cx='464.3' cy='34.6' r='0.4' opacity='0.4'/%3E%3Ccircle cx='95' cy='24.8' r='0.6' opacity='0.5'/%3E%3Ccircle cx='767.9' cy='8.8' r='0.4' opacity='0.4'/%3E%3Ccircle cx='1002.9' cy='60.9' r='0.3' opacity='0.9'/%3E%3Ccircle cx='381.9' cy='28.2' r='1.2' opacity='0.9'/%3E%3Ccircle cx='13.9' cy='69.5' r='0.5' opacity='0.8'/%3E%3Ccircle cx='513.1' cy='2.3' r='0.5' opacity='0.9'/%3E%3Ccircle cx='904.6' cy='17.4' r='1.2' opacity='0.9'/%3E%3Ccircle cx='381.5' cy='32.1' r='0.6' opacity='0.6'/%3E%3Ccircle cx='1057.8' cy='60.9' r='1' opacity='0.7'/%3E%3Ccircle cx='1040.1' cy='57.4' r='1.1' opacity='0.9'/%3E%3Ccircle cx='1164.4' cy='48.4' r='0.6' opacity='0.8'/%3E%3Ccircle cx='389.2' cy='60.5' r='0.5' opacity='0.9'/%3E%3Ccircle cx='790.2' cy='57.1' r='0.8' opacity='0.9'/%3E%3Ccircle cx='994.6' cy='3' r='0.5' opacity='0.5'/%3E%3Ccircle cx='28' cy='40.4' r='1.1' opacity='0.8'/%3E%3Ccircle cx='1024.1' cy='60.6' r='1.1' opacity='0.5'/%3E%3Ccircle cx='675' cy='32.2' r='0.7' opacity='0.7'/%3E%3Ccircle cx='901.3' cy='36.2' r='0.7' opacity='0.7'/%3E%3Ccircle cx='293.7' cy='49.2' r='1.1' opacity='0.6'/%3E%3Ccircle cx='305.5' cy='43' r='0.9' opacity='1'/%3E%3Ccircle cx='682' cy='22.1' r='0.9' opacity='0.7'/%3E%3Ccircle cx='763' cy='40' r='0.5' opacity='0.5'/%3E%3Ccircle cx='142' cy='23.3' r='0.9' opacity='0.9'/%3E%3Ccircle cx='772.9' cy='27.2' r='0.6' opacity='0.6'/%3E%3Ccircle cx='150.7' cy='10.8' r='0.4' opacity='0.7'/%3E%3Ccircle cx='451' cy='6.4' r='0.9' opacity='0.6'/%3E%3Ccircle cx='549' cy='7' r='1.1' opacity='0.6'/%3E%3Ccircle cx='364.1' cy='8.5' r='0.5' opacity='0.7'/%3E%3Ccircle cx='239.6' cy='42.5' r='0.9' opacity='0.9'/%3E%3Ccircle cx='941.6' cy='34.5' r='1.2' opacity='0.8'/%3E%3Ccircle cx='144.7' cy='43.7' r='1' opacity='0.9'/%3E%3Ccircle cx='695.9' cy='67.7' r='0.6' opacity='1'/%3E%3Ccircle cx='44.9' cy='7.2' r='0.6' opacity='0.9'/%3E%3Ccircle cx='1078.2' cy='50.6' r='0.8' opacity='0.5'/%3E%3Ccircle cx='641.5' cy='54.4' r='0.5' opacity='0.9'/%3E%3Ccircle cx='819.7' cy='40.7' r='1.3' opacity='0.6'/%3E%3Ccircle cx='34' cy='51.4' r='0.8' opacity='0.8'/%3E%3Ccircle cx='830.5' cy='47.7' r='0.3' opacity='0.8'/%3E%3Ccircle cx='1177.1' cy='59.2' r='1' opacity='0.7'/%3E%3Ccircle cx='262' cy='44.1' r='0.9' opacity='0.7'/%3E%3Ccircle cx='27.1' cy='60.4' r='1' opacity='1'/%3E%3Ccircle cx='369.3' cy='52.1' r='1.2' opacity='0.7'/%3E%3Ccircle cx='746.8' cy='13.9' r='0.5' opacity='0.7'/%3E%3Ccircle cx='518.9' cy='3.3' r='0.9' opacity='0.9'/%3E%3Ccircle cx='1008.4' cy='6' r='0.6' opacity='0.8'/%3E%3Ccircle cx='506.8' cy='22.2' r='0.6' opacity='0.4'/%3E%3Ccircle cx='443.3' cy='30.2' r='0.9' opacity='0.7'/%3E%3Ccircle cx='652.3' cy='30.2' r='0.9' opacity='0.9'/%3E%3Ccircle cx='1134.3' cy='32.4' r='1.1' opacity='1'/%3E%3Ccircle cx='778.3' cy='28.3' r='0.9' opacity='0.4'/%3E%3Ccircle cx='343.8' cy='2' r='1.1' opacity='0.5'/%3E%3Ccircle cx='287.6' cy='46.6' r='0.5' opacity='0.6'/%3E%3Ccircle cx='169.3' cy='53.2' r='0.6' opacity='0.8'/%3E%3Ccircle cx='906.8' cy='1' r='1.1' opacity='0.9'/%3E%3Ccircle cx='922' cy='66.8' r='0.4' opacity='0.5'/%3E%3Ccircle cx='46.5' cy='68.8' r='0.8' opacity='0.6'/%3E%3Ccircle cx='628.1' cy='58.5' r='1' opacity='0.9'/%3E%3Ccircle cx='11.6' cy='8' r='0.9' opacity='0.8'/%3E%3Ccircle cx='105.5' cy='20.1' r='0.7' opacity='0.9'/%3E%3Ccircle cx='810.9' cy='44.2' r='0.5' opacity='1'/%3E%3Ccircle cx='1197.8' cy='43.3' r='1' opacity='0.5'/%3E%3Ccircle cx='1067.1' cy='11.2' r='0.6' opacity='0.8'/%3E%3Ccircle cx='505.3' cy='32.5' r='1.3' opacity='0.7'/%3E%3Ccircle cx='661.9' cy='46.3' r='0.4' opacity='0.5'/%3E%3Ccircle cx='221.3' cy='58.7' r='0.6' opacity='1'/%3E%3Ccircle cx='649.5' cy='9' r='0.8' opacity='0.7'/%3E%3Ccircle cx='15.7' cy='37.9' r='1.1' opacity='0.7'/%3E%3Ccircle cx='253.8' cy='4.7' r='0.9' opacity='0.7'/%3E%3Ccircle cx='155.9' cy='58.3' r='0.3' opacity='0.9'/%3E%3Ccircle cx='864' cy='62.3' r='1' opacity='0.8'/%3E%3Ccircle cx='1009.4' cy='19.3' r='1' opacity='0.7'/%3E%3Ccircle cx='1.3' cy='8.6' r='0.4' opacity='0.4'/%3E%3Ccircle cx='619.1' cy='8.4' r='0.5' opacity='0.6'/%3E%3Ccircle cx='785.3' cy='17.1' r='0.5' opacity='0.8'/%3E%3Ccircle cx='900.3' cy='47.7' r='1.2' opacity='0.5'/%3E%3Ccircle cx='333.3' cy='38.3' r='0.7' opacity='0.8'/%3E%3Ccircle cx='488.1' cy='38.6' r='1.2' opacity='0.9'/%3E%3C/g%3E%3Ccircle cx='452' cy='42' r='24' fill='%23fbf3dc' opacity='.25' filter='url(%23b)'/%3E%3Ccircle cx='452' cy='42' r='16' fill='url(%23m)'/%3E%3Ccircle cx='496' cy='28' r='7' fill='%23e8b9a0'/%3E%3Ccircle cx='499' cy='26' r='6' fill='%232a2c52' opacity='.55'/%3E%3Cpath d='M0 100L70 84L130 94L200 70L262 90L330 78L400 96L470 74L540 100L600 106L660 98L720 72L790 92L860 66L930 88L1010 76L1080 92L1140 70L1200 84V150H0Z' fill='%236b5a7c' opacity='.8'/%3E%3Cpath d='M200 70L214 76L206 78L196 74ZM470 74L482 82L472 82L464 80ZM720 72L734 80L724 81L714 78ZM860 66L876 74L864 76L852 72ZM1140 70L1152 78L1142 78L1134 76Z' fill='%23c9b8d2' opacity='.7'/%3E%3Cpath d='M0 108L120 102L240 110L360 104L470 116L560 126L600 128L640 126L760 112L880 104L1000 108L1200 100V150H0Z' fill='%234a3f62'/%3E%3Cpath d='M603 106Q596 114 606 118Q620 124 598 130Q570 138 592 150H620Q600 140 620 132Q640 124 616 116Q608 112 609 106Z' fill='url(%23r)' opacity='.8'/%3E%3Crect y='110' width='1200' height='26' fill='url(%23f)'/%3E%3Cpath d='M391 130V100L395.2 95.2L397.3 99.2L400.1 92L401.9 97.6L405 94.4V130ZM411 130V110L414 106.4L415.5 109.4L417.5 104L418.8 108.2L421 105.8V130Z' fill='%233b3352'/%3E%3Cpath d='M0 150V118L80 114L180 122L300 116L400 124L470 132L540 150ZM620 150L668 124L700 116L812 112L860 120L900 150Z' fill='%233b3352'/%3E%3Cpath d='M703 122V80L708.4 74L711.1 79L714.7 70L717 77L721 73V122ZM733 122V64L739.6 56.8L742.9 62.8L747.3 52L750.1 60.4L755 55.6V122ZM770 120V91L774.8 85.6L777.2 90.1L780.4 82L782.4 88.3L786 84.7V120ZM700 122V110L708 108L714 112L726 106L734 110L752 108L760 104L768 110L780 108L788 112L796 110V122Z' fill='%231d1a2c'/%3E%3Cpath d='M740.5 80V69.5A3.5 3.5 0 0 1 747.5 69.5V80ZM709 95V87A3 3 0 0 1 715 87V95ZM775.5 103V96.5A2.5 2.5 0 0 1 780.5 96.5V103Z' fill='%237a5a74' opacity='.85'/%3E%3Cpath d='M626 150Q690 114 750 115Q818 116 884 150Z' fill='%231d1a2c'/%3E%3Cpath d='M0 150V134L120 128L260 136L400 130L520 140L580 150ZM820 150L900 136L1020 128L1120 136L1200 130V150Z' fill='%2315121e'/%3E%3C/svg%3E") 60% 100% / cover no-repeat;
         box-shadow:
           inset 0 0 0 1px rgba(0, 0, 0, 0.45),
           0 2px 3px rgba(0, 0, 0, 0.35),
@@ -218,7 +223,7 @@
         margin-top: 34px;
       }
       main > * + * {
-        margin-top: 24px;
+        margin-top: 40px;
       }
       main p,
       main li,
@@ -252,11 +257,10 @@
       .answer::before {
         content: "";
         display: block;
-        width: 96px;
-        height: 12px;
-        margin-bottom: 14px;
-        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 12'%3E%3Cpath d='M0 6H38M58 6H96' stroke='%23e8c66c' stroke-width='1.2'/%3E%3Cpath d='M48 0L54 6L48 12L42 6Z' fill='%23e8c66c'/%3E%3C/svg%3E")
-          no-repeat;
+        width: 160px;
+        height: 14px;
+        margin-bottom: 22px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 14'%3E%3Cg fill='none' stroke='%23e8c66c' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M8 7H62M98 7H152'/%3E%3Cpath d='M62 7c4-6 10-6 10-1.5c0 2.4-3.4 2.6-3.6.6M98 7c-4-6-10-6-10-1.5c0 2.4 3.4 2.6 3.6.6M62 7c4 6 10 6 10 1.5M98 7c-4 6-10 6-10 1.5'/%3E%3C/g%3E%3Cg fill='%23e8c66c'%3E%3Cpath d='M80 1.5L84 7L80 12.5L76 7Z'/%3E%3Cpath d='M1 7L5 4.5L9 7L5 9.5Z'/%3E%3Cpath d='M151 7L155 4.5L159 7L155 9.5Z'/%3E%3C/g%3E%3C/svg%3E") no-repeat;
       }
       /* the analogy is flavour text: italic, set apart by a thin ornament */
       .analogy,
@@ -267,7 +271,7 @@
         text-align: center;
         font: italic 400 20px/1.75 var(--flavour);
         color: var(--ink-soft);
-        padding: 30px 12px 0;
+        padding: 40px 12px 0;
       }
       .analogy::before,
       .takeaway::before {
@@ -289,17 +293,14 @@
       }
       .analogy::before,
       .takeaway::before {
-        background: linear-gradient(
-            90deg,
-            transparent,
-            var(--gold) calc(50% - 120px),
-            transparent calc(50% - 64px),
-            transparent calc(50% + 64px),
-            var(--gold) calc(50% + 120px),
-            transparent
-          )
-          center / 100% 1px no-repeat;
+        background:
+          var(--rule-l) right calc(50% + 135px) center / 130px 14px no-repeat,
+          var(--rule-r) left calc(50% + 135px) center / 130px 14px no-repeat;
         justify-content: center;
+      }
+      .analogy {
+        --rule-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 14'%3E%3Cg%3E%3Cpath d='M8 7H104c6-7 14-6 14-1c0 3-4 3.4-4.6.8M104 7c6 7 14 6 14 1' fill='none' stroke='%23e8c66c' stroke-width='1.2' stroke-linecap='round'/%3E%3Cpath d='M1 7L5 4.5L9 7L5 9.5ZM122 7L125 5L128 7L125 9Z' fill='%23e8c66c'/%3E%3C/g%3E%3C/svg%3E");
+        --rule-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 14'%3E%3Cg transform='matrix(-1 0 0 1 130 0)'%3E%3Cpath d='M8 7H104c6-7 14-6 14-1c0 3-4 3.4-4.6.8M104 7c6 7 14 6 14 1' fill='none' stroke='%23e8c66c' stroke-width='1.2' stroke-linecap='round'/%3E%3Cpath d='M1 7L5 4.5L9 7L5 9.5ZM122 7L125 5L128 7L125 9Z' fill='%23e8c66c'/%3E%3C/g%3E%3C/svg%3E");
       }
       /* the takeaway closes the page as the card's last word, a gold-framed seal */
       .takeaway {
@@ -308,9 +309,24 @@
         font: 600 22px/1.65 var(--flavour);
         font-style: normal;
         color: var(--ink);
+        padding-bottom: 46px;
         border-radius: 10px;
         background: var(--parchment-hi);
         text-wrap: balance;
+        --rule-l: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 14'%3E%3Cg%3E%3Cpath d='M8 7H104c6-7 14-6 14-1c0 3-4 3.4-4.6.8M104 7c6 7 14 6 14 1' fill='none' stroke='%23b0802a' stroke-width='1.2' stroke-linecap='round'/%3E%3Cpath d='M1 7L5 4.5L9 7L5 9.5ZM122 7L125 5L128 7L125 9Z' fill='%23b0802a'/%3E%3C/g%3E%3C/svg%3E");
+        --rule-r: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 14'%3E%3Cg transform='matrix(-1 0 0 1 130 0)'%3E%3Cpath d='M8 7H104c6-7 14-6 14-1c0 3-4 3.4-4.6.8M104 7c6 7 14 6 14 1' fill='none' stroke='%23b0802a' stroke-width='1.2' stroke-linecap='round'/%3E%3Cpath d='M1 7L5 4.5L9 7L5 9.5ZM122 7L125 5L128 7L125 9Z' fill='%23b0802a'/%3E%3C/g%3E%3C/svg%3E");
+      }
+      /* sealed in red wax where it meets the mat */
+      .takeaway::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -26px;
+        width: 54px;
+        height: 54px;
+        transform: translateX(-50%) rotate(-8deg);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Cdefs%3E%3CradialGradient id='w' cx='.38' cy='.32' r='.75'%3E%3Cstop offset='0' stop-color='%23d4554f'/%3E%3Cstop offset='.55' stop-color='%23a8292b'/%3E%3Cstop offset='1' stop-color='%235e1213'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M30 3L38.4 7L48.1 8.4L51.2 17.8L57.2 25.2L54.1 34.3L53.4 43.5L45.7 48.8L39.6 56.5L30 54.5L20.6 55.9L14.3 48.8L6.6 43.5L5.9 34.3L2.2 25.1L8.8 17.7L12.3 8.9L21.6 7Z' fill='url(%23w)' stroke='%235e1213' stroke-width='1' stroke-linejoin='round'/%3E%3Ccircle cx='30' cy='30' r='17' fill='none' stroke='%235e1213' stroke-width='2.2'/%3E%3Ccircle cx='30.6' cy='30.8' r='17' fill='none' stroke='%23e27a6c' stroke-opacity='.6' stroke-width='.8'/%3E%3Cpath d='M30 17.5L33 26L42 26L34.8 31.4L37.4 40L30 34.8L22.6 40L25.2 31.4L18 26L27 26Z' fill='%237c1819' stroke='%23e27a6c' stroke-opacity='.55' stroke-width='.8'/%3E%3Cellipse cx='22' cy='18' rx='6' ry='3' fill='%23fff' opacity='.18' transform='rotate(-30 22 18)'/%3E%3C/svg%3E") center / contain no-repeat;
+        filter: drop-shadow(0 3px 2px rgba(0, 0, 0, 0.45));
       }
       .takeaway::before {
         content: "Takeaway";
@@ -322,13 +338,13 @@
 
       /* sections lie open on the card: spacing and a gilt rule under each heading, so the option cards are the only framed objects */
       main > section {
-        margin-top: 64px;
+        margin-top: 80px;
       }
       main h2 {
         display: flex;
         align-items: baseline;
         gap: 12px;
-        margin-bottom: 20px;
+        margin-bottom: 28px;
         padding-bottom: 10px;
         background: linear-gradient(90deg, var(--gold), transparent 85%) left
           bottom / 100% 1px no-repeat;
@@ -339,15 +355,14 @@
       main h2::before {
         content: "";
         flex: none;
-        width: 11px;
-        height: 11px;
-        transform: translateY(-3px) rotate(45deg);
-        background: linear-gradient(135deg, var(--gold-hi), var(--gold));
-        box-shadow: 0 0 0 1.5px var(--frame);
+        width: 30px;
+        height: 18px;
+        transform: translateY(-1px);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f3dc93'/%3E%3Cstop offset='1' stop-color='%23b0802a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg fill='url(%23g)' stroke='%2317130f' stroke-width='.9'%3E%3Cpath d='M13 1.5L16.5 8L13 14.5L9.5 8Z'/%3E%3Cpath d='M9.5 8C7 4.5 2.5 4 1.6 7c-.6 2 1.2 3.6 3 2.8c1.2-.6 1.2-2.2.2-2.6C6.4 6.6 8 7 9.5 8ZM16.5 8C19 4.5 23.5 4 24.4 7c.6 2-1.2 3.6-3 2.8c-1.2-.6-1.2-2.2-.2-2.6C19.6 6.6 18 7 16.5 8Z'/%3E%3C/g%3E%3C/svg%3E") center / contain no-repeat;
       }
       .spread > .text > * + *,
       main > section:not(.spread) > * + * {
-        margin-top: 18px;
+        margin-top: 22px;
       }
 
       .spread {
@@ -574,8 +589,21 @@
       main > section > .cards {
         margin-top: 26px;
       }
+      /* four cards share one row: four 280px tracks overflow the mat at 1280 */
+      @container (min-width: 761px) {
+        .cards:has(> .card:nth-child(4)) {
+          grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+          gap: 30px 18px;
+        }
+      }
       .card {
         --id: var(--sea);
+        --land: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%239cc3d6'/%3E%3Cstop offset='.55' stop-color='%23d7e6e2'/%3E%3Cstop offset='.7' stop-color='%23f4e2bb'/%3E%3C/linearGradient%3E%3ClinearGradient id='w' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%233f7ea6'/%3E%3Cstop offset='1' stop-color='%23163c5c'/%3E%3C/linearGradient%3E%3CradialGradient id='g' cx='.72' cy='.6' r='.35'%3E%3Cstop offset='0' stop-color='%23fff6dc'/%3E%3Cstop offset='1' stop-color='%23fff6dc' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='280' height='80' fill='url(%23s)'/%3E%3Crect width='280' height='80' fill='url(%23g)'/%3E%3Cpath d='M150 54L156 40L161 41L164 54ZM176 54L180 45L184 46L186 54ZM232 54L236 33L241 30L247 36L250 54Z' fill='%237d9db0'/%3E%3Cpath d='M206 54L214 38L224 36L236 44L262 40L280 46V54Z' fill='%235c829b'/%3E%3Crect y='53' width='280' height='27' fill='url(%23w)'/%3E%3Cpath d='M120 58Q180 56 280 58M140 64Q200 61 260 64M100 71Q170 68 240 71' stroke='%23e9f3f2' stroke-opacity='.45' fill='none' stroke-width='.9'/%3E%3Cpath d='M0 14L20 10L44 16L58 26L64 40L74 50L86 56L96 60L0 60Z' fill='%23183449'/%3E%3Cpath d='M20 10L44 16L58 26L50 30L38 22L24 20Z' fill='%233b6683'/%3E%3Cpath d='M58 26L64 40L74 50L66 50L58 38Z' fill='%232a5270'/%3E%3Cpath d='M0 60L96 60L110 66L0 66Z' fill='%2310273a'/%3E%3Cpath d='M66 58Q78 54 92 59Q102 61 112 64M80 63Q96 60 116 67' stroke='%23fff' stroke-opacity='.7' fill='none' stroke-width='1.2' stroke-linecap='round'/%3E%3Cpath d='M168 20l3 2l3-2M182 15l2 1.5l2-1.5' stroke='%23284a62' fill='none' stroke-width='.8'/%3E%3C/svg%3E");
+        --mana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='d' cx='.36' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%23d6ecff'/%3E%3Cstop offset='.5' stop-color='%235d9bd0'/%3E%3Cstop offset='1' stop-color='%2317130f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14.5' fill='url(%23d)' stroke='%2317130f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='.8'/%3E%3Cg fill='%2317130f' stroke='%23fff' stroke-opacity='.4' stroke-width='.8'%3E%3Cpath d='M16 6.5C13 11 10 14.8 10 18.6a6 6 0 0 0 12 0C22 14.8 19 11 16 6.5Z'/%3E%3C/g%3E%3C/svg%3E");
+        --bevel:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+          inset 0 0 0 3px rgba(0, 0, 0, 0.32),
+          inset 0 0 0 4px rgba(255, 255, 255, 0.12);
         counter-increment: card;
         position: relative;
         display: grid;
@@ -586,6 +614,7 @@
         border: 9px solid var(--frame);
         border-radius: 16px;
         background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='v'%3E%3CfeTurbulence type='turbulence' baseFrequency='.008 .022' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -2.4 0 0 0 .5'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23v)'/%3E%3C/svg%3E"),
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 -.1'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23c)'/%3E%3C/svg%3E"),
           linear-gradient(
             160deg,
@@ -594,6 +623,7 @@
             color-mix(in srgb, var(--id) 65%, black)
           );
         box-shadow:
+          var(--bevel),
           0 0 0 1px #000,
           0 14px 24px -10px rgba(0, 0, 0, 0.6);
         /* a tilt script writes --rx/--ry (deg) and --mx/--my (pointer %) inline and sets .tilting while the pointer is over the card; unset, the card lies flat */
@@ -610,12 +640,18 @@
       }
       .card:nth-child(2) {
         --id: var(--blood);
+        --land: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%232b1013'/%3E%3Cstop offset='.5' stop-color='%237b2622'/%3E%3Cstop offset='.78' stop-color='%23df8546'/%3E%3C/linearGradient%3E%3CradialGradient id='l' cx='.53' cy='.24' r='.3'%3E%3Cstop offset='0' stop-color='%23ffb85a' stop-opacity='.9'/%3E%3Cstop offset='1' stop-color='%23ff6a2a' stop-opacity='0'/%3E%3C/radialGradient%3E%3Cfilter id='b' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='280' height='80' fill='url(%23s)'/%3E%3Cg fill='%234a2a2a' opacity='.7' filter='url(%23b)'%3E%3Cellipse cx='150' cy='12' rx='14' ry='8'/%3E%3Cellipse cx='166' cy='4' rx='20' ry='7'/%3E%3Cellipse cx='190' cy='-2' rx='26' ry='7'/%3E%3C/g%3E%3Crect width='280' height='80' fill='url(%23l)'/%3E%3Cpath d='M0 52L30 44L52 50L76 40L98 50L200 46L226 38L250 46L280 42V80H0Z' fill='%235a1c1c'/%3E%3Cpath d='M60 80L118 30L136 20L144 22L152 19L166 30L226 80Z' fill='%233a1214'/%3E%3Cpath d='M118 30L136 20L144 22L134 34L124 52L100 64L86 70Z' fill='%235e2220'/%3E%3Cpath d='M136 20L144 22L152 19L150 23L142 25Z' fill='%23ffcf73'/%3E%3Cg filter='url(%23b)' opacity='.8'%3E%3Cpath d='M140 22Q147 40 138 56Q134 66 140 76' stroke='%23ff5a1f' stroke-width='5' fill='none'/%3E%3C/g%3E%3Cpath d='M141 22Q148 38 140 54Q136 64 141 76L144 76Q140 64 144 54Q152 38 145 22Z' fill='%23ff7a2a'/%3E%3Cpath d='M142.5 23Q148.5 38 141.5 54Q138 64 142.2 74' stroke='%23ffd27a' stroke-width='.9' fill='none'/%3E%3Cpath d='M150 21Q156 30 158 42Q159 48 164 54L166 53Q161 47 160 41Q158 29 152 21Z' fill='%23e85a24'/%3E%3Cpath d='M0 80V62L14 56L22 60L34 50L44 58L58 54L70 64L84 62L96 80ZM180 80L196 64L208 68L222 56L236 62L250 52L262 60L280 56V80Z' fill='%23190809'/%3E%3C/svg%3E");
+        --mana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='d' cx='.36' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%23ffd0c4'/%3E%3Cstop offset='.5' stop-color='%23d4554f'/%3E%3Cstop offset='1' stop-color='%2317130f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14.5' fill='url(%23d)' stroke='%2317130f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='.8'/%3E%3Cg fill='%2317130f' stroke='%23fff' stroke-opacity='.4' stroke-width='.8'%3E%3Cpath d='M16 6c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 1.6-4.6 2.6-6.4c.4 2 1.4 3 2.4 3.4C14.6 11.6 15.6 9 16 6Z'/%3E%3C/g%3E%3C/svg%3E");
       }
       .card:nth-child(3) {
         --id: var(--moss);
+        --land: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23c9d9b4'/%3E%3Cstop offset='.6' stop-color='%23eef0d4'/%3E%3C/linearGradient%3E%3ClinearGradient id='m' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23f3f5e2' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23f3f5e2' stop-opacity='.75'/%3E%3C/linearGradient%3E%3CradialGradient id='g' cx='.3' cy='.25' r='.4'%3E%3Cstop offset='0' stop-color='%23fffbe0'/%3E%3Cstop offset='1' stop-color='%23fffbe0' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='280' height='80' fill='url(%23s)'/%3E%3Crect width='280' height='80' fill='url(%23g)'/%3E%3Cpath d='M0 40Q70 30 140 38T280 34V80H0Z' fill='%23a9bf95'/%3E%3Cpath d='M-6 24.2L-1.8 32.3L-3.7 31.9L0.2 39.6L-2.8 39.1L1.7 45.6L-13.7 45.6L-9.2 39.1L-12.2 39.6L-8.3 31.9L-10.2 32.3ZM1.9 26.7L5.8 34.3L4 33.9L7.6 41L4.9 40.6L9 46.6L-5.3 46.6L-1.1 40.6L-3.9 41L-0.3 33.9L-2.1 34.3ZM11 27.5L15 35.1L13.2 34.7L16.8 41.9L14.1 41.5L18.2 47.5L3.8 47.5L8 41.5L5.3 41.9L8.9 34.7L7.1 35.1ZM21.4 29.1L25.3 36.5L23.5 36.2L27 43.2L24.4 42.8L28.4 48.6L14.4 48.6L18.5 42.8L15.8 43.2L19.3 36.2L17.6 36.5ZM31.1 33.8L34.3 39.9L32.9 39.5L35.7 45.3L33.6 45L36.9 49.7L25.4 49.7L28.7 45L26.6 45.3L29.4 39.5L28 39.9ZM39.5 30.3L43.3 37.8L41.6 37.4L45.1 44.4L42.4 44L46.5 49.9L32.4 49.9L36.5 44L33.8 44.4L37.4 37.4L35.6 37.8ZM46.1 32.4L49.6 39.1L48 38.8L51.2 45.1L48.7 44.8L52.4 50.1L39.7 50.1L43.4 44.8L41 45.1L44.1 38.8L42.5 39.1ZM57.3 35.6L60.3 41.3L59 41L61.7 46.4L59.6 46.1L62.7 50.6L51.9 50.6L55.1 46.1L53 46.4L55.7 41L54.4 41.3ZM66.4 31.3L70.3 38.7L68.5 38.3L72 45.4L69.4 45L73.4 50.8L59.4 50.8L63.5 45L60.8 45.4L64.3 38.3L62.6 38.7ZM76.2 28.7L80.4 36.8L78.5 36.4L82.3 44L79.4 43.6L83.9 50L68.5 50L73 43.6L70.1 44L73.9 36.4L72 36.8ZM87.4 32.5L90.7 38.9L89.2 38.5L92.2 44.5L89.9 44.2L93.4 49.2L81.4 49.2L84.9 44.2L82.6 44.5L85.6 38.5L84.1 38.9ZM98.2 33.3L101.2 39.1L99.9 38.8L102.6 44.3L100.5 44L103.7 48.6L92.7 48.6L95.9 44L93.8 44.3L96.6 38.8L95.2 39.1ZM106.1 31.9L109.4 38.1L107.9 37.8L110.8 43.7L108.6 43.4L112 48.3L100.2 48.3L103.6 43.4L101.4 43.7L104.4 37.8L102.9 38.1ZM117.5 27.9L121.4 35.4L119.6 35L123.2 42.2L120.5 41.8L124.6 47.7L110.3 47.7L114.5 41.8L111.8 42.2L115.3 35L113.6 35.4ZM128.5 29.7L131.7 35.9L130.3 35.5L133.2 41.4L131 41L134.4 45.9L122.7 45.9L126.1 41L123.9 41.4L126.8 35.5L125.3 35.9ZM137.9 28.7L141.3 35.3L139.7 35L142.9 41.3L140.5 40.9L144.1 46.1L131.6 46.1L135.2 40.9L132.8 41.3L136 35L134.4 35.3ZM145.2 32L148.1 37.5L146.8 37.2L149.4 42.4L147.4 42.1L150.4 46.4L140 46.4L143 42.1L141 42.4L143.6 37.2L142.3 37.5ZM153.5 25.5L157.3 32.8L155.6 32.4L159 39.4L156.4 39L160.4 44.8L146.5 44.8L150.5 39L147.9 39.4L151.4 32.4L149.6 32.8ZM164.8 29.2L167.8 35L166.4 34.7L169.2 40.3L167.1 39.9L170.3 44.5L159.2 44.5L162.4 39.9L160.3 40.3L163.1 34.7L161.7 35ZM173.2 26.9L176.6 33.3L175.1 33L178.1 39L175.8 38.7L179.3 43.8L167.2 43.8L170.7 38.7L168.4 39L171.4 33L169.9 33.3ZM181.8 25.5L185.5 32.4L183.8 32L187.1 38.6L184.6 38.2L188.4 43.7L175.3 43.7L179.1 38.2L176.6 38.6L179.9 32L178.2 32.4ZM191.5 22.2L195.7 30.3L193.7 29.9L197.6 37.5L194.7 37.1L199.1 43.5L183.8 43.5L188.2 37.1L185.3 37.5L189.2 29.9L187.2 30.3ZM200.2 25.8L204 33L202.3 32.6L205.7 39.5L203.1 39.1L207.1 44.9L193.4 44.9L197.3 39.1L194.7 39.5L198.2 32.6L196.4 33ZM210 26.4L213.5 33.3L211.9 32.9L215.1 39.4L212.7 39L216.4 44.5L203.5 44.5L207.2 39L204.8 39.4L208 32.9L206.4 33.3ZM220 28.6L223.4 35.1L221.8 34.8L224.9 41L222.6 40.6L226.2 45.8L213.8 45.8L217.4 40.6L215 41L218.1 34.8L216.6 35.1ZM230.1 26.3L233.8 33.4L232.1 33L235.5 39.7L232.9 39.4L236.8 45L223.4 45L227.3 39.4L224.7 39.7L228.1 33L226.4 33.4ZM238.3 28.6L241.7 35.1L240.1 34.7L243.2 40.9L240.9 40.6L244.5 45.7L232.1 45.7L235.7 40.6L233.4 40.9L236.4 34.7L234.9 35.1ZM248.9 32.7L251.8 38.3L250.5 38L253.2 43.4L251.1 43.1L254.2 47.6L243.5 47.6L246.6 43.1L244.6 43.4L247.3 38L245.9 38.3ZM259.6 29.5L263 36.1L261.5 35.7L264.6 41.9L262.2 41.6L265.8 46.8L253.4 46.8L257 41.6L254.6 41.9L257.7 35.7L256.2 36.1ZM266.7 25.3L271.1 33.7L269.1 33.2L273.1 41.1L270.1 40.7L274.6 47.3L258.8 47.3L263.4 40.7L260.4 41.1L264.4 33.2L262.4 33.7ZM274.2 33.7L277.2 39.5L275.9 39.2L278.6 44.6L276.5 44.3L279.7 48.9L268.8 48.9L271.9 44.3L269.9 44.6L272.6 39.2L271.2 39.5ZM283 34.2L286 40L284.6 39.7L287.3 45.1L285.3 44.8L288.4 49.3L277.6 49.3L280.7 44.8L278.6 45.1L281.4 39.7L280 40Z' fill='%2386a274'/%3E%3Crect y='34' width='280' height='16' fill='url(%23m)'/%3E%3Cpath d='M-6 30.5L0.5 42.9L-2.5 42.3L3.4 54L-1.1 53.4L5.8 63.2L-17.8 63.2L-10.9 53.4L-15.4 54L-9.5 42.3L-12.5 42.9ZM10 33.7L16.2 45.5L13.4 44.9L19 56.1L14.7 55.5L21.2 64.8L-1.2 64.8L5.3 55.5L1 56.1L6.6 44.9L3.8 45.5ZM21.3 39.1L26.2 48.6L24 48.1L28.4 57.1L25 56.6L30.2 64L12.3 64L17.5 56.6L14.1 57.1L18.6 48.1L16.3 48.6ZM30.9 35.4L36.8 46.6L34.1 46L39.4 56.6L35.4 56L41.5 64.8L20.4 64.8L26.5 56L22.5 56.6L27.8 46L25.1 46.6ZM41.9 39.1L47.4 49.7L44.9 49.1L49.9 59.1L46.1 58.6L51.9 66.9L31.8 66.9L37.6 58.6L33.8 59.1L38.8 49.1L36.3 49.7ZM56.3 33.8L62.8 46.2L59.8 45.6L65.7 57.3L61.2 56.6L68 66.4L44.6 66.4L51.4 56.6L46.9 57.3L52.8 45.6L49.9 46.2ZM67.2 34L73.7 46.4L70.8 45.8L76.7 57.6L72.2 56.9L79 66.7L55.5 66.7L62.3 56.9L57.8 57.6L63.7 45.8L60.8 46.4ZM77.3 44.7L81.6 53.1L79.7 52.6L83.6 60.6L80.6 60.1L85.2 66.7L69.3 66.7L73.9 60.1L70.9 60.6L74.9 52.6L72.9 53.1ZM93.5 33.1L100 45.7L97.1 45L103 56.9L98.5 56.2L105.4 66.2L81.6 66.2L88.5 56.2L84 56.9L89.9 45L86.9 45.7ZM102.8 41.7L107.6 50.9L105.4 50.4L109.7 59.2L106.4 58.7L111.5 66L94 66L99.1 58.7L95.8 59.2L100.1 50.4L98 50.9ZM119.4 33.6L125.4 45.1L122.7 44.5L128.1 55.3L124 54.7L130.3 63.8L108.6 63.8L114.9 54.7L110.7 55.3L116.2 44.5L113.4 45.1ZM130.6 37.4L135.4 46.8L133.2 46.3L137.6 55.1L134.3 54.6L139.4 62L121.8 62L126.9 54.6L123.5 55.1L127.9 46.3L125.7 46.8ZM144.1 29.1L150.3 41L147.5 40.3L153.1 51.6L148.8 51L155.3 60.3L132.8 60.3L139.4 51L135.1 51.6L140.7 40.3L137.9 41ZM158.7 32.5L164.2 43.1L161.7 42.6L166.7 52.7L162.9 52.1L168.7 60.5L148.6 60.5L154.4 52.1L150.6 52.7L155.6 42.6L153.1 43.1ZM168 25.7L174.6 38.3L171.6 37.6L177.5 49.5L173 48.8L179.9 58.7L156.1 58.7L163 48.8L158.5 49.5L164.4 37.6L161.5 38.3ZM178.1 26.8L184.6 39.2L181.7 38.6L187.6 50.3L183.1 49.7L189.9 59.5L166.4 59.5L173.2 49.7L168.7 50.3L174.6 38.6L171.7 39.2ZM187.5 27.4L193.9 39.7L191 39.1L196.8 50.7L192.4 50.1L199.2 59.8L175.9 59.8L182.6 50.1L178.2 50.7L184 39.1L181.1 39.7ZM204.4 29L210.5 40.9L207.7 40.3L213.3 51.5L209.1 50.9L215.6 60.2L193.1 60.2L199.7 50.9L195.4 51.5L201 40.3L198.2 40.9ZM216.7 28.7L222.8 40.4L220.1 39.8L225.6 50.8L221.4 50.2L227.8 59.5L205.7 59.5L212.1 50.2L207.9 50.8L213.4 39.8L210.7 40.4ZM232.7 36.2L237.6 45.6L235.4 45.1L239.9 54.1L236.5 53.6L241.7 61L223.8 61L229 53.6L225.6 54.1L230 45.1L227.8 45.6ZM245 34.4L250.7 45.3L248.1 44.8L253.2 55.1L249.3 54.5L255.3 63.1L234.6 63.1L240.6 54.5L236.7 55.1L241.9 44.8L239.3 45.3ZM256.8 33L262.9 44.7L260.1 44.1L265.7 55.2L261.5 54.5L267.9 63.8L245.7 63.8L252.2 54.5L247.9 55.2L253.5 44.1L250.7 44.7ZM268.5 38L273.9 48.3L271.5 47.8L276.3 57.5L272.6 57L278.3 65.1L258.8 65.1L264.4 57L260.7 57.5L265.6 47.8L263.2 48.3ZM279.2 31.4L285.9 44.2L282.8 43.5L288.9 55.7L284.3 55L291.4 65.2L267 65.2L274.1 55L269.4 55.7L275.5 43.5L272.5 44.2Z' fill='%234f7345'/%3E%3Crect y='50' width='280' height='16' fill='url(%23m)' opacity='.7'/%3E%3Cpath d='M-6 27.8L5.3 49.5L0.2 48.4L10.5 69L2.6 67.8L14.6 85L-26.6 85L-14.6 67.8L-22.5 69L-12.2 48.4L-17.3 49.5ZM21.5 33.2L31.9 53.1L27.2 52L36.6 70.8L29.4 69.8L40.3 85.4L2.7 85.4L13.6 69.8L6.5 70.8L15.9 52L11.2 53.1ZM38.7 36.4L48.7 55.5L44.1 54.5L53.2 72.6L46.3 71.6L56.8 86.6L20.6 86.6L31.1 71.6L24.2 72.6L33.3 54.5L28.8 55.5ZM64.3 39.3L73.9 57.8L69.5 56.8L78.3 74.3L71.6 73.3L81.8 87.9L46.8 87.9L56.9 73.3L50.3 74.3L59 56.8L54.7 57.8ZM82.2 45L90.4 60.8L86.7 60L94.2 75L88.5 74.2L97.2 86.7L67.2 86.7L75.9 74.2L70.2 75L77.7 60L73.9 60.8ZM106.3 35.6L116.3 54.8L111.7 53.7L120.8 71.9L113.9 70.9L124.4 86L88.2 86L98.7 70.9L91.8 71.9L100.9 53.7L96.3 54.8ZM128.4 39.4L137.5 56.9L133.4 56L141.6 72.5L135.3 71.6L144.9 85.4L111.8 85.4L121.4 71.6L115.2 72.5L123.4 56L119.3 56.9ZM153.7 38.2L162.5 55.1L158.5 54.2L166.5 70.3L160.4 69.4L169.8 82.8L137.7 82.8L147 69.4L140.9 70.3L148.9 54.2L144.9 55.1ZM176.3 28.6L186.9 49.1L182.1 48L191.8 67.4L184.4 66.3L195.7 82.5L156.9 82.5L168.1 66.3L160.7 67.4L170.4 48L165.6 49.1ZM195.5 30L205.9 49.9L201.2 48.9L210.6 67.8L203.4 66.7L214.4 82.5L176.6 82.5L187.6 66.7L180.4 67.8L189.8 48.9L185.1 49.9ZM216.6 27.6L227.5 48.5L222.5 47.4L232.4 67.2L224.9 66.1L236.4 82.6L196.8 82.6L208.2 66.1L200.7 67.2L210.6 47.4L205.7 48.5ZM242.8 27.4L254.3 49.4L249.1 48.3L259.5 69.2L251.6 68L263.7 85.4L221.9 85.4L234.1 68L226.1 69.2L236.6 48.3L231.3 49.4ZM267.2 48.1L274.8 62.8L271.4 62L278.3 75.9L273 75.1L281.1 86.7L253.3 86.7L261.4 75.1L256.1 75.9L263.1 62L259.6 62.8Z' fill='%231d3a1f'/%3E%3Cpath d='M0 80V74Q60 70 140 75T280 72V80Z' fill='%23142a16'/%3E%3C/svg%3E");
+        --mana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='d' cx='.36' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%23ddf2cf'/%3E%3Cstop offset='.5' stop-color='%236aa35e'/%3E%3Cstop offset='1' stop-color='%2317130f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14.5' fill='url(%23d)' stroke='%2317130f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='.8'/%3E%3Cg fill='%2317130f' stroke='%23fff' stroke-opacity='.4' stroke-width='.8'%3E%3Cpath d='M16 5.5L22.5 14.5H19.5L23.5 20.5H17.6V25.5H14.4V20.5H8.5L12.5 14.5H9.5Z'/%3E%3C/g%3E%3C/svg%3E");
       }
       .card:nth-child(4) {
         --id: var(--bone);
+        --land: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23efe3c0'/%3E%3Cstop offset='.6' stop-color='%23f8efd6'/%3E%3Cstop offset='.72' stop-color='%23f6d58e'/%3E%3C/linearGradient%3E%3CradialGradient id='g' cx='.54' cy='.68' r='.45'%3E%3Cstop offset='0' stop-color='%23fff8e0'/%3E%3Cstop offset='1' stop-color='%23fff8e0' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='280' height='80' fill='url(%23s)'/%3E%3Cpath d='M150 50L-47 15.3L-42.3 -5.1ZM150 50L-29.8 -37.7L-19.6 -56ZM150 50L1.4 -83.8L16.2 -98.6ZM150 50L44 -119.6L62.3 -129.8ZM150 50L94.9 -142.3L115.3 -147ZM150 50L150 -150L170.9 -148.9ZM150 50L205.1 -142.3L224.9 -135.4ZM150 50L256 -119.6L273.1 -107.6ZM150 50L298.6 -83.8L311.8 -67.6ZM150 50L329.8 -37.7L337.9 -18.4ZM150 50L347 15.3L349.5 36Z' fill='%23fff9e6' opacity='.55'/%3E%3Crect width='280' height='80' fill='url(%23g)'/%3E%3Ccircle cx='150' cy='50' r='11' fill='%23fff4cf'/%3E%3Cpath d='M0 50Q60 44 120 52T280 48V80H0Z' fill='%23d3bd85'/%3E%3Cpath d='M0 60Q80 50 170 60T280 58V80H0Z' fill='%23b49c62'/%3E%3Cpath d='M0 70Q100 60 200 70T280 68V80H0Z' fill='%238a7442'/%3E%3Cpath d='M20 70l2-6M24 70l1-7M28 70l-1-5M210 70l2-6M214 70l1-7M218 70l-1-5M246 69l1-6M250 69l-1-5M110 66l1-5M114 66l-1-4' stroke='%235e4c26' stroke-width='.9' fill='none' stroke-linecap='round'/%3E%3Cpath d='M120 30l3 2l3-2M134 24l2 1.5l2-1.5' stroke='%238a7442' fill='none' stroke-width='.8'/%3E%3C/svg%3E");
+        --mana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='d' cx='.36' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%23fffdf2'/%3E%3Cstop offset='.5' stop-color='%23efe6c8'/%3E%3Cstop offset='1' stop-color='%2317130f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14.5' fill='url(%23d)' stroke='%2317130f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='.8'/%3E%3Cg fill='%2317130f' stroke='%23fff' stroke-opacity='.4' stroke-width='.8'%3E%3Ccircle cx='16' cy='16' r='4.6'/%3E%3Cpath d='M16 5.5L17.3 9.6H14.7ZM16 26.5L14.7 22.4H17.3ZM5.5 16L9.6 14.7V17.3ZM26.5 16L22.4 17.3V14.7ZM8.6 8.6L12.4 10.6L10.6 12.4ZM23.4 23.4L19.6 21.4L21.4 19.6ZM23.4 8.6L21.4 12.4L19.6 10.6ZM8.6 23.4L10.6 19.6L12.4 21.4Z'/%3E%3C/g%3E%3C/svg%3E");
       }
       .card:hover {
         --lift: -6px;
@@ -626,20 +662,30 @@
         padding: 6px 44px 6px 12px;
         border-radius: 10px / 50%;
         background: linear-gradient(var(--parchment-hi), var(--parchment-deep));
+        box-shadow:
+          0 0 0 1.5px var(--frame),
+          inset 0 1px 0 rgba(255, 255, 255, 0.85),
+          inset 0 -2px 0 rgba(95, 75, 54, 0.35),
+          inset 0 0 0 3px rgba(176, 128, 42, 0.18),
+          0 3px 0 1px rgba(0, 0, 0, 0.3);
         color: var(--ink);
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
         overflow-wrap: anywhere;
       }
+      /* the casting cost: the identity's mana symbol */
       .card h3::after {
         content: "";
-        --pip: var(--id);
         position: absolute;
-        right: 8px;
+        right: 7px;
         top: 50%;
-        width: 22px;
-        height: 22px;
+        width: 25px;
+        height: 25px;
         transform: translateY(-50%);
+        border-radius: 50%;
+        background: var(--mana) center / contain no-repeat;
+        box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.4);
       }
-      /* the stats are the text box, its top a small art window in the card's colour */
+      /* the stats are the text box, its top an art window painting the identity's land */
       .card .stats {
         list-style: none;
         margin-top: 8px;
@@ -648,6 +694,10 @@
         background:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cpath d='M0 .5H4M.5 0V4' stroke='%23785a32' stroke-opacity='.09'/%3E%3C/svg%3E"),
           var(--parchment-hi);
+        box-shadow:
+          -1.5px 0 0 var(--frame),
+          1.5px 0 0 var(--frame),
+          0 -1.5px 0 var(--frame);
       }
       .card .stats::before {
         content: "";
@@ -655,13 +705,10 @@
         height: 80px;
         margin: 0 -12px 8px;
         border-bottom: 2px solid var(--frame);
-        background:
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='none'%3E%3Ccircle cx='196' cy='26' r='12' fill='%23f4e2b4'/%3E%3Cpath d='M0 58 L60 40 L120 56 L190 34 L280 52 V80 H0Z' fill='%23000' opacity='.22'/%3E%3Cpath d='M0 70 L90 60 L170 72 L280 62 V80 H0Z' fill='%23000' opacity='.35'/%3E%3C/svg%3E")
-            center / 100% 100% no-repeat,
-          linear-gradient(
-            color-mix(in srgb, var(--id) 45%, white),
-            color-mix(in srgb, var(--id) 80%, black)
-          );
+        background: var(--land) center / cover no-repeat;
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+          inset 0 -14px 18px -14px rgba(0, 0, 0, 0.45);
       }
       .card .stats li {
         display: flex;
@@ -725,6 +772,10 @@
       .card > p {
         padding: 8px 12px 32px;
         border-radius: 0 0 4px 4px;
+        box-shadow:
+          -1.5px 0 0 var(--frame),
+          1.5px 0 0 var(--frame),
+          0 1.5px 0 var(--frame);
         background:
           linear-gradient(var(--hair), var(--hair)) top center / 70% 1px
             no-repeat,
@@ -744,7 +795,10 @@
         border: 2px solid var(--frame);
         border-radius: 8px;
         background: linear-gradient(var(--parchment-hi), var(--parchment-deep));
-        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.85),
+          inset 0 -2px 0 rgba(95, 75, 54, 0.35),
+          0 2px 0 rgba(0, 0, 0, 0.35);
         font: 700 15px/1.5 var(--display);
         text-align: center;
         color: var(--ink);
@@ -752,6 +806,8 @@
       /* the pick is the rare holo: a foil ring inside the black border, a rainbow foil on its gold frame and art window that sweeps with --mx/--my, and a sparkle foil that lights up only under the pointer */
       .card.pick {
         --id: var(--gold);
+        --land: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='xMidYMid slice'%3E%3Cdefs%3E%3ClinearGradient id='s' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%230b1230'/%3E%3Cstop offset='.6' stop-color='%231f2c58'/%3E%3Cstop offset='1' stop-color='%2345437a'/%3E%3C/linearGradient%3E%3ClinearGradient id='a' x2='1'%3E%3Cstop offset='0' stop-color='%235cffb4' stop-opacity='0'/%3E%3Cstop offset='.3' stop-color='%235cffb4'/%3E%3Cstop offset='.7' stop-color='%23a88bff'/%3E%3Cstop offset='1' stop-color='%23a88bff' stop-opacity='0'/%3E%3C/linearGradient%3E%3Cfilter id='b'%3E%3CfeGaussianBlur stdDeviation='2.5'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='280' height='80' fill='url(%23s)'/%3E%3Cg fill='%23fff'%3E%3Ccircle cx='168.3' cy='36.2' r='1' opacity='0.4'/%3E%3Ccircle cx='38.1' cy='4' r='0.4' opacity='0.5'/%3E%3Ccircle cx='2.7' cy='30.3' r='1.1' opacity='0.5'/%3E%3Ccircle cx='37.4' cy='10.1' r='0.8' opacity='0.5'/%3E%3Ccircle cx='127.8' cy='49.7' r='0.6' opacity='0.8'/%3E%3Ccircle cx='216.8' cy='19.8' r='0.6' opacity='0.4'/%3E%3Ccircle cx='64.4' cy='40.4' r='1.1' opacity='0.5'/%3E%3Ccircle cx='259.2' cy='25.4' r='0.4' opacity='0.5'/%3E%3Ccircle cx='168.7' cy='8.5' r='0.4' opacity='0.6'/%3E%3Ccircle cx='181' cy='27.8' r='0.7' opacity='1'/%3E%3Ccircle cx='21.1' cy='20.7' r='0.6' opacity='0.4'/%3E%3Ccircle cx='1.7' cy='20.7' r='0.4' opacity='0.5'/%3E%3Ccircle cx='258.7' cy='38.9' r='0.9' opacity='0.7'/%3E%3Ccircle cx='239.4' cy='48.1' r='0.9' opacity='0.8'/%3E%3Ccircle cx='160.2' cy='17.4' r='0.6' opacity='0.7'/%3E%3Ccircle cx='138.6' cy='28.4' r='0.9' opacity='0.8'/%3E%3Ccircle cx='177.2' cy='36.4' r='1' opacity='0.9'/%3E%3Ccircle cx='276.7' cy='21.9' r='0.7' opacity='1'/%3E%3Ccircle cx='273' cy='17.9' r='0.4' opacity='0.6'/%3E%3Ccircle cx='247.1' cy='35.4' r='0.9' opacity='1'/%3E%3Ccircle cx='220.4' cy='10.4' r='0.5' opacity='0.9'/%3E%3Ccircle cx='29.2' cy='45.8' r='0.9' opacity='0.8'/%3E%3Ccircle cx='199.2' cy='26.8' r='0.7' opacity='0.9'/%3E%3Ccircle cx='157.7' cy='43.7' r='0.5' opacity='0.8'/%3E%3Ccircle cx='121.5' cy='19.8' r='0.5' opacity='0.8'/%3E%3Ccircle cx='64.8' cy='44.9' r='1' opacity='0.6'/%3E%3Ccircle cx='191.2' cy='43.9' r='0.4' opacity='0.6'/%3E%3Ccircle cx='257.9' cy='0.1' r='0.4' opacity='0.6'/%3E%3Ccircle cx='6' cy='34.6' r='1' opacity='0.5'/%3E%3Ccircle cx='59.4' cy='47.4' r='0.9' opacity='0.5'/%3E%3Ccircle cx='32.7' cy='31.3' r='0.3' opacity='0.9'/%3E%3Ccircle cx='165.6' cy='37.6' r='0.4' opacity='0.6'/%3E%3Ccircle cx='200.1' cy='47.8' r='0.7' opacity='0.8'/%3E%3Ccircle cx='217.7' cy='35.1' r='0.9' opacity='0.8'/%3E%3Ccircle cx='28.1' cy='2.3' r='0.8' opacity='0.5'/%3E%3Ccircle cx='162.7' cy='12.5' r='0.5' opacity='0.8'/%3E%3Ccircle cx='176.3' cy='40.6' r='0.5' opacity='0.9'/%3E%3Ccircle cx='14.8' cy='34.5' r='0.6' opacity='0.9'/%3E%3Ccircle cx='184.7' cy='40.2' r='0.4' opacity='1'/%3E%3Ccircle cx='140.2' cy='41.1' r='0.6' opacity='0.9'/%3E%3C/g%3E%3Cg filter='url(%23b)' opacity='.75'%3E%3Cpath d='M0 30Q60 6 130 22T280 12' stroke='url(%23a)' stroke-width='9' fill='none'/%3E%3Cpath d='M20 42Q90 22 160 34T290 26' stroke='url(%23a)' stroke-width='5' fill='none' opacity='.6'/%3E%3C/g%3E%3Cpath d='M0 62L40 54L70 58L100 50L130 56L150 52L280 60V80H0Z' fill='%23262850'/%3E%3Cpath d='M177.4 54.7V37.3H181.1V33.6L183.6 27.4L186.1 33.6V38.6H191V27.4L194.8 13.8L198.5 27.4V34.8H203.4V29.9L205.9 22.4L208.4 29.9V39.8H213.4V54.7H177.4Z' fill='%230d0f24'/%3E%3Cg fill='%23ffd27a'%3E%3Crect x='194.1' y='29.9' width='1.2' height='2.5'/%3E%3Crect x='205.3' y='33.6' width='1' height='1.9'/%3E%3Crect x='183' y='36.7' width='1' height='1.9'/%3E%3C/g%3E%3Cpath d='M140 80L166 56L180 52L214 52L226 60L246 80Z' fill='%230d0f24'/%3E%3Cpath d='M0 80V68L50 64L90 70L130 66L160 80ZM230 80L256 66L280 68V80Z' fill='%23080918'/%3E%3C/svg%3E");
+        --mana: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3CradialGradient id='d' cx='.36' cy='.3' r='.75'%3E%3Cstop offset='0' stop-color='%23fff3c4'/%3E%3Cstop offset='.5' stop-color='%23e2b34c'/%3E%3Cstop offset='1' stop-color='%2317130f'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14.5' fill='url(%23d)' stroke='%2317130f' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23fff' stroke-opacity='.35' stroke-width='.8'/%3E%3Cg fill='%2317130f' stroke='%23fff' stroke-opacity='.4' stroke-width='.8'%3E%3Cpath d='M8.5 21.5L7.5 11.5L12.2 15.4L16 8.5L19.8 15.4L24.5 11.5L23.5 21.5ZM8.8 23H23.2V25H8.8Z'/%3E%3C/g%3E%3C/svg%3E");
         --foil: linear-gradient(
           115deg,
           rgba(255, 128, 200, 0.75),
@@ -779,11 +835,8 @@
         --sparkle:
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath fill='%23fff' d='M8 6L8.88 9.12L12 10L8.88 10.88L8 14L7.12 10.88L4 10L7.12 9.12ZM30 3.5L30.55 5.45L32.5 6L30.55 6.55L30 8.5L29.45 6.55L27.5 6L29.45 5.45ZM47 14.5L47.77 17.23L50.5 18L47.77 18.77L47 21.5L46.23 18.77L43.5 18L46.23 17.23ZM18 28L18.44 29.56L20 30L18.44 30.44L18 32L17.56 30.44L16 30L17.56 29.56ZM38 31L39.1 34.9L43 36L39.1 37.1L38 41L36.9 37.1L33 36L36.9 34.9ZM6 43L6.66 45.34L9 46L6.66 46.66L6 49L5.34 46.66L3 46L5.34 45.34ZM26 47.5L26.55 49.45L28.5 50L26.55 50.55L26 52.5L25.45 50.55L23.5 50L25.45 49.45ZM52 46L52.44 47.56L54 48L52.44 48.44L52 50L51.56 48.44L50 48L51.56 47.56Z'/%3E%3C/svg%3E")
             0 0 / 56px 56px,
-          repeating-linear-gradient(
-            -45deg,
-            rgba(255, 255, 255, 0.28) 0 1px,
-            transparent 1px 5px
-          );
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath fill='%23fff' d='M8 6L8.88 9.12L12 10L8.88 10.88L8 14L7.12 10.88L4 10L7.12 9.12ZM30 3.5L30.55 5.45L32.5 6L30.55 6.55L30 8.5L29.45 6.55L27.5 6L29.45 5.45ZM47 14.5L47.77 17.23L50.5 18L47.77 18.77L47 21.5L46.23 18.77L43.5 18L46.23 17.23ZM18 28L18.44 29.56L20 30L18.44 30.44L18 32L17.56 30.44L16 30L17.56 29.56ZM38 31L39.1 34.9L43 36L39.1 37.1L38 41L36.9 37.1L33 36L36.9 34.9ZM6 43L6.66 45.34L9 46L6.66 46.66L6 49L5.34 46.66L3 46L5.34 45.34ZM26 47.5L26.55 49.45L28.5 50L26.55 50.55L26 52.5L25.45 50.55L23.5 50L25.45 49.45ZM52 46L52.44 47.56L54 48L52.44 48.44L52 50L51.56 48.44L50 48L51.56 47.56Z'/%3E%3C/svg%3E")
+            28px 18px / 30px 30px;
         --sheen: linear-gradient(
           115deg,
           transparent 40%,
@@ -794,6 +847,7 @@
           var(--sheen) var(--mx, 50%) var(--my, 50%) / 300% 300% no-repeat,
           var(--foil) calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%)) /
             300% 300% no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='v'%3E%3CfeTurbulence type='turbulence' baseFrequency='.008 .022' numOctaves='4' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -2.4 0 0 0 .5'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23v)'/%3E%3C/svg%3E") 0 0,
           url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 -.1'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23c)'/%3E%3C/svg%3E")
             0 0,
           linear-gradient(
@@ -812,8 +866,9 @@
             #cfa6ff,
             #ff9ccf
           );
-        background-blend-mode: screen, overlay, normal, normal, normal;
+        background-blend-mode: screen, overlay, normal, normal, normal, normal;
         box-shadow:
+          var(--bevel),
           0 0 0 1px #000,
           0 0 0 4px var(--gold-hi),
           0 0 0 5px #000,
@@ -849,12 +904,21 @@
       .card.pick .stats {
         position: relative;
       }
-      /* the art window is about the card's 15%–35% band, so the pointer's card-relative --my is rescaled onto it */
+      /* over the art window a sparse glitter and a soft spot follow the pointer across, faint enough that the painting stays legible */
       .card.pick .stats::after {
-        mask: radial-gradient(
-          circle at var(--mx, 50%) calc((var(--my, 50%) - 15%) * 5),
-          #000,
-          transparent 55%
+        background:
+          radial-gradient(
+            circle at var(--mx, 50%) 50%,
+            rgba(255, 255, 255, 0.55),
+            transparent 34%
+          ),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cpath fill='%23fff' d='M14 10L14.6 12.4L17 13L14.6 13.6L14 16L13.4 13.6L11 13L13.4 12.4ZM50 30L50.5 31.5L52 32L50.5 32.5L50 34L49.5 32.5L48 32L49.5 31.5ZM26 54L26.7 56.3L29 57L26.7 57.7L26 60L25.3 57.7L23 57L25.3 56.3Z'/%3E%3C/svg%3E")
+            var(--mx, 50%) var(--my, 50%) / 72px 72px;
+        mask: linear-gradient(
+          90deg,
+          transparent calc(var(--mx, 50%) - 45%),
+          #000 var(--mx, 50%),
+          transparent calc(var(--mx, 50%) + 45%)
         );
         top: 0;
         left: 0;
@@ -865,27 +929,28 @@
       .card.pick.tilting .stats::after {
         opacity: 1;
       }
-      /* the rare's art window is the holo itself: foil and sheen over the painted hills */
+      .card.pick.tilting .stats::after {
+        opacity: 0.6;
+      }
+      /* the rare's art window is the holo itself: foil and sheen over the painted spire */
       .card.pick .stats::before {
         background:
           var(--sheen) var(--mx, 50%) var(--my, 50%) / 300% 300% no-repeat,
           var(--foil-wide) calc(100% - var(--mx, 50%))
             calc(100% - var(--my, 50%)) / 300% 300% no-repeat,
-          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='none'%3E%3Ccircle cx='196' cy='26' r='12' fill='%23f4e2b4'/%3E%3Cpath d='M0 58 L60 40 L120 56 L190 34 L280 52 V80 H0Z' fill='%23000' opacity='.22'/%3E%3Cpath d='M0 70 L90 60 L170 72 L280 62 V80 H0Z' fill='%23000' opacity='.35'/%3E%3C/svg%3E")
-            center / 100% 100% no-repeat,
-          linear-gradient(
-            color-mix(in srgb, var(--id) 70%, black),
-            color-mix(in srgb, var(--id) 35%, black)
-          );
-        background-blend-mode: screen, color-dodge, normal, normal;
+          var(--land) center / cover no-repeat;
+        background-blend-mode: screen, soft-light, normal;
       }
       .card.pick:hover {
         filter: brightness(1.05) saturate(1.1);
       }
       .card.pick::after {
         z-index: 3;
-        content: "★ Pick";
-        background: linear-gradient(var(--gold-hi), var(--gold));
+        content: "Pick";
+        padding-left: 30px;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M5 23L3.5 9.5L10.5 15L16 5.5L21.5 15L28.5 9.5L27 23ZM5.5 25H26.5V28H5.5Z' fill='%2317130f'/%3E%3C/svg%3E") 9px 50% / 17px 17px no-repeat,
+          linear-gradient(var(--gold-hi), var(--gold));
       }
       .card.pick meter {
         --id: var(--blood);
@@ -1213,7 +1278,7 @@
           text-align: left;
         }
         main > section {
-          margin-top: 44px;
+          margin-top: 56px;
         }
         main h2 {
           font-size: 21px;
@@ -1225,7 +1290,7 @@
           font-size: 18px;
         }
         .takeaway {
-          padding: 40px 18px 22px;
+          padding: 40px 18px 46px;
           font-size: 19px;
         }
         .spread {
@@ -1268,6 +1333,10 @@
         }
       }
       @media (max-width: 760px) {
+        body::before {
+          background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-68 -66 146 146'%3E%3Cdefs%3E%3Cfilter id='s' x='-.5' y='-.5' width='2' height='2'%3E%3CfeGaussianBlur stdDeviation='4.5'/%3E%3C/filter%3E%3Cfilter id='g' x='-1' y='-1' width='3' height='3'%3E%3CfeGaussianBlur stdDeviation='3'/%3E%3C/filter%3E%3C/defs%3E%3Cpolygon points='-3.4,-39.9 43.9,-24.4 54.3,24.5 17.4,57.9 -29.9,42.4 -40.3,-6.5' fill='%23120700' opacity='.55' filter='url(%23s)'/%3E%3Cpolygon points='-8.4,-45.9 38.9,-30.4 49.3,18.5 12.4,51.9 -34.9,36.4 -45.3,-12.5' fill='%23120700' opacity='.5' filter='url(%23g)'/%3E%3Cg stroke='%23fff' stroke-opacity='.38' stroke-width='.9' stroke-linejoin='round'%3E%3Cpolygon points='-10.4,-48.9 36.9,-33.4 0,0 -47.3,-15.5' fill='%23e8e2d2'/%3E%3Cpolygon points='-47.3,-15.5 0,0 10.4,48.9 -36.9,33.4' fill='%23dbd3ba'/%3E%3Cpolygon points='0,0 36.9,-33.4 47.3,15.5 10.4,48.9' fill='%238f8977'/%3E%3C/g%3E%3Cg transform='translate(-5.2 -24.5) rotate(-12) matrix(1 -.3 .6 .7 0 0)' font-family='Georgia, serif' font-weight='700' font-size='22' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='.7' y='.9' fill='%23fff' fill-opacity='.45'%3E6%3C/text%3E%3Ctext fill='%233a2f22'%3E6%3C/text%3E%3C/g%3E%3Cpolygon points='-10.4,-48.9 36.9,-33.4 47.3,15.5 10.4,48.9 -36.9,33.4 -47.3,-15.5' fill='none' stroke='%23000' stroke-opacity='.35' stroke-width='1' stroke-linejoin='round'/%3E%3Cellipse cx='-8' cy='-30.1' rx='5' ry='2.2' transform='rotate(-35 -8 -30.1)' fill='%23fff' opacity='.5' filter='url(%23g)'/%3E%3C/svg%3E")
+            calc(100% - 28px) 100% / 46px 46px no-repeat;
+        }
         body {
           padding: 12px 10px 32px;
         }
