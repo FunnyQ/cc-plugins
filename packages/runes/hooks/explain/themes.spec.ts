@@ -22,6 +22,47 @@ const fragmentClasses = [
   ]),
 ];
 
+// every rule naming the selector, in source order, with the @container or @media it sits in
+const rulesFor = (source: string, selector: string) => {
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const out: { at: string; body: string }[] = [];
+  let at = "";
+  let depth = 0;
+  for (const m of css.matchAll(/([^{}]*)\{|\}/g)) {
+    if (m[0] === "}") {
+      if (--depth === 0) at = "";
+      continue;
+    }
+    const head = m[1]!.trim().replace(/\s+/g, " ");
+    depth++;
+    if (head.startsWith("@")) {
+      at = head;
+      continue;
+    }
+    if (!head.split(/\s*,\s*/).includes(selector)) continue;
+    const end = css.indexOf("}", m.index! + m[0].length);
+    out.push({ at, body: css.slice(m.index! + m[0].length, end) });
+  }
+  return out;
+};
+const fontSizes = (css: string, selector: string) =>
+  rulesFor(css, selector).flatMap(({ at, body }) =>
+    [...body.matchAll(/font-size:\s*([^;]+);/g)].map((s) => `${at} ${s[1]}`),
+  );
+
+// read as text: checker.ts imports the mod runtime, which bun:test cannot load
+const [narrowLabel, narrowSoft] = readFileSync(
+  `${import.meta.dir}/checker.ts`,
+  "utf8",
+)
+  .match(/grow to (\d+px) \(label\) and (\d+px) \(label-soft\)/)!
+  .slice(1);
+const [first, last] = FRAGMENT_RULES.match(/letters ([a-z])–([a-z])/)!.slice(1);
+const PART_LETTERS = Array.from(
+  { length: last!.charCodeAt(0) - first!.charCodeAt(0) + 1 },
+  (_, i) => String.fromCharCode(first!.charCodeAt(0) + i),
+);
+
 test("the theme files are exactly THEMES", () => {
   expect(
     readdirSync(DIR)
@@ -63,5 +104,28 @@ for (const theme of THEMES) {
     const used = [...html.matchAll(/url\(#([\w-]+)\)/g)].map((m) => m[1]);
     expect(used.filter((id) => !ids.has(id))).toEqual([]);
     expect(ids.has("wash")).toBe(true);
+  });
+
+  // the fork spaces labels and the checker judges them at one set of sizes, so no theme may move them or where they grow
+  test(`${theme} sizes SVG labels as every theme does, growing to the checker's sizes`, () => {
+    const base = styleOf(read(THEMES[0]));
+    const css = styleOf(read(theme));
+    for (const selector of [".plate .label", ".plate .label-soft"])
+      expect(fontSizes(css, selector)).toEqual(fontSizes(base, selector));
+    expect(fontSizes(css, ".plate .label").at(-1)).toEndWith(` ${narrowLabel}`);
+    expect(fontSizes(css, ".plate .label-soft").at(-1)).toEndWith(
+      ` ${narrowSoft}`,
+    );
+  });
+
+  test(`${theme} lights a drawing's part for every part letter`, () => {
+    const css = styleOf(read(theme));
+    const missing = PART_LETTERS.filter(
+      (p) =>
+        !css.includes(
+          `[data-part="${p}"]:hover) .plate .part[data-part="${p}"]`,
+        ),
+    );
+    expect(missing).toEqual([]);
   });
 }
