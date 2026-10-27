@@ -4,7 +4,8 @@ import type { ExplainEntry, ExplainView } from "../../types";
 import { where } from "../transcript/where";
 import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
-import { writeExplainer } from "./html";
+import { config } from "../config";
+import { pickTheme, writeExplainer } from "./html";
 import { buildPrompt, drawBrief, parseReply, type Ask } from "./protocol";
 import { selectedOf, usageOf, withEntry } from "./state";
 
@@ -110,6 +111,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           await $.session.id(),
           { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
+          pickTheme(config.explain.theme, Math.random),
         );
         diagrams = hasDiagram(reply.main);
         body = { kind: "html", summary: reply.summary, path, check: "pending" };

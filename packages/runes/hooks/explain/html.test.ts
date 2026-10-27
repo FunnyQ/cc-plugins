@@ -4,6 +4,7 @@ import {
   cleanMain,
   CSP,
   explainerPath,
+  pickTheme,
   slugOf,
   writeExplainer,
 } from "./html";
@@ -123,7 +124,7 @@ const memoryIo = (files: Map<string, string>, dirs: string[]) => ({
 
 test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async () => {
   const files = new Map([
-    ["/r/hooks/explain/template.html", "<time>{{generatedAt}}</time>{{main}}"],
+    ["/r/hooks/explain/themes/picture-book.html", "<time>{{generatedAt}}</time>{{main}}"],
   ]);
   const dirs: string[] = [];
   const io = memoryIo(files, dirs);
@@ -135,6 +136,7 @@ test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async
     "abcd1234-0000",
     { title: "T", main: "<p>x</p>", project: "proj" },
     at,
+    "picture-book",
   ] as const;
 
   expect(await writeExplainer(io, ...args)).toBe(`${dir}/1402-t.html`);
@@ -166,4 +168,27 @@ test("assemble writes a language tag into {{lang}}, and leaves it empty for a na
     assemble('<html lang="{{lang}}">', { ...page, lang: 'en" onload="x' }),
   ).toBe('<html lang="">');
   expect(assemble('<html lang="{{lang}}">', page)).toBe('<html lang="">');
+});
+
+test("writeExplainer reads the template of the theme it is given", async () => {
+  const files = new Map([
+    ["/r/hooks/explain/themes/picture-book.html", "book {{main}}"],
+    ["/r/hooks/explain/themes/blueprint.html", "print {{main}}"],
+  ]);
+  const path = await writeExplainer(
+    memoryIo(files, []),
+    "/r",
+    "/h",
+    "abcd1234",
+    { title: "T", main: "<p>x</p>", project: "proj" },
+    new Date(2026, 9, 5, 14, 2),
+    "blueprint",
+  );
+  expect(files.get(path)).toBe("print <p>x</p>");
+});
+
+test("pickTheme keeps a named theme and draws one for random", () => {
+  expect(pickTheme("blueprint", () => 0)).toBe("blueprint");
+  expect(pickTheme("random", () => 0)).toBe("picture-book");
+  expect(pickTheme("random", () => 0.99)).toBe("blueprint");
 });

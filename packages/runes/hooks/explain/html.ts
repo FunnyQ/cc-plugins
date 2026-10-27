@@ -1,3 +1,4 @@
+import { THEMES, type Theme } from "../config";
 import { escapeHtml, prepareBlocks } from "./blocks";
 
 export const CSP =
@@ -67,6 +68,14 @@ export const assemble = (template: string, page: Page): string =>
     },
   );
 
+export const pickTheme = (
+  setting: Theme | "random",
+  rand: () => number,
+): Theme =>
+  setting === "random"
+    ? THEMES[Math.floor(rand() * THEMES.length)]!
+    : setting;
+
 const trimDashes = (s: string): string => s.replace(/^-+|-+$/g, "");
 
 export const slugOf = (title: string): string => {
@@ -118,8 +127,9 @@ export const writeExplainer = async (
   session: string,
   page: Omit<Page, "generatedAt">,
   at: Date,
+  theme: Theme,
 ): Promise<string> => {
-  const template = await io.read(`${root}/hooks/explain/template.html`);
+  const template = await io.read(`${root}/hooks/explain/themes/${theme}.html`);
   const first = explainerPath(home, page.project, session, at, page.title);
   await io.mkdir(first.slice(0, first.lastIndexOf("/")));
   let path = first;

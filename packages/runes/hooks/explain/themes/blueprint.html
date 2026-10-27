@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="{{lang}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=B612:wght@400;700&family=B612+Mono:wght@400;700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/400"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/500"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/600"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/700"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/ChenYuLuoYan/100" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      :root {
+        --ground: #0d3258; /* --ground: cyanotype sheet */
+        --ground-deep: #092542; /* --ground-deep: frame band, code wells, callouts */
+        --chalk: #e8f1fa; /* --chalk: line work and body text */
+        --chalk-soft: #a9c3dd; /* --chalk-soft: captions, running head, muted labels */
+        --rule: rgba(232, 241, 250, 0.34); /* --rule: hairlines between cells */
+        --redline: #ff8a68; /* --redline: the revision pencil: arrows, balloons, warnings */
+        --hatch-warm: #ff8a68; /* --hatch-warm: section hatch for the thing being explained */
+        --hatch-cool: #8fd3ff; /* --hatch-cool: cross-hatch for the outside or the other side */
+        --hatch-sage: #9fe0b0; /* --hatch-sage: stipple for the good or finished state */
+        --grid-minor: rgba(200, 225, 250, 0.03);
+        --grid-major: rgba(200, 225, 250, 0.07);
+        --mono: "B612 Mono", "IBMPlexSansTC", ui-monospace, Menlo, monospace;
+        --display: "B612", "IBMPlexSansTC", -apple-system, sans-serif;
+        color-scheme: dark;
+      }
+      body {
+        background: var(--ground-deep);
+        padding: 24px;
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--redline) 45%, transparent);
+        color: var(--chalk);
+      }
+      :focus-visible {
+        outline: 2px solid var(--redline);
+        outline-offset: 3px;
+      }
+      .sheet {
+        container-type: inline-size;
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        /* cyanotype paper: the drafting grid and a fine chalk grain over the uneven exposure of a hand-coated sheet */
+        background:
+          linear-gradient(var(--grid-major) 1px, transparent 1px) 0 0 / 80px
+            80px,
+          linear-gradient(90deg, var(--grid-major) 1px, transparent 1px) 0 0 /
+            80px 80px,
+          linear-gradient(var(--grid-minor) 1px, transparent 1px) 0 0 / 16px
+            16px,
+          linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px) 0 0 /
+            16px 16px,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .91 0 0 0 0 .95 0 0 0 0 .98 0 0 0 .35 -.15'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E"),
+          radial-gradient(
+            900px 600px at 18% 6%,
+            rgba(3, 18, 38, 0.34),
+            transparent 70%
+          ),
+          radial-gradient(
+            700px 1000px at 90% 26%,
+            rgba(140, 190, 235, 0.08),
+            transparent 70%
+          ),
+          radial-gradient(
+            1000px 700px at 28% 52%,
+            rgba(3, 18, 38, 0.28),
+            transparent 70%
+          ),
+          radial-gradient(
+            800px 800px at 82% 76%,
+            rgba(3, 18, 38, 0.32),
+            transparent 70%
+          ),
+          radial-gradient(
+            900px 600px at 22% 97%,
+            rgba(140, 190, 235, 0.07),
+            transparent 70%
+          ),
+          var(--ground);
+        color: var(--chalk);
+        font:
+          18px/1.62 "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        font-kerning: normal;
+        padding: 72px 96px 56px;
+        border: 1px solid var(--chalk-soft);
+      }
+      /* the drawing border: a heavy inner frame inset from the trim line, zone ticks in the band between */
+      .sheet::before {
+        content: "";
+        position: absolute;
+        inset: 18px;
+        border: 2px solid var(--chalk);
+        pointer-events: none;
+      }
+      .sheet::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 25% 0 / 1px 18px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 50% 0 / 1px 18px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 75% 0 / 1px 18px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 25% 100% / 1px
+            18px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 50% 100% / 1px
+            18px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 75% 100% / 1px
+            18px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 0 25% / 18px 1px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 0 50% / 18px 1px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 0 75% / 18px 1px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 100% 25% / 18px
+            1px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 100% 50% / 18px
+            1px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 100% 75% / 18px
+            1px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3E1%3C/text%3E%3C/svg%3E")
+            12.5% 0 / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3E2%3C/text%3E%3C/svg%3E")
+            37.5% 0 / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3E3%3C/text%3E%3C/svg%3E")
+            62.5% 0 / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3E4%3C/text%3E%3C/svg%3E")
+            87.5% 0 / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3EA%3C/text%3E%3C/svg%3E")
+            0 12.5% / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E")
+            0 37.5% / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E")
+            0 62.5% / 18px 18px no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18'%3E%3Ctext x='9' y='13' font-family='monospace' font-size='10' fill='%23a9c3dd' text-anchor='middle'%3ED%3C/text%3E%3C/svg%3E")
+            0 87.5% / 18px 18px no-repeat;
+      }
+      .masthead {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        font: 12px/1.4 var(--mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--chalk-soft);
+        flex-wrap: wrap;
+        white-space: nowrap;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--rule);
+        margin-bottom: 40px;
+      }
+      .sheet > h1 {
+        font-family: var(--display);
+        font-size: clamp(30px, 4cqi, 50px);
+        line-height: 1.14;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        max-width: 22ch;
+        margin-bottom: 22px;
+        text-wrap: balance;
+      }
+      main > * + * {
+        margin-top: 22px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 64ch;
+      }
+      /* h2 sits on a dimension line: a hairline with end ticks the heading's own width */
+      main h2 {
+        display: table;
+        font-family: var(--display);
+        font-size: 26px;
+        line-height: 1.25;
+        font-weight: 700;
+        margin: 0 0 18px;
+        padding-bottom: 10px;
+        text-wrap: balance;
+        background:
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 0
+            calc(100% - 4px) / 100% 1px no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 0 100% / 1px 9px
+            no-repeat,
+          linear-gradient(var(--chalk-soft), var(--chalk-soft)) 100% 100% / 1px
+            9px no-repeat;
+      }
+      main a {
+        color: var(--redline);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font: 0.86em var(--mono);
+        color: var(--chalk);
+        background: var(--ground-deep);
+        border: 1px solid var(--rule);
+        padding: 0 5px;
+        border-radius: 2px;
+      }
+
+      .answer {
+        font-size: 23px;
+        line-height: 1.5;
+        font-weight: 500;
+        max-width: 46ch;
+      }
+      .analogy,
+      .takeaway,
+      .compare > div,
+      main .code,
+      main .diff,
+      aside.note {
+        background: var(--ground-deep);
+        border: 1px solid var(--chalk-soft);
+      }
+      .analogy,
+      .takeaway {
+        padding: 18px 24px;
+        max-width: 52ch;
+        font-size: 18px;
+      }
+      .analogy::before,
+      .takeaway::before,
+      aside.note::before,
+      aside.warn::before,
+      .compare h3,
+      main th,
+      .timeline time,
+      main .code::before,
+      main .diff::before {
+        font: 700 11px/1.4 var(--mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--chalk-soft);
+      }
+      .analogy::before,
+      .takeaway::before,
+      aside.note::before,
+      aside.warn::before {
+        content: "Detail · think of it like this";
+        display: block;
+        margin-bottom: 6px;
+      }
+      .takeaway {
+        border: 2px solid var(--chalk);
+        font-weight: 600;
+        margin-top: 64px !important;
+      }
+      .takeaway::before {
+        content: "General note · take this with you";
+        font-weight: 700;
+      }
+
+      main > section {
+        margin-top: 72px;
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 56px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 18px;
+      }
+      .plate {
+        padding: 20px;
+        border: 1px solid var(--rule);
+        background: color-mix(in srgb, var(--ground-deep) 50%, transparent);
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        font-size: 15px;
+        color: var(--chalk-soft);
+        margin-top: 14px;
+        padding-top: 10px;
+        border-top: 1px solid var(--rule);
+        max-width: 52ch;
+      }
+
+      .parts {
+        display: grid;
+        gap: 4px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 10px;
+        padding: 8px 10px 8px 8px;
+        border: 1px solid transparent;
+        transition:
+          border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+          background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        align-self: start;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        margin-top: 2px;
+        border: 1.5px solid var(--redline);
+        font: 700 14px/1 var(--mono);
+        color: var(--redline);
+      }
+      .parts dd b {
+        display: block;
+      }
+      .parts > div:hover {
+        border-color: var(--rule);
+        background: color-mix(in srgb, var(--ground-deep) 70%, transparent);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.18;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      /* steps are drawing balloons: the number ringed, as an item callout */
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 18px;
+      }
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 52px;
+      }
+      .steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -2px;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border: 1.5px solid var(--redline);
+        border-radius: 50%;
+        font: 700 15px/1 var(--mono);
+        color: var(--redline);
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 56px 1fr;
+        align-items: center;
+      }
+      .compare > div {
+        padding: 20px 24px;
+        align-self: stretch;
+      }
+      .compare > div > * + * {
+        margin-top: 10px;
+      }
+      .compare h3 {
+        margin-bottom: 4px;
+      }
+      .compare::after {
+        content: "";
+        grid-column: 2;
+        grid-row: 1;
+        height: 16px;
+        background: var(--redline);
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 16'%3E%3Cpath d='M2 8H52M2 2V14' fill='none' stroke='black' stroke-width='1.6'/%3E%3Cpath d='M42 3L54 8L42 13Z' fill='black'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+      }
+      .compare > div:last-child {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .timeline {
+        list-style: none;
+        padding: 0 0 0 40px;
+        position: relative;
+        display: grid;
+        gap: 28px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 10px;
+        bottom: 10px;
+        border-left: 1.5px solid var(--chalk-soft);
+      }
+      .timeline > li {
+        position: relative;
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        left: -36px;
+        top: 6px;
+        width: 14px;
+        height: 14px;
+        background: var(--ground);
+        border: 2px solid var(--chalk);
+        transform: rotate(45deg);
+      }
+      .timeline time {
+        display: block;
+        color: var(--redline);
+      }
+      .timeline b {
+        display: block;
+        font-size: 19px;
+      }
+
+      /* SVG vocabulary the fork draws with */
+      .plate .ink {
+        fill: none;
+        stroke: var(--chalk);
+        stroke-width: 2;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--redline);
+        stroke-width: 2.4;
+        stroke-linecap: square;
+        stroke-linejoin: miter;
+      }
+      .plate .dash {
+        stroke-dasharray: 14 4 3 4;
+        stroke-linecap: butt;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: url(#hatch-warm);
+      }
+      .plate .wash-cool {
+        fill: url(#hatch-cool);
+      }
+      .plate .wash-sage {
+        fill: url(#hatch-sage);
+      }
+      .plate .label {
+        fill: var(--chalk);
+        font-size: 16px;
+        font-family: inherit;
+      }
+      .plate .label-soft {
+        fill: var(--chalk-soft);
+        font-size: 14px;
+        font-family: inherit;
+      }
+      .hatch-warm path {
+        stroke: var(--hatch-warm);
+        stroke-width: 1.3;
+        opacity: 0.55;
+      }
+      .hatch-cool path {
+        stroke: var(--hatch-cool);
+        stroke-width: 1;
+        opacity: 0.4;
+      }
+      .hatch-sage circle {
+        fill: var(--hatch-sage);
+        opacity: 0.55;
+      }
+
+      main,
+      main .code,
+      main .diff,
+      main .table {
+        scrollbar-color: var(--chalk-soft) var(--ground-deep);
+      }
+
+      main .code,
+      main .diff {
+        position: relative;
+        padding: 34px 0 16px;
+        max-width: 100%;
+        overflow-x: auto;
+        font: 14px/1.65 var(--mono);
+        tab-size: 2;
+      }
+      main .plate > .code {
+        border: 0;
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 24px;
+        font: inherit;
+        background: none;
+        border: 0;
+        border-radius: 0;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 0;
+        left: 0;
+        padding: 5px 12px 4px;
+        border-right: 1px solid var(--chalk-soft);
+        border-bottom: 1px solid var(--chalk-soft);
+        color: var(--chalk);
+      }
+      main .diff::before {
+        content: "Rev · before → after";
+      }
+      main .diff span {
+        display: block;
+        padding: 0 24px 0 30px;
+        margin: 0 -24px;
+        position: relative;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 12px;
+        color: var(--chalk-soft);
+      }
+      main .diff .del {
+        color: var(--chalk-soft);
+        text-decoration: line-through;
+        text-decoration-color: var(--redline);
+        text-decoration-thickness: 1.5px;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: var(--redline);
+      }
+      main .diff .add {
+        background: color-mix(in srgb, var(--hatch-sage) 14%, transparent);
+      }
+      main .diff .add::before {
+        content: "+";
+        color: var(--hatch-sage);
+        font-weight: 700;
+      }
+
+      /* tables are a parts list: every cell ruled, the header a band */
+      main .table {
+        overflow-x: auto;
+      }
+      main table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+        border: 1.5px solid var(--chalk);
+      }
+      main caption {
+        text-align: left;
+        font-size: 15px;
+        color: var(--chalk-soft);
+        padding-bottom: 8px;
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 14px;
+        border: 1px solid var(--rule);
+      }
+      main th {
+        background: var(--ground-deep);
+        color: var(--chalk);
+        border-bottom: 1.5px solid var(--chalk);
+        white-space: nowrap;
+      }
+      main :is(th, td).num {
+        text-align: right;
+        font-family: var(--mono);
+      }
+
+      aside.note,
+      aside.warn {
+        position: relative;
+        padding: 18px 24px 16px;
+        max-width: 52ch;
+      }
+      aside.note::before {
+        content: "Note";
+      }
+      /* a warning is drawn as a revision cloud, the scallops cut from one 24px tile */
+      aside.warn {
+        background: var(--ground-deep);
+        border: 12px solid transparent;
+        border-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Cg fill='none' stroke='%23ff8a68' stroke-width='1.6'%3E%3Ccircle cx='6' cy='6' r='5.2'/%3E%3Ccircle cx='18' cy='6' r='5.2'/%3E%3Ccircle cx='30' cy='6' r='5.2'/%3E%3Ccircle cx='6' cy='18' r='5.2'/%3E%3Ccircle cx='30' cy='18' r='5.2'/%3E%3Ccircle cx='6' cy='30' r='5.2'/%3E%3Ccircle cx='18' cy='30' r='5.2'/%3E%3Ccircle cx='30' cy='30' r='5.2'/%3E%3C/g%3E%3Crect x='6' y='6' width='24' height='24' fill='%23092542'/%3E%3C/svg%3E")
+          12 round;
+        padding: 12px 18px 10px;
+      }
+      aside.warn::before {
+        content: "△ Rev · watch out";
+        color: var(--redline);
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 32px;
+      }
+
+      svg.pele {
+        --_bg: var(--ground-deep);
+        --_fg: var(--chalk);
+        --_m: var(--chalk-soft);
+        --_l: var(--chalk);
+        --_s: transparent;
+        --_a: transparent;
+        --_b: var(--chalk);
+        --_c: var(--redline);
+        --_r: 0px;
+        color: var(--chalk);
+        font:
+          16px "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 1.6;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: var(--ground-deep);
+        stroke-width: 1.6;
+        stroke-linejoin: miter;
+        filter: url(#pen);
+      }
+      /* pele's wash copy becomes a hatched offset, the drafted shadow of the box */
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: url(#hatch-cool);
+        filter: url(#wash);
+        transform: translate(5px, 5px);
+      }
+      main .render-note {
+        font-size: 15px;
+        color: var(--redline);
+        margin-top: 10px;
+      }
+
+      /* the colophon is the drawing's title block, bottom right */
+      .colophon {
+        margin-top: 80px;
+        margin-left: auto;
+        width: min(100%, 520px);
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border: 2px solid var(--chalk);
+        /* the drafter's hand fills the printed cells; emfont ships this face at 100 only */
+        font:
+          100 19px/1.35 "ChenYuLuoYan",
+          "IBMPlexSansTC",
+          sans-serif;
+        font-synthesis: none;
+      }
+      .colophon > div {
+        padding: 8px 12px 9px;
+        border-right: 1px solid var(--rule);
+        border-bottom: 1px solid var(--rule);
+        min-width: 0;
+      }
+      .colophon > div:nth-child(2n) {
+        border-right: 0;
+      }
+      .colophon > .wide {
+        grid-column: 1 / -1;
+        border-right: 0;
+        font-size: 25px;
+      }
+      .colophon > div:nth-last-child(-n + 2) {
+        border-bottom: 0;
+      }
+      .colophon small {
+        display: block;
+        font: 700 10px/1.4 var(--mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--chalk-soft);
+        margin-bottom: 2px;
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .plate {
+          padding: 12px;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare::after {
+          grid-column: 1;
+          grid-row: 2;
+          transform: rotate(90deg);
+          height: 14px;
+          width: 40px;
+          justify-self: center;
+        }
+        .compare > div:last-child {
+          grid-column: 1;
+          grid-row: 3;
+        }
+        .answer {
+          font-size: 20px;
+        }
+        main h2 {
+          font-size: 22px;
+        }
+        main > section {
+          margin-top: 52px;
+        }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
+      }
+      @media (max-width: 760px) {
+        body {
+          padding: 0;
+        }
+        .sheet {
+          padding: 44px 26px 36px;
+          border: 0;
+        }
+        .sheet::before {
+          inset: 10px;
+          border-width: 1.5px;
+        }
+        .sheet::after {
+          display: none;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash">
+          <feOffset dx="0" dy="0" />
+        </filter>
+        <filter id="pen">
+          <feOffset dx="0" dy="0" />
+        </filter>
+        <pattern
+          id="hatch-warm"
+          class="hatch-warm"
+          width="8"
+          height="8"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <path d="M0 0V8" />
+        </pattern>
+        <pattern
+          id="hatch-cool"
+          class="hatch-cool"
+          width="8"
+          height="8"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <path d="M0 0V8M0 0H8" />
+        </pattern>
+        <pattern
+          id="hatch-sage"
+          class="hatch-sage"
+          width="7"
+          height="7"
+          patternUnits="userSpaceOnUse"
+        >
+          <circle cx="3.5" cy="3.5" r="1.1" />
+        </pattern>
+      </defs>
+    </svg>
+    <article class="sheet">
+      <header class="masthead">
+        <span>{{project}} · explained</span><time>{{generatedAt}}</time>
+      </header>
+      <h1>{{title}}</h1>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <div class="wide"><small>Title</small>{{title}}</div>
+        <div><small>Project</small>{{project}}</div>
+        <div><small>Date</small>{{generatedAt}}</div>
+        <div><small>Drawn by</small>a fork of this session</div>
+        <div><small>Scale · sheet</small>NTS · 1 of 1</div>
+      </footer>
+    </article>
+  </body>
+</html>

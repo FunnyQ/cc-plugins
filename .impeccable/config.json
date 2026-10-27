@@ -13,7 +13,7 @@
         "rule": "cream-palette",
         "value": "*",
         "files": [
-          "packages/runes/hooks/explain/template.html"
+          "packages/runes/hooks/explain/themes/picture-book.html"
         ],
         "createdAt": "2026-10-26T05:18:30.415Z",
         "reason": "agent decided: --paper #f3eee3 is the cold-press sheet of the documented Picture-Book Workshop design (CLAUDE.md runes explain), predates this session"

@@ -2,6 +2,7 @@ import type { EngineInterface, On } from "claude-code";
 import { expect, mock, test } from "claude-code/testing";
 
 import type { ExplainEntry, ExplainView } from "../../types";
+import { THEMES } from "../config";
 import { CONFIG, HOME, startSession } from "../transcript/test-session";
 import { where } from "../transcript/where";
 import { CHECK_TIMEOUT_MS, CHECKER, CHROME } from "./checker";
@@ -36,7 +37,7 @@ const USAGE = {
 const TOAST =
   "Explain plz! needs a wider terminal; the answer is in the pane once it fits";
 const ROOT = "/plugin";
-const TEMPLATE_PATH = `${ROOT}/hooks/explain/template.html`;
+const THEME_DIR = `${ROOT}/hooks/explain/themes/`;
 const textReply =
   "<mode>text</mode><title>Forks</title><body>a fork copies</body>";
 const askReply =
@@ -82,7 +83,10 @@ const rig = async (
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
-    [TEMPLATE_PATH, '<html lang="{{lang}}">{{main}}</html>'],
+    ...THEMES.map(
+      (theme) =>
+        [`${THEME_DIR}${theme}.html`, '<html lang="{{lang}}">{{main}}</html>'] as const,
+    ),
     [CHROME, ""],
   ]);
   const forks: string[] = [];
@@ -346,7 +350,7 @@ test("a press forks in the language settings name, and an html page carries it a
   r.replies.push(answered(htmlReply));
   await explainPress(r.$);
   const page = [...r.files.entries()].find(
-    ([p]) => p.endsWith(".html") && p !== TEMPLATE_PATH,
+    ([p]) => p.endsWith(".html") && !p.startsWith(THEME_DIR),
   );
   expect(page?.[1]).toContain('lang="ja"');
 });

@@ -17,6 +17,8 @@ export const RUNES = [
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
+export const THEMES = ["picture-book", "blueprint"] as const;
+export type Theme = (typeof THEMES)[number];
 
 type Config = {
   enabled: Record<Rune, boolean>;
@@ -53,6 +55,7 @@ type Config = {
   fold: { keep: string; min_calls: number };
   glow: { style: string };
   minimap: { bar_rows: number; gap: number; marker_color: string };
+  explain: { theme: Theme | "random" };
 };
 
 export const DEFAULTS: Config = {
@@ -120,6 +123,7 @@ export const DEFAULTS: Config = {
   fold: { keep: "", min_calls: 1 },
   glow: { style: "dark" },
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
+  explain: { theme: "random" },
 };
 
 export const configPath = (home: string) =>
@@ -210,6 +214,7 @@ teacher:
   # with it on and TYPESAFE_API_KEY set, every asked prompt is logged (secret-masked) to ~/.local/share/q-lab/runes/teacher/lessons.db, kept until you trash the file
 explain:
   enabled: ${enabled.explain} # the [Explain plz!] button under Clawd; a press forks this session to explain it, ELI5
+  # theme: ${DEFAULTS.explain.theme}   # ${["random", ...THEMES].join(" | ")}
 `;
 
 const TOP = ["clawd", "transcript", "minimap", "teacher", "explain"] as const;
@@ -248,6 +253,8 @@ const isText: Check = (v) => typeof v === "string" && v.length > 0;
 const isSide: Check = (v) => v === "left" || v === "right";
 const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
 const isList: Check = (v) => typeof v === "string";
+const isTheme: Check = (v) =>
+  v === "random" || (THEMES as readonly unknown[]).includes(v);
 
 const RULES: {
   [S in Exclude<keyof Config, "enabled">]: {
@@ -323,6 +330,7 @@ const RULES: {
     gap: [isCount, "a whole number above 0"],
     marker_color: [isColor, "#rrggbb"],
   },
+  explain: { theme: [isTheme, ["random", ...THEMES].join(" | ")] },
 };
 
 // where a section's fields are read from and the name a problem gives it: under transcript, or where 0.5.0 kept it,

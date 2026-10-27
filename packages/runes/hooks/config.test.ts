@@ -322,6 +322,24 @@ test("explain is on by default and its switch sits at the top level after teache
   expect(t.indexOf("\nexplain:")).toBeGreaterThan(t.indexOf("\nteacher:"));
 });
 
+test("explain.theme defaults to random, takes a theme name, and an invalid one falls back alone", () => {
+  expect(DEFAULTS.explain.theme).toBe("random");
+  expect(
+    normalize({ explain: { theme: "blueprint" } }).config.explain.theme,
+  ).toBe("blueprint");
+  const { config, problems } = normalize({
+    explain: { enabled: false, theme: "neon" },
+  });
+  expect(config.explain.theme).toBe("random");
+  expect(config.enabled.explain).toBe(false);
+  expect(problems).toEqual([
+    'explain.theme: "neon" (random | picture-book | blueprint)',
+  ]);
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain(
+    "\n  # theme: random   # random | picture-book | blueprint",
+  );
+});
+
 test("the explain template line names the button", () => {
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
     "# the [Explain plz!] button under Clawd",
