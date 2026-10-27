@@ -560,3 +560,102 @@ test("the desktop draws a text answer as Markdown, never through glow", async ($
   expect(md?.props?.text).toBe("**bold** words");
   expect(box.opens.some((argv) => argv[0] === "glow")).toBe(false);
 });
+
+const DESKTOP = { ...(PANE as object), surface: "desktop" } as never;
+const desktopTree = async ($: Engine) => {
+  const ui = await $.ui.mount(DESKTOP);
+  const root = (await ui.find({ type: "Box" })) as Node;
+  await ui.unmount();
+  return root;
+};
+const byKey = (root: Node, key: string) =>
+  flat(root).find((n) => n.props?.key === key);
+// the kit keeps no key on an Svg, so one is found by what it says
+const svgSaying = (root: Node, alt: string) =>
+  flat(root).find((n) => n.type === "Svg" && n.props?.alt === alt);
+type Hovered = Node & { hover?: Record<string, unknown> };
+
+test("desktop ask mode draws Clawd and a heading over a caption; the terminal draws neither", async ($, on) => {
+  const view = { entries: [], isRunning: false, isAsking: true };
+  await session($, on, view);
+  const root = await desktopTree($);
+  expect(svgSaying(root, "Clawd")).toBeDefined();
+  const heading = flat(root).find(
+    (n) => n.type === "Text" && n.props?.size === "heading",
+  );
+  expect(texts({ children: [heading] }).join("")).toBe("New question");
+  expect(flat(root).some((n) => n.props?.size === "caption")).toBe(true);
+  const term = await tree($);
+  expect(svgSaying(term, "Clawd")).toBeUndefined();
+  expect(flat(term).some((n) => n.props?.size !== undefined)).toBe(false);
+});
+
+test("desktop cards carry a background and the answer title a title size; the terminal's carry none", async ($, on) => {
+  await session($, on, { entries: [text("x2"), text("x1")], isRunning: false });
+  const root = await desktopTree($);
+  for (const key of ["explain-history", "explain-answer", "explain-ask-box"])
+    expect(byKey(root, key)?.props?.backgroundColor).toBeDefined();
+  expect(
+    flat(root).some((n) => n.type === "Text" && n.props?.size === "title"),
+  ).toBe(true);
+  const term = await tree($);
+  for (const key of ["explain-history", "explain-answer", "explain-ask-box"])
+    expect(byKey(term, key)?.props?.backgroundColor).toBeUndefined();
+});
+
+test("desktop history rows light on hover and an html entry's delete shows only on hover", async ($, on) => {
+  const page = {
+    id: "h1",
+    at: 1,
+    title: "P",
+    kind: "html",
+    summary: "s",
+    path: "/p/p.html",
+    check: "ok",
+  } as ExplainEntry;
+  await session($, on, { entries: [page, text("x1")], isRunning: false });
+  const root = await desktopTree($);
+  for (const id of ["h1", "x1"])
+    expect(
+      (byKey(root, `explain-row:${id}`) as Hovered)?.hover?.backgroundColor,
+    ).toBeDefined();
+  const reveal = flat(root).find((n) =>
+    (n.children as Node[] | undefined)?.some(
+      (c) => c.props?.key === "explain-delete:h1",
+    ),
+  ) as Hovered;
+  expect(reveal?.props?.display).toBe("none");
+  expect(reveal?.hover).toEqual({ display: "flex" });
+  const term = await tree($);
+  expect(byKey(term, "explain-row:h1")).toBeUndefined();
+});
+
+test("a desktop html entry draws its theme's swatch; one with no theme draws none", async ($, on) => {
+  const page = (theme?: string) =>
+    ({
+      id: "h1",
+      at: 1,
+      title: "P",
+      kind: "html",
+      summary: "s",
+      path: "/p/p.html",
+      check: "ok",
+      ...(theme ? { theme } : {}),
+    }) as ExplainEntry;
+  const box = await session($, on, {
+    entries: [page("blueprint")],
+    isRunning: false,
+  });
+  const swatch = svgSaying(await desktopTree($), "blueprint theme");
+  expect(String(swatch?.props?.source)).toContain("#0d3258");
+  box.view = { entries: [page()], isRunning: false };
+  expect(flat(await desktopTree($)).some((n) => n.type === "Svg")).toBe(false);
+  box.view = { entries: [page("blueprint")], isRunning: false };
+  expect(svgSaying(await tree($), "blueprint theme")).toBeUndefined();
+});
+
+test("the desktop ask field is a textarea at least 4 rows tall; the terminal's stays 1", async ($, on) => {
+  await session($, on, { entries: [text("x1")], isRunning: false });
+  expect(byKey(await desktopTree($), "explain-ask")?.props?.rows).toBe(4);
+  expect(byKey(await tree($), "explain-ask")?.props?.rows).toBe(1);
+});

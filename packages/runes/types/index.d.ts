@@ -16,6 +16,7 @@ export type ExplainEntry = {
       path: string;
       check: ExplainCheck;
       note?: string;
+      theme?: string; // absent on entries written before themes were recorded
     }
 );
 export type ExplainView = {

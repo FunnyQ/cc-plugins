@@ -25,10 +25,7 @@ const messageOf = (err: unknown) =>
 
 const basename = (path: string) => path.split("/").filter(Boolean).at(-1) ?? "";
 
-async function openPane(
-  $: EngineInterface,
-  focus = false,
-): Promise<boolean> {
+async function openPane($: EngineInterface, focus = false): Promise<boolean> {
   const { isPlaced } = await $.ui.open({
     id: PANE,
     title: "Explain plz!",
@@ -64,7 +61,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
         "status" in r && r.status !== undefined ? ` ${r.status}` : "";
       const error =
         r.reason === "nothing-to-fork"
-          ? "nothing to explain yet"
+          ? "send a message first: after a resume or /clear there is nothing to explain yet"
           : `the fork failed: ${r.reason}${r.reason === "api-error" ? status : ""}`;
       await update($, view, (v) => ({ ...v, error }));
       return;
@@ -99,6 +96,14 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           git?.exitCode === 0
             ? basename(git.stdout.trim())
             : basename(where.cwd);
+        const theme = pickTheme(
+          config.explain.theme === "auto"
+            ? ((await themer.pick(reply.title, reply.main)) ??
+                reply.theme ??
+                "random")
+            : config.explain.theme,
+          Math.random,
+        );
         const path = await writeExplainer(
           {
             read: (p) => $.fs.read(p).then(String),
@@ -112,17 +117,16 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           await $.session.id(),
           { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
-          pickTheme(
-            config.explain.theme === "auto"
-              ? ((await themer.pick(reply.title, reply.main)) ??
-                  reply.theme ??
-                  "random")
-              : config.explain.theme,
-            Math.random,
-          ),
+          theme,
         );
         diagrams = hasDiagram(reply.main);
-        body = { kind: "html", summary: reply.summary, path, check: "pending" };
+        body = {
+          kind: "html",
+          summary: reply.summary,
+          path,
+          check: "pending",
+          theme,
+        };
       } catch (err) {
         error = `could not write the explainer: ${messageOf(err)}`;
         body = { kind: "text", body: reply.summary };

@@ -87,7 +87,10 @@ const rig = async (
   const files = new Map<string, string>([
     ...THEMES.map(
       (theme) =>
-        [`${THEME_DIR}${theme}.html`, '<html lang="{{lang}}">{{main}}</html>'] as const,
+        [
+          `${THEME_DIR}${theme}.html`,
+          '<html lang="{{lang}}">{{main}}</html>',
+        ] as const,
     ),
     [CHROME, ""],
   ]);
@@ -267,6 +270,7 @@ test("press with an html reply writes the file, stores pending, and the checker'
       check: "pending",
     }),
   );
+  expect(THEMES).toContain(entry.theme as (typeof THEMES)[number]);
   expect(
     entry.path.startsWith(
       `${HOME}/.local/share/q-lab/runes/explain/cc-plugins/`,
@@ -320,7 +324,9 @@ test("with theme auto and a key, the page is written in the theme Jev picks from
     return {
       ok: true,
       text: JSON.stringify({
-        answers: { theme: { probabilities: { editorial: 0.9, blueprint: 0.1 } } },
+        answers: {
+          theme: { probabilities: { editorial: 0.9, blueprint: 0.1 } },
+        },
       }),
     };
   };
@@ -349,7 +355,9 @@ test("with theme auto and no key, nothing is sent and the page takes the theme t
     },
   });
   r.replies.push(
-    answered(htmlReply.replace("<summary>", "<theme>blueprint</theme><summary>")),
+    answered(
+      htmlReply.replace("<summary>", "<theme>blueprint</theme><summary>"),
+    ),
   );
   await explainPress(r.$);
   expect(sent).toEqual([]);
@@ -418,7 +426,7 @@ test("an unanswered fork sets the error, stores nothing, and clears isRunning", 
   expect(r.view()).toEqual({
     entries: [],
     isRunning: false,
-    error: "nothing to explain yet",
+    error: "send a message first: after a resume or /clear there is nothing to explain yet",
   });
   r.replies.push({ isAnswered: false, reason: "api-error", status: 529 });
   await explainPress(r.$);
@@ -477,7 +485,9 @@ test("[Tell me…] opens ask mode; a submit there asks fresh past the selected e
   expect(r.opens).toEqual([
     { id: "runes-explain", title: "Explain plz!", columns: 64, focus: true },
   ]);
-  expect(r.focuses).toEqual([{ requestId: "runes-explain", key: "explain-ask" }]);
+  expect(r.focuses).toEqual([
+    { requestId: "runes-explain", key: "explain-ask" },
+  ]);
   r.replies.push(answered(textReply));
   await explainAsk(r.$, "why?");
   expect(r.forks.map(briefless)).toEqual([
