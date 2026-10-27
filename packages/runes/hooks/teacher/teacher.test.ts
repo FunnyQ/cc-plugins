@@ -135,6 +135,15 @@ test("parseReply takes the why after the quip, in either order, and drops an emp
   ).toEqual({ better: "Can you check?", quip: undefined, why: undefined });
 });
 
+test("parseReply takes a why written after the rewrite", () => {
+  expect(
+    parseReply("<quip>RIP</quip>\nCan you check?\n<why>can + base verb</why>"),
+  ).toEqual({ better: "Can you check?", quip: "RIP", why: "can + base verb" });
+  expect(
+    parseReply("<quip>RIP</quip>\nCan you\ncheck?\n<why>\nUse the base verb\nafter can.\n</why>\n"),
+  ).toEqual({ better: "Can you\ncheck?", quip: "RIP", why: "Use the base verb after can." });
+});
+
 test("parseReply reads a tag that spans lines and folds its whitespace", () => {
   expect(
     parseReply("<quip>RIP</quip>\n<why>\nUse the base verb\nafter can.\n</why>\nCan you check?"),
@@ -259,6 +268,12 @@ test("isRewrite rejects a reply far longer than the prompt or holding a fence, w
   ).toBe(true);
   expect(isRewrite("x".repeat(200), "make it fast")).toBe(false);
   expect(isRewrite("Sure:\n```ts\nfast()\n```", "make it fast")).toBe(false);
+});
+
+test("keyOf strips pasted_content blocks, so only what the user typed is taught", () => {
+  expect(
+    keyOf(`<pasted_content id="d204">\n共用 base sheet 拆分。\n</pasted_content id="d204">\n\nlets improving those 2 now`),
+  ).toBe("lets improving those 2 now");
 });
 
 test("keyOf strips system-reminder blocks, so a row's text and the submitted text share a key", () => {

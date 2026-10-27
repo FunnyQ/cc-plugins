@@ -19,8 +19,8 @@ const SYSTEM = `You are Clawd, a chain-smoking, deadpan English teacher who has 
 
 Reply in exactly this shape, nothing else:
 <quip>a roast under 40 characters</quip>
-<why>the one rule behind the main fix, under 80 characters</why>
 the rewrite
+<why>the one rule behind the main fix in your rewrite, under 80 characters</why>
 
 The quip roasts the one specific mistake and names the actual word. Be a little mean. Never encouraging and never generic: a quip that would fit any other mistake is the wrong quip. No emoji. The why states the rule plainly, with no roast.`;
 const systemFor = (language: string | undefined) =>
@@ -88,6 +88,7 @@ export const isFullRewrite = (text: string, better: string) => {
 };
 
 const TAG = /^\s*<(quip|why)>([\s\S]*?)<\/\1>[ \t]*\n?/;
+const TRAILING_WHY = /\n\s*<why>([\s\S]*?)<\/why>\s*$/;
 const capped = (s: string | undefined, max: number) =>
   s && cells(s) <= max ? s : undefined;
 
@@ -96,6 +97,11 @@ export const parseReply = (reply: string) => {
   let rest = reply;
   for (let m; (m = TAG.exec(rest)); rest = rest.slice(m[0].length))
     tags[m[1]!] = m[2]!.replace(/\s+/g, " ").trim();
+  const why = TRAILING_WHY.exec(rest);
+  if (why) {
+    tags.why = why[1]!.replace(/\s+/g, " ").trim();
+    rest = rest.slice(0, why.index);
+  }
   return {
     better: rest.trim(),
     quip: capped(tags.quip, MAX_QUIP_CELLS),
@@ -123,7 +129,10 @@ export const isRewrite = (better: string, text: string) =>
   better.length <= 2 * text.length + 40 && !better.includes("```");
 
 export const keyOf = (text: string) =>
-  text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "").trim();
+  text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<pasted_content\b[^>]*>[\s\S]*?<\/pasted_content\b[^>]*>/g, "")
+    .trim();
 
 const questions = (prompt: string) => ({
   state: { prompt },
