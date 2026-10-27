@@ -372,6 +372,14 @@ test("a model call that throws records no-reply", async () => {
   expect(a.better).toBe(null);
 });
 
+test("an empty reply records empty", async () => {
+  const seen = recording(both, async () => "");
+  teacher.submit("the model answering with nothing", Promise.resolve("s1"));
+  const a = await recorded(seen);
+  expect(a.outcome).toBe("empty");
+  expect(a.better).toBe("");
+});
+
 test("a reply with only a quip records empty", async () => {
   const seen = recording(both, async () => "<quip>x</quip>\n");
   teacher.submit("a reply holding only the quip", Promise.resolve("s1"));

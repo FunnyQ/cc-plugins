@@ -160,14 +160,15 @@ const coach = async (
   text: string,
   session: Promise<string | undefined>,
 ) => {
+  const clean = scrub(text);
   const record = (
     outcome: Attempt["outcome"],
     scores: { english: number | null; improve: number | null },
-    lesson?: { better: string; quip: string | undefined },
+    lesson?: Lesson,
   ) =>
     t.record(
       {
-        prompt: scrub(text),
+        prompt: clean,
         ...scores,
         englishMin: ENGLISH,
         improveMin: IMPROVE,
@@ -178,10 +179,8 @@ const coach = async (
       },
       session,
     );
-  let answers: Awaited<ReturnType<typeof systemOne>>;
-  try {
-    answers = await systemOne(t, questions(scrub(text)));
-  } catch {
+  const answers = await systemOne(t, questions(clean)).catch(() => undefined);
+  if (!answers) {
     record("jev-failed", { english: null, improve: null });
     return undefined;
   }
@@ -198,25 +197,20 @@ const coach = async (
   const reply = await t
     .complete(`<message>\n${text}\n</message>`, SYSTEM)
     .catch(() => undefined);
-  if (!reply) {
+  if (reply === undefined) {
     record("no-reply", scores);
     return undefined;
   }
   const lesson = parseReply(reply);
-  if (!lesson.better) {
-    record("empty", scores, lesson);
-    return undefined;
-  }
-  if (same(lesson.better, text)) {
-    record("same", scores, lesson);
-    return undefined;
-  }
-  if (!isRewrite(lesson.better, text)) {
-    record("not-rewrite", scores, lesson);
-    return undefined;
-  }
-  record("shown", scores, lesson);
-  return lesson;
+  const outcome = !lesson.better
+    ? "empty"
+    : same(lesson.better, text)
+      ? "same"
+      : !isRewrite(lesson.better, text)
+        ? "not-rewrite"
+        : "shown";
+  record(outcome, scores, lesson);
+  return outcome === "shown" ? lesson : undefined;
 };
 
 export const teacher = {

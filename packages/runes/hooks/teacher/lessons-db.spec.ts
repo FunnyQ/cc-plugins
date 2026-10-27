@@ -52,6 +52,7 @@ const record = (home: string, stdin: string, args = ["record"]) =>
     stdin: new Blob([stdin]),
     stdout: "pipe",
     stderr: "pipe",
+    cwd: temp(),
     env: { ...process.env, HOME: home },
   });
 
@@ -553,6 +554,17 @@ describe("lessons-cli.ts label", () => {
     expect(labels(home).map((x) => (x as { done: number }).done)).toEqual([
       0, 0, 0,
     ]);
+  });
+
+  test("q at the verdict or note prompt quits without touching the current row", async () => {
+    for (const stdin of ["y\nq\n", "y\ng\nq\n"]) {
+      const home = three();
+      const r = await cli(home, stdin, ["label"]);
+      expect(r.code).toBe(0);
+      expect(labels(home).map((x) => (x as { done: number }).done)).toEqual([
+        0, 0, 0,
+      ]);
+    }
   });
 
   test("control characters print escaped", async () => {

@@ -2,14 +2,12 @@ import { Database } from "bun:sqlite";
 import { chmodSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { type AttemptRow, type Outcome, OUTCOMES, type Verdict } from "./attempt";
+import { type AttemptRow, OUTCOMES, type Verdict } from "./attempt";
 
 export const dbPath = (home: string) =>
   `${home}/.local/share/q-lab/runes/teacher/lessons.db`;
 
 const SCHEMA = 1;
-const WAL_TRIES = 50;
-const WAL_RETRY_MS = 100;
 
 const V1 = `CREATE TABLE attempts (
   id INTEGER PRIMARY KEY,
@@ -43,9 +41,9 @@ const enableWal = (db: Database) => {
       db.run("PRAGMA journal_mode = WAL;");
       return;
     } catch (e) {
-      if ((e as { code?: string }).code !== "SQLITE_BUSY" || tries >= WAL_TRIES)
+      if ((e as { code?: string }).code !== "SQLITE_BUSY" || tries >= 50)
         throw e;
-      Bun.sleepSync(WAL_RETRY_MS);
+      Bun.sleepSync(100);
     }
   }
 };
@@ -106,21 +104,19 @@ export function insert(db: Database, row: AttemptRow): void {
   );
 }
 
-const STRINGS = [
-  "at",
-  "project",
-  "session",
-  "prompt",
-  "model",
-  "effort",
-  "system",
-] as const;
-
 export function parseRow(json: string): AttemptRow {
   const r = JSON.parse(json) as Record<string, unknown>;
   if (!(OUTCOMES as readonly unknown[]).includes(r.outcome))
     throw new Error(`unknown outcome: ${String(r.outcome)}`);
-  for (const k of STRINGS)
+  for (const k of [
+    "at",
+    "project",
+    "session",
+    "prompt",
+    "model",
+    "effort",
+    "system",
+  ] as const)
     if (typeof r[k] !== "string") throw new Error(`${k} is not a string`);
   for (const k of ["englishMin", "improveMin"] as const)
     if (typeof r[k] !== "number") throw new Error(`${k} is not a number`);
@@ -133,17 +129,17 @@ export function parseRow(json: string): AttemptRow {
   return r as AttemptRow;
 }
 
-export type StoredRow = {
-  id: number;
-  at: string;
-  project: string;
-  outcome: Outcome;
-  english: number | null;
-  improve: number | null;
-  prompt: string;
-  better: string | null;
-  quip: string | null;
-};
+export type StoredRow = { id: number } & Pick<
+  AttemptRow,
+  | "at"
+  | "project"
+  | "outcome"
+  | "english"
+  | "improve"
+  | "prompt"
+  | "better"
+  | "quip"
+>;
 
 export function unlabeled(db: Database): StoredRow[] {
   return db
@@ -193,13 +189,6 @@ export type Cut = {
   recall: number;
 };
 
-export type Stats = {
-  variants: Variant[];
-  sweep: Cut[];
-  current: Cut | null;
-  sample: number;
-};
-
 type Labeled = { english: number; improve: number; needs: 0 | 1 };
 
 const ratio = (n: number, d: number) => (d === 0 ? 0 : n / d);
@@ -232,7 +221,7 @@ const GRID = Array.from({ length: 10 }, (_, k) => (50 + 5 * k) / 100);
 export function stats(
   db: Database,
   current: { english: number; improve: number },
-): Stats {
+) {
   const variants = db
     .query(
       `SELECT model, effort, system_hash AS systemHash, english_min AS englishMin, improve_min AS improveMin,

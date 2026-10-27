@@ -50,7 +50,9 @@ async function runLabel(dbFile: string) {
     process.stdout.write(q);
     const r = await lines.next();
     if (r.done) process.exit(0);
-    return String(r.value).trim();
+    const a = String(r.value).trim();
+    if (a === "q") process.exit(0);
+    return a;
   };
   for (const row of rows) {
     console.log(
@@ -64,7 +66,6 @@ async function runLabel(dbFile: string) {
     let skip = false;
     for (;;) {
       const a = await ask("needs? [y/n/s=skip/q=quit] ");
-      if (a === "q") process.exit(0);
       if (a === "y") needs = 1;
       else if (a === "n") needs = 0;
       else if (a === "s") skip = true;
@@ -79,7 +80,9 @@ async function runLabel(dbFile: string) {
           const v =
             VERDICT_KEYS[
               await ask(
-                "verdict? [g=good m=bad-model p=bad-prompt t=bad-gate] ",
+                `verdict? [${Object.entries(VERDICT_KEYS)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(" ")}] `,
               )
             ];
           if (v) {
@@ -145,12 +148,7 @@ try {
   else if (command === "stats") runStats(dbPath(home));
   else {
     const row = parseRow(await Bun.stdin.text());
-    const db = open(dbPath(home));
-    try {
-      insert(db, row);
-    } finally {
-      db.close();
-    }
+    insert(open(dbPath(home)), row);
   }
 } catch (e) {
   console.error(e instanceof Error ? e.message : String(e));
