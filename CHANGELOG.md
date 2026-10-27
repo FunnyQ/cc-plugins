@@ -1,5 +1,16 @@
 # Changelog
 
+## [runes 0.11.3] - 2026-10-27
+
+_tracks tag `runes-v0.11.3`_
+
+### Added
+- The teacher rune now records each lesson attempt in a local SQLite lessons database, giving you a history of your practice.
+- A new lessons CLI can record attempts, label them, and show stats over your lesson history.
+
+### Fixed
+- Pressing q now quits at every label prompt, and an empty model reply is recorded as empty instead of as no reply.
+
 ## [dispatch 5.8.0] - 2026-10-27
 
 _tracks tag `dispatch-v5.8.0`_
