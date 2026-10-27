@@ -20,6 +20,7 @@ test("the inventory carries the scrubbed title, each h2's text and the structure
     diagram: false,
     table: true,
     code: true,
+    cards: false,
   });
   expect(JSON.stringify(inv)).not.toContain("prose");
 });
@@ -38,6 +39,16 @@ test("the inventory cuts a long heading to 80 characters and sees a diff and a d
       timeline: false,
     }),
   );
+});
+
+test("the inventory sees a card comparison, single-quoted too, but not one quoted in code", () => {
+  const cards =
+    '<div class="cards"><article class="card pick"><h3>LRU</h3></article></div>';
+  expect(themeInventory("T", cards).cards).toBe(true);
+  expect(themeInventory("T", "<div class='cards'></div>").cards).toBe(true);
+  expect(
+    themeInventory("T", `<pre class="code">${cards}</pre>`).cards,
+  ).toBe(false);
 });
 
 test("the inventory decodes character references before it masks, so an encoded secret is still masked", () => {
@@ -97,7 +108,7 @@ test("jevTheme sends the inventory as state and takes Jev's likeliest theme", as
     Object.keys(
       (bodies[0]!.questions as { theme: { criteria: object } }).theme.criteria,
     ),
-  ).toEqual(["picture-book", "blueprint", "lab-notebook", "editorial"]);
+  ).toEqual(["picture-book", "blueprint", "lab-notebook", "editorial", "card-table"]);
 });
 
 test("jevTheme answers nothing when Jev throws, refuses, or names no theme", async () => {

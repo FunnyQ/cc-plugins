@@ -3,6 +3,7 @@ import {
   assemble,
   cleanMain,
   CSP,
+  cspFor,
   explainerPath,
   pickTheme,
   slugOf,
@@ -84,6 +85,7 @@ test("cleanMain keeps inline svg and every component class", () => {
     '<ol class="steps"><li>s</li></ol>',
     '<div class="compare"><div><h3>Before</h3>x</div><div><h3>After</h3>y</div></div>',
     '<ol class="timeline"><li><time>09:40</time><b>i</b>z</li></ol>',
+    '<div class="cards"><article class="card pick"><h3>LRU</h3><ul class="stats"><li>speed<meter min="0" max="5" value="4">4/5</meter></li></ul><p>w</p></article></div>',
     '<p class="takeaway">t</p>',
   ].join("");
   expect(cleanMain(main)).toBe(main);
@@ -124,7 +126,10 @@ const memoryIo = (files: Map<string, string>, dirs: string[]) => ({
 
 test("writeExplainer makes the dir, suffixes -2 and -3, never overwrites", async () => {
   const files = new Map([
-    ["/r/hooks/explain/themes/picture-book.html", "<time>{{generatedAt}}</time>{{main}}"],
+    [
+      "/r/hooks/explain/themes/picture-book.html",
+      "<time>{{generatedAt}}</time>{{main}}",
+    ],
   ]);
   const dirs: string[] = [];
   const io = memoryIo(files, dirs);
@@ -187,10 +192,35 @@ test("writeExplainer reads the template of the theme it is given", async () => {
   expect(files.get(path)).toBe("print <p>x</p>");
 });
 
+test("cspFor lets only a theme's own hashed script run, and every other theme none", () => {
+  expect(cspFor("blueprint")).toBe(CSP);
+  expect(CSP).not.toContain("script-src");
+  expect(cspFor("card-table")).toMatch(
+    /^default-src 'none'; .*; script-src 'sha256-[A-Za-z0-9+/]{43}='$/,
+  );
+});
+
+test("writeExplainer writes the theme's own CSP", async () => {
+  const files = new Map([
+    ["/r/hooks/explain/themes/card-table.html", "{{csp}}"],
+  ]);
+  const path = await writeExplainer(
+    memoryIo(files, []),
+    "/r",
+    "/h",
+    "abcd1234",
+    { title: "T", main: "<p>x</p>", project: "proj" },
+    new Date(2026, 9, 5, 14, 2),
+    "card-table",
+  );
+  expect(files.get(path)).toBe(cspFor("card-table"));
+});
+
 test("pickTheme keeps a named theme and draws one for random", () => {
   expect(pickTheme("blueprint", () => 0)).toBe("blueprint");
   expect(pickTheme("random", () => 0)).toBe("picture-book");
   expect(pickTheme("random", () => 0.3)).toBe("blueprint");
-  expect(pickTheme("random", () => 0.6)).toBe("lab-notebook");
-  expect(pickTheme("random", () => 0.99)).toBe("editorial");
+  expect(pickTheme("random", () => 0.45)).toBe("lab-notebook");
+  expect(pickTheme("random", () => 0.6)).toBe("editorial");
+  expect(pickTheme("random", () => 0.99)).toBe("card-table");
 });

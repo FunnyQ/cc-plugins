@@ -4,6 +4,16 @@ import { escapeHtml, prepareBlocks } from "./blocks";
 export const CSP =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com https://font.emtech.cc; font-src https://fonts.gstatic.com https://font.emtech.cc; img-src data:";
 
+// a theme's own inline script, by sha256 of its text; themes.spec.ts recomputes each from the theme file
+export const SCRIPT_HASHES: Partial<Record<Theme, string>> = {
+  "card-table": "SFBxEVFp7QRwTji9szwQsC4gZCLtfh97PLgBtYUn/LQ=",
+};
+
+export const cspFor = (theme: Theme): string => {
+  const hash = SCRIPT_HASHES[theme];
+  return hash ? `${CSP}; script-src 'sha256-${hash}'` : CSP;
+};
+
 export type Page = {
   title: string;
   main: string;
@@ -57,11 +67,15 @@ export const renderMain = (main: string): string => {
   );
 };
 
-export const assemble = (template: string, page: Page): string =>
+export const assemble = (
+  template: string,
+  page: Page,
+  csp: string = CSP,
+): string =>
   template.replace(
     /\{\{(csp|title|project|generatedAt|main|lang)\}\}/g,
     (_, key: string) => {
-      if (key === "csp") return CSP;
+      if (key === "csp") return csp;
       if (key === "lang") return langTag(page.lang);
       if (key === "main") return renderMain(page.main);
       return escapeHtml(page[key as "title" | "project" | "generatedAt"]);
@@ -72,9 +86,7 @@ export const pickTheme = (
   setting: Theme | "random",
   rand: () => number,
 ): Theme =>
-  setting === "random"
-    ? THEMES[Math.floor(rand() * THEMES.length)]!
-    : setting;
+  setting === "random" ? THEMES[Math.floor(rand() * THEMES.length)]! : setting;
 
 const trimDashes = (s: string): string => s.replace(/^-+|-+$/g, "");
 
@@ -137,7 +149,11 @@ export const writeExplainer = async (
     path = first.replace(/\.html$/, `-${n}.html`);
   await io.write(
     path,
-    assemble(template, { ...page, generatedAt: mastheadTime(at) }),
+    assemble(
+      template,
+      { ...page, generatedAt: mastheadTime(at) },
+      cspFor(theme),
+    ),
   );
   return path;
 };

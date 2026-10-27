@@ -435,6 +435,92 @@
         grid-row: 1;
       }
 
+      /* cards are boxed sidebar columns; the recommended one is reversed out in ink */
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        overflow: hidden;
+        border-top: 3px double var(--ink);
+        border-bottom: 1px solid var(--ink);
+      }
+      .card {
+        margin: -1px 0 0 -1px;
+        padding: 15px 18px 16px 19px;
+        box-shadow:
+          inset 1px 0 0 var(--ink),
+          inset 0 1px 0 var(--ink);
+      }
+      .card h3 {
+        font: 700 20px/1.2 var(--serif);
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--ink);
+        margin-bottom: 8px;
+      }
+      .stats {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+      }
+      .stats li {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+      }
+      meter {
+        appearance: none;
+        width: 100%;
+        height: 10px;
+        border: 0;
+        background: transparent;
+        border-bottom: 1px solid var(--ink);
+      }
+      meter::-webkit-meter-bar {
+        background: transparent;
+        border: 0;
+        height: 10px;
+      }
+      meter::-webkit-meter-optimum-value,
+      meter::-webkit-meter-suboptimum-value,
+      meter::-webkit-meter-even-less-good-value {
+        background: radial-gradient(circle, var(--ink) 1.6px, transparent 1.9px)
+          0 0 / 4px 4px;
+      }
+      meter::-moz-meter-bar {
+        background: radial-gradient(circle, var(--ink) 1.6px, transparent 1.9px)
+          0 0 / 4px 4px;
+      }
+      .card p {
+        margin-top: 12px;
+        font: italic 400 15px/1.5 var(--serif);
+        color: var(--ink-soft);
+      }
+      .card.pick {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .card.pick h3 {
+        border-bottom-color: var(--paper);
+      }
+      .card.pick p {
+        color: var(--paper);
+      }
+      .card.pick meter {
+        border-bottom-color: var(--paper);
+      }
+      .card.pick meter::-webkit-meter-optimum-value,
+      .card.pick meter::-webkit-meter-suboptimum-value,
+      .card.pick meter::-webkit-meter-even-less-good-value {
+        background: radial-gradient(circle, var(--paper) 1.6px, transparent 1.9px)
+          0 0 / 4px 4px;
+      }
+      .card.pick meter::-moz-meter-bar {
+        background: radial-gradient(circle, var(--paper) 1.6px, transparent 1.9px)
+          0 0 / 4px 4px;
+      }
+
       /* the timeline is a chronology: the time set large in the left column, a spine rule with a stop mark per entry, the entry a wire item */
       .timeline {
         --time-col: 150px;

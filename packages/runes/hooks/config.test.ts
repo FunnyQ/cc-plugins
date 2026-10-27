@@ -227,7 +227,7 @@ test("upgrade gives an explain block written before themes its theme line, under
 
 test("upgrade refreshes a stale theme list and keeps the chosen theme", () => {
   const list =
-    "auto | random | picture-book | blueprint | lab-notebook | editorial";
+    "auto | random | picture-book | blueprint | lab-notebook | editorial | card-table";
   const full = TEMPLATE(DEFAULTS.enabled);
   expect(upgrade(full, CURRENT())).toBe(full);
   const stale = full.replace(list, "random | picture-book | blueprint");
@@ -386,10 +386,10 @@ test("explain.theme defaults to auto, takes random or a theme name, and an inval
   expect(config.explain.theme).toBe("auto");
   expect(config.enabled.explain).toBe(false);
   expect(problems).toEqual([
-    'explain.theme: "neon" (auto | random | picture-book | blueprint | lab-notebook | editorial)',
+    'explain.theme: "neon" (auto | random | picture-book | blueprint | lab-notebook | editorial | card-table)',
   ]);
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
-    "\n  # theme: auto   # auto | random | picture-book | blueprint | lab-notebook | editorial\n  # auto asks TypeSafe's Jev",
+    "\n  # theme: auto   # auto | random | picture-book | blueprint | lab-notebook | editorial | card-table\n  # auto asks TypeSafe's Jev",
   );
 });
 

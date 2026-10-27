@@ -16,6 +16,7 @@ export type Inventory = {
   diagram: boolean;
   table: boolean;
   code: boolean;
+  cards: boolean;
 };
 
 // numeric references and the five escapes are decoded; a rarer named reference (`&commat;`) can still hide a secret from scrub, so decode named references too if a page is seen to use them
@@ -45,6 +46,7 @@ export const themeInventory = (title: string, main: string): Inventory => {
     diagram: kinds.has("mermaid"),
     table: /<table\b/i.test(lifted),
     code: kinds.has("code"),
+    cards: holdsClass(lifted, "div", "cards"),
   };
 };
 
@@ -54,7 +56,7 @@ const question = (inventory: Inventory) => ({
     theme: {
       type: "choice",
       instructions:
-        "Which visual theme suits an explainer page with this `title`, these section `headings`, and these blocks (`timeline`, `diff`, `diagram`, `table`, `code` say whether the page holds one)?",
+        "Which visual theme suits an explainer page with this `title`, these section `headings`, and these blocks (`timeline`, `diff`, `diagram`, `table`, `code`, `cards` say whether the page holds one)?",
       criteria: THEME_FIT,
     },
   },

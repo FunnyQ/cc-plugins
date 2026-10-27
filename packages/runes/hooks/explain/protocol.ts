@@ -31,6 +31,7 @@ export const FRAGMENT_RULES = [
   "Write only the inside of <main>: no <html>, <head>, <style>, <script>, no style or event (on…) attributes, no external URLs, no <image>, no <foreignObject>, and no images other than inline <svg>.",
   'Blocks in order: <p class="answer"> first and exactly once; then at most one <p class="analogy">; then one or more <section>; then at most one <p class="takeaway"> last. The template prints the analogy\'s and takeaway\'s labels itself, so write none.',
   'A <section> holds h2, p, <dl class="parts">, <ol class="steps">, <div class="compare"> (exactly two child divs, each starting with an h3), and <ol class="timeline"> (each li = <time>, <b>, text).',
+  'To weigh two to four options on the same measures, a <section> holds a <div class="cards"> instead of a compare: each option is an <article class="card"> holding an h3 name, a <ul class="stats"> whose every li is a measure name then <meter min="0" max="5" value="N">N/5</meter>, and one <p> with its weakness. Every card lists the same measures in the same order, and a higher value is always better, so name a cost by its virtue (cheapness, not cost). Write class="card pick" on the one card you recommend, and on none when none wins.',
   'A section with a drawing is <section class="spread"> whose first child is <figure class="plate"><svg viewBox="…"><title>…</title>…</svg><figcaption>Plate N. …</figcaption></figure> and whose second child is <div class="text">. Number plates in page order.',
   'Parts: <dl class="parts"> rows <div data-part="a"><dt>A</dt><dd><b>Name</b>definition</dd></div>, letters a–f; every SVG element of that part has class part and the same data-part; its label in the drawing starts with the capital letter (A · the session).',
   "SVG classes only: ink, ink-accent, dash, wash-warm, wash-cool, wash-sage, label, label-soft, part. No literal colours, no width or height attributes on the svg. Wash paths come before the ink they sit behind. Keep labels at least 24 viewBox units apart and never overlapping a line.",
@@ -49,6 +50,8 @@ export const THEME_FIT: Record<Theme, string> = {
     "Debugging and investigation: a bug hunt, a failing test, a root cause, a fix shown as a before and after",
   editorial:
     "A recap or a story over time: what happened in a session, a timeline, the history of a change",
+  "card-table":
+    "A choice among options: two to four alternatives weighed on the same measures, their trade-offs, which one to pick",
 };
 
 const GRAMMAR = [

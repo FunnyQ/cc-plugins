@@ -370,6 +370,71 @@
         grid-row: 1;
       }
 
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 18px;
+      }
+      .card {
+        padding: 16px 20px 18px;
+        background: color-mix(in srgb, var(--paper-deep) 60%, transparent);
+        border: 1px solid var(--rule);
+      }
+      .card h3 {
+        font: 700 24px/1.15 var(--hand);
+        color: var(--print);
+        margin-bottom: 8px;
+      }
+      .stats {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 6px;
+      }
+      .stats li {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+      }
+      meter {
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        border: 0;
+        border-bottom: 1px solid var(--rule);
+        background: transparent;
+      }
+      meter::-webkit-meter-bar {
+        background: transparent;
+        border: 0;
+        height: 8px;
+      }
+      meter::-webkit-meter-optimum-value,
+      meter::-webkit-meter-suboptimum-value,
+      meter::-webkit-meter-even-less-good-value {
+        background: var(--print);
+        border-radius: 4px 2px 3px 1px;
+      }
+      meter::-moz-meter-bar {
+        background: var(--print);
+        border-radius: 4px 2px 3px 1px;
+      }
+      .card p {
+        margin-top: 12px;
+        font: 400 22px/1.3 var(--hand);
+        color: var(--pencil);
+      }
+      .card.pick {
+        border: 2px solid var(--redpen);
+        border-radius: 46% 54% 50% 50% / 14% 12% 16% 13%;
+        padding: 20px 26px 22px;
+      }
+      .card.pick h3 {
+        color: var(--redpen);
+      }
+
       .timeline {
         list-style: none;
         padding: 0 0 0 40px;

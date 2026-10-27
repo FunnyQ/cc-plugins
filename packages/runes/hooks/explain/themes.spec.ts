@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "bun:test";
 
 import { THEMES } from "../config";
-import { renderMain } from "./html";
+import { renderMain, SCRIPT_HASHES } from "./html";
 import { FRAGMENT_RULES } from "./protocol";
 
 const DIR = `${import.meta.dir}/themes`;
@@ -88,6 +89,15 @@ for (const theme of THEMES) {
     expect(html).toContain(
       'http-equiv="Content-Security-Policy" content="{{csp}}"',
     );
+  });
+
+  // the page's CSP admits a script only by hash, so an edit to a theme's script must move its hash with it
+  test(`${theme} declares the hash of its own inline script, and none without one`, () => {
+    const hashes = [
+      ...read(theme).matchAll(/<script>([\s\S]*?)<\/script>/g),
+    ].map(([, body]) => createHash("sha256").update(body!).digest("base64"));
+    expect(hashes.length).toBeLessThanOrEqual(1);
+    expect(SCRIPT_HASHES[theme]).toBe(hashes[0]);
   });
 
   test(`${theme} styles every fragment class, pele, and its wash copy`, () => {

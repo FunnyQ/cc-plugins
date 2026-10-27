@@ -426,6 +426,80 @@
         grid-row: 1;
       }
 
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+      }
+      .card {
+        padding: 16px 20px 18px;
+        background: var(--ground-deep);
+        border: 1px solid var(--chalk-soft);
+      }
+      .card h3 {
+        font: 700 13px/1.4 var(--mono);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--chalk-soft);
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .stats {
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+      .stats li {
+        display: grid;
+        grid-template-columns: 1fr 90px;
+        align-items: center;
+        gap: 10px;
+        font-size: 15px;
+      }
+      meter {
+        appearance: none;
+        width: 100%;
+        height: 8px;
+        border: 1px solid var(--chalk-soft);
+        background: transparent;
+      }
+      meter::-webkit-meter-bar {
+        background: transparent;
+        border: 0;
+        height: 6px;
+      }
+      meter::-webkit-meter-optimum-value,
+      meter::-webkit-meter-suboptimum-value,
+      meter::-webkit-meter-even-less-good-value {
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--hatch-cool) 0 2px,
+          transparent 2px 4px
+        );
+      }
+      meter::-moz-meter-bar {
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--hatch-cool) 0 2px,
+          transparent 2px 4px
+        );
+      }
+      .card p {
+        margin-top: 12px;
+        font-size: 15px;
+        color: var(--chalk-soft);
+      }
+      .card.pick {
+        border: 2px solid var(--redline);
+        box-shadow: 5px 5px 0 -1px var(--ground), 5px 5px 0 0 var(--redline);
+      }
+      .card.pick h3 {
+        color: var(--redline);
+        border-bottom-color: var(--redline);
+      }
+
       .timeline {
         list-style: none;
         padding: 0 0 0 40px;

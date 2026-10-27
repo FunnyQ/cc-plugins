@@ -1,0 +1,1357 @@
+<!doctype html>
+<html lang="{{lang}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500..900&family=EB+Garamond:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:wght@400;600&display=swap"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/GenWanMinTW/400" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/LXGWWenKaiTC/400" />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/ChironSungHK/700" />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/400"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/600"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      :root {
+        --mat: #1c3128; /* --mat: the felt play mat the page lies on */
+        --frame: #17130f; /* --frame: the black card border */
+        --parchment: #ebdfc0; /* --parchment: the card face */
+        --parchment-hi: #f5edd8; /* --parchment-hi: text boxes */
+        --parchment-deep: #d6c49a; /* --parchment-deep: bevels, table head */
+        --ink: #241a11; /* --ink: type and lines */
+        --ink-soft: #5f4b36; /* --ink-soft: flavour, captions */
+        --hair: rgba(36, 26, 17, 0.2); /* --hair: rules between rows */
+        --gold: #b0802a; /* --gold: trim, the pick's foil */
+        --gold-hi: #e8c66c; /* --gold-hi: lit edge of the trim */
+        --sea: #2a6797; /* --sea: blue identity, notes */
+        --blood: #a8292b; /* --blood: red identity, warnings, removed lines */
+        --moss: #3f6d38; /* --moss: green identity, added lines */
+        --bone: #d8cfb4; /* --bone: white identity */
+        --chalk: #efe7d2; /* --chalk: type set straight on the mat */
+        --chalk-soft: #cbbf9f; /* --chalk-soft: flavour and captions on the mat */
+        --display: "Cinzel", "ChironSungHK", "Songti TC", serif;
+        --serif: "EB Garamond", "GenWanMinTW", "Songti TC", serif;
+        --flavour: "EB Garamond", "LXGWWenKaiTC", "Kaiti TC", serif;
+        --mono: "JetBrains Mono", "GenWanMinTW", ui-monospace, Menlo, monospace;
+        color-scheme: light;
+      }
+      body {
+        min-height: 100vh;
+        /* the table top: planks with their own tone and seams, a grain stretched along the boards, fine pale flecks, and a warm stain */
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='180'%3E%3Crect x='0' y='0' width='620' height='60' fill='%23fff' opacity='0.05'/%3E%3Crect x='620' y='0' width='920' height='60' fill='%23000' opacity='0.05'/%3E%3Crect x='1540' y='0' width='860' height='60' fill='%23fff' opacity='0.08'/%3E%3Crect x='0' y='60' width='150' height='60' fill='%23000' opacity='0.04'/%3E%3Crect x='150' y='60' width='710' height='60' fill='%23000' opacity='0.1'/%3E%3Crect x='860' y='60' width='1040' height='60' fill='%23000' opacity='0.07'/%3E%3Crect x='1900' y='60' width='500' height='60' fill='%23fff' opacity='0.03'/%3E%3Crect x='0' y='120' width='380' height='60' fill='%233a1a00' opacity='0.06'/%3E%3Crect x='380' y='120' width='820' height='60' fill='%233a1a00' opacity='0.12'/%3E%3Crect x='1200' y='120' width='850' height='60' fill='%23fff' opacity='0.03'/%3E%3Crect x='2050' y='120' width='350' height='60' fill='%233a1a00' opacity='0.09'/%3E%3Cpath d='M0 .5H2400M0 60.5H2400M0 120.5H2400' stroke='%231a0d04' stroke-opacity='.75' stroke-width='1.6'/%3E%3Cpath d='M0 2H2400M0 62H2400M0 122H2400' stroke='%23fff' stroke-opacity='.08'/%3E%3Cpath d='M620.5 0V60M1540.5 0V60M150.5 60V120M860.5 60V120M1900.5 60V120M380.5 120V180M1200.5 120V180M2050.5 120V180' stroke='%231a0d04' stroke-opacity='.6' stroke-width='1.4'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.005 .2' numOctaves='3' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .16 0 0 0 0 .08 0 0 0 0 .02 0 0 0 1.4 -.55'/%3E%3C/filter%3E%3Crect width='2400' height='180' filter='url(%23g)'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2400' height='90'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.02 .9' numOctaves='2' seed='8' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .6 0 0 0 .6 -.3'/%3E%3C/filter%3E%3Crect width='2400' height='90' filter='url(%23f)'/%3E%3C/svg%3E"),
+          linear-gradient(170deg, #75492a, #5a351c 60%, #4c2c17);
+        padding: 40px 28px 72px;
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--gold-hi) 55%, transparent);
+        color: var(--ink);
+      }
+      :focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 3px;
+      }
+
+      /* the page is the table: type lies straight on the mat in light ink, and every piece on it is reset to dark ink on its own face */
+      .sheet {
+        --ink: var(--chalk);
+        --ink-soft: var(--chalk-soft);
+        --hair: rgba(239, 231, 210, 0.22);
+        --link: #a9d0ef;
+        container-type: inline-size;
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 40px 72px 52px;
+        border-radius: 24px;
+        /* a cloth playmat: a basket weave of crossed threads, long fibres along the warp, and a shade darker toward the bottom */
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23000' opacity='.2'/%3E%3Crect y='.6' width='4' height='2.8' fill='%23fff' opacity='.09'/%3E%3Crect x='4' y='4.6' width='4' height='2.8' fill='%23fff' opacity='.09'/%3E%3Crect x='4.6' width='2.8' height='4' fill='%23fff' opacity='.05'/%3E%3Crect x='.6' y='4' width='2.8' height='4' fill='%23fff' opacity='.05'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='200'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.01 .7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .38 -.17'/%3E%3C/filter%3E%3Crect width='1600' height='200' filter='url(%23f)'/%3E%3C/svg%3E"),
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .45 -.1'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23f)'/%3E%3C/svg%3E"),
+          linear-gradient(var(--mat), color-mix(in srgb, var(--mat) 82%, black)),
+          var(--mat);
+        color: var(--ink);
+        font: 18px/1.8 var(--serif);
+        font-kerning: normal;
+      }
+      /* the mat's contact shadow on the wood, drawn by a layer behind it */
+      .sheet::after {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        inset: 0;
+        border-radius: inherit;
+        box-shadow:
+          0 1px 2px rgba(0, 0, 0, 0.55),
+          0 22px 40px -18px rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+      }
+      /* the stitched hem a few millimetres in from the mat's edge */
+      .sheet::before {
+        content: "";
+        position: absolute;
+        inset: 7px;
+        border: 1.5px dashed rgba(239, 231, 210, 0.32);
+        border-radius: 18px;
+        pointer-events: none;
+      }
+      .card,
+      .plate,
+      .compare > div,
+      aside.note,
+      aside.warn,
+      .takeaway,
+      main .table {
+        --ink: #241a11;
+        --ink-soft: #5f4b36;
+        --hair: rgba(36, 26, 17, 0.2);
+        --link: var(--sea);
+        color: var(--ink);
+      }
+      /* a piece set down on the cloth: its own weight as a short shadow, no outline */
+      .plate,
+      .compare > div,
+      aside.note,
+      aside.warn,
+      .takeaway,
+      main .table {
+        box-shadow:
+          0 2px 3px rgba(0, 0, 0, 0.35),
+          0 14px 26px -12px rgba(0, 0, 0, 0.6);
+      }
+
+      /* the title, set straight on the mat */
+      .titlebar {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 0 4px;
+      }
+      .titlebar h1 {
+        flex: 1;
+        font: 700 clamp(24px, 3.2cqi, 40px) / 1.25 var(--display);
+        letter-spacing: 0.01em;
+        text-wrap: balance;
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+      }
+      .card h3::after {
+        --pip: var(--gold);
+        display: block;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          color-mix(in srgb, var(--pip) 35%, white),
+          var(--pip) 55%,
+          color-mix(in srgb, var(--pip) 60%, black)
+        );
+        box-shadow:
+          0 0 0 1.5px var(--frame),
+          1px 2px 0 1px rgba(0, 0, 0, 0.55);
+      }
+
+      /* the art box: a painted dusk over hills, framed in black */
+      .art {
+        height: 150px;
+        margin: 22px 0 0;
+        border: 10px solid var(--parchment-hi);
+        border-bottom-width: 26px;
+        transform: rotate(-0.4deg);
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 150' preserveAspectRatio='none'%3E%3Cpath d='M0 92 L120 60 L210 84 L330 38 L450 80 L560 52 L700 90 L820 44 L930 70 L1060 36 L1200 74 V150 H0Z' fill='%234b5a63' opacity='.55'/%3E%3Cpath d='M0 118 L160 92 L300 112 L470 86 L620 116 L780 94 L960 120 L1100 98 L1200 110 V150 H0Z' fill='%232c3a2f'/%3E%3Cpath d='M0 138 L240 124 L520 140 L800 126 L1200 140 V150 H0Z' fill='%23182219'/%3E%3C/svg%3E")
+            bottom / 100% 100% no-repeat,
+          radial-gradient(
+            260px 120px at 72% 70%,
+            rgba(255, 214, 140, 0.9),
+            transparent 70%
+          ),
+          linear-gradient(#3d5873, #a7766a 62%, #e2b27a);
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.45),
+          0 2px 3px rgba(0, 0, 0, 0.35),
+          0 18px 30px -14px rgba(0, 0, 0, 0.7);
+      }
+      /* the type line under the art: what kind of card this is, and its set */
+      .typeline {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        margin-top: 14px;
+        padding: 8px 4px;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            var(--gold) 12%,
+            var(--gold) 88%,
+            transparent
+          )
+          left bottom / 100% 1px no-repeat;
+        font: 600 15px/1.4 var(--display);
+        letter-spacing: 0.04em;
+      }
+      .typeline .set {
+        font: 500 13px/1.4 var(--mono);
+        color: var(--ink-soft);
+        letter-spacing: 0;
+        text-align: right;
+      }
+
+      main {
+        margin-top: 34px;
+      }
+      main > * + * {
+        margin-top: 24px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 68ch;
+      }
+      main b {
+        font-weight: 700;
+      }
+      main a {
+        color: var(--link);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font: 0.82em var(--mono);
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: color-mix(in srgb, currentColor 14%, transparent);
+      }
+      main h3 {
+        font: 700 17px/1.35 var(--display);
+        letter-spacing: 0.02em;
+      }
+
+      /* the answer is the card's rules text: plain, large, first */
+      .answer {
+        font-size: 23px;
+        line-height: 1.7;
+        max-width: 46ch;
+      }
+      .answer::before {
+        content: "";
+        display: block;
+        width: 96px;
+        height: 12px;
+        margin-bottom: 14px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 12'%3E%3Cpath d='M0 6H38M58 6H96' stroke='%23e8c66c' stroke-width='1.2'/%3E%3Cpath d='M48 0L54 6L48 12L42 6Z' fill='%23e8c66c'/%3E%3C/svg%3E")
+          no-repeat;
+      }
+      /* the analogy is flavour text: italic, set apart by a thin ornament */
+      .analogy,
+      .takeaway {
+        position: relative;
+        max-width: 58ch;
+        margin-inline: auto;
+        text-align: center;
+        font: italic 400 20px/1.75 var(--flavour);
+        color: var(--ink-soft);
+        padding: 30px 12px 0;
+      }
+      .analogy::before,
+      .takeaway::before {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        font: 700 12px/1 var(--display);
+        font-style: normal;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--gold-hi);
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .analogy::before {
+        content: "Flavour";
+      }
+      .analogy::before,
+      .takeaway::before {
+        background: linear-gradient(
+            90deg,
+            transparent,
+            var(--gold) calc(50% - 120px),
+            transparent calc(50% - 64px),
+            transparent calc(50% + 64px),
+            var(--gold) calc(50% + 120px),
+            transparent
+          )
+          center / 100% 1px no-repeat;
+        justify-content: center;
+      }
+      /* the takeaway closes the page as the card's last word, a gold-framed seal */
+      .takeaway {
+        margin-top: 52px !important;
+        padding: 40px 32px 24px;
+        font: 600 22px/1.65 var(--flavour);
+        font-style: normal;
+        color: var(--ink);
+        border-radius: 10px;
+        background: var(--parchment-hi);
+        text-wrap: balance;
+      }
+      .takeaway::before {
+        content: "Takeaway";
+        color: var(--gold);
+        top: 16px;
+        left: 24px;
+        right: 24px;
+      }
+
+      /* sections lie open on the card: spacing and a gilt rule under each heading, so the option cards are the only framed objects */
+      main > section {
+        margin-top: 64px;
+      }
+      main h2 {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        background: linear-gradient(90deg, var(--gold), transparent 85%) left
+          bottom / 100% 1px no-repeat;
+        font: 700 26px/1.35 var(--display);
+        letter-spacing: 0.02em;
+        text-wrap: balance;
+      }
+      main h2::before {
+        content: "";
+        flex: none;
+        width: 11px;
+        height: 11px;
+        transform: translateY(-3px) rotate(45deg);
+        background: linear-gradient(135deg, var(--gold-hi), var(--gold));
+        box-shadow: 0 0 0 1.5px var(--frame);
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 18px;
+      }
+
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 40px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      /* a plate is an art box: an inked frame around a lighter field */
+      .plate {
+        padding: 14px;
+        border-radius: 6px;
+        background: linear-gradient(
+          color-mix(in srgb, var(--parchment-hi) 70%, white),
+          var(--parchment-hi)
+        );
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        margin-top: 12px;
+        padding-top: 8px;
+        border-top: 1px solid var(--hair);
+        font: italic 400 15px/1.6 var(--flavour);
+        color: var(--ink-soft);
+      }
+
+      .parts {
+        display: grid;
+        gap: 4px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 12px;
+        padding: 8px 10px 8px 4px;
+        border-radius: 8px;
+        transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        margin-top: 2px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          #4a4038,
+          var(--frame) 70%
+        );
+        box-shadow: 0 0 0 1.5px var(--gold);
+        color: var(--gold-hi);
+        font: 700 15px/1 var(--display);
+      }
+      .parts dd b {
+        display: block;
+        font-family: var(--display);
+        letter-spacing: 0.02em;
+      }
+      .parts > div:hover {
+        background: color-mix(in srgb, var(--gold-hi) 26%, transparent);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.18;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      /* steps are paid in generic mana: a numbered grey pip each */
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 14px;
+      }
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 48px;
+      }
+      .steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: 0.15em;
+        display: grid;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          #e4ddd0,
+          #a59c8c 60%,
+          #6f675b
+        );
+        box-shadow:
+          0 0 0 1.5px var(--frame),
+          1px 2px 0 1px rgba(0, 0, 0, 0.45);
+        font: 700 16px/1 var(--display);
+        color: var(--frame);
+      }
+
+      /* two sides face off across a VS seal */
+      .compare {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+      }
+      .compare > div {
+        padding: 14px 18px 18px;
+        border-radius: 10px;
+        background: var(--parchment-hi);
+      }
+      .compare > div > * + * {
+        margin-top: 10px;
+      }
+      .compare h3 {
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .compare::after {
+        content: "vs";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: grid;
+        place-items: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: var(--frame);
+        box-shadow: 0 0 0 2px var(--gold);
+        color: var(--gold-hi);
+        font: 700 14px/1 var(--display);
+        text-transform: uppercase;
+      }
+
+      /* the timeline is a turn order: a gold spine with a gem at each step */
+      .timeline {
+        --time-col: 92px;
+        list-style: none;
+        padding: 0;
+        display: grid;
+        gap: 4px;
+      }
+      .timeline > li {
+        position: relative;
+        display: grid;
+        grid-template-columns: var(--time-col) minmax(0, 66ch);
+        column-gap: 40px;
+        max-width: none;
+        padding: 10px 0 12px;
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: calc(var(--time-col) + 19px);
+        width: 2px;
+        background: var(--gold);
+      }
+      .timeline > li:first-child::before {
+        top: 22px;
+      }
+      .timeline > li:last-child::before {
+        bottom: calc(100% - 22px);
+      }
+      .timeline > li::after {
+        content: "";
+        position: absolute;
+        top: 15px;
+        left: calc(var(--time-col) + 13px);
+        width: 14px;
+        height: 14px;
+        transform: rotate(45deg);
+        background: linear-gradient(135deg, #e86a5c, var(--blood));
+        box-shadow: 0 0 0 1.5px var(--frame);
+      }
+      .timeline time {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        text-align: right;
+        font: 600 15px/1.9 var(--mono);
+        color: var(--ink-soft);
+      }
+      .timeline b {
+        grid-column: 2;
+        display: block;
+        font: 700 19px/1.5 var(--display);
+      }
+
+      /* the options as playing cards: same measures, one recommended */
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(232px, 280px));
+        justify-content: center;
+        gap: 30px 26px;
+        padding: 14px 0 10px;
+        counter-reset: card;
+      }
+      main > section > .cards {
+        margin-top: 26px;
+      }
+      .card {
+        --id: var(--sea);
+        counter-increment: card;
+        position: relative;
+        display: grid;
+        grid-row: span 3;
+        grid-template-rows: subgrid;
+        gap: 0;
+        padding: 9px 9px 14px;
+        border: 9px solid var(--frame);
+        border-radius: 16px;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 -.1'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23c)'/%3E%3C/svg%3E"),
+          linear-gradient(
+            160deg,
+            color-mix(in srgb, var(--id) 70%, white),
+            var(--id) 45%,
+            color-mix(in srgb, var(--id) 65%, black)
+          );
+        box-shadow:
+          0 0 0 1px #000,
+          0 14px 24px -10px rgba(0, 0, 0, 0.6);
+        /* a tilt script writes --rx/--ry (deg) and --mx/--my (pointer %) inline and sets .tilting while the pointer is over the card; unset, the card lies flat */
+        transform: perspective(800px) translateY(var(--lift, 0px))
+          rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+        transition:
+          transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+          box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .card.tilting {
+        transition:
+          transform 0.08s linear,
+          box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .card:nth-child(2) {
+        --id: var(--blood);
+      }
+      .card:nth-child(3) {
+        --id: var(--moss);
+      }
+      .card:nth-child(4) {
+        --id: var(--bone);
+      }
+      .card:hover {
+        --lift: -6px;
+      }
+      .card h3 {
+        position: relative;
+        align-self: start;
+        padding: 6px 44px 6px 12px;
+        border-radius: 10px / 50%;
+        background: linear-gradient(var(--parchment-hi), var(--parchment-deep));
+        color: var(--ink);
+        overflow-wrap: anywhere;
+      }
+      .card h3::after {
+        content: "";
+        --pip: var(--id);
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        width: 22px;
+        height: 22px;
+        transform: translateY(-50%);
+      }
+      /* the stats are the text box, its top a small art window in the card's colour */
+      .card .stats {
+        list-style: none;
+        margin-top: 8px;
+        padding: 0 12px 6px;
+        border-radius: 4px 4px 0 0;
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cpath d='M0 .5H4M.5 0V4' stroke='%23785a32' stroke-opacity='.09'/%3E%3C/svg%3E"),
+          var(--parchment-hi);
+      }
+      .card .stats::before {
+        content: "";
+        display: block;
+        height: 80px;
+        margin: 0 -12px 8px;
+        border-bottom: 2px solid var(--frame);
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='none'%3E%3Ccircle cx='196' cy='26' r='12' fill='%23f4e2b4'/%3E%3Cpath d='M0 58 L60 40 L120 56 L190 34 L280 52 V80 H0Z' fill='%23000' opacity='.22'/%3E%3Cpath d='M0 70 L90 60 L170 72 L280 62 V80 H0Z' fill='%23000' opacity='.35'/%3E%3C/svg%3E")
+            center / 100% 100% no-repeat,
+          linear-gradient(
+            color-mix(in srgb, var(--id) 45%, white),
+            color-mix(in srgb, var(--id) 80%, black)
+          );
+      }
+      .card .stats li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 0;
+        border-bottom: 1px dotted var(--hair);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      .card .stats li:last-child {
+        border-bottom: 0;
+      }
+      /* a meter is five pips: rings for the track, filled gems up to the value */
+      .card meter {
+        appearance: none;
+        flex: none;
+        width: 80px;
+        height: 16px;
+        border: 0;
+        background: radial-gradient(
+            circle at 8px 8px,
+            transparent 4.2px,
+            color-mix(in srgb, var(--ink-soft) 60%, transparent) 4.6px 5.6px,
+            transparent 6px
+          )
+          0 0 / 16px 16px repeat-x;
+      }
+      .card meter::-webkit-meter-bar {
+        height: 16px;
+        border: 0;
+        background: none;
+      }
+      .card meter::-webkit-meter-optimum-value,
+      .card meter::-webkit-meter-suboptimum-value,
+      .card meter::-webkit-meter-even-less-good-value {
+        background: radial-gradient(
+            circle at 8px 8px,
+            color-mix(in srgb, var(--id) 40%, white) 0 1.6px,
+            var(--id) 2.8px 4.6px,
+            var(--frame) 5px 5.8px,
+            transparent 6.2px
+          )
+          0 0 / 16px 16px repeat-x;
+      }
+      .card meter::-moz-meter-bar {
+        background: radial-gradient(
+            circle at 8px 8px,
+            color-mix(in srgb, var(--id) 40%, white) 0 1.6px,
+            var(--id) 2.8px 4.6px,
+            var(--frame) 5px 5.8px,
+            transparent 6.2px
+          )
+          0 0 / 16px 16px repeat-x;
+      }
+      .card:nth-child(4) meter {
+        --id: var(--gold);
+      }
+      /* the weakness is the flavour text, closing the text box */
+      .card > p {
+        padding: 8px 12px 32px;
+        border-radius: 0 0 4px 4px;
+        background:
+          linear-gradient(var(--hair), var(--hair)) top center / 70% 1px
+            no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Cpath d='M0 .5H4M.5 0V4' stroke='%23785a32' stroke-opacity='.09'/%3E%3C/svg%3E"),
+          var(--parchment-hi);
+        font: italic 400 15px/1.65 var(--flavour);
+        color: var(--ink-soft);
+      }
+      /* the corner box, where a creature's power would sit, holds the option's number */
+      .card::after {
+        content: counter(card, upper-roman);
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        min-width: 50px;
+        padding: 2px 10px;
+        border: 2px solid var(--frame);
+        border-radius: 8px;
+        background: linear-gradient(var(--parchment-hi), var(--parchment-deep));
+        box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+        font: 700 15px/1.5 var(--display);
+        text-align: center;
+        color: var(--ink);
+      }
+      /* the pick is the rare holo: a foil ring inside the black border, a rainbow foil on its gold frame and art window that sweeps with --mx/--my, and a sparkle foil that lights up only under the pointer */
+      .card.pick {
+        --id: var(--gold);
+        --foil: linear-gradient(
+          115deg,
+          rgba(255, 128, 200, 0.75),
+          rgba(255, 214, 110, 0.75) 10%,
+          rgba(150, 255, 196, 0.75) 20%,
+          rgba(120, 200, 255, 0.75) 30%,
+          rgba(200, 150, 255, 0.75) 40%,
+          rgba(255, 128, 200, 0.75) 50%,
+          rgba(255, 214, 110, 0.75) 60%,
+          rgba(150, 255, 196, 0.75) 70%,
+          rgba(120, 200, 255, 0.75) 80%,
+          rgba(200, 150, 255, 0.75) 90%,
+          rgba(255, 128, 200, 0.75)
+        );
+        --foil-wide: linear-gradient(
+          110deg,
+          rgba(255, 79, 154, 0.72),
+          rgba(255, 165, 61, 0.72) 17%,
+          rgba(255, 241, 106, 0.72) 33%,
+          rgba(93, 255, 150, 0.72) 50%,
+          rgba(63, 200, 255, 0.72) 67%,
+          rgba(138, 114, 255, 0.72) 83%,
+          rgba(255, 79, 154, 0.72)
+        );
+        --sparkle:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cpath fill='%23fff' d='M8 6L8.88 9.12L12 10L8.88 10.88L8 14L7.12 10.88L4 10L7.12 9.12ZM30 3.5L30.55 5.45L32.5 6L30.55 6.55L30 8.5L29.45 6.55L27.5 6L29.45 5.45ZM47 14.5L47.77 17.23L50.5 18L47.77 18.77L47 21.5L46.23 18.77L43.5 18L46.23 17.23ZM18 28L18.44 29.56L20 30L18.44 30.44L18 32L17.56 30.44L16 30L17.56 29.56ZM38 31L39.1 34.9L43 36L39.1 37.1L38 41L36.9 37.1L33 36L36.9 34.9ZM6 43L6.66 45.34L9 46L6.66 46.66L6 49L5.34 46.66L3 46L5.34 45.34ZM26 47.5L26.55 49.45L28.5 50L26.55 50.55L26 52.5L25.45 50.55L23.5 50L25.45 49.45ZM52 46L52.44 47.56L54 48L52.44 48.44L52 50L51.56 48.44L50 48L51.56 47.56Z'/%3E%3C/svg%3E")
+            0 0 / 56px 56px,
+          repeating-linear-gradient(
+            -45deg,
+            rgba(255, 255, 255, 0.28) 0 1px,
+            transparent 1px 5px
+          );
+        --sheen: linear-gradient(
+          115deg,
+          transparent 40%,
+          rgba(255, 255, 255, 0.8) 50%,
+          transparent 60%
+        );
+        background:
+          var(--sheen) var(--mx, 50%) var(--my, 50%) / 300% 300% no-repeat,
+          var(--foil) calc(100% - var(--mx, 50%)) calc(100% - var(--my, 50%)) /
+            300% 300% no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='c'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 -.1'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23c)'/%3E%3C/svg%3E")
+            0 0,
+          linear-gradient(
+              160deg,
+              color-mix(in srgb, var(--gold) 70%, white),
+              var(--gold) 45%,
+              color-mix(in srgb, var(--gold) 65%, black)
+            )
+            center / calc(100% - 6px) calc(100% - 6px) no-repeat,
+          conic-gradient(
+            from 200deg,
+            #ff9ccf,
+            #ffe08a,
+            #a8ffd0,
+            #8ad2ff,
+            #cfa6ff,
+            #ff9ccf
+          );
+        background-blend-mode: screen, overlay, normal, normal, normal;
+        box-shadow:
+          0 0 0 1px #000,
+          0 0 0 4px var(--gold-hi),
+          0 0 0 5px #000,
+          0 18px 28px -10px rgba(0, 0, 0, 0.6);
+      }
+      /* sparkle and a specular spot, between the frame and the card's boxes, so they light the frame and never the text */
+      .card.pick::before,
+      .card.pick .stats::after {
+        content: "";
+        position: absolute;
+        pointer-events: none;
+        background:
+          radial-gradient(
+            circle at var(--mx, 50%) var(--my, 50%),
+            rgba(255, 255, 255, 0.9),
+            transparent 32%
+          ),
+          var(--sparkle);
+        mix-blend-mode: color-dodge;
+        mask: radial-gradient(
+          circle at var(--mx, 50%) var(--my, 50%),
+          #000,
+          transparent 55%
+        );
+        opacity: 0;
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .card.pick::before {
+        z-index: -1;
+        inset: 0;
+        border-radius: 7px;
+      }
+      .card.pick .stats {
+        position: relative;
+      }
+      /* the art window is about the card's 15%–35% band, so the pointer's card-relative --my is rescaled onto it */
+      .card.pick .stats::after {
+        mask: radial-gradient(
+          circle at var(--mx, 50%) calc((var(--my, 50%) - 15%) * 5),
+          #000,
+          transparent 55%
+        );
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+      }
+      .card.pick.tilting::before,
+      .card.pick.tilting .stats::after {
+        opacity: 1;
+      }
+      /* the rare's art window is the holo itself: foil and sheen over the painted hills */
+      .card.pick .stats::before {
+        background:
+          var(--sheen) var(--mx, 50%) var(--my, 50%) / 300% 300% no-repeat,
+          var(--foil-wide) calc(100% - var(--mx, 50%))
+            calc(100% - var(--my, 50%)) / 300% 300% no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 280 80' preserveAspectRatio='none'%3E%3Ccircle cx='196' cy='26' r='12' fill='%23f4e2b4'/%3E%3Cpath d='M0 58 L60 40 L120 56 L190 34 L280 52 V80 H0Z' fill='%23000' opacity='.22'/%3E%3Cpath d='M0 70 L90 60 L170 72 L280 62 V80 H0Z' fill='%23000' opacity='.35'/%3E%3C/svg%3E")
+            center / 100% 100% no-repeat,
+          linear-gradient(
+            color-mix(in srgb, var(--id) 70%, black),
+            color-mix(in srgb, var(--id) 35%, black)
+          );
+        background-blend-mode: screen, color-dodge, normal, normal;
+      }
+      .card.pick:hover {
+        filter: brightness(1.05) saturate(1.1);
+      }
+      .card.pick::after {
+        z-index: 3;
+        content: "★ Pick";
+        background: linear-gradient(var(--gold-hi), var(--gold));
+      }
+      .card.pick meter {
+        --id: var(--blood);
+      }
+
+      /* SVG vocabulary the fork draws with: inked lines over watercolour washes */
+      .plate .ink {
+        fill: none;
+        stroke: var(--ink);
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--blood);
+        stroke-width: 2.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .plate .dash {
+        stroke-dasharray: 7 5;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        opacity: 0.55;
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: #d9933e;
+      }
+      .plate .wash-cool {
+        fill: #5d8fb8;
+      }
+      .plate .wash-sage {
+        fill: #7f9d68;
+      }
+      .plate .label {
+        fill: var(--ink);
+        font-size: 16px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+      .plate .label-soft {
+        fill: var(--ink-soft);
+        font-size: 14px;
+        font-family: "IBMPlexSansTC", sans-serif;
+      }
+
+      main,
+      main .code,
+      main .diff,
+      main .table {
+        scrollbar-color: var(--gold) var(--parchment-deep);
+      }
+      /* code is set on a slate tablet with gold trim */
+      main .code,
+      main .diff {
+        position: relative;
+        max-width: 100%;
+        overflow-x: auto;
+        padding: 34px 0 16px;
+        border: 3px solid var(--frame);
+        border-radius: 10px;
+        background: #221d18;
+        box-shadow:
+          inset 0 0 0 1px var(--gold),
+          0 3px 0 rgba(0, 0, 0, 0.2);
+        color: #eadfc4;
+        font: 14px/1.7 var(--mono);
+        tab-size: 2;
+        font-variant-ligatures: none;
+        scrollbar-color: var(--gold) #221d18;
+      }
+      main .plate > .code {
+        border: 0;
+        box-shadow: none;
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 22px;
+        font: inherit;
+        background: none;
+        border-radius: 0;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 9px;
+        left: 22px;
+        font: 700 11px/1.4 var(--display);
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--gold-hi);
+      }
+      main .diff::before {
+        content: "Before and after";
+      }
+      main .diff span {
+        display: block;
+        position: relative;
+        padding: 0 22px 0 34px;
+        margin: 0 -22px;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 14px;
+      }
+      main .diff .del {
+        background: rgba(168, 41, 43, 0.3);
+        color: #e9b3a8;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: #f08a7c;
+      }
+      main .diff .add {
+        background: rgba(63, 109, 56, 0.4);
+        color: #d6efc0;
+      }
+      main .diff .add::before {
+        content: "+";
+        color: #a6dc8a;
+      }
+      main .mermaid {
+        font: 14px/1.6 var(--mono);
+        white-space: pre;
+        overflow-x: auto;
+      }
+
+      main .table {
+        overflow-x: auto;
+        border-radius: 8px;
+      }
+      main table {
+        width: 100%;
+        background: var(--parchment-hi);
+        border-collapse: collapse;
+        font-size: 16px;
+        font-variant-numeric: lining-nums tabular-nums;
+      }
+      main caption {
+        text-align: left;
+        padding: 8px 14px;
+        font: italic 400 15px/1.5 var(--flavour);
+        color: var(--ink-soft);
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 16px;
+      }
+      main th {
+        background: var(--frame);
+        color: var(--gold-hi);
+        font: 700 13px/1.4 var(--display);
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+      }
+      main tbody tr:nth-child(even) td {
+        background: color-mix(in srgb, var(--parchment-deep) 30%, transparent);
+      }
+      main tbody tr + tr td {
+        border-top: 1px solid var(--hair);
+      }
+      main td {
+        min-width: 6em;
+      }
+      main :is(th, td).num {
+        text-align: right;
+        font-family: var(--mono);
+        font-size: 0.9em;
+      }
+
+      /* asides are reminder text: a note in blue mana, a warning in red */
+      aside.note,
+      aside.warn {
+        --tone: var(--sea);
+        position: relative;
+        max-width: 62ch;
+        padding: 14px 20px 16px 58px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--tone) 10%, var(--parchment-hi));
+        font-size: 17px;
+      }
+      aside.warn {
+        --tone: var(--blood);
+      }
+      aside.note::before,
+      aside.warn::before {
+        display: block;
+        font: 700 12px/1.6 var(--display);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--tone);
+      }
+      aside.note::before {
+        content: "Reminder";
+      }
+      aside.warn::before {
+        content: "Warning";
+      }
+      aside.note::after,
+      aside.warn::after {
+        content: "i";
+        position: absolute;
+        left: 16px;
+        top: 16px;
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        background: radial-gradient(
+          circle at 35% 30%,
+          color-mix(in srgb, var(--tone) 40%, white),
+          var(--tone) 60%,
+          color-mix(in srgb, var(--tone) 60%, black)
+        );
+        box-shadow: 0 0 0 1.5px var(--frame);
+        color: #fff;
+        font: 700 14px/1 var(--display);
+      }
+      aside.warn::after {
+        content: "!";
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 28px;
+      }
+
+      svg.pele {
+        --_bg: var(--parchment-hi);
+        --_fg: var(--ink);
+        --_m: var(--ink-soft);
+        --_l: var(--ink);
+        --_s: color-mix(in srgb, #d9933e 22%, transparent);
+        --_a: color-mix(in srgb, #5d8fb8 22%, transparent);
+        --_b: var(--frame);
+        --_c: var(--blood);
+        --_r: 6px;
+        color: var(--ink);
+        font:
+          16px "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "PingFang TC",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 2;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: none;
+        stroke-width: 2;
+      }
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: #d9933e;
+        opacity: 0.4;
+        filter: url(#wash);
+      }
+      svg.pele .pele-node > rect:not([rx]) {
+        rx: var(--_r);
+      }
+      main .render-note {
+        margin-top: 8px;
+        font: italic 400 15px/1.5 var(--flavour);
+        color: var(--blood);
+      }
+
+      /* the collector line along the bottom edge of the card */
+      .colophon {
+        margin-top: 48px;
+        padding-top: 12px;
+        border-top: 1px solid var(--hair);
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 6px 24px;
+        font: 400 13px/1.5 var(--mono);
+        color: var(--ink-soft);
+      }
+      .colophon b {
+        margin-right: 6px;
+        font: 700 11px/1.5 var(--display);
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink);
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .titlebar {
+          padding: 8px 12px 8px 16px;
+          border-radius: 14px;
+        }
+        .art {
+          height: 96px;
+          margin-inline: 6px;
+        }
+        .typeline {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 0;
+          margin-inline: 6px;
+        }
+        .typeline .set {
+          text-align: left;
+        }
+        main > section {
+          margin-top: 44px;
+        }
+        main h2 {
+          font-size: 21px;
+        }
+        .answer {
+          font-size: 20px;
+        }
+        .analogy {
+          font-size: 18px;
+        }
+        .takeaway {
+          padding: 40px 18px 22px;
+          font-size: 19px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 40px;
+        }
+        .cards {
+          grid-template-columns: minmax(0, 300px);
+          gap: 26px;
+        }
+        .card {
+          grid-row: auto;
+          grid-template-rows: auto;
+        }
+        .timeline {
+          --time-col: 50px;
+        }
+        .timeline > li {
+          column-gap: 36px;
+        }
+        .timeline time {
+          font-size: 13px;
+        }
+        .timeline b {
+          font-size: 17px;
+        }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
+      }
+      @media (max-width: 760px) {
+        body {
+          padding: 12px 10px 32px;
+        }
+        .sheet::before {
+          inset: 5px;
+          border-radius: 12px;
+        }
+        .sheet {
+          border-radius: 16px;
+          padding: 24px 18px 30px;
+          font-size: 17px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part,
+        .card,
+        .card.pick::before,
+        .card.pick .stats::after {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency=".04"
+            numOctaves="3"
+            seed="9"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="10" />
+          <feGaussianBlur stdDeviation=".5" />
+        </filter>
+      </defs>
+    </svg>
+    <article class="sheet">
+      <header class="titlebar">
+        <h1>{{title}}</h1>
+      </header>
+      <div class="art" aria-hidden="true"></div>
+      <p class="typeline">
+        <span>Explainer — {{project}}</span
+        ><time class="set">{{generatedAt}}</time>
+      </p>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <span><b>Set</b>{{project}}</span>
+        <span><b>Drawn by</b>a fork of this session</span>
+        <span><b>Printed</b>{{generatedAt}}</span>
+      </footer>
+    </article>
+    <script>
+      (() => {
+        if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        for (const card of document.querySelectorAll(".card")) {
+          let box, point, frame;
+          card.addEventListener("pointermove", (e) => {
+            point = e;
+            frame ||= requestAnimationFrame(() => {
+              frame = 0;
+              box ||= card.getBoundingClientRect();
+              const x = (point.clientX - box.left) / box.width;
+              const y = (point.clientY - box.top) / box.height;
+              card.classList.add("tilting");
+              card.style.setProperty("--rx", `${(y - 0.5) * 20}deg`);
+              card.style.setProperty("--ry", `${(0.5 - x) * 20}deg`);
+              card.style.setProperty("--mx", `${x * 100}%`);
+              card.style.setProperty("--my", `${y * 100}%`);
+            });
+          });
+          card.addEventListener("pointerleave", () => {
+            cancelAnimationFrame(frame);
+            frame = 0;
+            box = null;
+            card.classList.remove("tilting");
+            for (const name of ["--rx", "--ry", "--mx", "--my"])
+              card.style.removeProperty(name);
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>
