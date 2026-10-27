@@ -1,5 +1,21 @@
 # Changelog
 
+## [runes 0.13.0] - 2026-10-28
+
+_tracks tag `runes-v0.13.0`_
+
+### Added
+- The English teacher rune now shows a lesson card under the prompt on the desktop, with a smoking Clawd, the quip, the struck-out original over the rewrite, and the reason.
+- The minimap and Explain buttons now work on the Claude Code desktop app, using native buttons and a block-bar minimap.
+- The explain pane on desktop is polished with better text sizes, card backgrounds, hover highlights, a theme colour swatch for HTML entries, and a clearer message when a resumed session has nothing to fork yet.
+- Explain answers render through the desktop's native Markdown element instead of glow, so text answers display correctly there.
+
+### Changed
+- The desktop minimap is now a single compact block graphic that shrinks to fit, so it no longer pushes Clawd and the buttons out of the band; click-to-jump is no longer available on desktop.
+
+### Fixed
+- The desktop band no longer repeats the English teacher notice already shown in the lesson card.
+
 ## [dispatch 5.8.1] - 2026-10-28
 
 _tracks tag `dispatch-v5.8.1`_
