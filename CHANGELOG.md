@@ -1,5 +1,15 @@
 # Changelog
 
+## [runes 0.12.2] - 2026-10-27
+
+_tracks tag `runes-v0.12.2`_
+
+### Added
+- The explain pane's question box now grows with each line you type, up to 6 lines, so a multi-line question stays readable; a single line too long for the box still ends in "…".
+
+### Changed
+- The guide-map explain theme now shows asides and analogies as soft colour boards with a capsule label on the top edge, and uses rounded Chiron GoRound TC and Nunito fonts.
+
 ## [runes 0.12.1] - 2026-10-27
 
 _tracks tag `runes-v0.12.1`_
