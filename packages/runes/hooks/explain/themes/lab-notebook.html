@@ -1,0 +1,897 @@
+<!doctype html>
+<html lang="{{lang}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{title}}</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Caveat:wght@400..700&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/400"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/500"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/600"
+    />
+    <link
+      rel="stylesheet"
+      href="https://font.emtech.cc/css/IBMPlexSansTC/700"
+    />
+    <link rel="stylesheet" href="https://font.emtech.cc/css/Iansui/400" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      :root {
+        --paper: #e6f0da; /* --paper: engineering-pad green */
+        --paper-deep: #d8e6c9; /* --paper-deep: the pad's back board, header cells, table head */
+        --slip: #f7f9f1; /* --slip: printout taped onto the page: code and diffs */
+        --graphite: #1f2a23; /* --graphite: printed body text */
+        --pencil: #545e57; /* --pencil: handwritten asides, captions */
+        --print: #2d6a45; /* --print: the pad's own green printing: header labels, rules */
+        --rule: rgba(45, 106, 69, 0.32);
+        --redpen: #c0281c; /* --redpen: warnings, strikes, circled numbers */
+        --greenink: #17683a; /* --greenink: additions */
+        --grid-minor: rgba(45, 120, 75, 0.13);
+        --hand: "Caveat", "Iansui", cursive;
+        --mono:
+          "IBM Plex Mono", "IBMPlexSansTC", ui-monospace, Menlo, monospace;
+        --display:
+          "IBM Plex Sans Condensed", "IBMPlexSansTC", -apple-system, sans-serif;
+        color-scheme: light;
+      }
+      body {
+        background: #b9c9ad;
+        padding: 24px;
+      }
+      ::selection {
+        background: color-mix(in srgb, var(--redpen) 22%, transparent);
+        color: var(--graphite);
+      }
+      :focus-visible {
+        outline: 2px solid var(--redpen);
+        outline-offset: 3px;
+      }
+      .sheet {
+        container-type: inline-size;
+        position: relative;
+        max-width: 1280px;
+        margin: 0 auto;
+        background:
+          linear-gradient(var(--grid-minor) 1px, transparent 1px) 0 0 / 20px
+            20px,
+          linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px) 0 0 /
+            20px 20px,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .2 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .22 -.08'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23g)'/%3E%3C/svg%3E"),
+          var(--paper);
+        color: var(--graphite);
+        font:
+          18px/1.62 "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        font-kerning: normal;
+        padding: 0 96px 56px 132px;
+        box-shadow:
+          0 1px 2px rgba(20, 40, 25, 0.18),
+          0 12px 32px -12px rgba(20, 40, 25, 0.35);
+      }
+      /* the pad's printed margin: a double green rule down the left */
+      .sheet::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 96px;
+        width: 4px;
+        border-left: 1px solid var(--print);
+        border-right: 1px solid var(--print);
+        opacity: 0.55;
+        pointer-events: none;
+      }
+
+      /* the printed header strip, filled in by hand */
+      .masthead {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr auto;
+        margin: 0 -96px 44px -132px;
+        padding: 0 96px 0 132px;
+        border-bottom: 2px solid var(--print);
+        background: color-mix(in srgb, var(--paper-deep) 70%, transparent);
+      }
+      .masthead > div {
+        padding: 12px 16px 8px;
+        border-right: 1px solid var(--rule);
+        min-width: 0;
+      }
+      .masthead > div:first-child {
+        padding-left: 0;
+      }
+      .masthead > div:last-child {
+        border-right: 0;
+      }
+      .masthead small,
+      .colophon small {
+        display: block;
+        font: 600 11px/1.3 var(--display);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--print);
+      }
+      .masthead span,
+      .masthead time {
+        display: block;
+        font: 400 26px/1.15 var(--hand);
+        color: var(--graphite);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sheet > h1 {
+        font-family: var(--display);
+        font-size: clamp(30px, 4cqi, 48px);
+        line-height: 1.16;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        max-width: 22ch;
+        margin-bottom: 24px;
+        text-wrap: balance;
+      }
+      main > * + * {
+        margin-top: 22px;
+      }
+      main p,
+      main li,
+      main dd {
+        max-width: 64ch;
+      }
+      main h2 {
+        font-family: var(--display);
+        font-size: 26px;
+        line-height: 1.25;
+        font-weight: 700;
+        display: table;
+        margin: 0 0 16px;
+        padding: 0 18px 12px 0;
+        text-wrap: balance;
+        /* underlined by hand: one stroke out, a lighter one back */
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 12' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%231f2a23' stroke-linecap='round' vector-effect='non-scaling-stroke'%3E%3Cpath d='M1 6.5C20 4.2 45 7.4 70 5.2 84 4.2 93 5 99 4' stroke-width='2' vector-effect='non-scaling-stroke'/%3E%3Cpath d='M6 9.6C30 7.8 60 10 96 7.6' stroke-width='1.2' opacity='.55' vector-effect='non-scaling-stroke'/%3E%3C/g%3E%3C/svg%3E")
+          0 100% / 100% 12px no-repeat;
+      }
+      main h3 {
+        font-family: var(--display);
+        font-weight: 600;
+      }
+      main a {
+        color: var(--redpen);
+        text-underline-offset: 3px;
+      }
+      main code {
+        font: 0.86em var(--mono);
+        color: var(--graphite);
+        background: color-mix(in srgb, var(--slip) 80%, transparent);
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+
+      .answer {
+        font-size: 23px;
+        line-height: 1.5;
+        font-weight: 500;
+        max-width: 46ch;
+      }
+      /* the result is boxed twice, the way a worked problem boxes its answer */
+      .takeaway {
+        max-width: 52ch;
+        padding: 26px 32px;
+        /* each box is four separate strokes that overshoot at the corners; the inner one sits 6px in */
+        background:
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M2.5 4.6C30 3.4 64 5 97 3.6M95.8 1.8C96.6 30 95.4 68 96.4 98.2M98.4 95.8C66 96.8 32 95 1.6 96.2M3.6 98.6C2.6 66 4 32 3 1.6' fill='none' stroke='%231f2a23' stroke-width='1.5' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+            center / calc(100% - 12px) calc(100% - 12px) no-repeat,
+          url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M1 2.4C34 1.2 70 2.8 99 1.4M98.2 0.4C99.2 34 97.8 70 98.8 99.4M99.6 98.4C64 97.2 30 99 0.6 97.8M1.8 99.6C0.8 64 2.2 30 1.2 0.6' fill='none' stroke='%231f2a23' stroke-width='1.6' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+            0 0 / 100% 100% no-repeat;
+        font-weight: 600;
+        margin-top: 64px !important;
+      }
+      .analogy {
+        max-width: 52ch;
+        padding: 16px 22px;
+        background: color-mix(in srgb, var(--paper-deep) 60%, transparent);
+        border: 1px solid var(--rule);
+      }
+      .analogy::before,
+      .takeaway::before,
+      aside.note::before,
+      aside.warn::before {
+        display: block;
+        margin-bottom: 4px;
+        font: 600 24px/1.1 var(--hand);
+      }
+      .analogy::before {
+        content: "think of it like this —";
+        color: var(--pencil);
+      }
+      .takeaway::before {
+        content: "∴ take this with you";
+        color: var(--graphite);
+      }
+
+      main > section {
+        margin-top: 72px;
+      }
+      .spread {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+        gap: 56px;
+        align-items: start;
+      }
+      .spread > .plate {
+        position: sticky;
+        top: 24px;
+      }
+      .spread > .text > * + *,
+      main > section:not(.spread) > * + * {
+        margin-top: 18px;
+      }
+      .plate {
+        padding: 20px;
+        border: 1px solid var(--rule);
+        background: color-mix(in srgb, var(--paper) 55%, transparent);
+      }
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        overflow: visible;
+      }
+      .plate figcaption {
+        font: 400 22px/1.3 var(--hand);
+        color: var(--pencil);
+        margin-top: 12px;
+        max-width: 52ch;
+      }
+
+      .parts {
+        display: grid;
+        gap: 4px;
+      }
+      .parts > div {
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        gap: 10px;
+        padding: 8px 10px 8px 6px;
+        border-radius: 3px;
+        transition: background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .parts dt {
+        align-self: start;
+        display: grid;
+        place-items: center;
+        width: 30px;
+        height: 30px;
+        margin-top: -1px;
+        font: 700 22px/1 var(--hand);
+        color: var(--redpen);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath d='M16 3.2C9 2.4 3.4 7 3.3 14.6c-.1 7.2 5 12.3 11.9 12.1 7-.2 11.8-5.6 11.5-12.4C26.4 8 21.6 3.6 14 3.9' fill='none' stroke='%23c0281c' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E")
+          center / 100% 100% no-repeat;
+      }
+      .parts dd b {
+        display: block;
+      }
+      .parts > div:hover {
+        background: color-mix(in srgb, var(--redpen) 7%, transparent);
+      }
+      .plate .part {
+        transition: opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      section:has(.parts > [data-part]:hover) .plate .part {
+        opacity: 0.18;
+      }
+      section:has(.parts > [data-part="a"]:hover) .plate .part[data-part="a"],
+      section:has(.parts > [data-part="b"]:hover) .plate .part[data-part="b"],
+      section:has(.parts > [data-part="c"]:hover) .plate .part[data-part="c"],
+      section:has(.parts > [data-part="d"]:hover) .plate .part[data-part="d"],
+      section:has(.parts > [data-part="e"]:hover) .plate .part[data-part="e"],
+      section:has(.parts > [data-part="f"]:hover) .plate .part[data-part="f"] {
+        opacity: 1;
+      }
+
+      /* steps are numbered by hand, each number ringed in pencil */
+      .steps {
+        list-style: none;
+        padding: 0;
+        counter-reset: step;
+        display: grid;
+        gap: 18px;
+      }
+      .steps > li {
+        counter-increment: step;
+        position: relative;
+        padding-left: 52px;
+      }
+      .steps > li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -3px;
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        font: 700 24px/1 var(--hand);
+        color: var(--graphite);
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath d='M16 3.2C9 2.4 3.4 7 3.3 14.6c-.1 7.2 5 12.3 11.9 12.1 7-.2 11.8-5.6 11.5-12.4C26.4 8 21.6 3.6 14 3.9' fill='none' stroke='%23545e57' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")
+          center / 100% 100% no-repeat;
+      }
+
+      .compare {
+        display: grid;
+        grid-template-columns: 1fr 64px 1fr;
+        align-items: center;
+      }
+      .compare > div {
+        padding: 18px 22px;
+        align-self: stretch;
+        background: color-mix(in srgb, var(--paper-deep) 60%, transparent);
+        border: 1px solid var(--rule);
+      }
+      .compare > div > * + * {
+        margin-top: 10px;
+      }
+      .compare h3 {
+        font: 700 24px/1.15 var(--hand);
+        color: var(--print);
+        margin-bottom: 4px;
+      }
+      .compare::after {
+        content: "";
+        grid-column: 2;
+        grid-row: 1;
+        height: 22px;
+        background: var(--graphite);
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 22'%3E%3Cpath d='M5 12.5C18 10.5 34 11.8 56 10.6M46 4.5C50 7 53.5 9 57.5 10.6 53 12.6 49.5 15 46.5 18' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+      }
+      .compare > div:last-child {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      .timeline {
+        list-style: none;
+        padding: 0 0 0 40px;
+        position: relative;
+        display: grid;
+        gap: 26px;
+      }
+      .timeline::before {
+        content: "";
+        position: absolute;
+        left: 11px;
+        top: 10px;
+        bottom: 10px;
+        border-left: 1.5px solid var(--pencil);
+      }
+      .timeline > li {
+        position: relative;
+      }
+      .timeline > li::before {
+        content: "";
+        position: absolute;
+        left: -35px;
+        top: 7px;
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: var(--paper);
+        border: 2px solid var(--graphite);
+      }
+      .timeline time {
+        display: block;
+        font: 600 23px/1.2 var(--hand);
+        color: var(--redpen);
+      }
+      .timeline b {
+        display: block;
+        font-size: 19px;
+      }
+
+      /* SVG vocabulary the fork draws with: graphite lines, red pen accent, pencil hatching */
+      .plate .ink {
+        fill: none;
+        stroke: var(--graphite);
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: url(#pen);
+      }
+      .plate .ink-accent {
+        fill: none;
+        stroke: var(--redpen);
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        filter: url(#pen);
+      }
+      .plate .dash {
+        stroke-dasharray: 7 5;
+      }
+      .plate .wash-warm,
+      .plate .wash-cool,
+      .plate .wash-sage {
+        stroke: none;
+        filter: url(#wash);
+      }
+      .plate .wash-warm {
+        fill: url(#hatch-warm);
+      }
+      .plate .wash-cool {
+        fill: url(#hatch-cool);
+      }
+      .plate .wash-sage {
+        fill: url(#hatch-sage);
+      }
+      .plate .label {
+        fill: var(--graphite);
+        font-size: 16px;
+        font-family: inherit;
+      }
+      .plate .label-soft {
+        fill: var(--pencil);
+        font-size: 14px;
+        font-family: inherit;
+      }
+      .hatch-warm path {
+        stroke: var(--redpen);
+        stroke-width: 1.1;
+        opacity: 0.5;
+      }
+      .hatch-cool path {
+        stroke: var(--graphite);
+        stroke-width: 0.9;
+        opacity: 0.4;
+      }
+      .hatch-sage path {
+        stroke: var(--greenink);
+        stroke-width: 0.9;
+        opacity: 0.45;
+      }
+
+      main,
+      main .code,
+      main .diff,
+      main .table {
+        scrollbar-color: var(--print) var(--paper-deep);
+      }
+
+      /* code and diffs are printouts taped onto the page */
+      main .code,
+      main .diff {
+        position: relative;
+        padding: 36px 0 16px;
+        max-width: 100%;
+        overflow-x: auto;
+        font: 14px/1.65 var(--mono);
+        tab-size: 2;
+        background: var(--slip);
+        box-shadow:
+          0 1px 1px rgba(20, 40, 25, 0.12),
+          0 6px 14px -8px rgba(20, 40, 25, 0.35);
+      }
+      main .plate > .code {
+        box-shadow: none;
+      }
+      main .code > code,
+      main .diff > code {
+        display: block;
+        width: max-content;
+        min-width: 100%;
+        padding: 0 24px;
+        font: inherit;
+        background: none;
+        border-radius: 0;
+      }
+      main .code::before,
+      main .diff::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 6px;
+        left: 20px;
+        font: 600 22px/1 var(--hand);
+        color: var(--pencil);
+      }
+      main .diff::before {
+        content: "before → after";
+      }
+      /* a strip of tape over the top edge */
+      main .code::after,
+      main .diff::after {
+        content: "";
+        position: absolute;
+        top: -9px;
+        right: 48px;
+        width: 92px;
+        height: 22px;
+        background: rgba(236, 226, 170, 0.62);
+        transform: rotate(2.5deg);
+        box-shadow: 0 1px 2px rgba(20, 40, 25, 0.12);
+      }
+      main .diff span {
+        display: block;
+        padding: 0 24px 0 34px;
+        margin: 0 -24px;
+        position: relative;
+      }
+      main .diff span::before {
+        position: absolute;
+        left: 12px;
+        top: -2px;
+        font: 700 20px/1.3 var(--hand);
+      }
+      main .diff .del {
+        color: #5d6660;
+        text-decoration: line-through;
+        text-decoration-color: var(--redpen);
+        text-decoration-thickness: 2px;
+      }
+      main .diff .del::before {
+        content: "−";
+        color: var(--redpen);
+      }
+      main .diff .add {
+        color: var(--greenink);
+        background: color-mix(in srgb, var(--greenink) 8%, transparent);
+      }
+      main .diff .add::before {
+        content: "+";
+        color: var(--greenink);
+      }
+
+      main .table {
+        overflow-x: auto;
+      }
+      main table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+        border-top: 2px solid var(--print);
+        border-bottom: 2px solid var(--print);
+        background: color-mix(in srgb, var(--paper-deep) 55%, transparent);
+      }
+      main caption {
+        text-align: left;
+        font: 400 22px/1.3 var(--hand);
+        color: var(--pencil);
+        padding-bottom: 4px;
+      }
+      main th,
+      main td {
+        text-align: left;
+        vertical-align: top;
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--rule);
+      }
+      main th {
+        font: 600 12px/1.4 var(--display);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--print);
+        background: color-mix(in srgb, var(--paper-deep) 70%, transparent);
+        border-bottom: 1.5px solid var(--print);
+        white-space: nowrap;
+      }
+      main :is(th, td).num {
+        text-align: right;
+        font-family: var(--mono);
+      }
+
+      /* asides are pencil notes in the hand, held by a bracket */
+      aside.note,
+      aside.warn {
+        position: relative;
+        max-width: 52ch;
+        font: 400 24px/1.3 var(--hand);
+      }
+      aside.note {
+        padding: 4px 0 4px 26px;
+        color: var(--pencil);
+      }
+      aside.note::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 4px;
+        bottom: 4px;
+        width: 10px;
+        border: 1.5px solid var(--pencil);
+        border-right: 0;
+        border-radius: 8px 0 0 8px;
+      }
+      aside.note::before {
+        content: "note —";
+      }
+      /* a warning is ringed in red pen */
+      aside.warn {
+        color: var(--redpen);
+        padding: 36px 10% 36px 9%;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M55 3.5C30 2 6 9 3 40c-3 31 20 57 50 56.5C84 96 98 76 97 48 96 18 74 3 44 6.5' fill='none' stroke='%23c0281c' stroke-width='1.8' stroke-linecap='round' vector-effect='non-scaling-stroke'/%3E%3C/svg%3E")
+          center / 100% 100% no-repeat;
+      }
+      aside.warn::before {
+        content: "! careful";
+        font-weight: 700;
+      }
+      aside:is(.note, .warn) code {
+        font-size: 0.68em;
+        white-space: nowrap;
+      }
+      main aside:is(.note, .warn):not(:first-child) {
+        margin-top: 32px;
+      }
+
+      svg.pele {
+        --_bg: var(--paper);
+        --_fg: var(--graphite);
+        --_m: var(--pencil);
+        --_l: var(--graphite);
+        --_s: transparent;
+        --_a: transparent;
+        --_b: var(--graphite);
+        --_c: var(--redpen);
+        --_r: 3px;
+        color: var(--graphite);
+        font:
+          16px "IBMPlexSansTC",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Hiragino Sans",
+          "PingFang TC",
+          "Helvetica Neue",
+          sans-serif;
+        display: block;
+        width: auto;
+        max-width: 100%;
+        height: auto;
+        margin-inline: auto;
+        overflow: visible;
+      }
+      svg.pele .pele-edges {
+        filter: url(#pen);
+      }
+      svg.pele .pele-edges path:not(.pele-marker) {
+        stroke-width: 1.5;
+      }
+      svg.pele .pele-node > :is(rect, polygon, circle, ellipse, path) {
+        fill: var(--paper);
+        stroke-width: 1.5;
+        filter: url(#pen);
+      }
+      /* pele's wash copy becomes pencil hatching under the box */
+      svg.pele .pele-node > .wash {
+        stroke: none;
+        fill: url(#hatch-cool);
+        filter: url(#wash);
+        transform: translate(4px, 4px);
+      }
+      main .render-note {
+        font: 400 22px/1.3 var(--hand);
+        color: var(--redpen);
+        margin-top: 8px;
+      }
+
+      /* the colophon is the pad's footer strip, filled in by hand */
+      .colophon {
+        margin: 80px -96px -56px -132px;
+        padding: 0 96px 0 132px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, auto));
+        justify-content: start;
+        border-top: 2px solid var(--print);
+        background: color-mix(in srgb, var(--paper-deep) 70%, transparent);
+        font: 400 23px/1.2 var(--hand);
+      }
+      .colophon > div {
+        padding: 12px 22px 10px;
+        border-right: 1px solid var(--rule);
+        min-width: 0;
+      }
+      .colophon > div:first-child {
+        padding-left: 0;
+      }
+      .colophon > div:last-child {
+        border-right: 0;
+      }
+
+      @container (max-width: 760px) {
+        .plate .label {
+          font-size: 24px;
+        }
+        .plate .label-soft {
+          font-size: 21px;
+        }
+        .spread {
+          grid-template-columns: 1fr;
+          gap: 24px;
+        }
+        .spread > .plate {
+          position: static;
+        }
+        .plate {
+          padding: 12px;
+        }
+        .compare {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare::after {
+          grid-column: 1;
+          grid-row: 2;
+          transform: rotate(90deg);
+          height: 18px;
+          width: 44px;
+          justify-self: center;
+        }
+        .compare > div:last-child {
+          grid-column: 1;
+          grid-row: 3;
+        }
+        .answer {
+          font-size: 20px;
+        }
+        aside.warn {
+          padding: 44px 15% 44px 14%;
+        }
+        main h2 {
+          font-size: 22px;
+        }
+        main > section {
+          margin-top: 52px;
+        }
+        .plate:has(> svg.pele) {
+          overflow-x: auto;
+        }
+        svg.pele {
+          max-width: none;
+          margin-inline: 0;
+        }
+      }
+      @media (max-width: 760px) {
+        body {
+          padding: 0;
+        }
+        .sheet {
+          padding: 0 22px 36px 44px;
+        }
+        .sheet::before {
+          left: 28px;
+        }
+        .masthead,
+        .colophon {
+          margin-left: -44px;
+          margin-right: -22px;
+          padding-left: 44px;
+          padding-right: 22px;
+        }
+        .masthead {
+          grid-template-columns: 1fr auto;
+        }
+        .masthead > div:first-child {
+          grid-column: 1 / -1;
+          border-right: 0;
+          border-bottom: 1px solid var(--rule);
+        }
+        .masthead > div:nth-child(2) {
+          padding-left: 0;
+        }
+        .colophon {
+          margin-bottom: -36px;
+          grid-template-columns: 1fr 1fr;
+        }
+        .colophon > div {
+          padding-left: 0;
+          border-right: 0;
+        }
+        .colophon > div:first-child {
+          grid-column: 1 / -1;
+        }
+        .colophon > div:nth-child(-n + 3) {
+          border-bottom: 1px solid var(--rule);
+        }
+        .colophon > div:nth-child(2) {
+          border-right: 1px solid var(--rule);
+        }
+        .colophon > div:nth-child(3) {
+          padding-left: 16px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .parts > div,
+        .plate .part {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <filter id="wash" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.9"
+            numOctaves="1"
+            seed="3"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="2.4" />
+        </filter>
+        <filter id="pen" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.035"
+            numOctaves="2"
+            seed="7"
+          />
+          <feDisplacementMap in="SourceGraphic" scale="1.8" />
+        </filter>
+        <pattern
+          id="hatch-warm"
+          class="hatch-warm"
+          width="6"
+          height="6"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(40)"
+        >
+          <path d="M0 0V6" />
+        </pattern>
+        <pattern
+          id="hatch-cool"
+          class="hatch-cool"
+          width="6"
+          height="6"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(-50)"
+        >
+          <path d="M0 0V6" />
+        </pattern>
+        <pattern
+          id="hatch-sage"
+          class="hatch-sage"
+          width="7"
+          height="7"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <path d="M0 0V7M0 0H7" />
+        </pattern>
+      </defs>
+    </svg>
+    <article class="sheet">
+      <header class="masthead">
+        <div><small>Project</small><span>{{project}}</span></div>
+        <div><small>Date</small><time>{{generatedAt}}</time></div>
+        <div><small>Sheet No.</small><span>1 of 1</span></div>
+      </header>
+      <h1>{{title}}</h1>
+      <main>{{main}}</main>
+      <footer class="colophon">
+        <div><small>Subject</small>{{title}}</div>
+        <div><small>Project</small>{{project}}</div>
+        <div><small>Worked by</small>a fork of this session</div>
+        <div><small>Checked</small>—</div>
+      </footer>
+    </article>
+  </body>
+</html>

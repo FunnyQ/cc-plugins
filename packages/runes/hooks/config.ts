@@ -17,7 +17,7 @@ export const RUNES = [
 ] as const;
 export type Rune = (typeof RUNES)[number];
 export type Side = "left" | "right";
-export const THEMES = ["picture-book", "blueprint"] as const;
+export const THEMES = ["picture-book", "blueprint", "lab-notebook"] as const;
 export type Theme = (typeof THEMES)[number];
 
 type Config = {

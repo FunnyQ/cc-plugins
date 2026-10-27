@@ -190,5 +190,6 @@ test("writeExplainer reads the template of the theme it is given", async () => {
 test("pickTheme keeps a named theme and draws one for random", () => {
   expect(pickTheme("blueprint", () => 0)).toBe("blueprint");
   expect(pickTheme("random", () => 0)).toBe("picture-book");
-  expect(pickTheme("random", () => 0.99)).toBe("blueprint");
+  expect(pickTheme("random", () => 0.5)).toBe("blueprint");
+  expect(pickTheme("random", () => 0.99)).toBe("lab-notebook");
 });
