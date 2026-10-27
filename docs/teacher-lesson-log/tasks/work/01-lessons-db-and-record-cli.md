@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: work/02, work/03
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -146,21 +146,21 @@ runes' `tsconfig.json` loads only mod types, so `bun:sqlite` and `Bun` in these 
 
 ## Acceptance criteria
 
-- [ ] `attempt.ts` exports `ENGLISH = 0.7`, `IMPROVE = 0.6`, `OUTCOMES` in the order `jev-failed, gated, no-reply, empty, same, not-rewrite, shown`, `VERDICTS` in the order `good, bad-model, bad-prompt, bad-gate`, and the types `Outcome`, `Attempt`, `AttemptRow`, `Verdict` with exactly the `schema.md` fields. It imports nothing.
-- [ ] `lessons-db.ts` imports only `bun:sqlite`, `node:fs`, `node:path`, `./attempt`. `lessons-cli.ts` imports only `./lessons-db` and `./attempt`.
-- [ ] Opening a file with `user_version = 2` throws `lessons.db schema v2 is newer than this runes build` and leaves its journal mode `delete`.
-- [ ] Two `record` children started together on a fresh file leave 2 rows, in each of 20 rounds.
-- [ ] `record` exits 0 on a valid row. It exits 1 on bad JSON, a bad row, or an empty `HOME`, and 2 on a missing or unknown subcommand, with the stderr texts above.
-- [ ] `grep -rlE "bun:test|bun:sqlite" packages/runes --include='*.test.ts' --include='*.test.tsx'` prints nothing.
-- [ ] `teacher.ts` and `register.tsx` are unchanged: `git diff --quiet -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx`.
+- [x] `attempt.ts` exports `ENGLISH = 0.7`, `IMPROVE = 0.6`, `OUTCOMES` in the order `jev-failed, gated, no-reply, empty, same, not-rewrite, shown`, `VERDICTS` in the order `good, bad-model, bad-prompt, bad-gate`, and the types `Outcome`, `Attempt`, `AttemptRow`, `Verdict` with exactly the `schema.md` fields. It imports nothing.
+- [x] `lessons-db.ts` imports only `bun:sqlite`, `node:fs`, `node:path`, `./attempt`. `lessons-cli.ts` imports only `./lessons-db` and `./attempt`.
+- [x] Opening a file with `user_version = 2` throws `lessons.db schema v2 is newer than this runes build` and leaves its journal mode `delete`.
+- [x] Two `record` children started together on a fresh file leave 2 rows, in each of 20 rounds.
+- [x] `record` exits 0 on a valid row. It exits 1 on bad JSON, a bad row, or an empty `HOME`, and 2 on a missing or unknown subcommand, with the stderr texts above.
+- [x] `grep -rlE "bun:test|bun:sqlite" packages/runes --include='*.test.ts' --include='*.test.tsx'` prints nothing.
+- [x] `teacher.ts` and `register.tsx` are unchanged: `git diff --quiet -- packages/runes/hooks/teacher/teacher.ts packages/runes/hooks/register.tsx`.
 
 ## Verification
 
-- [ ] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` passes with 0 failures.
-- [ ] `h=$(mktemp -d); echo '{"prompt":"can you checking the logs","english":0.92,"improve":0.81,"englishMin":0.7,"improveMin":0.6,"outcome":"shown","better":"can you check the logs","quip":"verbs, not gerunds","system":"You are Clawd.","at":"2026-10-27T10:00:00.000Z","project":"cc-plugins","session":"abc123","model":"haiku","effort":"low"}' | HOME=$h bun packages/runes/hooks/teacher/lessons-cli.ts record && sqlite3 $h/.local/share/q-lab/runes/teacher/lessons.db 'select outcome from attempts'; rm -rf "$h"` prints `shown`.
-- [ ] `bun packages/runes/hooks/teacher/lessons-cli.ts; echo $?` prints the usage line and `2`.
-- [ ] `claude plugin test packages/runes` still reports 373 pass, 0 fail.
-- [ ] `claude plugin validate packages/runes` passes.
+- [x] `(cd packages/runes/hooks/teacher && bun test ./lessons-db.spec.ts)` passes with 0 failures.
+- [x] `h=$(mktemp -d); echo '{"prompt":"can you checking the logs","english":0.92,"improve":0.81,"englishMin":0.7,"improveMin":0.6,"outcome":"shown","better":"can you check the logs","quip":"verbs, not gerunds","system":"You are Clawd.","at":"2026-10-27T10:00:00.000Z","project":"cc-plugins","session":"abc123","model":"haiku","effort":"low"}' | HOME=$h bun packages/runes/hooks/teacher/lessons-cli.ts record && sqlite3 $h/.local/share/q-lab/runes/teacher/lessons.db 'select outcome from attempts'; rm -rf "$h"` prints `shown`.
+- [x] `bun packages/runes/hooks/teacher/lessons-cli.ts; echo $?` prints the usage line and `2`.
+- [x] `claude plugin test packages/runes` still reports 373 pass, 0 fail.
+- [x] `claude plugin validate packages/runes` passes.
 
 ## Eval rubric
 
