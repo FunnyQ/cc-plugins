@@ -25,6 +25,11 @@ const attr = (attrs: string, pattern: RegExp): string | undefined => {
 const hasClass = (attrs: string, name: string): boolean =>
   (attr(attrs, CLASS_ATTR) ?? "").split(/\s+/).includes(name);
 
+export const holdsClass = (html: string, tag: string, name: string): boolean =>
+  [...html.matchAll(new RegExp(`<${tag}\\b${ATTRS}>`, "gi"))].some(
+    ([, attrs]) => hasClass(attrs!, name),
+  );
+
 const ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -110,30 +115,36 @@ const diffBlock = (before: string, after: string): string => {
 // the cleaner's regexes read text as well as tags, so raw-text blocks leave before it runs and come back after
 export function prepareBlocks(main: string): {
   main: string;
+  kinds: Set<"diff" | "mermaid" | "code">;
   splice: (cleaned: string) => string;
 } {
   // grown until the fragment cannot already hold it, so text the fork wrote never reads as a placeholder
   let tag = "runes-block";
   while (main.includes(tag)) tag += "-";
   const blocks: string[] = [];
-  const hold = (html: string) => `<!--${tag}:${blocks.push(html) - 1}-->`;
+  const kinds = new Set<"diff" | "mermaid" | "code">();
+  const hold = (kind: "diff" | "mermaid" | "code", html: string) => {
+    kinds.add(kind);
+    return `<!--${tag}:${blocks.push(html) - 1}-->`;
+  };
   const lifted = main
     .replace(DIFF, (whole, figure, beforeAttrs, before, afterAttrs, after) =>
       hasClass(figure, "diff") &&
       hasClass(beforeAttrs, "before") &&
       hasClass(afterAttrs, "after")
-        ? hold(diffBlock(sourceOf(before), sourceOf(after)))
+        ? hold("diff", diffBlock(sourceOf(before), sourceOf(after)))
         : whole,
     )
     .replace(PRE, (whole, attrs: string, inner: string) => {
       if (hasClass(attrs, "mermaid"))
-        return hold(diagramFallback(sourceOf(inner)));
+        return hold("mermaid", diagramFallback(sourceOf(inner)));
       if (hasClass(attrs, "code"))
-        return hold(codeBlock(attr(attrs, LANG_ATTR) ?? "", sourceOf(inner)));
+        return hold("code", codeBlock(attr(attrs, LANG_ATTR) ?? "", sourceOf(inner)));
       return whole;
     });
   return {
     main: lifted,
+    kinds,
     splice: (cleaned) =>
       cleaned.replace(
         new RegExp(`<!--${tag}:(\\d+)-->`, "g"),

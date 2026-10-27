@@ -1,3 +1,5 @@
+import { THEMES, type Theme } from "../config";
+
 export type Ask =
   | { kind: "press" }
   | { kind: "pick"; topic: string }
@@ -10,7 +12,13 @@ export type Ask =
 
 export type Reply =
   | { kind: "text"; title: string; body: string }
-  | { kind: "html"; title: string; summary: string; main: string }
+  | {
+      kind: "html";
+      title: string;
+      summary: string;
+      main: string;
+      theme?: Theme;
+    }
   | { kind: "ask"; title: string; question: string; options: string[] };
 
 const MAX_TITLE = 60;
@@ -32,11 +40,22 @@ export const FRAGMENT_RULES = [
   "Inside every <pre>, write raw text exactly as it reads: no tags, no <code>, and no escapes, with one exception: write a closing pre tag inside the text as &lt;/pre&gt;. The page escapes the rest.",
 ].join("\n");
 
+export const THEME_FIT: Record<Theme, string> = {
+  "picture-book":
+    "A warm, general explanation for a newcomer: what something is or why it works, told simply, ELI5",
+  blueprint:
+    "Structure and architecture: components, modules, data flow, how the parts of a system connect",
+  "lab-notebook":
+    "Debugging and investigation: a bug hunt, a failing test, a root cause, a fix shown as a before and after",
+  editorial:
+    "A recap or a story over time: what happened in a session, a timeline, the history of a change",
+};
+
 const GRAMMAR = [
   "<mode>text|html|ask</mode>",
   `<title>a headline, at most ${MAX_TITLE} characters</title>`,
   "text → <body>markdown</body>",
-  "html → <summary>a short markdown summary, read in a narrow side pane above the page's link</summary><main>an HTML fragment</main>",
+  `html → <theme>the theme whose fit matches the page best</theme><summary>a short markdown summary, read in a narrow side pane above the page's link</summary><main>an HTML fragment</main>, where the themes are:\n${THEMES.map((t) => `  ${t}: ${THEME_FIT[t]}`).join("\n")}`,
   `ask  → <question>one line</question><option>a topic</option> … ${MIN_OPTIONS} to ${MAX_OPTIONS} options`,
 ].join("\n");
 
@@ -139,7 +158,9 @@ export const parseReply = (raw: string): Reply => {
     case "html": {
       const summary = tag(raw, "summary");
       const main = tag(raw, "main");
-      if (summary && main) return { kind: "html", title, summary, main };
+      const theme = THEMES.find((t) => t === tag(raw, "theme"));
+      if (summary && main)
+        return { kind: "html", title, summary, main, ...(theme && { theme }) };
       return summary ? { kind: "text", title, body: summary } : fallback;
     }
     case "ask": {

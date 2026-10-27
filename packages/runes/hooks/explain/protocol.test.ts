@@ -1,5 +1,7 @@
 import { expect, test } from "claude-code/testing";
 
+import { THEMES } from "../config";
+
 import {
   BRIEF_AXES,
   buildPrompt,
@@ -159,6 +161,31 @@ test("rule 7: html with summary and main", () => {
       "<mode>html</mode><title>T</title><summary>S</summary><main>\n<p>M</p>\n</main>",
     ),
   ).toEqual({ kind: "html", title: "T", summary: "S", main: "<p>M</p>" });
+});
+
+test("an html reply carries the theme the fork picked, and drops one that names no theme", () => {
+  expect(
+    parseReply(
+      "<mode>html</mode><title>T</title><theme> editorial </theme><summary>S</summary><main><p>M</p></main>",
+    ),
+  ).toEqual({
+    kind: "html",
+    title: "T",
+    summary: "S",
+    main: "<p>M</p>",
+    theme: "editorial",
+  });
+  expect(
+    parseReply(
+      "<mode>html</mode><title>T</title><theme>neon</theme><summary>S</summary><main><p>M</p></main>",
+    ),
+  ).toEqual({ kind: "html", title: "T", summary: "S", main: "<p>M</p>" });
+});
+
+test("the grammar asks for a theme and names each one's fit", () => {
+  const prompt = buildPrompt({ kind: "press" });
+  for (const theme of THEMES) expect(prompt).toContain(`${theme}: `);
+  expect(prompt).toContain("<theme>");
 });
 
 test("rule 8: html without main degrades to text with the summary", () => {

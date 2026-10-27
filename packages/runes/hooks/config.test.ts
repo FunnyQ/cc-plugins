@@ -218,29 +218,49 @@ test("a section left empty gets its switch back, and never throws", () => {
 
 test("upgrade gives an explain block written before themes its theme line, under the switch", () => {
   const full = TEMPLATE(DEFAULTS.enabled);
-  const themeLine = full.split("\n").find((l) => l.includes("# theme:"))!;
-  const old = full.replace(`${themeLine}\n`, "");
+  const lines = full.split("\n");
+  const at = lines.findIndex((l) => l.includes("# theme:"));
+  const old = lines.filter((_, i) => i !== at && i !== at + 1).join("\n");
+  expect(lines[at + 1]).toContain("# auto asks TypeSafe's Jev");
   expect(upgrade(old, CURRENT())).toBe(full);
 });
 
 test("upgrade refreshes a stale theme list and keeps the chosen theme", () => {
-  const list = "random | picture-book | blueprint | lab-notebook | editorial";
+  const list =
+    "auto | random | picture-book | blueprint | lab-notebook | editorial";
   const full = TEMPLATE(DEFAULTS.enabled);
+  expect(upgrade(full, CURRENT())).toBe(full);
   const stale = full.replace(list, "random | picture-book | blueprint");
   expect(upgrade(stale, CURRENT())).toBe(full);
-  const chosen = full.replace(
-    "  # theme: random   #",
-    "  theme: blueprint   #",
+  const older = full.replace(
+    `  # theme: auto   # ${list}`,
+    "  # theme: random   # random | picture-book | blueprint",
   );
+  expect(upgrade(older, CURRENT())).toBe(full);
+  const chosen = full.replace("  # theme: auto   #", "  theme: random   #");
   expect(
     upgrade(chosen.replace(list, "random | picture-book"), CURRENT()),
   ).toBe(chosen);
+  const named = full.replace("  # theme: auto   #", "  theme: blueprint   #");
+  expect(upgrade(named.replace(list, "random"), CURRENT())).toBe(named);
+});
+
+test("upgrade adds the privacy line under a theme line that lacks it, once", () => {
+  const full = TEMPLATE(DEFAULTS.enabled);
+  const lines = full.split("\n");
+  const at = lines.findIndex((l) => l.includes("# theme:"));
+  const bare = lines.filter((_, i) => i !== at + 1).join("\n");
+  expect(upgrade(bare, CURRENT())).toBe(full);
+  const named = bare.replace("  # theme: auto   #", "  theme: editorial   #");
+  expect(upgrade(upgrade(named, CURRENT()), CURRENT())).toBe(
+    full.replace("  # theme: auto   #", "  theme: editorial   #"),
+  );
 });
 
 test("upgrade leaves a theme line with a note of its own alone", () => {
   const full = TEMPLATE(DEFAULTS.enabled);
   const own = full.replace(
-    /  # theme: random {3}# .*\n/,
+    /  # theme: auto {3}# .*\n/,
     "  theme: editorial   # the newspaper one\n",
   );
   expect(upgrade(own, CURRENT())).toBe(own);
@@ -352,21 +372,24 @@ test("explain is on by default and its switch sits at the top level after teache
   expect(t.indexOf("\nexplain:")).toBeGreaterThan(t.indexOf("\nteacher:"));
 });
 
-test("explain.theme defaults to random, takes a theme name, and an invalid one falls back alone", () => {
-  expect(DEFAULTS.explain.theme).toBe("random");
+test("explain.theme defaults to auto, takes random or a theme name, and an invalid one falls back alone", () => {
+  expect(DEFAULTS.explain.theme).toBe("auto");
+  expect(normalize({ explain: { theme: "random" } }).config.explain.theme).toBe(
+    "random",
+  );
   expect(
     normalize({ explain: { theme: "blueprint" } }).config.explain.theme,
   ).toBe("blueprint");
   const { config, problems } = normalize({
     explain: { enabled: false, theme: "neon" },
   });
-  expect(config.explain.theme).toBe("random");
+  expect(config.explain.theme).toBe("auto");
   expect(config.enabled.explain).toBe(false);
   expect(problems).toEqual([
-    'explain.theme: "neon" (random | picture-book | blueprint | lab-notebook | editorial)',
+    'explain.theme: "neon" (auto | random | picture-book | blueprint | lab-notebook | editorial)',
   ]);
   expect(TEMPLATE(DEFAULTS.enabled)).toContain(
-    "\n  # theme: random   # random | picture-book | blueprint | lab-notebook | editorial",
+    "\n  # theme: auto   # auto | random | picture-book | blueprint | lab-notebook | editorial\n  # auto asks TypeSafe's Jev",
   );
 });
 

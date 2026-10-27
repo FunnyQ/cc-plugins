@@ -20,6 +20,8 @@ import {
   PANE,
 } from "./explain";
 import { buildPrompt } from "./protocol";
+import { themer } from "./theme-jev";
+import type { Post } from "../transcript/jev";
 import { usageOf } from "./state";
 
 const BRIEF = "\n\nIf you reply in html";
@@ -307,6 +309,52 @@ test("an html reply without a diagram starts no pele child", async () => {
   r.replies.push(answered(htmlReply));
   await explainPress(r.$);
   expect(r.runs.some((a) => a[1]?.endsWith("pele-cli.ts"))).toBe(false);
+});
+
+test("with theme auto and a key, the page is written in the theme Jev picks from the title and headings", async () => {
+  const r = await rig();
+  r.files.set(`${THEME_DIR}editorial.html`, "EDITORIAL {{main}}");
+  const sent: string[] = [];
+  const post: Post = async (_url, init) => {
+    sent.push(init.body);
+    return {
+      ok: true,
+      text: JSON.stringify({
+        answers: { theme: { probabilities: { editorial: 0.9, blueprint: 0.1 } } },
+      }),
+    };
+  };
+  themer.work({ apiKey: "k", post });
+  try {
+    r.replies.push(answered(htmlReply));
+    await explainPress(r.$);
+  } finally {
+    themer.work({ apiKey: undefined, post });
+  }
+  const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
+  expect(r.files.get(entry.path)).toStartWith("EDITORIAL ");
+  expect(JSON.parse(sent[0]!).state.title).toBe("Fork flow");
+  expect(sent[0]).not.toContain("yes");
+});
+
+test("with theme auto and no key, nothing is sent and the page takes the theme the fork picked", async () => {
+  const r = await rig();
+  r.files.set(`${THEME_DIR}blueprint.html`, "BLUEPRINT {{main}}");
+  const sent: string[] = [];
+  themer.work({
+    apiKey: undefined,
+    post: async (_url, init) => {
+      sent.push(init.body);
+      return { ok: false, text: "" };
+    },
+  });
+  r.replies.push(
+    answered(htmlReply.replace("<summary>", "<theme>blueprint</theme><summary>")),
+  );
+  await explainPress(r.$);
+  expect(sent).toEqual([]);
+  const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
+  expect(r.files.get(entry.path)).toStartWith("BLUEPRINT ");
 });
 
 test("the project falls back to the cwd's basename when git fails", async () => {

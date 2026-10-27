@@ -5,6 +5,7 @@ import { mascot } from "./clawd/mascot";
 import { registerChecker } from "./explain/checker";
 import { explainHooks } from "./explain/explain";
 import { explainPane } from "./explain/pane";
+import { themer } from "./explain/theme-jev";
 import { minimap } from "./minimap/minimap";
 import { teach, teacher } from "./teacher/teacher";
 import {
@@ -147,6 +148,7 @@ export const register: Register = (on) => {
         }, reject);
       });
     jev.work({ apiKey, post, redraw });
+    themer.work({ apiKey, post });
     teacher.work({
       apiKey,
       post,

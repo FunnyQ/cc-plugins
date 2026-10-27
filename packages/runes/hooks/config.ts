@@ -23,6 +23,7 @@ export const THEMES = [
   "lab-notebook",
   "editorial",
 ] as const;
+const THEME_SETTINGS = ["auto", "random", ...THEMES] as const;
 export type Theme = (typeof THEMES)[number];
 
 type Config = {
@@ -60,7 +61,7 @@ type Config = {
   fold: { keep: string; min_calls: number };
   glow: { style: string };
   minimap: { bar_rows: number; gap: number; marker_color: string };
-  explain: { theme: Theme | "random" };
+  explain: { theme: (typeof THEME_SETTINGS)[number] };
 };
 
 export const DEFAULTS: Config = {
@@ -128,13 +129,16 @@ export const DEFAULTS: Config = {
   fold: { keep: "", min_calls: 1 },
   glow: { style: "dark" },
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
-  explain: { theme: "random" },
+  explain: { theme: "auto" },
 };
 
 export const configPath = (home: string) =>
   `${home}/.config/q-lab/cc-plugins/runes/config.yaml`;
 
 export const config: Config = { ...DEFAULTS };
+
+const PRIVACY =
+  "# auto asks TypeSafe's Jev to pick one from the page's (secret-masked) title and section headings, never its prose; needs TYPESAFE_API_KEY, and without one the explaining fork picks";
 
 export const TEMPLATE = (
   enabled: Config["enabled"],
@@ -219,7 +223,8 @@ teacher:
   # with it on and TYPESAFE_API_KEY set, every asked prompt is logged (secret-masked) to ~/.local/share/q-lab/runes/teacher/lessons.db, kept until you trash the file
 explain:
   enabled: ${enabled.explain} # the [Explain plz!] button under Clawd; a press forks this session to explain it, ELI5
-  # theme: ${DEFAULTS.explain.theme}   # ${["random", ...THEMES].join(" | ")}
+  # theme: ${DEFAULTS.explain.theme}   # ${THEME_SETTINGS.join(" | ")}
+  ${PRIVACY}
 `;
 
 const TOP = ["clawd", "transcript", "minimap", "teacher", "explain"] as const;
@@ -259,7 +264,7 @@ const isSide: Check = (v) => v === "left" || v === "right";
 const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
 const isList: Check = (v) => typeof v === "string";
 const isTheme: Check = (v) =>
-  v === "random" || (THEMES as readonly unknown[]).includes(v);
+  (THEME_SETTINGS as readonly unknown[]).includes(v);
 
 const RULES: {
   [S in Exclude<keyof Config, "enabled">]: {
@@ -335,7 +340,7 @@ const RULES: {
     gap: [isCount, "a whole number above 0"],
     marker_color: [isColor, "#rrggbb"],
   },
-  explain: { theme: [isTheme, ["random", ...THEMES].join(" | ")] },
+  explain: { theme: [isTheme, THEME_SETTINGS.join(" | ")] },
 };
 
 // where a section's fields are read from and the name a problem gives it: under transcript, or where 0.5.0 kept it,
@@ -583,7 +588,7 @@ export const upgrade = (text: string, raw: unknown): string => {
 
   const explain = locate(lines, ["explain"]);
   if (explain?.isOpen) {
-    const options = ["random", ...THEMES].join(" | ");
+    const options = THEME_SETTINGS.join(" | ");
     const at = lines.findIndex(
       (l, i) =>
         i > explain.head &&
@@ -593,16 +598,26 @@ export const upgrade = (text: string, raw: unknown): string => {
     );
     if (at === -1) {
       const after = switchAt(lines, explain);
+      const pad = " ".repeat(explain.inner);
       lines.splice(
         after === -1 ? explain.head + 1 : after + 1,
         0,
-        `${" ".repeat(explain.inner)}# theme: ${DEFAULTS.explain.theme}   # ${options}`,
+        `${pad}# theme: ${DEFAULTS.explain.theme}   # ${options}`,
+        `${pad}${PRIVACY}`,
       );
     } else {
-      lines[at] = lines[at]!.replace(
-        /(#\s*)random(\s*\|\s*[\w-]+)*\s*$/,
-        `$1${options}`,
+      const privacy = lines.findIndex(
+        (l, i) =>
+          i > explain.head &&
+          i < explain.end &&
+          l.trim().startsWith("# auto asks TypeSafe's Jev"),
       );
+      if (privacy === -1)
+        lines.splice(at + 1, 0, `${" ".repeat(explain.inner)}${PRIVACY}`);
+      lines[at] = lines[at]!.replace(
+        /(#\s*)(auto\s*\|\s*)?random(\s*\|\s*[\w-]+)*\s*$/,
+        `$1${options}`,
+      ).replace(/^(\s*#\s*theme\s*:\s*)random\b/, "$1auto");
     }
   }
   return lines.join("\n");

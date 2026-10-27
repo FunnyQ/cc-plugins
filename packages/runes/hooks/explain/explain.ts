@@ -7,6 +7,7 @@ import { checker, startCheck } from "./checker";
 import { config } from "../config";
 import { pickTheme, writeExplainer } from "./html";
 import { buildPrompt, drawBrief, parseReply, type Ask } from "./protocol";
+import { themer } from "./theme-jev";
 import { selectedOf, usageOf, withEntry } from "./state";
 
 export const PANE = "runes-explain";
@@ -111,7 +112,14 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
           await $.session.id(),
           { title: reply.title, main: reply.main, project, lang: language },
           new Date(at),
-          pickTheme(config.explain.theme, Math.random),
+          pickTheme(
+            config.explain.theme === "auto"
+              ? ((await themer.pick(reply.title, reply.main)) ??
+                  reply.theme ??
+                  "random")
+              : config.explain.theme,
+            Math.random,
+          ),
         );
         diagrams = hasDiagram(reply.main);
         body = { kind: "html", summary: reply.summary, path, check: "pending" };
