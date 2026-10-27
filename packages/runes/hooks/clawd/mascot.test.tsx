@@ -309,10 +309,20 @@ test("with Clawd off, the minimap still draws in the band on the terminal and th
   expect((await desk.find({ key: "clawd-row" }))?.props).toMatchObject({
     justifyContent: "flex-start",
   });
-  expect(await desk.find({ key: "line:0" })).toBeDefined();
-  // the desktop leaves a gap between text lines, so each bucket is one Svg bar over its button, aligned by its column
-  // a bar as wide as its column's button, so neighbouring bars touch
-  expect((await desk.find({ type: "Svg" }))?.props.width).toBe(34);
+  // the desktop draws the map alone: one Svg of square blocks, no jump buttons
+  expect(await desk.find({ key: "line:0" })).toBeUndefined();
+  const map = String((await desk.find({ type: "Svg" }))?.props.source);
+  const sizes = [...map.matchAll(/<rect [^>]*width="(\d+)" height="(\d+)"/g)];
+  expect(sizes.length).toBeGreaterThan(0);
+  for (const [, w, h] of sizes) expect(w).toBe(h);
+  // five blocks a column on the desktop, whatever bar_rows the terminal uses
+  expect(map).toContain('height="44"');
+  // the map shrinks inside its slot, never pushing Clawd and the buttons out of the band
+  expect((await desk.find({ key: "minimap-slot" }))?.props).toMatchObject({
+    flexShrink: 1,
+    minWidth: 0,
+    overflow: "hidden",
+  });
   expect(await desk.find({ text: "█" })).toBeUndefined();
   await desk.unmount();
 });

@@ -23,7 +23,7 @@ export const band = (on: On) => {
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const isDrawn = e.surface === "terminal" || e.surface === "desktop";
     const hasMap = config.enabled.minimap && isDrawn;
-    const lesson = e.surface === "terminal" ? teacher.latest() : undefined;
+    const lesson = isDrawn ? teacher.latest() : undefined;
     const hasButton = config.enabled.explain && isDrawn;
     if (
       (!config.enabled.clawd && !hasMap && !lesson && !hasButton) ||
@@ -57,15 +57,20 @@ export const band = (on: On) => {
     const room = (e.props.bodyColumns ?? 0) - reserved;
     const map =
       list?.length && room > 4
-        ? (e.surface === "desktop" ? desktopMap : inlineMap)(
-            ui,
-            list,
-            new Set((shown ?? []).map(stem)),
-            room,
-            config.minimap.bar_rows,
-            (target) => () =>
-              void $.ui.scroll({ to: { requestId: target }, block: "start" }),
-          )
+        ? e.surface === "desktop"
+          ? desktopMap(ui, list, new Set((shown ?? []).map(stem)), room)
+          : inlineMap(
+              ui,
+              list,
+              new Set((shown ?? []).map(stem)),
+              room,
+              config.minimap.bar_rows,
+              (target) => () =>
+                void $.ui.scroll({
+                  to: { requestId: target },
+                  block: "start",
+                }),
+            )
         : undefined;
     const row = (picture?: ReturnType<typeof h>) => (
       <Box
@@ -89,11 +94,28 @@ export const band = (on: On) => {
           inner - 3,
         )
       : [];
-    // resolved on the terminal alone: the desktop's Button and Text are other types, and the notice never draws there
+    const toLesson = () => {
+      if (lesson?.requestId)
+        void $.ui.scroll({
+          to: { requestId: lesson.requestId },
+          block: "start",
+        });
+    };
+    // resolved on the terminal alone: the desktop's Button and Text are other types, so it draws its own notice below
     const term = e.surface === "terminal" ? $.ui.resolve(e) : undefined;
-    const notice =
-      !lesson || !term
-        ? undefined
+    const notice = !lesson
+      ? undefined
+      : !term
+        ? (
+            <Box key="teacher" flexDirection="row" gap={1} alignItems="center">
+              <ui.Text size="caption" weight="semibold" color={TEACHER_COLOR}>
+                Your English Teacher
+              </ui.Text>
+              <Button key="teacher:0" plain dimColor onPress={toLesson}>
+                {`${lesson.quip ?? lesson.better} ↑`}
+              </Button>
+            </Box>
+          )
         : bubble(
             { Box: term.Box, Text: term.Text },
             {
@@ -107,16 +129,7 @@ export const band = (on: On) => {
               rows: [
                 [
                   "teacher:0",
-                  <term.Button
-                    plain
-                    onPress={() => {
-                      if (lesson.requestId)
-                        void $.ui.scroll({
-                          to: { requestId: lesson.requestId },
-                          block: "start",
-                        });
-                    }}
-                  >
+                  <term.Button plain onPress={toLesson}>
                     {`${first.map((r) => r.text).join("")}${rest.length ? "…" : ""} ↑`}
                   </term.Button>,
                 ],

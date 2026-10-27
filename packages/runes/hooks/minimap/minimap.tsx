@@ -116,60 +116,59 @@ export const inlineMap = (
   );
 };
 
-// the desktop's native "─" button, measured; a column is the wider of the two, so bars this wide touch. Measure again if the desktop restyles its buttons
-const BAR_WIDTH = 34;
-const CELL_HEIGHT = 8;
-// a desktop column holds a native button, about three cells wide
-export const DESKTOP_COLUMN = 3;
+const BLOCK = 8;
+// the desktop's blocks are smaller than a terminal cell, so it draws taller bars than bar_rows
+const DESKTOP_BAR_ROWS = 5;
+const GAP = 2;
+const PITCH = BLOCK + GAP;
+// the desktop's code-font advance, which its cells are counted in; a guess, but the Svg scales down to its slot, so a wide guess only shrinks the squares
+const CELL_PX = 8;
 
-const barSvg = (line: Line, barRows: number) => {
-  const height = barRows * CELL_HEIGHT;
-  let top = height;
-  const rects = line.segments.map((s) => {
-    top -= s.cells * CELL_HEIGHT;
-    return `<rect x="0" y="${top}" width="${BAR_WIDTH}" height="${s.cells * CELL_HEIGHT}" fill="${colorOf(s.kind)}"/>`;
+// the desktop draws the map alone, no jump buttons: their native padding set every column's width
+const mapSvg = (drawn: Line[], barRows: number) => {
+  const height = barRows * BLOCK + GAP * 2;
+  const rects = drawn.flatMap((line, x) => {
+    let row = barRows;
+    const blocks = line.segments.flatMap((s) =>
+      Array.from({ length: s.cells }, () => {
+        row -= 1;
+        return `<rect x="${x * PITCH}" y="${row * BLOCK}" width="${BLOCK}" height="${BLOCK}" fill="${colorOf(s.kind)}"/>`;
+      }),
+    );
+    return line.isHere
+      ? [
+          ...blocks,
+          `<rect x="${x * PITCH}" y="${barRows * BLOCK + GAP}" width="${BLOCK}" height="${GAP}" fill="${config.minimap.marker_color}"/>`,
+        ]
+      : blocks;
   });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${BAR_WIDTH}" height="${height}" viewBox="0 0 ${BAR_WIDTH} ${height}">${rects.join("")}</svg>`;
+  const width = drawn.length * PITCH - GAP;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" shape-rendering="crispEdges">${rects.join("")}</svg>`;
 };
 
-// the desktop leaves a gap between text lines, so each bucket is one Svg bar over its button, aligned by their column
+// the slot shrinks and clips, so a guessed width too wide narrows the map rather than pushing Clawd and the buttons out
 export const desktopMap = (
-  { Box, Text, Button, Svg }: Ui,
+  { Box, Svg }: Ui,
   list: Row[],
   here: Set<string>,
   width: number,
-  barRows: number,
-  jump: (target: string) => () => void,
-) => (
-  <Box flexDirection="row" alignItems="flex-end">
-    {lines(
-      list,
-      here,
-      Math.max(1, Math.floor(width / DESKTOP_COLUMN)),
-      barRows,
-    ).map((line, i) => (
-      <Box key={`col:${i}`} flexDirection="column" alignItems="center">
-        <Svg
-          source={barSvg(line, barRows)}
-          alt={line.segments.map((s) => s.kind).join(", ")}
-          width={BAR_WIDTH}
-          height={barRows * CELL_HEIGHT}
-        />
-        {line.isHere ? (
-          <Text color={config.minimap.marker_color}>━</Text>
-        ) : (
-          <Button
-            key={`line:${i}`}
-            plain
-            dimColor
-            label="─"
-            onPress={jump(line.target)}
-          />
-        )}
-      </Box>
-    ))}
-  </Box>
-);
+) => {
+  const drawn = lines(
+    list,
+    here,
+    Math.max(1, Math.floor((width * CELL_PX) / PITCH)),
+    DESKTOP_BAR_ROWS,
+  );
+  return (
+    <Box key="minimap-slot" flexShrink={1} minWidth={0} overflow="hidden">
+      <Svg
+        key="minimap"
+        source={mapSvg(drawn, DESKTOP_BAR_ROWS)}
+        alt={`minimap, ${drawn.length} columns`}
+      />
+    </Box>
+  );
+};
 
 const forgetTranscript = () => {
   transcript = lastSeen = undefined;
