@@ -2,6 +2,7 @@ import { read } from "claude-code";
 import type { On } from "claude-code";
 
 import type { ExplainEntry, ExplainView } from "../../types";
+import type { Theme } from "../config";
 import type { Run } from "../transcript/ansi";
 import { runLine } from "../transcript/bubble";
 import { svg as clawdSvg } from "../clawd/encode";
@@ -38,7 +39,7 @@ const ASK_CAPTION = "Ask a follow-up, or name what to explain";
 const CARD = "#232120";
 const CARD_HOVER = "#2f2c2a";
 // ground, then accents, from each theme's own :root
-const SWATCH: Record<string, string[]> = {
+const SWATCH: Record<Theme, string[]> = {
   "picture-book": ["#f3eee3", "#d97757", "#7da0b8", "#9bb08a"],
   blueprint: ["#0d3258", "#e8f1fa", "#ff8a68", "#8fd3ff"],
   "lab-notebook": ["#e6f0da", "#2d6a45", "#c0281c", "#1f2a23"],
@@ -46,10 +47,14 @@ const SWATCH: Record<string, string[]> = {
   "card-table": ["#1c3128", "#ebdfc0", "#b0802a", "#241a11"],
   "guide-map": ["#f5f1e4", "#8ed462", "#ffd23f", "#4fa6e3"],
 };
-const swatchSvg = ([ground, ...accents]: string[]) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 24"><rect width="40" height="24" rx="4" fill="${ground}"/>${accents
-    .map((c, i) => `<circle cx="${10 + i * 10}" cy="12" r="4" fill="${c}"/>`)
-    .join("")}</svg>`;
+const SWATCH_SVG: Record<string, string> = Object.fromEntries(
+  Object.entries(SWATCH).map(([theme, [ground, ...accents]]) => [
+    theme,
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 24"><rect width="40" height="24" rx="4" fill="${ground}"/>${accents
+      .map((c, i) => `<circle cx="${10 + i * 10}" cy="12" r="4" fill="${c}"/>`)
+      .join("")}</svg>`,
+  ]),
+);
 const BORDER_AND_PADDING = 4;
 const FIELD_MAX_ROWS = 6;
 const DESKTOP_FIELD_ROWS = 4;
@@ -102,7 +107,7 @@ export const explainPane = (on: On) => {
 
     // glow answers null while it renders in the background, and its worker redraws when the lines land
     const markdown = (id: string, text: string) => {
-      if (e.surface === "desktop" && "Markdown" in ui)
+      if (isDesktop)
         return [<ui.Markdown key={`explain-md:${id}`} text={text} />];
       const lines: Run[][] =
         glow.view(inner, text, `explain:${id}`) ?? wrapWords([{ text }], inner);
@@ -122,7 +127,7 @@ export const explainPane = (on: On) => {
           </Text>
         </Text>
       );
-      const swatch = isDesktop && entry.theme && SWATCH[entry.theme];
+      const swatch = isDesktop && entry.theme && SWATCH_SVG[entry.theme];
       const deleteButton = (
         <Button
           key={`explain-delete:${entry.id}`}
@@ -137,7 +142,7 @@ export const explainPane = (on: On) => {
             <Box gap={1} alignItems="center">
               <ui.Svg
                 key={`explain-swatch:${entry.id}`}
-                source={swatchSvg(swatch)}
+                source={swatch}
                 alt={`${entry.theme} theme`}
                 width={40}
                 height={24}
@@ -236,19 +241,7 @@ export const explainPane = (on: On) => {
       </Box>
     ) : null;
 
-    const lineCount = (v.draft ?? "").split("\n").length;
-    const field = (minRows: number) => (
-      <Input
-        key="explain-ask"
-        placeholder="ask a follow-up, or name what to explain"
-        value={v.draft ?? ""}
-        rows={Math.min(Math.max(lineCount, minRows), FIELD_MAX_ROWS)}
-        submitLabel="ask"
-        onSubmit={() => undefined}
-      />
-    );
-
-    const askBox = (label: string, heading: string, hasClawd: boolean) => (
+    const askBox = (isNew: boolean, hasClawd: boolean) => (
       <Box
         key="explain-ask-box"
         flexDirection="column"
@@ -270,7 +263,7 @@ export const explainPane = (on: On) => {
             ) : null}
             <Box flexDirection="column">
               <Text size="heading" weight="semibold">
-                {heading}
+                {isNew ? NEW_HEADING : ASK_HEADING}
               </Text>
               <Text size="caption" dimColor>
                 {ASK_CAPTION}
@@ -279,20 +272,31 @@ export const explainPane = (on: On) => {
           </Box>
         ) : (
           <Text dimColor bold>
-            {label}
+            {isNew ? NEW_LABEL : ASK_LABEL}
           </Text>
         )}
-        {field(isDesktop ? DESKTOP_FIELD_ROWS : 1)}
+        <Input
+          key="explain-ask"
+          placeholder="ask a follow-up, or name what to explain"
+          value={v.draft ?? ""}
+          rows={Math.min(
+            Math.max(
+              (v.draft ?? "").split("\n").length,
+              isDesktop ? DESKTOP_FIELD_ROWS : 1,
+            ),
+            FIELD_MAX_ROWS,
+          )}
+          submitLabel="ask"
+          onSubmit={() => undefined}
+        />
       </Box>
     );
-
-    const tail = askBox(ASK_LABEL, ASK_HEADING, false);
 
     if (v.isAsking && !v.isRunning)
       return (
         <Box flexDirection="column" gap={1}>
           {banner}
-          {askBox(NEW_LABEL, NEW_HEADING, true)}
+          {askBox(true, true)}
           <Box justifyContent="flex-end">
             <Button
               key="explain-show-history"
@@ -318,7 +322,7 @@ export const explainPane = (on: On) => {
           >
             <Text dimColor>{EMPTY}</Text>
           </Box>
-          {askBox(ASK_LABEL, ASK_HEADING, true)}
+          {askBox(false, true)}
         </Box>
       );
 
@@ -407,13 +411,16 @@ export const explainPane = (on: On) => {
           </Box>
           {u && (
             <Box justifyContent="flex-end" paddingX={1}>
-              <Text dimColor {...desk({ size: "caption" as const, tabular: true })}>
+              <Text
+                dimColor
+                {...desk({ size: "caption" as const, tabular: true })}
+              >
                 {`${kilo(u.input)} in · ${kilo(u.cacheRead)} cached · ${kilo(u.output)} out`}
               </Text>
             </Box>
           )}
         </Box>
-        {tail}
+        {askBox(false, false)}
       </Box>
     );
   });

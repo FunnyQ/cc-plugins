@@ -24,6 +24,23 @@ export const TEACHER_ICON = "\u{F0890}";
 type Run = { text: string; bold?: boolean; color?: string };
 
 // a lesson never changes, yet every redraw of its prompt re-ran the word diff
+const runsMemo = memo(50);
+// the desktop wraps text itself, so it takes the rewrite as one line of runs
+export const rewriteRuns = (
+  text: string,
+  better: string,
+  fullColor?: string,
+): Run[] => {
+  const key = keyOf(text);
+  return runsMemo(`${fullColor ?? ""}\0${key}\0${better}`, () =>
+    isFullRewrite(key, better)
+      ? [{ text: better, color: fullColor }]
+      : changes(key, better).map(({ text, isChanged }): Run =>
+          isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
+        ),
+  );
+};
+
 const linesMemo = memo(50);
 export const lessonLines = (
   text: string,
@@ -34,14 +51,7 @@ export const lessonLines = (
   linesMemo(
     `${width}\0${isLight()}\0${keyOf(text)}\0${better}\0${why ?? ""}`,
     (): Run[][] => [
-      ...wrapWords(
-        isFullRewrite(keyOf(text), better)
-          ? [{ text: better, color: palette().var }]
-          : changes(keyOf(text), better).map(({ text, isChanged }): Run =>
-              isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
-            ),
-        width,
-      ),
+      ...wrapWords(rewriteRuns(text, better, palette().var), width),
       ...(why
         ? [
             [{ text: "─".repeat(Math.max(width, 1)), color: palette().dim }],
@@ -50,14 +60,6 @@ export const lessonLines = (
         : []),
     ],
   );
-
-// the desktop wraps text itself, so it takes the rewrite as one line of runs
-export const rewriteRuns = (text: string, better: string): Run[] =>
-  isFullRewrite(keyOf(text), better)
-    ? [{ text: better }]
-    : changes(keyOf(text), better).map(({ text, isChanged }): Run =>
-        isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
-      );
 
 // the desktop's lesson under the prompt: a card in the teacher's colour, no octant smoker, since Text there is not a cell grid
 export const lessonCard = (
