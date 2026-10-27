@@ -15,7 +15,7 @@ import {
   TITLES,
 } from "./teacher";
 import { wrapWords } from "../transcript/text";
-import { lessonLines } from "./lesson";
+import { lessonLines, rewriteRuns, TEACHER_COLOR } from "./lesson";
 import type { Attempt } from "./attempt";
 
 test("a short prompt, a slash command, a shell escape, or a wall of text is never asked about", () => {
@@ -616,4 +616,16 @@ test("the same prompt submitted twice records once", async () => {
   teacher.submit(prompt, Promise.resolve("s1"));
   await new Promise((r) => setTimeout(r, 20));
   expect(seen.length).toBe(1);
+});
+
+// the desktop wraps text itself, so its card takes the rewrite as one line of runs
+test("the desktop's rewrite runs mark each changed word, and a full rewrite is one plain run", () => {
+  const partial = rewriteRuns("can you checking it", "Can you check it?");
+  expect(partial.map((r) => r.text).join("")).toBe("Can you check it?");
+  const marked = partial.filter((r) => r.bold);
+  expect(marked.length).toBeGreaterThan(0);
+  for (const r of marked) expect(r.color).toBe(TEACHER_COLOR);
+  expect(rewriteRuns("pls fix", "Please rewrite the whole parser.")).toEqual([
+    { text: "Please rewrite the whole parser." },
+  ]);
 });

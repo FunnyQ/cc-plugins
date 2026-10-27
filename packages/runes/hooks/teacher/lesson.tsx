@@ -10,11 +10,14 @@ import {
   runLine,
 } from "../transcript/bubble";
 import { cells, wrapWords } from "../transcript/text";
-import { octantsOf } from "../clawd/encode";
+import { octantsOf, svgOf } from "../clawd/encode";
 import { CLIPS } from "../clawd/frames";
 import { changes, isFullRewrite, keyOf, teacher } from "./teacher";
 
 export const TEACHER_COLOR = "#4f9a6a";
+// raw greens, since no theme key names a tinted ground; tuned for the desktop's dark theme
+const CARD_GROUND = "#17201a";
+const REWRITE_GROUND = "#203026";
 // nf-md U+F0890, needs a Nerd Font
 export const TEACHER_ICON = "\u{F0890}";
 
@@ -48,6 +51,75 @@ export const lessonLines = (
     ],
   );
 
+// the desktop wraps text itself, so it takes the rewrite as one line of runs
+export const rewriteRuns = (text: string, better: string): Run[] =>
+  isFullRewrite(keyOf(text), better)
+    ? [{ text: better }]
+    : changes(keyOf(text), better).map(({ text, isChanged }): Run =>
+        isChanged ? { text, bold: true, color: TEACHER_COLOR } : { text },
+      );
+
+// the desktop's lesson under the prompt: a card in the teacher's colour, no octant smoker, since Text there is not a cell grid
+export const lessonCard = (
+  { Box, Text, Svg }: Pick<Elements["desktop"], "Box" | "Text" | "Svg">,
+  text: string,
+  better: string,
+) => {
+  const why = teacher.why(text);
+  return (
+    <Box
+      key="teacher"
+      flexDirection="row"
+      gap={2}
+      borderStyle="round"
+      borderColor={TEACHER_COLOR}
+      backgroundColor={CARD_GROUND}
+      paddingX={2}
+      paddingY={1}
+      marginTop={1}
+    >
+      <Svg
+        source={SMOKER_SVG}
+        alt="Clawd the teacher, smoking"
+        width={60}
+        height={48}
+      />
+      <Box flexDirection="column" flexGrow={1} gap={1}>
+        <Box flexDirection="column">
+          <Text size="caption" weight="semibold" color={TEACHER_COLOR}>
+            YOUR ENGLISH TEACHER
+          </Text>
+          <Text size="heading" weight="semibold" italic>
+            {teacher.title(text)}
+          </Text>
+        </Box>
+        <Box
+          flexDirection="column"
+          backgroundColor={REWRITE_GROUND}
+          paddingX={1}
+          paddingY={1}
+        >
+          <Text size="footnote" dimColor strikethrough>
+            {text}
+          </Text>
+          <Text>
+            {rewriteRuns(text, better).map((r) => (
+              <Text bold={r.bold} color={r.color}>
+                {r.text}
+              </Text>
+            ))}
+          </Text>
+        </Box>
+        {why ? (
+          <Text size="footnote" dimColor>
+            {why}
+          </Text>
+        ) : null}
+      </Box>
+    </Box>
+  );
+};
+
 // octant text needs no blit, so it draws in any terminal; a cell with a gap draws every pixel in one colour,
 // so each puff sits alone in its 2x4 cell, clear of the body and the red tip, and the cream cigarette's cell is
 // filled with body so it has no gap and keeps both colours
@@ -66,6 +138,7 @@ const EDITS: [number, number, string][] = [
 const grid = [...CLIPS.smoking![23]!.grid.replace(/s/g, ".")];
 for (const [row, col, c] of EDITS) grid[row * 20 + col] = c;
 const SMOKER = octantsOf(grid.join(""));
+const SMOKER_SVG = svgOf(grid.join(""));
 const SMOKER_COLUMNS = 10;
 const [[tailSlot, ...smoke] = [], ...body] = SMOKER;
 const TALKER = [
@@ -95,9 +168,7 @@ export const lessonRows = (
     better,
     teacher.why(text),
     inner - SMOKER_COLUMNS - 1,
-  ).map(
-    (line) => runLine(Text, line),
-  );
+  ).map((line) => runLine(Text, line));
   const height = Math.max(lines.length, TALKER.length);
   return [
     ["teacher:divider", DIVIDER],

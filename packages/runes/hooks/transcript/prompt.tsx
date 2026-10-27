@@ -2,7 +2,7 @@ import type { On } from "claude-code";
 
 import { config } from "../config";
 import { noteRow } from "../minimap/minimap";
-import { lessonBubble, lessonRows } from "../teacher/lesson";
+import { lessonBubble, lessonCard, lessonRows } from "../teacher/lesson";
 import { teacher } from "../teacher/teacher";
 import { bubble, foldRows, runLine } from "./bubble";
 import { glow, INSTALL_HINT } from "./glow";
@@ -32,6 +32,24 @@ export const segments = (text: string): Segment[] => {
 export const prompt = (on: On) => {
   // module state, so a hot reload folds every row again
   const open = new Set<string>();
+
+  // the desktop draws its own prompt row; the lesson goes under it. No origin matcher: only a composer prompt ever has a lesson
+  on(
+    "ui.render",
+    { component: "UserMessage", surface: "desktop" },
+    async ($, e, next) => {
+      teacher.seen(e.props.text, e.requestId);
+      const better = teacher.lesson(e.props.text);
+      if (!better) return next(e);
+      const ui = $.ui.resolve(e);
+      return (
+        <ui.Box flexDirection="column">
+          {await next(e)}
+          {lessonCard(ui, e.props.text, better)}
+        </ui.Box>
+      );
+    },
+  );
 
   on(
     "ui.render",

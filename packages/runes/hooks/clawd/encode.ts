@@ -133,8 +133,11 @@ export const pixels = memo((clip, index) => {
   return { rgba: toBase64(bytes), width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
 });
 
-export const svg = memo((clip, index): string => {
-  const grid = CLIPS[clip]![index]!.grid;
+export const svg = memo((clip, index): string =>
+  svgOf(CLIPS[clip]![index]!.grid),
+);
+
+export const svgOf = (grid: string): string => {
   const rects: string[] = [];
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 20;) {
@@ -149,4 +152,4 @@ export const svg = memo((clip, index): string => {
     }
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 16" shape-rendering="crispEdges">${rects.join("")}</svg>`;
-});
+};
