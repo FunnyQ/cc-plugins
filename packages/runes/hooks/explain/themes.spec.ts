@@ -128,6 +128,15 @@ for (const theme of THEMES) {
     );
   });
 
+  // a timeline li holds bare text beside <strong> and <code>, and a grid or flex li makes each of them its own cell
+  test(`${theme} lays a timeline entry out as flowing text`, () => {
+    const css = styleOf(read(theme));
+    const boxes = rulesFor(css, ".timeline > li").flatMap(({ body }) =>
+      [...body.matchAll(/display:\s*([^;]+);/g)].map((d) => d[1]!.trim()),
+    );
+    expect(boxes.filter((d) => /grid|flex/.test(d))).toEqual([]);
+  });
+
   test(`${theme} lights a drawing's part for every part letter`, () => {
     const css = styleOf(read(theme));
     const missing = PART_LETTERS.filter(
