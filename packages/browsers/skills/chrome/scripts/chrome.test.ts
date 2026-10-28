@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { settle } from "./cdp";
-import { parseArgs } from "./chrome";
+import { type Page, settle } from "./cdp";
+import { interacted, parseArgs } from "./chrome";
 
 describe("parseArgs", () => {
   test("splits the command, positionals, and flags", () => {
@@ -47,5 +47,52 @@ describe("settle", () => {
         error: { code: -32601, message: "'Nope.method' wasn't found" },
       }),
     ).toThrow("Nope.method: 'Nope.method' wasn't found");
+  });
+});
+
+function fakePage(): { page: Page; emit: (method: string) => void } {
+  const listeners = new Set<(method: string) => void>();
+  const page: Page = {
+    send: async () => ({}),
+    nextEvent: (events, timeoutMs) =>
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          listeners.delete(listener);
+          reject(new Error("timeout"));
+        }, timeoutMs);
+        const listener = (method: string) => {
+          if (!events.includes(method)) return;
+          clearTimeout(timer);
+          listeners.delete(listener);
+          resolve(method);
+        };
+        listeners.add(listener);
+      }),
+    close: () => {},
+  };
+  return { page, emit: (method) => [...listeners].forEach((l) => l(method)) };
+}
+
+describe("interacted", () => {
+  test("waits for a navigation that starts while a slow click is still running", async () => {
+    const { page, emit } = fakePage();
+    let stoppedAt = 0;
+    const slowClick = async () => {
+      setTimeout(() => emit("Page.frameStartedLoading"), 80);
+      setTimeout(() => {
+        stoppedAt = performance.now();
+        emit("Page.frameStoppedLoading");
+      }, 300);
+      await Bun.sleep(100);
+    };
+    await interacted(page, slowClick);
+    expect(stoppedAt).toBeGreaterThan(0);
+  });
+
+  test("returns soon after a click that starts no navigation", async () => {
+    const { page } = fakePage();
+    const started = performance.now();
+    await interacted(page, () => Bun.sleep(100));
+    expect(performance.now() - started).toBeLessThan(400);
   });
 });

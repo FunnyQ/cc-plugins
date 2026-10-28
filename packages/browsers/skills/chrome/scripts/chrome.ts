@@ -164,18 +164,19 @@ async function navigated(page: Page, start: () => Promise<any>): Promise<void> {
 }
 
 /** Runs an input action and, when it starts loading a page, waits until loading stops — as WebDriver's click does. */
-async function interacted(
+export async function interacted(
   page: Page,
   act: () => Promise<unknown>,
 ): Promise<void> {
   // Grace window, not a guarantee: a navigation a page timer starts later than this is not waited for.
   const started = page
-    .nextEvent(["Page.frameStartedLoading"], NAVIGATION_GRACE_MS)
+    .nextEvent(["Page.frameStartedLoading"], LOAD_TIMEOUT_MS)
     .catch(() => null);
   const stopped = page.nextEvent(["Page.frameStoppedLoading"], LOAD_TIMEOUT_MS);
   stopped.catch(() => {});
   await act();
-  if (await started) await stopped;
+  const grace = Bun.sleep(NAVIGATION_GRACE_MS).then(() => null);
+  if (await Promise.race([started, grace])) await stopped;
 }
 
 async function title(page: Page): Promise<string> {
