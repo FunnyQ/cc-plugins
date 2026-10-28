@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -91,20 +91,20 @@ Keep byte-identical: the `startup|resume|clear|compact` matchers, the order of h
 
 ## Acceptance criteria
 
-- [ ] `packages/monitor/skills/cockpit/bin/hook.ts` exports `shouldSkip(platform: NodeJS.Platform): boolean` and runs its main body only under `import.meta.main`.
-- [ ] On win32, `bun hook.ts <event>` reads all of stdin and exits 0 with empty stdout and stderr.
-- [ ] On macOS/Linux, `bun hook.ts <event>` runs `<bin dir>/cockpit hook <event>` with stdin, stdout, stderr and exit code passed through unchanged.
-- [ ] `packages/monitor/.claude-plugin/plugin.json`'s two cockpit hooks are the exec-form entries above with timeouts 5 and 10; the setup.ts hook, matchers and version are unchanged.
-- [ ] `packages/monitor/.codex-plugin/hooks.json` and `packages/monitor/skills/cockpit/bin/cockpit` are unchanged.
-- [ ] (human) On macOS, make a recording stub: `d=$(mktemp -d) && printf '#!/bin/sh\necho "$*" >> %s/calls.log\ncat >/dev/null\n' "$d" > "$d/stub" && chmod 755 "$d/stub"`. Run `COCKPIT_BIN="$d/stub" claude --plugin-dir packages/monitor` in this checkout, send the prompt `say hi`, let the turn end, and quit. No hook error appears, and `"$d/calls.log"` holds a line `hook session-start` and a line `hook stop`.
+- [x] `packages/monitor/skills/cockpit/bin/hook.ts` exports `shouldSkip(platform: NodeJS.Platform): boolean` and runs its main body only under `import.meta.main`.
+- [x] On win32, `bun hook.ts <event>` reads all of stdin and exits 0 with empty stdout and stderr.
+- [x] On macOS/Linux, `bun hook.ts <event>` runs `<bin dir>/cockpit hook <event>` with stdin, stdout, stderr and exit code passed through unchanged.
+- [x] `packages/monitor/.claude-plugin/plugin.json`'s two cockpit hooks are the exec-form entries above with timeouts 5 and 10; the setup.ts hook, matchers and version are unchanged.
+- [x] `packages/monitor/.codex-plugin/hooks.json` and `packages/monitor/skills/cockpit/bin/cockpit` are unchanged.
+- [x] (human) On macOS, make a recording stub: `d=$(mktemp -d) && printf '#!/bin/sh\necho "$*" >> %s/calls.log\ncat >/dev/null\n' "$d" > "$d/stub" && chmod 755 "$d/stub"`. Run `COCKPIT_BIN="$d/stub" claude --plugin-dir packages/monitor` in this checkout, send the prompt `say hi`, let the turn end, and quit. No hook error appears, and `"$d/calls.log"` holds a line `hook session-start` and a line `hook stop`.
 
 ## Verification
 
-- [ ] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` passes (cases 1–3 run on macOS/Linux, case 4 skipped).
-- [ ] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts` still passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `git diff -- packages/monitor/.codex-plugin/hooks.json packages/monitor/skills/cockpit/bin/cockpit` prints nothing.
-- [ ] `git diff -U0 -- packages/monitor/.claude-plugin/plugin.json | grep -E '^[-+].*("version"|setup\.ts|"matcher")'` prints nothing.
+- [x] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` passes (cases 1–3 run on macOS/Linux, case 4 skipped).
+- [x] `bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts` still passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `git diff -- packages/monitor/.codex-plugin/hooks.json packages/monitor/skills/cockpit/bin/cockpit` prints nothing.
+- [x] `git diff -U0 -- packages/monitor/.claude-plugin/plugin.json | grep -E '^[-+].*("version"|setup\.ts|"matcher")'` prints nothing.
 
 ## Eval rubric
 
