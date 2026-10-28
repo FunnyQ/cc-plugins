@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   formatEntry,
   parseLog,
@@ -145,8 +145,7 @@ describe("renderRunlog", () => {
     "relay",
   ]) {
     test(`re-renders the committed ${slug} trail byte for byte`, async () => {
-      const root = resolve(import.meta.dir, "../../../../../..");
-      const dir = join(root, "docs", slug, ".flightlog");
+      const dir = join(import.meta.dir, "fixtures", "runlog", slug);
       const entries = parseLog(await readFile(join(dir, "run.jsonl"), "utf-8"));
       const expected = await readFile(join(dir, "RUNLOG.md"), "utf-8");
       expect(renderRunlog(entries, { slug })).toBe(expected);
