@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -62,22 +62,22 @@ Codex and OpenCode on Windows are not supported.
 
 ## Acceptance criteria
 
-- [ ] `README.md` has exactly one `## Windows` heading, placed directly before `## usage-dashboard`.
-- [ ] The section names the two supported runtimes (native Windows CLI, Desktop **Local** session), says WSL is expected to behave like Linux but is not yet verified, and says Desktop WSL sessions load no plugins.
-- [ ] The section names `bun` on `PATH` as a requirement and Git for Windows as recommended, with PowerShell tolerated.
-- [ ] The section says the status is work in progress, that monitor skips its cockpit hooks on native Windows so the cockpit and the usage dashboard do not work there yet, and that other features are not yet verified.
-- [ ] The section links `./docs/windows-support/WAYPOINTS.md` and says Codex and OpenCode on Windows are not supported.
-- [ ] No other section of `README.md` changed.
+- [x] `README.md` has exactly one `## Windows` heading, placed directly before `## usage-dashboard`.
+- [x] The section names the two supported runtimes (native Windows CLI, Desktop **Local** session), says WSL is expected to behave like Linux but is not yet verified, and says Desktop WSL sessions load no plugins.
+- [x] The section names `bun` on `PATH` as a requirement and Git for Windows as recommended, with PowerShell tolerated.
+- [x] The section says the status is work in progress, that monitor skips its cockpit hooks on native Windows so the cockpit and the usage dashboard do not work there yet, and that other features are not yet verified.
+- [x] The section links `./docs/windows-support/WAYPOINTS.md` and says Codex and OpenCode on Windows are not supported.
+- [x] No other section of `README.md` changed.
 
 ## Verification
 
-- [ ] `grep -c '^## Windows$' README.md` prints `1`.
-- [ ] `awk '/^## Windows$/{f=1;next} /^## /{f=0} f' README.md > /tmp/q-lab-windows-section.txt && for w in bun PATH WSL Local 'Git for Windows' PowerShell 'skips its cockpit hooks' 'usage dashboard' 'do not work there yet' 'work in progress' 'not yet verified' 'not supported' 'WAYPOINTS.md' Codex OpenCode; do grep -q "$w" /tmp/q-lab-windows-section.txt || echo "missing: $w"; done` prints nothing.
-- [ ] `awk '/^## /{if($0=="## usage-dashboard")print prev; prev=$0}' README.md` prints `## Windows`.
-- [ ] `test -f docs/windows-support/WAYPOINTS.md` exits 0, and `grep -c '](./docs/windows-support/WAYPOINTS.md)' README.md` prints `1`.
-- [ ] (human) Read the extracted section in `/tmp/q-lab-windows-section.txt` against the fact list under Implementation notes, one fact at a time. Every fact is present with the same meaning, and no sentence claims more (for example, that Desktop WSL sessions load plugins, or that WSL is verified).
-- [ ] `git diff --numstat -- README.md | awk '{exit $2!=0}'` exits 0 (no deleted lines).
-- [ ] `git diff -U0 -- README.md | grep -c '^@@'` prints `1` (one contiguous inserted block).
+- [x] `grep -c '^## Windows$' README.md` prints `1`.
+- [x] `awk '/^## Windows$/{f=1;next} /^## /{f=0} f' README.md > /tmp/q-lab-windows-section.txt && for w in bun PATH WSL Local 'Git for Windows' PowerShell 'skips its cockpit hooks' 'usage dashboard' 'do not work there yet' 'work in progress' 'not yet verified' 'not supported' 'WAYPOINTS.md' Codex OpenCode; do grep -q "$w" /tmp/q-lab-windows-section.txt || echo "missing: $w"; done` prints nothing.
+- [x] `awk '/^## /{if($0=="## usage-dashboard")print prev; prev=$0}' README.md` prints `## Windows`.
+- [x] `test -f docs/windows-support/WAYPOINTS.md` exits 0, and `grep -c '](./docs/windows-support/WAYPOINTS.md)' README.md` prints `1`.
+- [x] (human) Read the extracted section in `/tmp/q-lab-windows-section.txt` against the fact list under Implementation notes, one fact at a time. Every fact is present with the same meaning, and no sentence claims more (for example, that Desktop WSL sessions load plugins, or that WSL is verified).
+- [x] `git diff --numstat -- README.md | awk '{exit $2!=0}'` exits 0 (no deleted lines).
+- [x] `git diff -U0 -- README.md | grep -c '^@@'` prints `1` (one contiguous inserted block).
 
 ## Eval rubric
 
