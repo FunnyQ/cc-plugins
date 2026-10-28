@@ -5,9 +5,9 @@
 
 ## Legs
 
-- [~] 1. Windows baseline — windows-latest and ubuntu-latest CI jobs run `bun test` and `tsc` and record which suites fail, and no plugin prints an error in a native Windows session, CLI or Desktop app, with or without Git Bash (monitor hooks exit quietly under both Git Bash and PowerShell)
+- [x] 1. Windows baseline — windows-latest and ubuntu-latest CI jobs run `bun test` and `tsc` and record which suites fail, and no plugin prints an error in a native Windows session, CLI or Desktop app, with or without Git Bash (monitor hooks exit quietly under both Git Bash and PowerShell)
       → legs/01-baseline/
-- [ ] 2. Core workflow plugins — chronicle, dispatch, guard and relay pass their suites on windows-latest, and commit / release / flightplan / autopilot / the comment reviewer each run once on a real Windows PC and pass on WSL (shared fixes: temp dir, home dir, file opener for macOS / Windows / Linux / WSL, `sh -c`, CRLF)
+- [~] 2. Core workflow plugins — chronicle, dispatch, guard and relay pass their suites on windows-latest, and commit / release / flightplan / autopilot / the comment reviewer each run once on a real Windows PC and pass on WSL (shared fixes: temp dir, home dir, file opener for macOS / Windows / Linux / WSL, `sh -c`, CRLF)
       → legs/02-core-workflow/
 - [ ] 3. Browser and UI plugins — browsers (chrome, firefox, zen), runes and herdr work on Windows and WSL: browsers find Windows- and Linux-installed binaries, explain opens its HTML page, herdr-browser drives a pane; safari refuses with a clear "macOS only" message
       → legs/03-browser-ui/
