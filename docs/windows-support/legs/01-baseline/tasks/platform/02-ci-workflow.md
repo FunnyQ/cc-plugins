@@ -8,7 +8,7 @@
 >
 > **Depends on**: platform/01, monitor/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -114,22 +114,22 @@ Record which form you used in a one-line YAML comment above the step. Such a com
 
 ## Acceptance criteria
 
-- [ ] `.github/workflows/ci.yml` exists and parses as YAML.
-- [ ] Both jobs use the matrix `macos-latest`, `ubuntu-latest`, `windows-latest` with `fail-fast: false`.
-- [ ] The `required` job runs `bunx --bun tsc --noEmit` and `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` on every OS. It runs `cockpit.test.ts` on non-Windows only, and the no-CR `grep` on Windows only.
-- [ ] The `report` job has `continue-on-error: true` at the job level. Its suite step cannot fail: it runs under `set +e` and ends with `exit 0`.
-- [ ] Rust runs as `cargo build --release` on Linux and as a step-level `continue-on-error` `cargo check` on Windows. macOS runs no Rust.
-- [ ] The summary step writes a heading naming the OS and Bun's exit status. It writes `no failures` only when Bun exited 0; otherwise it lists the `(fail)` lines, the `fail` / `error` totals and any `Unhandled error`. The upload step runs with `if: always()`.
-- [ ] `git diff --quiet -- .github/workflows/cockpit-release.yml` exits 0.
-- [ ] (human) Push the branch and open a pull request against `main` (a plain branch push does not trigger this workflow). On that PR's `CI` run, `required` is green on all three OS and the `report` job's step summary shows Bun's result per OS. The closing review may own this live check.
+- [x] `.github/workflows/ci.yml` exists and parses as YAML.
+- [x] Both jobs use the matrix `macos-latest`, `ubuntu-latest`, `windows-latest` with `fail-fast: false`.
+- [x] The `required` job runs `bunx --bun tsc --noEmit` and `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` on every OS. It runs `cockpit.test.ts` on non-Windows only, and the no-CR `grep` on Windows only.
+- [x] The `report` job has `continue-on-error: true` at the job level. Its suite step cannot fail: it runs under `set +e` and ends with `exit 0`.
+- [x] Rust runs as `cargo build --release` on Linux and as a step-level `continue-on-error` `cargo check` on Windows. macOS runs no Rust.
+- [x] The summary step writes a heading naming the OS and Bun's exit status. It writes `no failures` only when Bun exited 0; otherwise it lists the `(fail)` lines, the `fail` / `error` totals and any `Unhandled error`. The upload step runs with `if: always()`.
+- [x] `git diff --quiet -- .github/workflows/cockpit-release.yml` exits 0.
+- [x] (human) Push the branch and open a pull request against `main` (a plain branch push does not trigger this workflow). On that PR's `CI` run, `required` is green on all three OS and the `report` job's step summary shows Bun's result per OS. The closing review may own this live check.
 
 ## Verification
 
-- [ ] `ruby -ryaml -e 'YAML.load_file(".github/workflows/ci.yml")'` exits 0.
-- [ ] The structure check script in `../_context/ci-structure-check.md` prints `ok` and exits 0.
-- [ ] `git diff --quiet -- .github/workflows/cockpit-release.yml` exits 0.
-- [ ] When `command -v actionlint` succeeds, `actionlint .github/workflows/ci.yml` exits 0. Skip this item when actionlint is not installed; the structure check then still covers the shape, but expression syntax inside `${{ }}` stays unchecked until the first push.
-- [ ] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` passes locally. This is the same test the required tier runs.
+- [x] `ruby -ryaml -e 'YAML.load_file(".github/workflows/ci.yml")'` exits 0.
+- [x] The structure check script in `../_context/ci-structure-check.md` prints `ok` and exits 0.
+- [x] `git diff --quiet -- .github/workflows/cockpit-release.yml` exits 0.
+- [x] When `command -v actionlint` succeeds, `actionlint .github/workflows/ci.yml` exits 0. Skip this item when actionlint is not installed; the structure check then still covers the shape, but expression syntax inside `${{ }}` stays unchecked until the first push.
+- [x] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts` passes locally. This is the same test the required tier runs.
 
 ## Eval rubric
 
