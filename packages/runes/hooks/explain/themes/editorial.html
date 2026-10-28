@@ -533,11 +533,9 @@
       }
       .timeline > li {
         position: relative;
-        display: grid;
-        grid-template-columns: var(--time-col) minmax(0, 66ch);
-        column-gap: var(--gap);
         max-width: none;
-        padding: 22px 0 20px;
+        padding: 22px max(0px, 100% - var(--time-col) - var(--gap) - 66ch) 20px
+          calc(var(--time-col) + var(--gap));
       }
       .timeline > li + li {
         border-top: 1px solid var(--hair);
@@ -561,8 +559,10 @@
         background: var(--spot);
       }
       .timeline time {
-        grid-column: 1;
-        grid-row: 1 / span 2;
+        position: absolute;
+        top: 22px;
+        left: 0;
+        width: var(--time-col);
         text-align: right;
         font: italic 700 36px/1.05 var(--serif);
         letter-spacing: -0.01em;
@@ -570,7 +570,6 @@
         color: var(--spot);
       }
       .timeline b {
-        grid-column: 2;
         display: block;
         font-size: 22px;
         line-height: 1.35;

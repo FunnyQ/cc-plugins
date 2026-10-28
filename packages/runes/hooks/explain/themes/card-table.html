@@ -531,12 +531,11 @@
         gap: 4px;
       }
       .timeline > li {
+        --gap: 40px;
         position: relative;
-        display: grid;
-        grid-template-columns: var(--time-col) minmax(0, 66ch);
-        column-gap: 40px;
         max-width: none;
-        padding: 10px 0 12px;
+        padding: 10px max(0px, 100% - var(--time-col) - var(--gap) - 66ch) 12px
+          calc(var(--time-col) + var(--gap));
       }
       .timeline > li::before {
         content: "";
@@ -565,14 +564,15 @@
         box-shadow: 0 0 0 1.5px var(--frame);
       }
       .timeline time {
-        grid-column: 1;
-        grid-row: 1 / span 2;
+        position: absolute;
+        top: 10px;
+        left: 0;
+        width: var(--time-col);
         text-align: right;
         font: 600 15px/1.9 var(--mono);
         color: var(--ink-soft);
       }
       .timeline b {
-        grid-column: 2;
         display: block;
         font: 700 19px/1.5 var(--display);
       }
@@ -1316,7 +1316,7 @@
           --time-col: 50px;
         }
         .timeline > li {
-          column-gap: 36px;
+          --gap: 36px;
         }
         .timeline time {
           font-size: 13px;
