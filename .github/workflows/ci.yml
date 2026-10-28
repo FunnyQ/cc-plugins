@@ -31,6 +31,8 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx --bun tsc --noEmit
       - run: bun test packages/monitor/skills/cockpit/bin/hook.test.ts
+      - if: runner.os == 'macOS'
+        run: cargo build --release --locked --target aarch64-apple-darwin --manifest-path packages/monitor/cockpit-rs/Cargo.toml
       - if: runner.os != 'Windows'
         run: bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts
       - if: runner.os == 'Windows'
