@@ -118,7 +118,7 @@ Before touching Workflow, gather the work-list in the main conversation:
    opencode --version   # needed if devEngine or reviewEngine is 'opencode'
    ```
    If a selected engine is not installed, tell the user before flying. Only that engine's step needs it; the per-task Claude work still runs.
-9. Probe whether live panes are available: `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Probe on every flight, not only an external-dev one — the closing review lens can run live even when Claude writes every task. Resolve `relay.ts` as relay's own live locator does: the repo-sibling path first, then the newest relay version's `skills/relay/scripts/relay.ts` under `~/.claude/plugins/cache` or `~/.codex/plugins/cache`. Capture the absolute path as `CFG.relayPath`, or `''` when it is not found.
+9. Probe whether live panes are available: `HERDR_ENV=1` **and** relay's `relay.ts` resolves. Probe on every flight, not only an external-dev one — the closing review lens can run live even when Claude writes every task. Resolve `relay.ts` by taking the first of these that exists: the repo-sibling `<base>/../../../relay/skills/relay/scripts/relay.ts`, then the unversioned marketplace checkout `~/.claude/plugins/marketplaces/q-lab-marketplace/packages/relay/skills/relay/scripts/relay.ts`, then the newest relay version's `skills/relay/scripts/relay.ts` under `~/.claude/plugins/cache` or `~/.codex/plugins/cache`. Prefer the marketplace checkout over the cache because its path survives a relay version bump, so a permission rule naming it keeps matching. Capture the absolute path as `CFG.relayPath`, or `''` when it is not found.
 
 ## Step 2 — Confirm the flight with the user
 
