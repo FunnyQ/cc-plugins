@@ -9,6 +9,9 @@ on:
 permissions:
   contents: read
 
+env:
+  BUN_VERSION: 1.4.4
+
 defaults:
   run:
     shell: bash
@@ -24,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.4
+          bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bunx --bun tsc --noEmit
       - run: bun test packages/monitor/skills/cockpit/bin/hook.test.ts
@@ -44,10 +47,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.4
+          bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
-      - if: runner.os != 'macOS'
-        uses: dtolnay/rust-toolchain@stable
       - if: runner.os != 'macOS'
         uses: Swatinem/rust-cache@v2
         with:
@@ -59,15 +60,11 @@ jobs:
         continue-on-error: true
         run: cargo check --manifest-path packages/monitor/cockpit-rs/Cargo.toml
       # bun 1.4.4 still prints (fail) lines to the console with --reporter=junit, so one run serves log and artifact.
-      - run: |
-          set +e
-          bun test --parallel . --reporter=junit --reporter-outfile=junit-${{ matrix.os }}.xml 2>&1 | tee bun-test.log
-          echo "${PIPESTATUS[0]}" > bun-test.exit
-          exit 0
       - if: always()
         run: |
           set +e
-          code=$(cat bun-test.exit 2>/dev/null || echo missing)
+          bun test --parallel . --reporter=junit --reporter-outfile=junit-${{ matrix.os }}.xml 2>&1 | tee bun-test.log
+          code=${PIPESTATUS[0]}
           {
             echo "## bun test — ${{ matrix.os }} (exit $code)"
             if [ "$code" = 0 ]; then
@@ -86,4 +83,3 @@ jobs:
           path: |
             junit-${{ matrix.os }}.xml
             bun-test.log
-          if-no-files-found: warn
