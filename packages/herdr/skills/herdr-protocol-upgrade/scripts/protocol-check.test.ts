@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -17,7 +17,8 @@ import {
 
 const tempRepos: string[] = [];
 afterEach(() => {
-  for (const repo of tempRepos.splice(0)) execFileSync("trash", [repo]);
+  for (const repo of tempRepos.splice(0))
+    rmSync(repo, { recursive: true, force: true });
 });
 
 const schemaFixture = (protocol = 19) => ({

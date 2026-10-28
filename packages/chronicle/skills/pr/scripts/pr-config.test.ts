@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -223,7 +223,7 @@ describe("save CLI", () => {
         }).stdout.toString(),
       ).toBe("A  unrelated.txt\n");
     } finally {
-      Bun.spawnSync(["trash", repo]);
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 });
