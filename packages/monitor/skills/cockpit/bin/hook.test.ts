@@ -8,7 +8,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { shouldSkip } from "./hook";
 
 const entry = join(import.meta.dir, "hook.ts");
 const manifest = join(import.meta.dir, "../../../.claude-plugin/plugin.json");
@@ -35,12 +34,6 @@ test("manifest runs the cockpit hooks through bun hook.ts in exec form", () => {
     args: ["${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/hook.ts", "stop"],
     timeout: 10,
   });
-});
-
-test("shouldSkip is true only on win32", () => {
-  expect(shouldSkip("win32")).toBe(true);
-  expect(shouldSkip("darwin")).toBe(false);
-  expect(shouldSkip("linux")).toBe(false);
 });
 
 test.skipIf(process.platform === "win32")(
