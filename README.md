@@ -135,6 +135,24 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 - Workflow-driven autopilot. There is no Workflow tool, so [autopilot](./packages/dispatch/skills/autopilot) runs as a manual task-tool wave loop instead: behaviorally close, but with no automatic parallel-wave scheduling.
 - monitor's `setup.ts --session-check`. It is deliberately not ported because it is inert outside Claude Code — it returns immediately without `CLAUDE_PLUGIN_DATA`, and its actual work is statusline-path migration and reaping orphaned Claude processes.
 
+## Windows
+
+Windows support is a work in progress. Plugins load without hook errors. monitor skips its cockpit hooks on native Windows, so the cockpit and the usage dashboard do not work there yet. Other features are not yet verified on Windows. The roadmap is [docs/windows-support/WAYPOINTS.md](./docs/windows-support/WAYPOINTS.md).
+
+**Supported runtimes:**
+
+- The Claude Code CLI on native Windows.
+- The Claude Code Desktop app's **Local** session.
+
+Claude Code inside WSL is expected to behave like Linux, but is not yet verified. The Desktop app's WSL sessions do not load plugins.
+
+**Requirements on native Windows:**
+
+- Put `bun` on `PATH`. monitor, guard and runes call it.
+- Install Git for Windows (recommended). Without it, Claude Code runs hooks through PowerShell, which these plugins also tolerate.
+
+Codex and OpenCode on Windows are not supported.
+
 ## usage-dashboard
 
 A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and visualizes usage in a browser. No telemetry, no cloud; everything stays on your machine.

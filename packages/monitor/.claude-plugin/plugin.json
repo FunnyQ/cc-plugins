@@ -34,7 +34,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit\" hook session-start",
+            "command": "bun",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/hook.ts",
+              "session-start"
+            ],
             "timeout": 5
           }
         ]
@@ -45,7 +49,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit\" hook stop",
+            "command": "bun",
+            "args": [
+              "${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/hook.ts",
+              "stop"
+            ],
             "timeout": 10
           }
         ]
