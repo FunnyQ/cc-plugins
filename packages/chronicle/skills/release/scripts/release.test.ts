@@ -150,7 +150,7 @@ function repo(files: Record<string, string>): string {
 }
 
 async function commitAll(dir: string, message: string): Promise<void> {
-  await $`git add -A && git -c user.name=t -c user.email=t@t commit -qm ${message}`
+  await $`git add -A && git commit -qm ${message}`
     .cwd(dir)
     .quiet();
 }
@@ -158,7 +158,7 @@ async function commitAll(dir: string, message: string): Promise<void> {
 async function initRepo(files: Record<string, string>): Promise<string> {
   const dir = repo(files);
   await $`git init -q -b main`.cwd(dir).quiet();
-  await $`git config commit.gpgsign false && git config tag.gpgsign false`
+  await $`git config user.name t && git config user.email t@t && git config commit.gpgsign false && git config tag.gpgsign false`
     .cwd(dir)
     .quiet();
   await commitAll(dir, "init");
