@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -42,17 +42,17 @@ Write exactly this one line, followed by a trailing newline, and nothing else:
 
 ## Acceptance criteria
 
-- [ ] `.gitattributes` exists at the repo root and its whole content is the single line `* text=auto eol=lf` plus a trailing newline.
-- [ ] Every path in the index is already LF, binary, or empty, so the rule renormalizes nothing: `git ls-files --eol` lists no entry whose first column is other than `i/lf`, `i/-text`, or `i/none`.
-- [ ] `git check-attr text eol -- packages/monitor/skills/cockpit/bin/cockpit` reports `text: auto` and `eol: lf`.
-- [ ] A checkout simulated with `core.autocrlf=true` writes the shim with no carriage return (command under Verification).
+- [x] `.gitattributes` exists at the repo root and its whole content is the single line `* text=auto eol=lf` plus a trailing newline.
+- [x] Every path in the index is already LF, binary, or empty, so the rule renormalizes nothing: `git ls-files --eol` lists no entry whose first column is other than `i/lf`, `i/-text`, or `i/none`.
+- [x] `git check-attr text eol -- packages/monitor/skills/cockpit/bin/cockpit` reports `text: auto` and `eol: lf`.
+- [x] A checkout simulated with `core.autocrlf=true` writes the shim with no carriage return (command under Verification).
 
 ## Verification
 
-- [ ] `test "$(cat .gitattributes)" = '* text=auto eol=lf' && test "$(wc -l < .gitattributes | tr -d ' ')" = 1`
-- [ ] `test -z "$(git ls-files --eol | awk '$1!="i/lf" && $1!="i/-text" && $1!="i/none"')"`
-- [ ] `git check-attr text eol -- packages/monitor/skills/cockpit/bin/cockpit | grep -c -E ': (text: auto|eol: lf)$'` prints `2`.
-- [ ] `bash -c 't=$(mktemp -d) && git -c core.autocrlf=true checkout-index --prefix="$t/" packages/monitor/skills/cockpit/bin/cockpit && ! grep -q $'"'"'\r'"'"' "$t/packages/monitor/skills/cockpit/bin/cockpit"'` succeeds. `checkout-index` reads `.gitattributes` from the working tree. Measured in a throwaway clone: without the file the shim is written with 119 carriage returns, with it 0.
+- [x] `test "$(cat .gitattributes)" = '* text=auto eol=lf' && test "$(wc -l < .gitattributes | tr -d ' ')" = 1`
+- [x] `test -z "$(git ls-files --eol | awk '$1!="i/lf" && $1!="i/-text" && $1!="i/none"')"`
+- [x] `git check-attr text eol -- packages/monitor/skills/cockpit/bin/cockpit | grep -c -E ': (text: auto|eol: lf)$'` prints `2`.
+- [x] `bash -c 't=$(mktemp -d) && git -c core.autocrlf=true checkout-index --prefix="$t/" packages/monitor/skills/cockpit/bin/cockpit && ! grep -q $'"'"'\r'"'"' "$t/packages/monitor/skills/cockpit/bin/cockpit"'` succeeds. `checkout-index` reads `.gitattributes` from the working tree. Measured in a throwaway clone: without the file the shim is written with 119 carriage returns, with it 0.
 
 ## Eval rubric
 
