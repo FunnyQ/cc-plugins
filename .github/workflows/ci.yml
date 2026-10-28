@@ -55,7 +55,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: packages/monitor/cockpit-rs
-      - if: runner.os == 'Linux'
+      - if: runner.os != 'Windows'
         continue-on-error: true
         run: cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml
       - if: runner.os == 'Windows'
