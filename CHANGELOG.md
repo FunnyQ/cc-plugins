@@ -1,5 +1,26 @@
 # Changelog
 
+## [monitor 8.4.0] - 2026-10-29
+
+_tracks tag `monitor-v8.4.0`_
+
+### Added
+- Monitor hooks now run through a bun entry, so they load on native Windows, where the cockpit binary is skipped and the hook exits cleanly.
+
+## [dispatch 5.8.2] - 2026-10-29
+
+_tracks tag `dispatch-v5.8.2`_
+
+### Changed
+- Autopilot's scout now finds relay.ts through the stable marketplace checkout before falling back to the versioned cache, so exact-path permission rules no longer break on every relay version bump.
+
+## [runes 0.13.1] - 2026-10-29
+
+_tracks tag `runes-v0.13.1`_
+
+### Fixed
+- Explain timeline entries in the Editorial and Card Table themes no longer spill prose and code into the time column.
+
 ## [runes 0.13.0] - 2026-10-28
 
 _tracks tag `runes-v0.13.0`_
