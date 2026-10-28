@@ -1,5 +1,12 @@
 # Changelog
 
+## [browsers 0.1.3] - 2026-10-29
+
+_tracks tag `browsers-v0.1.3`_
+
+### Fixed
+- Chrome click and press now reliably wait for the new page to finish loading, instead of sometimes returning while it was still loading on slower machines.
+
 ## [monitor 8.4.0] - 2026-10-29
 
 _tracks tag `monitor-v8.4.0`_
