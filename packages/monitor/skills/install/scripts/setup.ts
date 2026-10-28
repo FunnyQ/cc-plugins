@@ -14,12 +14,13 @@ import {
   constants,
   copyFileSync,
   existsSync,
+  mkdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
 import { Database } from "bun:sqlite";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
   type Check,
   dashboardChecks,
@@ -190,6 +191,7 @@ function applyScriptPermissions(dryRun: boolean): boolean {
     permissions: { ...(data.permissions ?? {}), allow: [...allow, ...missing] },
   };
   const bak = backup(SETTINGS_JSON);
+  mkdirSync(dirname(SETTINGS_JSON), { recursive: true });
   writeFileSync(SETTINGS_JSON, `${JSON.stringify(next, null, 2)}\n`);
   console.log(`✓ Pre-approved q-lab plugin scripts in ${SETTINGS_JSON}`);
   if (bak) console.log(`   (backup: ${bak})`);

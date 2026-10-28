@@ -152,6 +152,13 @@ describe("--apply", () => {
     expect(settingsJson().statusLine).toBeUndefined();
   });
 
+  test("creates ~/.claude when it does not exist yet", () => {
+    rmSync(join(home, ".claude"), { recursive: true, force: true });
+    const { stdout } = run(["--apply"]);
+    expect(stdout).toContain("✓ Pre-approved q-lab plugin scripts");
+    expect(settingsJson().permissions.allow.length).toBeGreaterThan(0);
+  });
+
   test("removes a leftover channel entry but preserves other mcpServers and the statusLine", () => {
     writeFileSync(
       join(home, ".claude.json"),
