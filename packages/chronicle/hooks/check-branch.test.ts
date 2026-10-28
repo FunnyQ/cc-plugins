@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -12,7 +18,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  Bun.spawnSync(["trash", repo]);
+  rmSync(repo, { recursive: true, force: true });
 });
 
 function writePrConfig(config: unknown): void {
@@ -122,7 +128,7 @@ describe("check-branch", () => {
       cwd: repo,
       stdin: new TextEncoder().encode("{ git commit"),
     });
-    Bun.spawnSync(["trash", bin]);
+    rmSync(bin, { recursive: true, force: true });
 
     expect(noJq.exitCode).toBe(0);
     expect(noJq.stdout.toString()).toBe("");
