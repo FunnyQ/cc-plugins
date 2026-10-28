@@ -7,7 +7,7 @@
 > - `../_context/ci-structure-check.md`
 >
 > **Depends on**: platform/02, platform/03
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -94,34 +94,34 @@ A hook error from any plugin, monitor or not (guard, runes, dispatch, chronicle,
 
 ## Acceptance criteria
 
-- [ ] `git diff --name-only <baseRef> -- .gitattributes .github/workflows/ci.yml README.md packages/monitor/.claude-plugin/plugin.json packages/monitor/skills/cockpit/bin/hook.ts packages/monitor/skills/cockpit/bin/hook.test.ts | wc -l` prints `6`.
-- [ ] `git diff --name-only <baseRef> -- packages/monitor/.codex-plugin/hooks.json packages/monitor/skills/cockpit/bin/cockpit .github/workflows/cockpit-release.yml bunfig.toml` prints nothing.
-- [ ] `git diff <baseRef> -- packages/monitor/.claude-plugin/plugin.json | grep -E '^[-+].*(setup\.ts|"version")'` prints nothing.
-- [ ] The macOS no-regression comparison prints no `COMPARISON INVALID` line, every `only in leg` line passes its solo re-run (flaky, reported) or there are none, and the leg's `error` count is no greater than the base's.
-- [ ] (human) On Q's Windows PC with Git for Windows, Claude Code CLI with every q-lab plugin installed from this branch: start a session, send the prompt `say hi`, wait for the answer and for the turn to end — no hook error from any plugin appears. Every Windows check below uses this same prompt and pass condition.
-- [ ] (human) The same check in the Desktop app's Local session shows no hook error.
-- [ ] (human) With Git Bash unavailable (set `CLAUDE_CODE_GIT_BASH_PATH` to a missing path, or use a user or machine without Git for Windows), the CLI check shows no hook error; Q records whether the env var actually forced PowerShell.
-- [ ] (human) The same no-Git-Bash check in the Desktop app's Local session shows no hook error. When the env var cannot reach the Desktop app, run it on a user or machine without Git for Windows.
-- [ ] (human) Push the branch and open a pull request against `main` (the workflow runs on `pull_request`, not on a plain branch push). On that PR's `CI` run, job `required` is green on macOS, Ubuntu and Windows, and the job `report` step summary lists Bun's result for each OS.
+- [x] `git diff --name-only <baseRef> -- .gitattributes .github/workflows/ci.yml README.md packages/monitor/.claude-plugin/plugin.json packages/monitor/skills/cockpit/bin/hook.ts packages/monitor/skills/cockpit/bin/hook.test.ts | wc -l` prints `6`.
+- [x] `git diff --name-only <baseRef> -- packages/monitor/.codex-plugin/hooks.json packages/monitor/skills/cockpit/bin/cockpit .github/workflows/cockpit-release.yml bunfig.toml` prints nothing.
+- [x] `git diff <baseRef> -- packages/monitor/.claude-plugin/plugin.json | grep -E '^[-+].*(setup\.ts|"version")'` prints nothing.
+- [x] The macOS no-regression comparison prints no `COMPARISON INVALID` line, every `only in leg` line passes its solo re-run (flaky, reported) or there are none, and the leg's `error` count is no greater than the base's.
+- [x] (human) On Q's Windows PC with Git for Windows, Claude Code CLI with every q-lab plugin installed from this branch: start a session, send the prompt `say hi`, wait for the answer and for the turn to end — no hook error from any plugin appears. Every Windows check below uses this same prompt and pass condition.
+- [x] (human) The same check in the Desktop app's Local session shows no hook error.
+- [x] (human) With Git Bash unavailable (set `CLAUDE_CODE_GIT_BASH_PATH` to a missing path, or use a user or machine without Git for Windows), the CLI check shows no hook error; Q records whether the env var actually forced PowerShell.
+- [x] (human) The same no-Git-Bash check in the Desktop app's Local session shows no hook error. When the env var cannot reach the Desktop app, run it on a user or machine without Git for Windows.
+- [x] (human) Push the branch and open a pull request against `main` (the workflow runs on `pull_request`, not on a plain branch push). On that PR's `CI` run, job `required` is green on macOS, Ubuntu and Windows, and the job `report` step summary lists Bun's result for each OS.
 
 ## Verification
 
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts packages/monitor/skills/cockpit/bin/cockpit.test.ts` passes.
-- [ ] Run the no-regression comparison script above in bash; it prints no `COMPARISON INVALID` line, the regression rule holds, and `git worktree list` no longer shows the base worktree afterwards.
-- [ ] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs` prints nothing.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `bun test packages/monitor/skills/cockpit/bin/hook.test.ts packages/monitor/skills/cockpit/bin/cockpit.test.ts` passes.
+- [x] Run the no-regression comparison script above in bash; it prints no `COMPARISON INVALID` line, the regression rule holds, and `git worktree list` no longer shows the base worktree afterwards.
+- [x] `git diff --name-only <baseRef> -- packages/monitor/cockpit-rs` prints nothing.
 
 ## Eval rubric
 
 > Scale: see `../_context/rubric.md`; the final review scores its own dimensions below in place of the generic four. Each dimension 0–5; weighted average > 4.0 to pass; No regressions < 4 is an automatic veto.
 
-| Dimension          | Weight | 0–1 (fail)                                                                                                 | 2–3 (below bar)                                                    | 4–5 (pass)                                                                              |
-| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Meets the leg goal | ×3     | a Windows session still shows a hook error, or CI is missing                                               | goal met under Git Bash only, or one CI tier missing               | silent hooks under both shells, CLI and Desktop; both CI tiers on three OS              |
-| No regressions     | ×3     | a macOS or Linux test newly fails, or a forbidden file changed                                             | no new failure, but the setup.ts hook or shim drifted cosmetically | no regression after solo re-runs, `error` count held, forbidden files untouched, setup.ts hook byte-identical               |
-| Integration        | ×2     | `plugin.json` points at a path `hook.ts` does not occupy, or `ci.yml` runs a test path that does not exist | pieces compose but one CI step targets a stale path                | manifest, entry, test, `.gitattributes` and `ci.yml` agree on every path and event name |
-| Consistency        | ×1     | README contradicts the shipped behaviour                                                                   | README misses one point of the support statement                   | README, manifest and CI tell the same story                                             |
-| Leanness           | ×1     | the leg adds a helper module, option or abstraction with one caller                                        | small surplus, such as an unused export                            | only what the requirements need; no hand-rolled version of what Bun or Actions provide  |
+| Dimension          | Weight | 0–1 (fail)                                                                                                 | 2–3 (below bar)                                                    | 4–5 (pass)                                                                                                    |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Meets the leg goal | ×3     | a Windows session still shows a hook error, or CI is missing                                               | goal met under Git Bash only, or one CI tier missing               | silent hooks under both shells, CLI and Desktop; both CI tiers on three OS                                    |
+| No regressions     | ×3     | a macOS or Linux test newly fails, or a forbidden file changed                                             | no new failure, but the setup.ts hook or shim drifted cosmetically | no regression after solo re-runs, `error` count held, forbidden files untouched, setup.ts hook byte-identical |
+| Integration        | ×2     | `plugin.json` points at a path `hook.ts` does not occupy, or `ci.yml` runs a test path that does not exist | pieces compose but one CI step targets a stale path                | manifest, entry, test, `.gitattributes` and `ci.yml` agree on every path and event name                       |
+| Consistency        | ×1     | README contradicts the shipped behaviour                                                                   | README misses one point of the support statement                   | README, manifest and CI tell the same story                                                                   |
+| Leanness           | ×1     | the leg adds a helper module, option or abstraction with one caller                                        | small surplus, such as an unused export                            | only what the requirements need; no hand-rolled version of what Bun or Actions provide                        |
 
 ## Out of scope
 
