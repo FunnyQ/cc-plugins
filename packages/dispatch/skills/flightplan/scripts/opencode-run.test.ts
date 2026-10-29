@@ -16,6 +16,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { NO_ASK_CONTRACT } from "./lib/harness-run";
 import { parseJsonl, DEFAULT_MODEL, REVIEW_GUARD } from "./opencode-run.ts";
 
 const SCRIPT = join(import.meta.dir, "opencode-run.ts");
@@ -25,10 +26,13 @@ let originalHome: string | undefined;
 let originalUserProfile: string | undefined;
 let fakeOpencode: string;
 let argsLog: string;
+let stdinLog: string;
+let originalStdinLog: string | undefined;
 
 const FAKE = `#!/usr/bin/env bun
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 writeFileSync(process.env.ARGS_LOG, JSON.stringify(process.argv.slice(2)));
+writeFileSync(process.env.STDIN_LOG, readFileSync(0));
 process.stdout.write(JSON.stringify({ type: "step_start" }) + "\\n");
 process.stdout.write(JSON.stringify({ type: "text", part: { text: "OPENCODE SAYS: " } }) + "\\n");
 process.stdout.write(JSON.stringify({ type: "text", part: { text: "did the thing" } }) + "\\n");
@@ -45,6 +49,9 @@ beforeAll(async () => {
   process.env.USERPROFILE = dir;
   fakeOpencode = join(dir, "fake-opencode.ts");
   argsLog = join(dir, "args.json");
+  stdinLog = join(dir, "stdin.txt");
+  originalStdinLog = process.env.STDIN_LOG;
+  process.env.STDIN_LOG = stdinLog;
   await writeFile(fakeOpencode, FAKE);
   await chmod(fakeOpencode, 0o755);
 });
@@ -52,6 +59,7 @@ beforeAll(async () => {
 afterAll(async () => {
   restoreEnv("HOME", originalHome);
   restoreEnv("USERPROFILE", originalUserProfile);
+  restoreEnv("STDIN_LOG", originalStdinLog);
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -79,6 +87,7 @@ beforeAll(async () => {
 
 const loggedArgs = async (): Promise<string[]> =>
   JSON.parse(await readFile(argsLog, "utf-8"));
+const loggedStdin = () => readFile(stdinLog, "utf-8");
 
 describe("opencode-run delegate", () => {
   test("uses `run -m <delegate default> --format json` + prints output and a status list", async () => {
@@ -102,7 +111,7 @@ describe("opencode-run delegate", () => {
     expect(args).toContain(DEFAULT_MODEL.delegate);
     expect(args).toContain("--format");
     expect(args).toContain("json");
-    expect(args[args.length - 1]).toContain("implement task UI-03");
+    expect(await loggedStdin()).toContain("implement task UI-03");
   });
 
   test("pipes the prompt via stdin when no --prompt-file", async () => {
@@ -113,8 +122,28 @@ describe("opencode-run delegate", () => {
       env: { ...process.env, OPENCODE_BIN: opencodeBin, ARGS_LOG: argsLog },
     });
     expect(res.success).toBe(true);
+    expect(await loggedStdin()).toContain("do it from stdin");
+  });
+});
+
+describe("opencode-run prompt transport", () => {
+  test("a prompt holding cmd.exe special characters reaches opencode on stdin, never in argv", async () => {
+    const prompt = 'say "hi" 100% & bye\nline two';
+    const promptFile = join(dir, "special.txt");
+    await writeFile(promptFile, prompt);
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, "delegate", "--prompt-file", promptFile],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+        env: { ...process.env, OPENCODE_BIN: opencodeBin, ARGS_LOG: argsLog },
+      },
+    );
+    expect(res.success).toBe(true);
+    expect(await loggedStdin()).toBe(NO_ASK_CONTRACT + prompt);
     const args = await loggedArgs();
-    expect(args[args.length - 1]).toContain("do it from stdin");
+    expect(args.some((arg) => arg.includes("100%"))).toBe(false);
+    expect(args.some((arg) => arg.includes("\n"))).toBe(false);
   });
 });
 
@@ -133,7 +162,7 @@ describe("opencode-run review", () => {
 
     const args = await loggedArgs();
     expect(args).toContain(DEFAULT_MODEL.review);
-    const message = args[args.length - 1];
+    const message = await loggedStdin();
     expect(message.startsWith(REVIEW_GUARD)).toBe(true);
     expect(message).toContain("review the diff");
   });
@@ -293,7 +322,7 @@ describe("opencode-run unattended contract", () => {
       });
       expect(res.success).toBe(true);
 
-      const message = (await loggedArgs()).at(-1)!;
+      const message = await loggedStdin();
       expect(message).toContain("Nobody is watching this run");
       expect(message).toContain("do the thing");
     }

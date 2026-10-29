@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -61,12 +62,16 @@ function gitRaw(
   args: string[],
   options: { env?: Record<string, string>; stdin?: Uint8Array } = {},
 ) {
-  return Bun.spawnSync(["git", "-C", root, ...args], {
-    stdin: options.stdin,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, ...options.env },
-  });
+  // A system core.autocrlf=true (Git for Windows' default) would write CRLF back into LF files.
+  return Bun.spawnSync(
+    ["git", "-C", root, "-c", "core.autocrlf=false", ...args],
+    {
+      stdin: options.stdin,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...options.env },
+    },
+  );
 }
 
 function git(
@@ -276,7 +281,26 @@ function isDirectory(path: string): boolean {
   return existsSync(path) && lstatSync(path).isDirectory();
 }
 
-function seedIgnored(repo: string, path: string, excluded: string): void {
+type Spawn = (argv: string[]) => { exitCode: number | null };
+
+function defaultSpawn(argv: string[]): { exitCode: number | null } {
+  try {
+    return Bun.spawnSync(argv, {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: process.env,
+    });
+  } catch {
+    return { exitCode: null };
+  }
+}
+
+export function seedIgnored(
+  repo: string,
+  path: string,
+  excluded: string,
+  spawn: Spawn = defaultSpawn,
+): void {
   function copy(relative: string): void {
     relative = relative.replace(/\/$/, "");
     if (relative === excluded || relative.startsWith(`${excluded}/`)) return;
@@ -288,22 +312,11 @@ function seedIgnored(repo: string, path: string, excluded: string): void {
     }
     const destination = join(path, relative);
     mkdirSync(dirname(destination), { recursive: true });
-    const cloned = Bun.spawnSync(["cp", "-c", "-R", source, destination], {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: process.env,
-    });
-    if (cloned.exitCode !== 0) {
-      const fallback =
-        isDirectory(source) && isDirectory(destination)
-          ? `${source}/.`
-          : source;
-      Bun.spawnSync(["cp", "-R", fallback, destination], {
-        stdout: "pipe",
-        stderr: "pipe",
-        env: process.env,
-      });
-    }
+    if (spawn(["cp", "-c", "-R", source, destination]).exitCode === 0) return;
+    const fallback =
+      isDirectory(source) && isDirectory(destination) ? `${source}/.` : source;
+    if (spawn(["cp", "-R", fallback, destination]).exitCode === 0) return;
+    cpSync(source, destination, { recursive: true });
   }
   let paths: string[];
   try {
@@ -327,6 +340,12 @@ function seedIgnored(repo: string, path: string, excluded: string): void {
       /* Ignored dependencies are best-effort seeds. */
     }
   }
+}
+
+export function linkType(
+  platform: NodeJS.Platform = process.platform,
+): "junction" | undefined {
+  return platform === "win32" ? "junction" : undefined;
 }
 
 export function samePathKey(
@@ -403,7 +422,7 @@ export function create(options: RefOptions): Location {
   seedIgnored(options.repo, path, planOf(options));
   const link = join(path, planOf(options));
   mkdirSync(dirname(link), { recursive: true });
-  symlinkSync(join(resolve(options.repo), planOf(options)), link);
+  symlinkSync(join(resolve(options.repo), planOf(options)), link, linkType());
   state[options.ref] = { path, base };
   writeState(root, state);
   return { path, base };

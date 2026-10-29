@@ -19,10 +19,12 @@ import {
   create,
   fingerprint,
   land,
+  linkType,
   rebase,
   remove,
   reset,
   samePathKey,
+  seedIgnored,
   show,
   sweep,
   unland,
@@ -658,7 +660,7 @@ describe("worktree lifecycle", () => {
 
   // Windows cannot run a #!/bin/sh stub, and its PATH separator is ";", not ":".
   test.skipIf(process.platform === "win32")(
-    "ignored seeds fall back from clone copies and tolerate complete copy failure",
+    "ignored seeds fall back from clone copies, then to cpSync when every cp fails",
     () => {
       const options = fixture();
       put(options.repo, "node_modules/x/index.js", "dependency\n");
@@ -679,14 +681,61 @@ describe("worktree lifecycle", () => {
         put(bin, "cp", "#!/bin/sh\nexit 1\n");
         const second = create(options);
         expect(show(options)).toEqual({ ...second, exists: true });
-        expect(existsSync(join(second.path, "node_modules/x/index.js"))).toBe(
-          false,
-        );
+        expect(
+          readFileSync(join(second.path, "node_modules/x/index.js"), "utf8"),
+        ).toBe("dependency\n");
       } finally {
         process.env.PATH = originalPath;
       }
     },
   );
+
+  test("ignored seeds copy with cpSync when both cp attempts fail, with no PATH stub", () => {
+    const options = fixture();
+    const bytes = new Uint8Array([0, 13, 10, 255, 128, 10]);
+    put(options.repo, "node_modules/x/index.js", "dependency\n");
+    put(options.repo, "node_modules/x/lib/deep/blob.bin", bytes);
+    const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+    scratch.push(destination);
+    const tried: string[][] = [];
+    seedIgnored(options.repo, destination, "docs/test-plan", (argv) => {
+      tried.push(argv);
+      return { exitCode: 1 };
+    });
+    expect(tried.map((argv) => argv.slice(0, 2))).toEqual([
+      ["cp", "-c"],
+      ["cp", "-R"],
+    ]);
+    expect(
+      readFileSync(join(destination, "node_modules/x/index.js"), "utf8"),
+    ).toBe("dependency\n");
+    expect(
+      new Uint8Array(
+        readFileSync(join(destination, "node_modules/x/lib/deep/blob.bin")),
+      ),
+    ).toEqual(bytes);
+  });
+
+  test("create and land round-trip LF bytes when git's core.autocrlf is true, as on Windows", () => {
+    const options = fixture();
+    git(options.repo, "config", "core.autocrlf", "true");
+    put(options.repo, "lf.txt", "one\ntwo\n");
+    const baseline = fingerprint(options).fingerprint;
+    const wt = create(options);
+    put(wt.path, "landed.txt", "three\nfour\n");
+    put(wt.path, "a.txt", "base\nedited\n");
+    expect(land({ ...options, expect: baseline, op: "a1-land" }).status).toBe(
+      "clean",
+    );
+    for (const root of [options.repo, wt.path]) {
+      for (const file of ["lf.txt", "landed.txt", "a.txt", "b.txt"]) {
+        expect(readFileSync(join(root, file), "utf8")).not.toContain("\r");
+      }
+    }
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe(
+      "base\nedited\n",
+    );
+  });
 
   test("ignored ancestor directories never seed the excluded plan", () => {
     const options = fixture();
@@ -731,6 +780,14 @@ describe("worktree lifecycle", () => {
     expect(unland({ ...options, op: "a1-unland" })).toEqual({
       restored: ["a.txt"],
     });
+  });
+});
+
+describe("linkType", () => {
+  test("links the plan dir as a junction on win32 only, which needs no Developer Mode", () => {
+    expect(linkType("win32")).toBe("junction");
+    expect(linkType("darwin")).toBeUndefined();
+    expect(linkType("linux")).toBeUndefined();
   });
 });
 
