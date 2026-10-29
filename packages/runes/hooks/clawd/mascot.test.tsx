@@ -296,8 +296,11 @@ test("with Clawd off, the minimap still draws in the band on the terminal and th
     surface: "terminal",
     ...BAND,
   });
-  const row = await term.find({ key: "clawd-row" });
-  expect(row?.props).toMatchObject({ justifyContent: "flex-start", width: 80 });
+  // the buttons take Clawd's place at the right of the map's row, so the band spends no line on them
+  type Node = { props?: { key?: string }; children?: Node[] } | undefined;
+  const row = (await term.find({ key: "clawd-row" })) as Node;
+  expect(row?.props).toMatchObject({ justifyContent: "space-between", width: 80 });
+  expect(row?.children?.at(-1)?.props?.key).toBe("explain-buttons");
   expect(await term.find({ key: "clawd" })).toBeUndefined();
   expect(await term.find({ key: "line:0" })).toBeDefined();
   await term.unmount();
@@ -307,7 +310,7 @@ test("with Clawd off, the minimap still draws in the band on the terminal and th
     ...BAND,
   });
   expect((await desk.find({ key: "clawd-row" }))?.props).toMatchObject({
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
   });
   // the desktop draws the map alone: one Svg of square blocks, no jump buttons
   expect(await desk.find({ key: "line:0" })).toBeUndefined();
