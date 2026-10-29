@@ -7,7 +7,7 @@ Keep the existing required and smoke jobs and the macos-latest / ubuntu-latest /
 Extend required with:
 
 ```sh
-bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ .github/scripts/browser-smoke.test.ts
+bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ ./.github/scripts/browser-smoke.test.ts
 (cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
 bun .github/scripts/browser-smoke.ts
 ```

@@ -38,7 +38,7 @@ Every task starts todo. Every non-final task uses the common weighted rubric. On
 - Add the runner with optional --check-prerequisites, consistent nonzero failures, actual Chrome/Firefox version/path reporting and controlled local/data pages. Require Chrome on every OS and Firefox on macOS and Linux in the runner, and assert the Firefox refusal on native Windows, even though ordinary optional live tests may skip.
 - Allocate a private Q_BROWSER_STATE_DIR before each browser launch and use it for cleanup on timeout before id output, never shared-registry differences. Test concurrent unrelated launch preservation. Exercise open, reuse through a fresh CLI process, interaction, text/eval, PNG screenshot and owned close. Test absent prerequisites and fail propagation with injected child operations. Never install a user dependency as a side effect.
 - Preserve Safari's macOS opt-in and keep Zen live checking owed unless a reproducible CI installation is available.
-- Verify `bun test .github/scripts/browser-smoke.test.ts`, `bun .github/scripts/browser-smoke.ts`, `bun test packages/browsers`, and root tsc. Record installed browser versions rather than assume availability.
+- Verify `bun test ./.github/scripts/browser-smoke.test.ts`, `bun .github/scripts/browser-smoke.ts`, `bun test packages/browsers`, and root tsc. Record installed browser versions rather than assume availability.
 
 ## runes/01 — portable-test-contracts
 
@@ -74,6 +74,7 @@ Every task starts todo. Every non-final task uses the common weighted rubric. On
 - Depends on: runes/02. Blocks: platform/01. Models: dev=opus/high.
 - Required reading: shared.md, rubric.md, windows.md, runes.md.
 - Own packages/runes/hooks/explain/{checker.ts,checker.test.ts,checker-cli.ts,geometry-cli.ts} and hooks/{platform-cli.ts,platform.spec.ts}.
+- Align explain/{explain.test.ts,button.test.tsx} fixtures with runtime Chrome discovery by injecting explicit Chrome-present or Chrome-absent snapshots; retain all existing behavior assertions.
 - Apply exactly the six checker changes in runes.md: RuntimeInfo.chrome discovery (Linux Chrome only on WSL), the fixed checker-cli.ts screenshot helper, exact-match Bash permission, fixed Read/Edit containment, shared opener plus cleanup-check at settle, and pathToFileURL in geometry-cli.ts.
 - Keep the existing cN tokens, pending map, timeout, late-verdict isolation and missing-Chrome skip unchanged. Add no job manifest, lock, process tracking or cancel operation.
 - Test Windows-looking paths on macOS by injecting Windows semantics rather than relying on host path.join. Cover spaces, CJK, metacharacters, sibling prefixes, case aliases, `..` and a page path that falls back to normal permission.
@@ -112,7 +113,7 @@ Every task starts todo. Every non-final task uses the common weighted rubric. On
 - Own .github/workflows/ci.yml and .github/scripts/browser-smoke.ts only if CI invocation/provisioning integration needs a correction. Preserve previously landed core gates and the report job.
 - Add browsers/herdr to required, run the isolated runes contracts with package cwd and require native Chrome smoke on all three OS plus Firefox on macOS and Linux. Keep root exclusions intact.
 - Prefer image-installed browsers; explicitly provision an absent required browser from an official source rather than adding a skip. Print prerequisite/version evidence.
-- Verify root tsc, `bun test packages/browsers packages/herdr .github/scripts/browser-smoke.test.ts`, isolated runes contracts, and real browser smoke locally. Inspect all matrix branches. Tag remote PR CI outcome as human owed until an actual implementation PR exists; do not require an unauthorized push for a local task gate.
+- Verify root tsc, `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts`, isolated runes contracts, and real browser smoke locally. Inspect all matrix branches. Tag remote PR CI outcome as human owed until an actual implementation PR exists; do not require an unauthorized push for a local task gate.
 
 ## platform/02 — support-docs
 
@@ -134,7 +135,7 @@ Every task starts todo. Every non-final task uses the common weighted rubric. On
 - Required reading: shared.md, rubric.md, windows.md, browsers.md, runes.md, verification.md.
 - Own docs/windows-support/legs/03-browser-ui/REVIEW.md and narrowly scoped integration fixes in the already-declared plugin/CI/documentation surface.
 - Inspect the entire execution diff using <baseRef>, including earlier committed waves. Confirm every branch reaches the closing gate and support claims agree with actual automated/human evidence.
-- Run `bun test packages/browsers packages/herdr .github/scripts/browser-smoke.test.ts`, root tsc, the complete runes mod suite and validation, isolated platform/theme contracts and the real native browser smoke.
+- Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts`, root tsc, the complete runes mod suite and validation, isolated platform/theme contracts and the real native browser smoke.
 - Review native process/profile cleanup, the Firefox/Zen Windows refusal, Safari refusal and checker permissions together. Record owed human checks in the persistent ledger; never present their task checkboxes as proof of completion.
 - Write exact command outcomes, versions, changed-file list, limits and outstanding debts to REVIEW.md. Use the exact path in every report acceptance criterion. Add (human) checks for actual Windows/WSL pane/mod/Zen operations and remote CI, with machine-verifiable gates alongside them.
 - Use the final Integration/Goal coverage/No regressions/Consistency/Leanness rubric from rubric.md. Run appropriate tests after final fixes. Do not push, merge, release or implement deferred Windows Firefox/Zen or WSL-to-Windows browser support.

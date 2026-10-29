@@ -9,7 +9,7 @@
 >
 > **Depends on**: runes/02
 > **Blocks**: platform/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -20,6 +20,7 @@ Run explain's geometry and screenshot checks wherever local Chrome exists, with 
 
 - `packages/runes/hooks/explain/checker.ts` — use discovered Chrome, the fixed screenshot helper, exact-match Bash permission, fixed containment and the shared opener and cleanup at settle.
 - `packages/runes/hooks/explain/checker.test.ts` — cover the changed boundaries through the mod kit.
+- `packages/runes/hooks/explain/{explain.test.ts,button.test.tsx}` (modify, bounded fixture alignment) — inject explicit runtime Chrome discovery results while preserving existing checker and button assertions.
 - `packages/runes/hooks/explain/checker-cli.ts` (new) — take one wide or narrow screenshot of one page.
 - `packages/runes/hooks/explain/geometry-cli.ts` — encode the page URL with `pathToFileURL`.
 - `packages/runes/hooks/platform-cli.ts` — fill `RuntimeInfo.chrome` and export the discovery function checker-cli.ts reuses.
@@ -34,6 +35,8 @@ This is a port, not a redesign. Keep the existing `cN` verdict tokens, the `pend
 Do not add job manifests, per-page locks, process-ownership tracking or a cancel operation. A screenshot still being written when a check times out is existing behavior on every OS and stays out of this leg.
 
 Keep Bun globals and Node imports out of modules the mod loads. Keep the hook engine object inside its own module.
+
+Align the existing explain and button test fixtures with runtime Chrome discovery. Inject explicit Chrome-present or Chrome-absent snapshots instead of using filesystem existence as a substitute for the probe. Preserve every existing behavior assertion.
 
 ### 1. Discover Chrome
 
@@ -75,20 +78,20 @@ In geometry-cli.ts, replace the `file://` concatenation with `pathToFileURL(page
 
 ## Acceptance criteria
 
-- [ ] Discovery tests return the macOS path, the first existing Windows candidate from injected ProgramFiles / ProgramFiles(x86) / LOCALAPPDATA, the first Linux PATH name, a Linux-only result on WSL and `null` when nothing exists; a `null` result settles the entry `skipped` and still opens the page.
-- [ ] checker-cli.ts tests reject a missing or unknown mode, a non-`.html` page and any extra argument, derive the exact PNG name per mode, and launch Chrome with an argv array containing an encoded file URL and a temporary profile that is removed after Chrome exits.
-- [ ] Permission tests allow exactly the two stored commands for a pending check, deny any other command, deny a stored command after its check settles, and send a plugin root or page path containing `'` to the normal permission flow; a Windows home containing a space, a plugin root containing `$(…)` (which must not expand) and a UNC home (which must reach the helper as `//server/…`) are allowed.
-- [ ] Containment tests with injected Windows semantics accept backslash and case variants of a file under the root, and reject `..`, a sibling `explain-other/` directory and a different drive.
-- [ ] Settlement tests prove pass, skip, failure and timeout call the shared opener and `cleanup-check`, run cleanup when opening fails, and keep the verdict.
-- [ ] Existing checker tests for verdict tokens, timeouts, denied spawn and late replies pass unchanged.
-- [ ] Mod-loaded modules stay free of Bun-only imports, Bun globals and cross-plugin imports.
+- [x] Discovery tests return the macOS path, the first existing Windows candidate from injected ProgramFiles / ProgramFiles(x86) / LOCALAPPDATA, the first Linux PATH name, a Linux-only result on WSL and `null` when nothing exists; a `null` result settles the entry `skipped` and still opens the page.
+- [x] checker-cli.ts tests reject a missing or unknown mode, a non-`.html` page and any extra argument, derive the exact PNG name per mode, and launch Chrome with an argv array containing an encoded file URL and a temporary profile that is removed after Chrome exits.
+- [x] Permission tests allow exactly the two stored commands for a pending check, deny any other command, deny a stored command after its check settles, and send a plugin root or page path containing `'` to the normal permission flow; a Windows home containing a space, a plugin root containing `$(…)` (which must not expand) and a UNC home (which must reach the helper as `//server/…`) are allowed.
+- [x] Containment tests with injected Windows semantics accept backslash and case variants of a file under the root, and reject `..`, a sibling `explain-other/` directory and a different drive.
+- [x] Settlement tests prove pass, skip, failure and timeout call the shared opener and `cleanup-check`, run cleanup when opening fails, and keep the verdict.
+- [x] Existing checker tests for verdict tokens, timeouts, denied spawn and late replies pass unchanged.
+- [x] Mod-loaded modules stay free of Bun-only imports, Bun globals and cross-plugin imports.
 
 ## Verification
 
-- [ ] Run `claude plugin test packages/runes` from the repository root and require zero failures.
-- [ ] Run `claude plugin validate packages/runes` from the repository root and require success.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require zero failures.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require no diagnostics; record that this command excludes the runes mod and does not replace its mod tests.
+- [x] Run `claude plugin test packages/runes` from the repository root and require zero failures.
+- [x] Run `claude plugin validate packages/runes` from the repository root and require success.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require zero failures.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require no diagnostics; record that this command excludes the runes mod and does not replace its mod tests.
 
 ## Eval rubric
 

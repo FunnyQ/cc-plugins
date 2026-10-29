@@ -75,7 +75,7 @@ Apply only narrow integration fixes. Add regression coverage for a discovered de
 ## Verification
 
 - [ ] Run `git diff --name-only <baseRef> -- packages/browsers packages/runes packages/herdr .github README.md CLAUDE.md docs/windows-support` and the corresponding full diff; reconcile the reviewed scope with `docs/windows-support/legs/03-browser-ui/REVIEW.md`.
-- [ ] Run `bun test packages/browsers packages/herdr .github/scripts/browser-smoke.test.ts` from the repository root and require zero failures.
+- [ ] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` from the repository root and require zero failures.
 - [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit zero; keep runes' root exclusion intact and do not claim this command validates the mod.
 - [ ] Run `claude plugin test packages/runes` and `claude plugin validate packages/runes` from the repository root and require both to exit zero.
 - [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require zero failures without importing the mod test kit into the standalone contracts.

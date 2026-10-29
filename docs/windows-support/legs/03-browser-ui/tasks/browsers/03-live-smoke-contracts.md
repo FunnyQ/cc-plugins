@@ -8,7 +8,7 @@
 >
 > **Depends on**: browsers/02
 > **Blocks**: platform/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -58,22 +58,22 @@ Keep injection local to the smoke runner rather than adding a transport framewor
 
 ## Acceptance criteria
 
-- [ ] The normal command requires native Chrome on every OS and Firefox on macOS and Linux, asserts the Firefox refusal on native Windows, prints actual paths and versions, and returns nonzero for any missing required prerequisite instead of reporting a skip.
-- [ ] `--check-prerequisites` verifies the required browsers without opening an automation instance and returns nonzero on prerequisite failure; invalid arguments fail clearly.
-- [ ] Each real smoke sequence opens a fresh isolated instance and reconnects to the same returned id through separate CLI children for interaction, content verification, screenshot and close.
-- [ ] Each required browser's screenshot produces a PNG at the caller-owned destination containing spaces and CJK text, without cross-OS output-path conversion.
-- [ ] Failed actions, wrong page content, invalid PNG data, child timeouts and cleanup failures all fail the command; unit tests cover these failure paths and preserve the primary diagnostic.
-- [ ] `finally` cleanup closes only smoke-owned ids and disposes only the runner's server/scratch resources; missing prerequisites cause no browser launch.
-- [ ] Optional local browser tests may still skip absent installations, while Safari live automation remains both macOS-only and explicitly enabled with `SAFARI_LIVE=1`.
-- [ ] The runner installs no browser or dependency and makes no system configuration change; measured native versions are reported without claiming Zen, Windows Firefox or real WSL verification.
+- [x] The normal command requires native Chrome on every OS and Firefox on macOS and Linux, asserts the Firefox refusal on native Windows, prints actual paths and versions, and returns nonzero for any missing required prerequisite instead of reporting a skip.
+- [x] `--check-prerequisites` verifies the required browsers without opening an automation instance and returns nonzero on prerequisite failure; invalid arguments fail clearly.
+- [x] Each real smoke sequence opens a fresh isolated instance and reconnects to the same returned id through separate CLI children for interaction, content verification, screenshot and close.
+- [x] Each required browser's screenshot produces a PNG at the caller-owned destination containing spaces and CJK text, without cross-OS output-path conversion.
+- [x] Failed actions, wrong page content, invalid PNG data, child timeouts and cleanup failures all fail the command; unit tests cover these failure paths and preserve the primary diagnostic.
+- [x] `finally` cleanup closes only smoke-owned ids and disposes only the runner's server/scratch resources; missing prerequisites cause no browser launch.
+- [x] Optional local browser tests may still skip absent installations, while Safari live automation remains both macOS-only and explicitly enabled with `SAFARI_LIVE=1`.
+- [x] The runner installs no browser or dependency and makes no system configuration change; measured native versions are reported without claiming Zen, Windows Firefox or real WSL verification.
 
 ## Verification
 
-- [ ] Run `bun test .github/scripts/browser-smoke.test.ts` and confirm prerequisite, assertion, timeout and cleanup regression cases pass without real browser launches.
-- [ ] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites` and confirm the required native executable paths and versions are reported; resolve a missing prerequisite explicitly rather than converting it to a successful skip.
-- [ ] Run `bun .github/scripts/browser-smoke.ts` and confirm every required browser sequence passes and its owned instances close.
-- [ ] Run `bun test packages/browsers` and confirm optional local tests retain their prerequisite behavior and Safari does not open a window without opt-in.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and confirm it passes.
+- [x] Run `bun test ./.github/scripts/browser-smoke.test.ts` and confirm prerequisite, assertion, timeout and cleanup regression cases pass without real browser launches.
+- [x] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites` and confirm the required native executable paths and versions are reported; resolve a missing prerequisite explicitly rather than converting it to a successful skip.
+- [x] Run `bun .github/scripts/browser-smoke.ts` and confirm every required browser sequence passes and its owned instances close.
+- [x] Run `bun test packages/browsers` and confirm optional local tests retain their prerequisite behavior and Safari does not open a window without opt-in.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and confirm it passes.
 
 ## Eval rubric
 

@@ -28,7 +28,7 @@ Keep the `macos-latest`, `ubuntu-latest` and `windows-latest` matrix, Bun `1.4.4
 Run the following commands in the blocking `required` job:
 
 ```sh
-bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ .github/scripts/browser-smoke.test.ts
+bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ ./.github/scripts/browser-smoke.test.ts
 (cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
 bun .github/scripts/browser-smoke.ts
 ```
@@ -64,7 +64,7 @@ Remote implementation-PR CI is owed until an authorized PR exists. Keep that res
 ## Verification
 
 - [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0.
-- [ ] Run `bun test packages/browsers packages/herdr .github/scripts/browser-smoke.test.ts` and require zero failures.
+- [ ] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` and require zero failures.
 - [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0 without collecting mod tests.
 - [ ] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites`, then `bun .github/scripts/browser-smoke.ts`; require every browser the host requires to pass and record their actual paths and versions.
 - [ ] Inspect `git diff -- .github/workflows/ci.yml .github/scripts/browser-smoke.ts` against each matrix branch and confirm all new required commands propagate failure while existing core, monitor, smoke and report behavior is retained.
