@@ -26,6 +26,7 @@ function fixture(platform: "darwin" | "linux" | "win32" = "linux") {
       const result = intercept(argv, root);
       if (result) return result;
       if (argv[1] === "--version") return ok(`${argv[0]} 123.4`);
+      if (argv[0] === "powershell.exe") return ok("123.4");
       const command = argv[2];
       const name = argv[1]!.includes("chrome") ? "chrome" : "firefox";
       if (command === "open") {
@@ -79,6 +80,15 @@ describe("required browser smoke", () => {
       expect(f.calls).toHaveLength(1);
     });
   }
+  test("Windows reads Chrome's version from the executable, since chrome.exe --version opens a browser", async () => {
+    const f = fixture("win32");
+    f.intercept((argv) => argv[0] === "powershell.exe" ? ok("156.0.8078.48") : undefined);
+    await runSmoke({ checkPrerequisites: true }, f.deps);
+    expect(f.calls).toHaveLength(1);
+    expect(f.calls[0]!.argv).not.toContain("--version");
+    expect(f.calls[0]!.argv.at(-1)).toContain("VersionInfo.ProductVersion");
+    expect(f.messages.join("\n")).toContain("/native/chrome\nversion: 156.0.8078.48");
+  });
   test("preflight reports selected paths and measured versions without opening", async () => {
     const f = fixture();
     await runSmoke({ checkPrerequisites: true }, f.deps);

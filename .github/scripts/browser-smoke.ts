@@ -82,7 +82,11 @@ export async function runSmoke(options: SmokeOptions, deps: SmokeDependencies = 
   for (const name of required) {
     try {
       const binary = deps.resolve(name);
-      const version = requireSuccess(await deps.run([binary, "--version"], 10_000), `${name} version`);
+      // chrome.exe treats --version as a launch and prints nothing, so Windows reads the file's version resource.
+      const probe = deps.platform === "win32"
+        ? deps.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "(Get-Item -LiteralPath $env:Q_SMOKE_BINARY).VersionInfo.ProductVersion"], 10_000, { Q_SMOKE_BINARY: binary })
+        : deps.run([binary, "--version"], 10_000);
+      const version = requireSuccess(await probe, `${name} version`);
       if (!/\d/.test(version)) throw new Error(`version reporting returned no measured version: ${version}`);
       deps.report(`${name}: ${binary}\nversion: ${version}`);
     } catch (error) { throw new Error(`${name} prerequisite: ${diagnostic(error)}`); }
