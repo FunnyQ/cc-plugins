@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { basename, join } from "path";
+import { tmpdir } from "os";
 import {
   CLI_DEFAULT,
   SUGGESTED_CONFIG_PATH,
@@ -8,6 +9,7 @@ import {
   addTimestampSuffix,
   createTmpRunDir,
   TMP_ROOT,
+  tmpRoot,
   timestampForPath,
 } from "./shared";
 import type { Mode } from "./types";
@@ -101,8 +103,11 @@ describe("addTimestampSuffix", () => {
 });
 
 describe("createTmpRunDir", () => {
-  it("roots under the q-lab namespace", () => {
-    expect(TMP_ROOT).toBe("/tmp/q-lab/relay/relay");
+  it("roots under the q-lab namespace, absolute on every platform", () => {
+    expect(tmpRoot("darwin")).toBe("/tmp/q-lab/relay/relay");
+    expect(tmpRoot("linux")).toBe("/tmp/q-lab/relay/relay");
+    expect(tmpRoot("win32")).toBe(join(tmpdir(), "q-lab", "relay", "relay"));
+    expect(TMP_ROOT).toBe(tmpRoot());
   });
 
   it("returns a path under TMP_ROOT", () => {
@@ -112,9 +117,7 @@ describe("createTmpRunDir", () => {
 
   it("returns a path with correct format: <ts>-<pid>-<rand>", () => {
     const dir = createTmpRunDir();
-    const parts = dir.split("/");
-    const last = parts[parts.length - 1];
-    expect(last).toMatch(/^\d{8}-\d{6}-\d{3}-\d+-[a-f0-9]{8}$/);
+    expect(basename(dir)).toMatch(/^\d{8}-\d{6}-\d{3}-\d+-[a-f0-9]{8}$/);
   });
 
   it("creates the directory", () => {

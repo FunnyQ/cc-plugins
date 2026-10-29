@@ -405,8 +405,8 @@ describe("executeRelay", () => {
           buildArgs = args;
           return "/tmp/prompt.md";
         },
-        run: (argv) => {
-          promptArg = argv.at(-1) ?? "";
+        run: (_argv, opts) => {
+          promptArg = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -433,8 +433,8 @@ describe("executeRelay", () => {
           built = true;
           return "/tmp/prompt.md";
         },
-        run: (argv) => {
-          promptArg = argv.at(-1) ?? "";
+        run: (_argv, opts) => {
+          promptArg = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -549,12 +549,12 @@ describe("executeRelay", () => {
   });
 
   it("gives opencode the uncommitted review prompt when task is absent", async () => {
-    let invocation: string[] = [];
+    let prompt = "";
     const result = await executeRelay(
       ["opencode", "review"],
       deps({
-        run: (argv) => {
-          invocation = argv;
+        run: (_argv, opts) => {
+          prompt = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -566,8 +566,8 @@ describe("executeRelay", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(invocation.at(-1)).toContain("Review only the uncommitted changes");
-    expect(invocation.at(-1)).toContain("git diff --cached");
+    expect(prompt).toContain("Review only the uncommitted changes");
+    expect(prompt).toContain("git diff --cached");
   });
 
   it("passes a provided review task without adding uncommitted scope", async () => {

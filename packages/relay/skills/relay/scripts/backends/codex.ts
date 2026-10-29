@@ -20,14 +20,16 @@ export function buildImagePrompt(prompt: string): string {
 export function extractGeneratedPngPath(
   output: string,
   home = homedir(),
+  exists: (path: string) => boolean = existsSync,
 ): string | null {
-  const matches = output.match(/(?:~|\/)[^\s"'`]+\.png/g) ?? [];
+  const matches =
+    output.match(/(?:[A-Za-z]:[\\/]|~[\\/]|\/)[^\s"'`]+\.png/g) ?? [];
 
   for (const match of matches) {
-    const fullPath = match.startsWith("~/")
+    const fullPath = /^~[\\/]/.test(match)
       ? join(home, match.slice(2))
       : match;
-    if (existsSync(fullPath)) return fullPath;
+    if (exists(fullPath)) return fullPath;
   }
 
   return null;
@@ -116,8 +118,10 @@ export const codexBackend: Backend = {
       return { argv, stdin: opts.promptText };
     }
 
-    const prompt = buildImagePrompt(opts.task || "an image");
-    return { argv: [CODEX_BIN, "exec", "-o", opts.lastFile!, prompt] };
+    return {
+      argv: [CODEX_BIN, "exec", "-o", opts.lastFile!, "-"],
+      stdin: buildImagePrompt(opts.task || "an image"),
+    };
   },
 
   parseOutput(raw: string): string {

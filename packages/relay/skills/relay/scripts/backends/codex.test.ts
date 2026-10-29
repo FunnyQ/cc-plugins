@@ -17,6 +17,7 @@ import {
   codexBackend,
 } from "./codex";
 import type { InvokeOpts } from "../types";
+import { SPAWN_PROMPT, spawnStub } from "./spawn-stub";
 
 describe("codexBackend", () => {
   describe("invokeLive", () => {
@@ -173,16 +174,40 @@ describe("codexBackend", () => {
           "exec",
           "-o",
           "/tmp/last.txt",
-          "Generate an image of: a sunset over mountains.",
+          "-",
         ]);
-        expect(result.stdin).toBeUndefined();
+        expect(result.stdin).toBe(
+          "Generate an image of: a sunset over mountains.",
+        );
       });
 
       it("should use generic prompt if task is absent", () => {
         const opts: InvokeOpts = { lastFile: "/tmp/last.txt" };
         const result = codexBackend.invoke("image", opts);
-        expect(result.argv[result.argv.length - 1]).toBe(
-          "Generate an image of: an image.",
+        expect(result.argv.at(-1)).toBe("-");
+        expect(result.stdin).toBe("Generate an image of: an image.");
+      });
+
+      it("keeps a special-character prompt out of argv and intact on stdin", () => {
+        const result = codexBackend.invoke("image", {
+          task: SPAWN_PROMPT,
+          lastFile: "/tmp/last.txt",
+        });
+        for (const arg of result.argv) {
+          for (const bad of ["hi", "%", "&", '"', "\n"]) {
+            expect(arg).not.toContain(bad);
+          }
+        }
+        expect(result.stdin).toBe(buildImagePrompt(SPAWN_PROMPT));
+      });
+
+      it("delivers the prompt byte-for-byte to a spawned stub", () => {
+        const result = codexBackend.invoke("image", {
+          task: SPAWN_PROMPT,
+          lastFile: "/tmp/last.txt",
+        });
+        expect(spawnStub(result.argv, result.stdin)).toBe(
+          buildImagePrompt(SPAWN_PROMPT),
         );
       });
     });
@@ -246,6 +271,29 @@ describe("codexBackend", () => {
       writeFileSync(pngPath, "fake");
       const output = `Image saved to ~/test-image.png`;
       expect(extractGeneratedPngPath(output, tempDir)).toBe(pngPath);
+    });
+
+    it("returns a backslash drive-letter path whole", () => {
+      const path = "C:\\Users\\me\\.codex\\generated_images\\a.png";
+      expect(
+        extractGeneratedPngPath(`saved to ${path}`, tempDir, () => true),
+      ).toBe(path);
+    });
+
+    it("returns a forward-slash drive-letter path with its drive", () => {
+      const path = "C:/Users/me/.codex/generated_images/a.png";
+      expect(
+        extractGeneratedPngPath(`saved to ${path}`, tempDir, () => true),
+      ).toBe(path);
+    });
+
+    it("expands a backslash tilde path against the home dir", () => {
+      mkdirSync(join(tempDir, "sub"), { recursive: true });
+      const pngPath = join(tempDir, "sub\\a.png");
+      writeFileSync(pngPath, "fake");
+      expect(
+        extractGeneratedPngPath("saved to ~\\sub\\a.png", tempDir),
+      ).toBe(pngPath);
     });
 
     it("should return null if no .png found in output", () => {

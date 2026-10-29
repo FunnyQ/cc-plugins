@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { opencodeBackend, parseError, parseJsonl } from "./opencode";
 import type { InvokeOpts } from "../types";
+import { SPAWN_PROMPT, spawnStub } from "./spawn-stub";
 
 describe("opencodeBackend", () => {
   describe("invokeLive", () => {
@@ -55,9 +56,8 @@ describe("opencodeBackend", () => {
         "opencode-go/deepseek-v4-light",
         "--format",
         "json",
-        "--",
-        "test prompt",
       ]);
+      expect(result.stdin).toBe("test prompt");
     });
 
     it("builds review argv with the resolved model", () => {
@@ -74,9 +74,8 @@ describe("opencodeBackend", () => {
         "opencode-go/deepseek-v4-pro",
         "--format",
         "json",
-        "--",
-        "review prompt",
       ]);
+      expect(result.stdin).toBe("review prompt");
     });
 
     it("never passes --variant", () => {
@@ -96,9 +95,8 @@ describe("opencodeBackend", () => {
         "run",
         "--format",
         "json",
-        "--",
-        "test prompt",
       ]);
+      expect(result.stdin).toBe("test prompt");
     });
 
     it("overrides model with --model flag", () => {
@@ -118,7 +116,8 @@ describe("opencodeBackend", () => {
 
       expect(result.argv).toContain("--format");
       expect(result.argv).toContain("json");
-      expect(result.argv).toContain("");
+      expect(result.argv).not.toContain("");
+      expect(result.stdin).toBe("");
     });
 
     it("handles missing prompt text", () => {
@@ -159,12 +158,23 @@ describe("opencodeBackend", () => {
       expect(result.argv).not.toContain("--auto");
     });
 
-    it("separates the prompt with -- so flag-like task text is not parsed", () => {
-      const opts: InvokeOpts = { promptText: "add --help flag to the CLI" };
-      const result = opencodeBackend.invoke("delegate", opts);
+    it("keeps a special-character prompt out of argv and intact on stdin", () => {
+      const result = opencodeBackend.invoke("delegate", {
+        promptText: SPAWN_PROMPT,
+      });
+      for (const arg of result.argv) {
+        for (const bad of ["hi", "%", "&", '"', "\n"]) {
+          expect(arg).not.toContain(bad);
+        }
+      }
+      expect(result.stdin).toBe(SPAWN_PROMPT);
+    });
 
-      expect(result.argv.at(-2)).toBe("--");
-      expect(result.argv.at(-1)).toBe("add --help flag to the CLI");
+    it("delivers the prompt byte-for-byte to a spawned stub", () => {
+      const result = opencodeBackend.invoke("delegate", {
+        promptText: SPAWN_PROMPT,
+      });
+      expect(spawnStub(result.argv, result.stdin)).toBe(SPAWN_PROMPT);
     });
   });
 
