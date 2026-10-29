@@ -312,6 +312,21 @@ describe("executable discovery", () => {
       resolveBinary("firefox", ["/snap/firefox/current/usr/lib/firefox/firefox", "/usr/bin/firefox"], options),
     ).toBe("/usr/bin/firefox");
   });
+
+  test("Linux skips a shell wrapper that execs a Snap and keeps any other script", () => {
+    const root = mkdtempSync(join(import.meta.dir, ".snap-wrapper-"));
+    try {
+      const wrapper = join(root, "firefox");
+      writeFileSync(wrapper, '#!/bin/sh\nexec /snap/bin/firefox "$@"\n');
+      const launcher = join(root, "chromium-browser");
+      writeFileSync(launcher, '#!/bin/sh\nexec /usr/lib/chromium/chromium "$@"\n');
+      const options = { platform: "linux", wsl: false, validate: () => true } as const;
+      expect(() => resolveBinary("firefox", [wrapper], options)).toThrow("Snap builds of firefox are not supported");
+      expect(resolveBinary("chrome", [wrapper, launcher], options)).toBe(launcher);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 test("WSL rejects a Linux symlink to a Windows executable", () => {

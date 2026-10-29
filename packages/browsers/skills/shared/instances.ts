@@ -10,6 +10,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  openSync,
+  readSync,
+  closeSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -106,7 +109,7 @@ export function resolveBinary(
     const real = platform === "linux" ? target(path) : path;
     if (wsl && (/\.exe$/i.test(real) || /^[a-z]:/i.test(real))) continue;
     // A Snap confines the browser to its own /tmp, so it never sees the profile or DevToolsActivePort.
-    if (platform === "linux" && /^\/snap\/|^\/usr\/bin\/snap$/.test(real)) {
+    if (platform === "linux" && (/^\/snap\/|^\/usr\/bin\/snap$/.test(real) || execsSnap(real))) {
       snap = true;
       continue;
     }
@@ -115,6 +118,21 @@ export function resolveBinary(
   throw new Error(
     `no ${name} found; looked for ${candidates.join(", ")}${snap ? `\nSnap builds of ${name} are not supported: their private /tmp hides the profile. Install a non-Snap build.` : ""}${wsl ? `\nInstall a Linux build of ${name} inside WSL.` : ""}`,
   );
+}
+
+// Ubuntu's transitional /usr/bin/firefox and /usr/bin/chromium-browser are shell scripts that exec /snap/bin/<name>.
+function execsSnap(path: string): boolean {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, "r");
+    const buffer = Buffer.alloc(4096);
+    const head = buffer.subarray(0, readSync(fd, buffer)).toString("latin1");
+    return head.startsWith("#!") && /\/snap\/bin\//.test(head);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
 }
 
 function ownedProfile(stateDir: string, instance: Instance): boolean {
