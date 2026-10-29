@@ -1,5 +1,35 @@
 # Changelog
 
+## [chronicle 0.22.7] - 2026-10-29
+
+_tracks tag `chronicle-v0.22.7`_
+
+### Fixed
+- Chronicle commit, adr, install and release scripts now handle Windows paths, temp payloads and the Codex home fallback correctly.
+
+## [dispatch 5.8.3] - 2026-10-29
+
+_tracks tag `dispatch-v5.8.3`_
+
+### Fixed
+- Removing a worktree on Windows now also removes the plan link, so the next create no longer fails with "already exists" and remove no longer falsely reports success.
+- Dispatch spawning, worktree seeding and browser opening work on Windows and WSL, including line-ending handling, a copy fallback, and opencode prompts that keep shell metacharacters intact.
+- Dispatch task-path checks and the flightplan lint now accept Windows backslash paths.
+
+## [guard 0.9.3] - 2026-10-29
+
+_tracks tag `guard-v0.9.3`_
+
+### Fixed
+- Guard comment hooks and the comments-reaper scan now resolve Windows paths, file names and state directories correctly.
+
+## [relay 0.9.5] - 2026-10-29
+
+_tracks tag `relay-v0.9.5`_
+
+### Fixed
+- Relay's codex and opencode backends now start correctly on Windows.
+
 ## [browsers 0.1.3] - 2026-10-29
 
 _tracks tag `browsers-v0.1.3`_
