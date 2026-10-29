@@ -89,6 +89,22 @@ describe("interacted", () => {
     expect(stoppedAt).toBeGreaterThan(0);
   });
 
+  test("waits for a requested navigation that starts loading after the grace window", async () => {
+    const { page, emit } = fakePage();
+    let stoppedAt = 0;
+    const click = async () => {
+      setTimeout(() => emit("Page.frameRequestedNavigation"), 90);
+      setTimeout(() => emit("Page.frameStartedLoading"), 250);
+      setTimeout(() => {
+        stoppedAt = performance.now();
+        emit("Page.frameStoppedLoading");
+      }, 300);
+      await Bun.sleep(100);
+    };
+    await interacted(page, click);
+    expect(stoppedAt).toBeGreaterThan(0);
+  });
+
   test("returns soon after a click that starts no navigation", async () => {
     const { page } = fakePage();
     const started = performance.now();
@@ -100,6 +116,7 @@ describe("interacted", () => {
 import {
   existsSync,
   readdirSync,
+  mkdirSync,
   mkdtempSync,
   writeFileSync,
   readFileSync,
@@ -155,6 +172,31 @@ test("native Chrome launch passes the executable as argv and records before read
         ),
       ),
     ).toEqual(instance);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("a port file Chrome still holds open reads as not ready yet", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "chrome-port-busy-"));
+  try {
+    const instance = await launch(parseArgs(["open", "about:blank"]), {
+      stateDir,
+      resolve: () => "chrome",
+      spawn: (argv) => {
+        const profile = argv
+          .find((arg) => arg.startsWith("--user-data-dir="))!
+          .slice(16);
+        const port = join(profile, "DevToolsActivePort");
+        mkdirSync(port);
+        setTimeout(() => {
+          rmSync(port, { recursive: true });
+          writeFileSync(port, "9444\n/devtools/browser/test\n");
+        }, 150);
+        return { pid: process.pid, unref() {} };
+      },
+    });
+    expect(instance.port).toBe(9444);
   } finally {
     rmSync(stateDir, { recursive: true, force: true });
   }

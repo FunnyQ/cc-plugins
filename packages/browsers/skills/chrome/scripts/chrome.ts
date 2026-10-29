@@ -2,7 +2,7 @@
 
 // Chrome refuses remote debugging on its default profile.
 
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { connectPage, type Page } from "./cdp";
 import {
@@ -137,9 +137,10 @@ export async function launch(
   const timeoutMs = options.timeoutMs ?? LAUNCH_TIMEOUT_MS;
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const lines = existsSync(portFile)
-      ? readFileSync(portFile, "utf8").split("\n")
-      : [];
+    let lines: string[] = [];
+    try {
+      lines = readFileSync(portFile, "utf8").split("\n");
+    } catch {}
     if (lines.length > 1) {
       instance.port = Number(lines[0]);
       recordInstance(stateDir, instance);
@@ -198,7 +199,10 @@ export async function interacted(
 ): Promise<void> {
   // Grace window, not a guarantee: a navigation a page timer starts later than this is not waited for.
   const started = page
-    .nextEvent(["Page.frameStartedLoading"], LOAD_TIMEOUT_MS)
+    .nextEvent(
+      ["Page.frameRequestedNavigation", "Page.frameStartedLoading"],
+      LOAD_TIMEOUT_MS,
+    )
     .catch(() => null);
   const stopped = page.nextEvent(["Page.frameStoppedLoading"], LOAD_TIMEOUT_MS);
   stopped.catch(() => {});
