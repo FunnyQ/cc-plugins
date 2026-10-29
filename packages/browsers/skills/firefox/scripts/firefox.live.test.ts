@@ -1,10 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BINARIES } from "./firefox";
+import { browserCandidates, nativePlatformInput } from "../../shared/platform";
+import { resolveBinary } from "../../shared/instances";
 
-const installed = BINARIES.firefox.some((path) => existsSync(path));
+const installed = (() => {
+  if (process.platform === "win32") return false;
+  try {
+    const input = nativePlatformInput();
+    resolveBinary("firefox", browserCandidates("firefox", input), input);
+    return true;
+  } catch {
+    return false;
+  }
+})();
 const cli = join(import.meta.dir, "firefox.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {

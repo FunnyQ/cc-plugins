@@ -1,10 +1,19 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BINARIES } from "./chrome";
+import { browserCandidates, nativePlatformInput } from "../../shared/platform";
+import { resolveBinary } from "../../shared/instances";
 
-const installed = BINARIES.some((path) => existsSync(path));
+const installed = (() => {
+  try {
+    const input = nativePlatformInput();
+    resolveBinary("chrome", browserCandidates("chrome", input), input);
+    return true;
+  } catch {
+    return false;
+  }
+})();
 const cli = join(import.meta.dir, "chrome.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
