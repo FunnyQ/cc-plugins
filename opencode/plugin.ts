@@ -24,7 +24,7 @@ const FLIGHTPLAN_TASK =
 // narrowing it past the hook silently stops guarding a language, so
 // plugin.test.ts cross-checks both directions against syntaxFor.
 const COMMENT_GUARDED =
-  /(\.(rb|rake|gemspec|py|sh|bash|zsh|fish|yaml|yml|toml|ex|exs|pl|pm|r|env|ini|conf|properties|graphql|gql|tf|hcl|js|mjs|cjs|jsx|ts|mts|cts|tsx|jsonc|json5|go|rs|c|h|cpp|cc|cxx|hpp|hh|hxx|m|mm|cs|java|kt|kts|scala|swift|dart|zig|proto|css|scss|sass|less|styl|html|htm|xml|svg|vue|svelte|astro|erb|haml|slim|php|sql|lua|hs)|(^|\/)(rakefile|gemfile|guardfile|capfile|brewfile|procfile|makefile|dockerfile|justfile)(\.[^/]*)?)$/i;
+  /(\.(rb|rake|gemspec|py|sh|bash|zsh|fish|yaml|yml|toml|ex|exs|pl|pm|r|env|ini|conf|properties|graphql|gql|tf|hcl|js|mjs|cjs|jsx|ts|mts|cts|tsx|jsonc|json5|go|rs|c|h|cpp|cc|cxx|hpp|hh|hxx|m|mm|cs|java|kt|kts|scala|swift|dart|zig|proto|css|scss|sass|less|styl|html|htm|xml|svg|vue|svelte|astro|erb|haml|slim|php|sql|lua|hs)|(^|[\\/])(rakefile|gemfile|guardfile|capfile|brewfile|procfile|makefile|dockerfile|justfile)(\.[^\\/]*)?)$/i;
 
 // S9/S10/S17: OpenCode has no Agent tool, no "fork" subagent, and a spawned
 // subagent inherits no context. The cockpit scripts are shared with Claude Code
@@ -339,7 +339,7 @@ const QLabPlugin = Object.assign(
         if (!COMMIT_COMMAND.test(output.args.command)) return;
 
         const result = await run(
-          [join(root, CHECK_BRANCH)],
+          ["bash", join(root, CHECK_BRANCH)],
           hookPayload("command", output.args.command),
         );
         if (!result) return;
@@ -374,7 +374,7 @@ const QLabPlugin = Object.assign(
         // so neither may return early on the other's behalf.
         if (FLIGHTPLAN_TASK.test(filePath)) {
           const result = await run(
-            [join(root, FLIGHTPLAN_LINT)],
+            ["bash", join(root, FLIGHTPLAN_LINT)],
             hookPayload("file_path", filePath),
           );
           const message = result && lintVerdict(result.exitCode, result.stderr);
