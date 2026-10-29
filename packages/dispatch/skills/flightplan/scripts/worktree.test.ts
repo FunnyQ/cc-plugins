@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
@@ -14,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import {
   create,
   fingerprint,
@@ -53,19 +54,6 @@ function put(root: string, path: string, content: string | Uint8Array) {
   writeFileSync(full, content);
 }
 
-function samePath(p: string): string {
-  let head = resolve(p);
-  const rest: string[] = [];
-  while (!existsSync(head)) {
-    const parent = dirname(head);
-    if (parent === head) break;
-    rest.unshift(basename(head));
-    head = parent;
-  }
-  const real = join(realpathSync.native(head), ...rest);
-  return process.platform === "win32" ? real.toLowerCase() : real;
-}
-
 function fixture() {
   const temp = realpathSync(
     mkdtempSync(join(tmpdir(), "dispatch-worktree-test-")),
@@ -99,7 +87,7 @@ function registered(repo: string): string[] {
   return git(repo, "worktree", "list", "--porcelain")
     .split("\n")
     .filter((line) => line.startsWith("worktree "))
-    .map((line) => samePath(line.slice("worktree ".length)));
+    .map((line) => samePathKey(line.slice("worktree ".length)));
 }
 
 function rootOf(options: { repo: string; slug: string }) {
@@ -138,6 +126,31 @@ describe("worktree lifecycle", () => {
     expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe("main\n");
     expect(readFileSync(index)).toEqual(before);
     expect(statSync(index).mtimeMs).toBe(timestamp.getTime());
+  });
+
+  test("CRLF checkouts with trusted index stats round-trip through create, land and unland", () => {
+    const options = fixture();
+    git(options.repo, "config", "core.autocrlf", "true");
+    put(options.repo, "a.txt", "base\r\n");
+    const timestamp = new Date(Date.now() - 10_000);
+    utimesSync(join(options.repo, "a.txt"), timestamp, timestamp);
+    git(options.repo, "add", "a.txt");
+    const index = join(options.repo, ".git/index");
+    const before = readFileSync(index);
+    const baseline = fingerprint(options).fingerprint;
+    const wt = create(options);
+    expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe("base\r\n");
+    expect(readFileSync(index)).toEqual(before);
+    put(wt.path, "a.txt", "base\r\nedited\r\n");
+    expect(land({ ...options, expect: baseline, op: "crlf-land" }).status).toBe(
+      "clean",
+    );
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe(
+      "base\r\nedited\r\n",
+    );
+    unland({ ...options, op: "crlf-unland" });
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe("base\r\n");
+    expect(readFileSync(index)).toEqual(before);
   });
 
   test("create snapshots tracked and untracked files, seeds ignored paths, and excludes the plan", () => {
@@ -508,10 +521,10 @@ describe("worktree lifecycle", () => {
   test("remove prunes a worktree deleted by hand, reached through a repo alias so git's spelling differs from pathOf's", () => {
     const options = aliasedFixture();
     const { path } = create(options);
-    expect(registered(options.repo)).toContain(samePath(path));
+    expect(registered(options.repo)).toContain(samePathKey(path));
     rmSync(path, { recursive: true, force: true });
     expect(remove(options)).toEqual({ removed: true });
-    expect(registered(options.repo)).not.toContain(samePath(path));
+    expect(registered(options.repo)).not.toContain(samePathKey(path));
   });
 
   test("sweep keep-all leaves state and registrations untouched; keep scopes removals to this slug", () => {
@@ -542,14 +555,10 @@ describe("worktree lifecycle", () => {
     });
     expect(existsSync(other.path)).toBe(true);
     expect(existsSync(userPath)).toBe(true);
-    const remaining = git(options.repo, "worktree", "list", "--porcelain");
-    const listed = remaining
-      .split("\n")
-      .filter((line) => line.startsWith("worktree "))
-      .map((line) => samePath(line.slice("worktree ".length)));
-    expect(listed).toContain(samePath(second.path));
-    expect(listed).not.toContain(samePath(first.path));
-    expect(remaining.split("worktree ").length - 1).toBe(4);
+    const listed = registered(options.repo);
+    expect(listed).toContain(samePathKey(second.path));
+    expect(listed).not.toContain(samePathKey(first.path));
+    expect(listed).toHaveLength(4);
     for (const removed of [true, false]) {
       const response = cli([
         "remove",
@@ -660,7 +669,7 @@ describe("worktree lifecycle", () => {
 
   // Windows cannot run a #!/bin/sh stub, and its PATH separator is ";", not ":".
   test.skipIf(process.platform === "win32")(
-    "ignored seeds fall back from clone copies, then to cpSync when every cp fails",
+    "ignored seeds fall back from a failed clone copy to cp -R",
     () => {
       const options = fixture();
       put(options.repo, "node_modules/x/index.js", "dependency\n");
@@ -677,12 +686,6 @@ describe("worktree lifecycle", () => {
         const first = create(options);
         expect(
           readFileSync(join(first.path, "node_modules/x/index.js"), "utf8"),
-        ).toBe("dependency\n");
-        put(bin, "cp", "#!/bin/sh\nexit 1\n");
-        const second = create(options);
-        expect(show(options)).toEqual({ ...second, exists: true });
-        expect(
-          readFileSync(join(second.path, "node_modules/x/index.js"), "utf8"),
         ).toBe("dependency\n");
       } finally {
         process.env.PATH = originalPath;
@@ -714,6 +717,48 @@ describe("worktree lifecycle", () => {
         readFileSync(join(destination, "node_modules/x/lib/deep/blob.bin")),
       ),
     ).toEqual(bytes);
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "cpSync seeds preserve relative symlinks (Windows symlink creation requires privilege)",
+    () => {
+      const options = fixture();
+      put(options.repo, "node_modules/x/index.js", "dependency\n");
+      symlinkSync("x", join(options.repo, "node_modules/linked"));
+      const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+      scratch.push(destination);
+      seedIgnored(options.repo, destination, "docs/test-plan", () => ({
+        exitCode: null,
+      }));
+      expect(readlinkSync(join(destination, "node_modules/linked"))).toBe("x");
+      put(destination, "node_modules/x/index.js", "copied dependency\n");
+      expect(
+        readFileSync(join(destination, "node_modules/linked/index.js"), "utf8"),
+      ).toBe("copied dependency\n");
+      expect(
+        readFileSync(join(options.repo, "node_modules/x/index.js"), "utf8"),
+      ).toBe("dependency\n");
+    },
+  );
+
+  test("ignored seeds stop spawning cp once it is missing from PATH", () => {
+    const options = fixture();
+    put(options.repo, "node_modules/x/index.js", "dependency\n");
+    put(options.repo, ".flightlog/run.jsonl", "{}\n");
+    const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+    scratch.push(destination);
+    const tried: string[][] = [];
+    seedIgnored(options.repo, destination, "docs/test-plan", (argv) => {
+      tried.push(argv);
+      return { exitCode: null };
+    });
+    expect(tried).toHaveLength(1);
+    expect(
+      readFileSync(join(destination, ".flightlog/run.jsonl"), "utf8"),
+    ).toBe("{}\n");
+    expect(
+      readFileSync(join(destination, "node_modules/x/index.js"), "utf8"),
+    ).toBe("dependency\n");
   });
 
   test("create and land round-trip LF bytes when git's core.autocrlf is true, as on Windows", () => {

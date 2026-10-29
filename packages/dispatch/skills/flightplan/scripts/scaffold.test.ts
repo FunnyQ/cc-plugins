@@ -1,23 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, access, rm, stat, writeFile } from "node:fs/promises";
-import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { checkCollision, scaffold, validateInput } from "./scaffold";
 import { parseTask } from "./lib/parse-task";
-
-function samePath(p: string): string {
-  let head = resolve(p);
-  const rest: string[] = [];
-  while (!existsSync(head)) {
-    const parent = dirname(head);
-    if (parent === head) break;
-    rest.unshift(basename(head));
-    head = parent;
-  }
-  const real = join(realpathSync.native(head), ...rest);
-  return process.platform === "win32" ? real.toLowerCase() : real;
-}
+import { samePathKey } from "./worktree";
 
 async function newRoot(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "flightplan-scaffold-"));
@@ -272,8 +259,8 @@ describe("scaffold CLI", () => {
       .split("\n")
       .find((line) => line.startsWith("Scaffolded "));
     expect(printed).toBeDefined();
-    expect(samePath(printed!.slice("Scaffolded ".length).trim())).toBe(
-      samePath(join(root, "docs", "course-player")),
+    expect(samePathKey(printed!.slice("Scaffolded ".length).trim())).toBe(
+      samePathKey(join(root, "docs", "course-player")),
     );
     await rm(root, { recursive: true });
   });

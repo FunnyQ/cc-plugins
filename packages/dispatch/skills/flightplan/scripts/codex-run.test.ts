@@ -13,17 +13,15 @@ import {
   writeFile,
   readFile,
   readdir,
-  chmod,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isolateHome, writeFakeBin } from "./lib/fake-bin.ts";
 
 const SCRIPT = join(import.meta.dir, "codex-run.ts");
 
 let dir: string;
-let originalHome: string | undefined;
-let originalUserProfile: string | undefined;
-let fakeCodex: string;
+let restoreHome: () => void;
 let argsLog: string;
 
 const FAKE = `#!/usr/bin/env bun
@@ -35,46 +33,17 @@ const oi = argv.indexOf("-o");
 if (oi !== -1) writeFileSync(argv[oi + 1], "CODEX SAYS: did the thing");
 `;
 
-function isolateHomeFromDeveloperRelayConfig() {
-  originalHome = process.env.HOME;
-  originalUserProfile = process.env.USERPROFILE;
-  process.env.HOME = dir;
-  process.env.USERPROFILE = dir;
-}
-
+let codexBin: string;
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
-  isolateHomeFromDeveloperRelayConfig();
-  fakeCodex = join(dir, "fake-codex.ts");
+  restoreHome = isolateHome(dir);
   argsLog = join(dir, "args.json");
-  await writeFile(fakeCodex, FAKE);
-  await chmod(fakeCodex, 0o755);
+  codexBin = await writeFakeBin(dir, "codex", FAKE);
 });
 
 afterAll(async () => {
-  restoreEnv("HOME", originalHome);
-  restoreEnv("USERPROFILE", originalUserProfile);
+  restoreHome();
   await rm(dir, { recursive: true, force: true });
-});
-
-function restoreEnv(key: string, value: string | undefined) {
-  if (value === undefined) delete process.env[key];
-  else process.env[key] = value;
-}
-
-const shim = (fake: string) => `@"${process.execPath}" "${fake}" %*\r\n`;
-
-let codexBin: string;
-beforeAll(async () => {
-  codexBin =
-    process.platform === "win32" ? join(dir, "codex.cmd") : join(dir, "codex");
-  await writeFile(
-    codexBin,
-    process.platform === "win32"
-      ? shim(fakeCodex)
-      : `#!/bin/sh\nexec bun ${fakeCodex} "$@"\n`,
-  );
-  await chmod(codexBin, 0o755);
 });
 
 describe("codex-run delegate", () => {

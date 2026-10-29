@@ -149,20 +149,20 @@ export function openerCommands(
   return [["xdg-open", url]];
 }
 
-export function openBrowser(
+export async function openBrowser(
   commands: string[][],
-  spawn: (command: string[]) => void = (command) => {
-    Bun.spawn(command, {
-      detached: true,
+  spawn: (command: string[]) => Promise<number> = (command) => {
+    return Bun.spawn(command, {
       stdio: ["ignore", "ignore", "ignore"],
-    }).unref();
+    }).exited;
   },
-): void {
+): Promise<void> {
   let failure: unknown;
   for (const command of commands) {
     try {
-      spawn(command);
-      return;
+      const code = await spawn(command);
+      if (code === 0) return;
+      failure = new Error(`${command[0]} exited with code ${code}`);
     } catch (error) {
       failure = error;
     }
@@ -268,7 +268,7 @@ export async function main(): Promise<void> {
   console.log(planLine(plan));
 
   if (open) {
-    openBrowser(openerCommands(url));
+    await openBrowser(openerCommands(url));
   }
 }
 

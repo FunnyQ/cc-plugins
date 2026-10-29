@@ -187,6 +187,7 @@ function snapshot(root: string, plan: string): string {
     }
     const env = { GIT_INDEX_FILE: index };
     git(root, ["add", "-A"], env);
+    git(root, ["add", "--renormalize", "-A"], env);
     git(
       root,
       ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", plan],
@@ -312,12 +313,21 @@ export function seedIgnored(
     }
     const destination = join(path, relative);
     mkdirSync(dirname(destination), { recursive: true });
-    if (spawn(["cp", "-c", "-R", source, destination]).exitCode === 0) return;
-    const fallback =
-      isDirectory(source) && isDirectory(destination) ? `${source}/.` : source;
-    if (spawn(["cp", "-R", fallback, destination]).exitCode === 0) return;
-    cpSync(source, destination, { recursive: true });
+    if (hasCp) {
+      const cloned = spawn(["cp", "-c", "-R", source, destination]).exitCode;
+      if (cloned === 0) return;
+      hasCp = cloned !== null;
+    }
+    if (hasCp) {
+      const fallback =
+        isDirectory(source) && isDirectory(destination)
+          ? `${source}/.`
+          : source;
+      if (spawn(["cp", "-R", fallback, destination]).exitCode === 0) return;
+    }
+    cpSync(source, destination, { recursive: true, verbatimSymlinks: true });
   }
+  let hasCp = true;
   let paths: string[];
   try {
     paths = git(repo, [

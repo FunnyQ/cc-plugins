@@ -12,19 +12,17 @@ import {
   rm,
   writeFile,
   readFile,
-  chmod,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isolateHome, restoreEnv, writeFakeBin } from "./lib/fake-bin.ts";
 import { NO_ASK_CONTRACT } from "./lib/harness-run";
 import { parseJsonl, DEFAULT_MODEL, REVIEW_GUARD } from "./opencode-run.ts";
 
 const SCRIPT = join(import.meta.dir, "opencode-run.ts");
 
 let dir: string;
-let originalHome: string | undefined;
-let originalUserProfile: string | undefined;
-let fakeOpencode: string;
+let restoreHome: () => void;
 let argsLog: string;
 let stdinLog: string;
 let originalStdinLog: string | undefined;
@@ -39,50 +37,23 @@ process.stdout.write(JSON.stringify({ type: "text", part: { text: "did the thing
 // no terminal step_finish — exercises the #26855-safe parser
 `;
 
+let opencodeBin: string;
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "opencode-run-test-"));
   // Every spawn inherits this HOME, so the developer's own relay config never
   // reaches a test that expects the wrapper default.
-  originalHome = process.env.HOME;
-  originalUserProfile = process.env.USERPROFILE;
-  process.env.HOME = dir;
-  process.env.USERPROFILE = dir;
-  fakeOpencode = join(dir, "fake-opencode.ts");
+  restoreHome = isolateHome(dir);
   argsLog = join(dir, "args.json");
   stdinLog = join(dir, "stdin.txt");
   originalStdinLog = process.env.STDIN_LOG;
   process.env.STDIN_LOG = stdinLog;
-  await writeFile(fakeOpencode, FAKE);
-  await chmod(fakeOpencode, 0o755);
+  opencodeBin = await writeFakeBin(dir, "opencode", FAKE);
 });
 
 afterAll(async () => {
-  restoreEnv("HOME", originalHome);
-  restoreEnv("USERPROFILE", originalUserProfile);
+  restoreHome();
   restoreEnv("STDIN_LOG", originalStdinLog);
   await rm(dir, { recursive: true, force: true });
-});
-
-function restoreEnv(key: string, value: string | undefined) {
-  if (value === undefined) delete process.env[key];
-  else process.env[key] = value;
-}
-
-const shim = (fake: string) => `@"${process.execPath}" "${fake}" %*\r\n`;
-
-let opencodeBin: string;
-beforeAll(async () => {
-  opencodeBin =
-    process.platform === "win32"
-      ? join(dir, "opencode.cmd")
-      : join(dir, "opencode");
-  await writeFile(
-    opencodeBin,
-    process.platform === "win32"
-      ? shim(fakeOpencode)
-      : `#!/bin/sh\nexec bun ${fakeOpencode} "$@"\n`,
-  );
-  await chmod(opencodeBin, 0o755);
 });
 
 const loggedArgs = async (): Promise<string[]> =>

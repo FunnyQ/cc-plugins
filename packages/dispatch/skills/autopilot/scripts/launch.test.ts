@@ -188,9 +188,9 @@ describe("openerCommands", () => {
 });
 
 describe("openBrowser", () => {
-  test("falls back from wslview to cmd.exe when the first spawn throws", () => {
+  test("falls back from wslview to cmd.exe when the first spawn throws", async () => {
     const tried: string[][] = [];
-    openBrowser(
+    await openBrowser(
       [
         ["wslview", "u"],
         ["cmd.exe", "/c", "start", "", "u"],
@@ -198,20 +198,48 @@ describe("openBrowser", () => {
       (command) => {
         tried.push(command);
         if (command[0] === "wslview") throw new Error("Executable not found");
+        return Promise.resolve(0);
       },
     );
     expect(tried.map((command) => command[0])).toEqual(["wslview", "cmd.exe"]);
   });
 
-  test("logs the notice only when every opener threw", () => {
+  test("awaits a nonzero wslview exit before trying cmd.exe and stops after success", async () => {
+    const tried: string[] = [];
+    await openBrowser(
+      [["wslview"], ["cmd.exe"], ["unused"]],
+      async (command) => {
+        await Bun.sleep(1);
+        tried.push(command[0]!);
+        return command[0] === "wslview" ? 1 : 0;
+      },
+    );
+    expect(tried).toEqual(["wslview", "cmd.exe"]);
+  });
+
+  test("logs a notice when every opener exits nonzero", async () => {
     const errors: string[] = [];
     const original = console.error;
     console.error = (message: string) => errors.push(message);
     try {
-      openBrowser([["a"], ["b"]], () => {
+      await openBrowser([["wslview"], ["cmd.exe"]], async () => 1);
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toEqual([
+      "flightdeck notice: browser opener unavailable: cmd.exe exited with code 1",
+    ]);
+  });
+
+  test("logs the notice only when every opener threw", async () => {
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (message: string) => errors.push(message);
+    try {
+      await openBrowser([["a"], ["b"]], () => {
         throw new Error("Executable not found");
       });
-      openBrowser([["a"]], () => {});
+      await openBrowser([["a"]], () => Promise.resolve(0));
     } finally {
       console.error = original;
     }
