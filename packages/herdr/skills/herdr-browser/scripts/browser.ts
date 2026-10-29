@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 import {
-  INSTALL_HINT,
+  requireExecutable,
   newcomer,
   parseTerminalBrowsers,
   selectTarget,
@@ -311,6 +311,11 @@ export async function run(
   command: string[],
   { timeoutMs, env, failureName }: RunOpts = {},
 ): Promise<string> {
+  const dependency =
+    command[0] === "terminal-browser"
+      ? "terminal-browser"
+      : command[0] === HERDR_BIN ? "herdr" : null;
+  if (dependency) requireExecutable(command[0], dependency);
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
@@ -386,12 +391,14 @@ function requireArg(value: string | null | undefined, message: string): string {
 
 const PROBE_TIMEOUT_MS = 3_000;
 
-async function terminalTargets(): Promise<Target[]> {
-  if (!Bun.which("terminal-browser")) {
-    throw new Error(INSTALL_HINT);
-  }
+export async function terminalTargets(
+  exec: typeof run = run,
+  platform: NodeJS.Platform = process.platform,
+  which: (executable: string) => string | null = Bun.which,
+): Promise<Target[]> {
+  requireExecutable("terminal-browser", "terminal-browser", platform, which);
   return parseTerminalBrowsers(
-    await run(["terminal-browser", "ls", "--all", "--json"], {
+    await exec(["terminal-browser", "ls", "--all", "--json"], {
       timeoutMs: PROBE_TIMEOUT_MS,
     }),
   );

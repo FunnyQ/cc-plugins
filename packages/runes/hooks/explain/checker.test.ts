@@ -2,18 +2,21 @@ import type { EngineInterface, On } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import type { Engine } from "claude-code/testing";
 
+import { runtime } from "../platform";
+import { where } from "../transcript/where";
 import type { ExplainView } from "../../types";
 import { HOME, startSession } from "../transcript/test-session";
 import {
   CHECK_TIMEOUT_MS,
   CHECKER,
   CHECKER_PROMPT,
-  CHROME,
   checker,
   parseVerdict,
+  registerChecker,
   startCheck,
 } from "./checker";
 
+const CHROME = "/test/chrome";
 const DIR = `${HOME}/.local/share/q-lab/runes/explain`;
 const PAGE = `${DIR}/repo/20261025-1200-fork.html`;
 const end = {
@@ -23,8 +26,11 @@ const end = {
   turnId: "t",
   reason: "answer",
 } as const;
-const shot = (html: string, png = `${DIR}/repo/x.check.png`) =>
-  `"${CHROME}" --headless=new --disable-gpu --hide-scrollbars --window-size=1280,4000 --screenshot=${png} file://${html}`;
+const shot = (html: string, mode = "wide", root = "/plugin") =>
+  `bun '${root.replaceAll("\\", "/")}/hooks/explain/checker-cli.ts' ${mode} '${html.replaceAll("\\", "/")}'`;
+const task = (page: string, token: string) =>
+  `Check this explainer page: ${page}\nYour check token is ${token}.\nWide screenshot: ${shot(page)}\nNarrow screenshot: ${shot(page, "narrow")}`;
+const openedPage = (page: string) => [JSON.stringify({ op: "open", path: page })];
 const HANDBACK =
   "Do not hand back. Reply with your check token, then OK, FIXED <n>, or FAILED <reason>, as your final message.";
 
@@ -92,9 +98,7 @@ test("the session registers the checker on sonnet at medium effort, with a promp
     },
   ]);
   for (const s of [
-    `\`"${CHROME}" --headless=new --disable-gpu --hide-scrollbars --window-size=1280,4000 --screenshot=<dir>/<name>.check.png file://<html>\``,
-    "`--window-size=420,7000`",
-    "`--screenshot=<dir>/<name>.check-narrow.png`",
+    "exact wide and narrow screenshot commands",
     "Written by a fork of this session",
     "FAILED page taller than the screenshot",
     "`ink`, `ink-accent`, `dash`, `wash-warm`, `wash-cool`, `wash-sage`, `label`, `label-soft`, `part`",
@@ -121,29 +125,31 @@ test("the checker is hidden from the model, and the engine's own Agent call pass
   ).toEqual(asks);
 });
 
-test("Bash allows only the checker's quoted Chrome shot inside the explainer root", async ($, on) => {
-  await session($, on);
-  const bash = (command: string, agentId?: string) =>
-    $.tool.check({ tool: "Bash", input: { command }, agentId } as never);
-  expect(await bash(shot(PAGE), "k1")).toEqual(allows);
+test("Bash allows exactly the two pending commands and revokes them after settlement", async () => {
+  const r = await rig();
+  await startCheck(r.$, "a", PAGE);
+  const bash = (command: string, agentId: string | undefined = "k1") => r.permission(1, { command }, agentId);
+  expect(await bash(shot(PAGE))).toEqual({ decision: "allow" });
+  expect(await bash(shot(PAGE, "narrow"))).toEqual({ decision: "allow" });
+  for (const command of [shot("/etc/passwd.html"), shot(PAGE) + "; echo unsafe", shot(PAGE) + " ", shot(PAGE, "other"), shot(PAGE.replace(".html", "-other.html")), "echo ok"]) {
+    expect(await bash(command)).toEqual({ decision: "ask" });
+  }
   for (const command of [
-    shot("/etc/passwd.html"),
     shot(`${DIR}/../x.html`),
-    shot(PAGE, "/tmp/x.png"),
-    shot(PAGE, `${DIR}/../x.png`),
-    `${shot(PAGE)}; rm -rf /`,
-    `${shot(PAGE)} $HOME`,
     shot(`${DIR}/%2e%2e/x.html`),
-    shot(PAGE).replace(`"${CHROME}"`, CHROME),
-    `"${CHROME}" --screenshot=${DIR}/x.png`,
-    `${shot(PAGE)} --log-net-log=/tmp/outside.json`,
-    `${shot(PAGE)} https://example.com`,
-    `${shot(PAGE)} file://${DIR}/repo/other.html`,
+    shot(PAGE) + " $HOME",
+    shot(PAGE).replace("'/plugin/hooks/explain/checker-cli.ts'", "/plugin/hooks/explain/checker-cli.ts"),
+    shot(PAGE) + " --screenshot=/tmp/x.png",
+    shot(PAGE) + ` --screenshot=${DIR}/../x.png`,
+    shot(PAGE) + " --log-net-log=/tmp/outside.json",
+    shot(PAGE) + " https://example.com",
+    shot(PAGE) + ` file://${DIR}/repo/other.html`,
     `"${CHROME}" --headless=new https://example.com # file://${PAGE}`,
-  ])
-    expect(await bash(command, "k1")).toEqual(asks);
-  expect(await bash(shot(PAGE))).toEqual(asks);
-  expect(await bash(shot(PAGE), "o")).toEqual(asks);
+  ]) expect(await bash(command)).toEqual({ decision: "ask" });
+  expect(await r.permission(1, { command: shot(PAGE) }, "")).toEqual({ decision: "ask" });
+  expect(await bash(shot(PAGE), "o")).toEqual({ decision: "ask" });
+  await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} OK` });
+  expect(await bash(shot(PAGE))).toEqual({ decision: "ask" });
 });
 
 test("Read and Edit allow inside the explainer root only, and only for the checker", async ($, on) => {
@@ -161,10 +167,7 @@ test("Read and Edit allow inside the explainer root only, and only for the check
 
 test("with HOME missing, Bash, Read and Edit all pass through", async ($, on) => {
   await session($, on, { HOME: "" });
-  const loose = shot(
-    "/.local/share/q-lab/runes/explain/x.html",
-    "/.local/share/q-lab/runes/explain/x.png",
-  );
+  const loose = shot("/.local/share/q-lab/runes/explain/x.html");
   expect(
     await $.tool.check({
       tool: "Bash",
@@ -202,7 +205,7 @@ let epoch = 0;
 
 // `geometry` is the geometry CLI's stdout; absent, the CLI exits 1, and an Error is a run that cannot start
 const rig = async (
-  opts: { chrome?: boolean; deny?: string; geometry?: string | Error } = {},
+  opts: { chrome?: boolean; deny?: string; geometry?: string | Error; root?: string; home?: string; windows?: boolean; openError?: boolean | "throw" } = {},
 ) => {
   // checker.ts keeps its pending checks and token counter per module, so each rig starts far enough on to expire the last rig's leftovers
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
@@ -226,13 +229,17 @@ const rig = async (
   const removed: string[][] = [];
   const agents: { id: string; type: string }[] = [];
   const $ = {
-    plugin: { name: "runes", root: "/plugin" },
-    fs: {
-      exists: async (path: string) => opts.chrome !== false && path === CHROME,
-    },
+    plugin: { name: "runes", root: opts.root ?? "/plugin" },
     clock: { now: async () => now },
     process: {
-      run: async (argv: string[]) => {
+      run: async (argv: string[], init?: { stdin?: string }) => {
+        if (argv[1]?.endsWith("/hooks/platform-cli.ts")) {
+          const operation = JSON.parse(init!.stdin!);
+          if (operation.op === "cleanup-check") removed.push([init!.stdin!]);
+          else opened.push([init!.stdin!]);
+          if (operation.op === "open" && opts.openError === "throw") throw new Error("opener refused");
+          return { exitCode: operation.op === "open" && opts.openError ? 7 : 0, stdout: "", stderr: "opener refused" };
+        }
         if (argv[0] === "bun") {
           measured.push(argv);
           if (opts.geometry instanceof Error) throw opts.geometry;
@@ -240,8 +247,6 @@ const rig = async (
             ? { exitCode: 1, stdout: "", stderr: "" }
             : { exitCode: 0, stdout: opts.geometry, stderr: "" };
         }
-        if (argv[0] === "rm") removed.push(argv);
-        else opened.push(argv);
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     },
@@ -280,6 +285,9 @@ const rig = async (
       check: string;
       note?: string;
     };
+  runtime.info = { platform: opts.windows ? "win32" : "darwin", wsl: false, home: opts.home ?? HOME, tmp: "/tmp", chrome: opts.chrome === false ? null : CHROME };
+  where.home = opts.home ?? HOME;
+  await registerChecker({ ...$, agent: { ...$.agent, register: async () => ({}) } } as unknown as EngineInterface);
   await turnEnd({});
   opened.length = 0;
   removed.length = 0;
@@ -288,6 +296,8 @@ const rig = async (
     spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!;
   return {
     $,
+    permission: (index: number, input: unknown, agentId = "k1") =>
+      hooks["tool.check"]![index]!($, { input, agentId }, async () => ({ decision: "ask" })),
     token,
     hooks,
     spawns,
@@ -339,7 +349,7 @@ test("missing Chrome settles the check as skipped and opens the page", async () 
   expect(r.entry("a")).toEqual(
     expect.objectContaining({ check: "skipped", note: "no Chrome" }),
   );
-  expect(r.opened).toEqual([["open", PAGE]]);
+  expect(r.opened).toEqual([openedPage(PAGE)]);
 });
 
 test("a clean geometry check settles ok and opens the page without spawning the checker", async () => {
@@ -352,7 +362,7 @@ test("a clean geometry check settles ok and opens the page without spawning the 
   expect(r.entry("a")).toEqual(
     expect.objectContaining({ check: "ok", note: "geometry clean" }),
   );
-  expect(r.opened).toEqual([["open", PAGE]]);
+  expect(r.opened).toEqual([openedPage(PAGE)]);
 });
 
 test("geometry faults go to the checker's task message", async () => {
@@ -361,7 +371,7 @@ test("geometry faults go to the checker's task message", async () => {
   });
   await startCheck(r.$, "a", PAGE);
   expect(r.spawns[0]!.prompt).toBe(
-    `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.\nA geometry check found:\n- 1280: figure 1 "C" overlaps "D"`,
+    task(PAGE, r.token(0)) + `\nA geometry check found:\n- 1280: figure 1 "C" overlaps "D"`,
   );
   expect(r.entry("a")).toEqual(expect.objectContaining({ check: "pending" }));
 });
@@ -371,18 +381,13 @@ test("a geometry check that fails, cannot start, or prints no verdict leaves the
     const r = await rig({ geometry });
     await startCheck(r.$, "a", PAGE);
     expect(r.spawns[0]!.prompt).toBe(
-      `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.`,
+      task(PAGE, r.token(0)),
     );
   }
 });
 
 test("settling removes the page's screenshots, whichever way it settles", async () => {
-  const shots = [
-    "rm",
-    "-f",
-    PAGE.replace(/\.html$/, ".check.png"),
-    PAGE.replace(/\.html$/, ".check-narrow.png"),
-  ];
+  const shots = [JSON.stringify({ op: "cleanup-check", page: PAGE })];
   const clean = await rig({ geometry: '{"faults":[]}' });
   await startCheck(clean.$, "a", PAGE);
   expect(clean.removed).toEqual([shots]);
@@ -402,7 +407,7 @@ test("a denied spawn settles the check as failed with the deny text", async () =
   expect(r.entry("a")).toEqual(
     expect.objectContaining({ check: "failed", note: "not allowed" }),
   );
-  expect(r.opened).toEqual([["open", PAGE]]);
+  expect(r.opened).toEqual([openedPage(PAGE)]);
 });
 
 test("startCheck returns at the spawn; the checker's answer settles it exactly once", async () => {
@@ -411,7 +416,7 @@ test("startCheck returns at the spawn; the checker's answer settles it exactly o
   expect(r.spawns).toEqual([
     {
       subagentType: CHECKER,
-      prompt: `Check this explainer page: ${PAGE}\nYour check token is ${r.token(0)}.`,
+      prompt: task(PAGE, r.token(0)),
       description: "check explainer layout",
     } as never,
   ]);
@@ -423,7 +428,7 @@ test("startCheck returns at the spawn; the checker's answer settles it exactly o
   expect(r.entry("a")).toEqual(
     expect.objectContaining({ check: "fixed", note: "2 fix(es)" }),
   );
-  expect(r.opened).toEqual([["open", PAGE]]);
+  expect(r.opened).toEqual([openedPage(PAGE)]);
   await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} OK` });
   expect(r.entry("a")).toEqual(expect.objectContaining({ check: "fixed" }));
   expect(r.opened).toHaveLength(1);
@@ -462,8 +467,8 @@ test("two checks answered in reverse order each get their own verdict", async ()
   );
   expect(r.entry("b")).toEqual(expect.objectContaining({ check: "ok" }));
   expect(r.opened).toEqual([
-    ["open", "/p/b"],
-    ["open", "/p/a"],
+    openedPage("/p/b"),
+    openedPage("/p/a"),
   ]);
 });
 
@@ -478,7 +483,7 @@ test("a check times out at the first turn end of any loop after 180 s", async ()
   expect(r.entry("a")).toEqual(
     expect.objectContaining({ check: "failed", note: "timed out" }),
   );
-  expect(r.opened).toEqual([["open", PAGE]]);
+  expect(r.opened).toEqual([openedPage(PAGE)]);
 });
 
 for (const [name, late] of [
@@ -500,5 +505,52 @@ for (const [name, late] of [
       answer: late.answer?.replace("TOKEN", r.token(0)),
     });
     expect(r.entry("b")).toEqual(expect.objectContaining({ check: "pending" }));
-    expect(r.opened).toEqual([["open", "/p/a"]]);
+    expect(r.opened).toEqual([openedPage("/p/a")]);
   });
+
+test("Windows containment accepts separator and case aliases but rejects parent segments, siblings and drives", async () => {
+  const r = await rig({ windows: true, home: "C:\\Users\\Q Space" });
+  await startCheck(r.$, "a", PAGE);
+  for (const index of [2, 3]) {
+    for (const file_path of ["c:/users/q space/.local/share/q-lab/runes/explain/repo/page.html", "C:\\Users\\Q Space\\.local\\share\\q-lab\\runes\\explain\\page.html"]) {
+      expect(await r.permission(index, { file_path })).toEqual({ decision: "allow" });
+    }
+    for (const file_path of ["C:/Users/Q Space/.local/share/q-lab/runes/explain/../page.html", "C:/Users/Q Space/.local/share/q-lab/runes/explain-other/page.html", "D:/Users/Q Space/.local/share/q-lab/runes/explain/page.html"]) {
+      expect(await r.permission(index, { file_path })).toEqual({ decision: "ask" });
+    }
+  }
+});
+
+test("screenshot commands quote spaces, substitutions and UNC paths while unsafe quotes fall through", async () => {
+  for (const [root, page, allowed] of [
+    ["C:\\Users\\Q Space\\plugin", "C:\\Users\\Q Space\\page.html", true],
+    ["/plugin/$(echo unsafe)", "/home/q/空間 & %#.html", true],
+    ["\\\\server\\share\\plugin", "\\\\server\\share\\page.html", true],
+    ["/plugin's", PAGE, false],
+    ["/plugin", "/page's.html", false],
+    ["/plugin\nother", PAGE, false],
+    ["/plugin", "/page\nother.html", false],
+  ] as const) {
+    const r = await rig({ root });
+    await startCheck(r.$, "a", page);
+    for (const mode of ["wide", "narrow"]) {
+      const command = shot(page, mode, root);
+      expect(await r.permission(1, { command })).toEqual({ decision: allowed ? "allow" : "ask" });
+      if (allowed) expect(r.spawns[0]!.prompt).toContain(command);
+    }
+  }
+});
+
+test("all verdicts use shared operations and preserve the verdict when opening fails", async () => {
+  for (const openError of [false, true, "throw"] as const)
+    for (const outcome of ["ok", "skipped", "failed", "timeout"] as const) {
+      const r = await rig({ chrome: outcome !== "skipped", geometry: outcome === "ok" ? '{"faults":[]}' : undefined, openError });
+      await startCheck(r.$, "a", PAGE);
+      if (outcome === "failed") await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} FAILED broken` });
+      if (outcome === "timeout") { r.advance(CHECK_TIMEOUT_MS); await r.turnEnd({}); }
+      expect(r.entry("a").check).toBe(outcome === "timeout" ? "failed" : outcome);
+      expect(r.opened).toEqual([openedPage(PAGE)]);
+      expect(r.removed).toEqual([[JSON.stringify({ op: "cleanup-check", page: PAGE })]]);
+      if (openError) expect(r.entry("a").note).toContain("opener refused");
+    }
+});

@@ -1,14 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { BINARIES } from "./chrome";
+import { browserCandidates, nativePlatformInput } from "../../shared/platform";
+import { resolveBinary } from "../../shared/instances";
 
-const installed = BINARIES.some((path) => existsSync(path));
+const installed = (() => {
+  try {
+    const input = nativePlatformInput();
+    resolveBinary("chrome", browserCandidates("chrome", input), input);
+    return true;
+  } catch {
+    return false;
+  }
+})();
 const cli = join(import.meta.dir, "chrome.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
-  const result = Bun.spawnSync(["bun", cli, ...argv]);
+  const result = Bun.spawnSync([process.execPath, cli, ...argv]);
   return {
     code: result.exitCode,
     out: result.stdout.toString().trim(),
@@ -19,13 +28,17 @@ function run(...argv: string[]): { code: number; out: string; err: string } {
 // Async, unlike `run`: a server in this process cannot answer while spawnSync blocks it.
 async function runAsync(
   ...argv: string[]
-): Promise<{ code: number; out: string }> {
-  const child = Bun.spawn(["bun", cli, ...argv], {
+): Promise<{ code: number; out: string; err: string }> {
+  const child = Bun.spawn([process.execPath, cli, ...argv], {
     stdout: "pipe",
     stderr: "pipe",
   });
-  const out = (await new Response(child.stdout).text()).trim();
-  return { code: await child.exited, out };
+  const [code, out, err] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  return { code, out: out.trim(), err: err.trim() };
 }
 
 describe.skipIf(!installed)("chrome CLI against a real browser", () => {
@@ -51,28 +64,31 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
         });
       },
     });
-    const opened = await runAsync(
-      "open",
-      "--new",
-      `http://127.0.0.1:${server.port}/`,
-    );
-    expect(opened.code).toBe(0);
-    const id = opened.out.split(" ")[0]!;
-
     try {
-      expect((await runAsync("click", "--id", id, "#go")).code).toBe(0);
-      expect(
-        (
-          await runAsync(
-            "eval",
-            "--id",
-            id,
-            "document.readyState + ' ' + document.title",
-          )
-        ).out,
-      ).toBe("complete Two");
+      const opened = await runAsync(
+        "open",
+        "--new",
+        `http://127.0.0.1:${server.port}/`,
+      );
+      expect(opened).toMatchObject({ code: 0 });
+      const id = opened.out.split(" ")[0]!;
+
+      try {
+        expect(await runAsync("click", "--id", id, "#go")).toMatchObject({ code: 0 });
+        expect(
+          (
+            await runAsync(
+              "eval",
+              "--id",
+              id,
+              "document.readyState + ' ' + document.title",
+            )
+          ).out,
+        ).toBe("complete Two");
+      } finally {
+        await runAsync("close", "--id", id);
+      }
     } finally {
-      await runAsync("close", "--id", id);
       server.stop(true);
     }
   }, 60_000);
@@ -81,7 +97,7 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
     const page =
       "data:text/html,<title>T</title><form onsubmit=\"document.title='sent:'+q.value;return false\"><input id=q></form>";
     const opened = run("open", "--new", page);
-    expect(opened.code).toBe(0);
+    expect(opened).toMatchObject({ code: 0 });
     const id = opened.out.split(" ")[0]!;
 
     try {

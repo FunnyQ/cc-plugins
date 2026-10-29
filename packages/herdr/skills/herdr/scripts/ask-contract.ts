@@ -4,7 +4,8 @@
 
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { posix, win32 } from "node:path";
 
 export const ASK_RESULT_END_MARKER = "==== ASK RESULT END ====";
 
@@ -30,13 +31,20 @@ export function extractFinalText(content: string): string | null {
   return lines.slice(0, -1).join("\n").trimEnd();
 }
 
+export function askRunPath(
+  exactDir: string | undefined,
+  platform: NodeJS.Platform,
+  tempRoot: string,
+): string {
+  if (exactDir !== undefined) return exactDir;
+  const leaf = `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`;
+  return platform === "win32"
+    ? win32.join(tempRoot, "q-lab", "herdr", "ask", leaf)
+    : posix.join("/tmp/q-lab/herdr/ask", leaf);
+}
+
 export function createAskRunDir(exactDir?: string): string {
-  const dir =
-    exactDir ??
-    join(
-      "/tmp/q-lab/herdr/ask",
-      `${Date.now()}-${process.pid}-${randomUUID().slice(0, 8)}`,
-    );
+  const dir = askRunPath(exactDir, process.platform, tmpdir());
   mkdirSync(dir, { recursive: true });
   return dir;
 }

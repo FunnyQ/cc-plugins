@@ -5,11 +5,11 @@ import { join } from "node:path";
 
 // Opt-in: Safari has no headless mode, so this opens a window that takes focus and
 // a glass pane that swallows input — never something a plain `bun test .` may do.
-const enabled = process.env.SAFARI_LIVE === "1";
+const enabled = process.platform === "darwin" && process.env.SAFARI_LIVE === "1";
 const cli = join(import.meta.dir, "safari.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
-  const result = Bun.spawnSync(["bun", cli, ...argv]);
+  const result = Bun.spawnSync([process.execPath, cli, ...argv]);
   return {
     code: result.exitCode,
     out: result.stdout.toString().trim(),

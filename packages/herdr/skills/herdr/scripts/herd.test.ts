@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ASK_RESULT_END_MARKER } from "./ask-contract.ts";
 import {
   addressOf,
@@ -1543,8 +1544,8 @@ async function withRegistryFile(
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "herd-registry-"));
   const path = join(dir, "registry.json");
-  await writeFile(path, JSON.stringify({ version: 1, projects }));
   try {
+    await writeFile(path, JSON.stringify({ version: 1, projects }));
     await fn(path);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -2019,7 +2020,7 @@ describe("ask", () => {
         expect(res.report).toContain("collect");
         expect(res.report).toContain(res.resultPath);
         expect(res.report).toContain(
-          import.meta.resolve("./herd.ts").replace("file://", ""),
+          fileURLToPath(import.meta.resolve("./herd.ts")),
         );
       }
     });

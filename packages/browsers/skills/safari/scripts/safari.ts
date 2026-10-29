@@ -291,9 +291,18 @@ async function run(invocation: Invocation): Promise<string> {
   }
 }
 
+export async function execute(
+  argv: string[],
+  platform: string = process.platform,
+  executeInvocation: (invocation: Invocation) => Promise<string> = run,
+): Promise<string> {
+  if (platform !== "darwin") throw new Error("safari is macOS only");
+  return executeInvocation(parseArgs(argv));
+}
+
 if (import.meta.main) {
   try {
-    console.log(await run(parseArgs(Bun.argv.slice(2))));
+    console.log(await execute(Bun.argv.slice(2)));
     process.exit(0);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

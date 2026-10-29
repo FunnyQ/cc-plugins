@@ -2,9 +2,15 @@
 
 // Chrome refuses remote debugging on its default profile.
 
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { connectPage, type Page } from "./cdp";
+import {
+  browserCandidates,
+  browserStateDir,
+  nativePlatformInput,
+  type PlatformInput,
+} from "../../shared/platform";
 import {
   isAlive,
   liveInstances,
@@ -28,19 +34,12 @@ export type Invocation = {
   output: string | null;
 };
 
-const STATE_DIR = "/tmp/q-lab/browsers/chrome";
+const STATE_DIR = browserStateDir("chrome");
 const DEFAULT_SIZE = "1440x900";
 const LAUNCH_TIMEOUT_MS = 20_000;
 const LOAD_TIMEOUT_MS = 15_000;
 // Measured on a local link: a 10ms window missed 1 in 5 navigations, 30ms missed none.
 const NAVIGATION_GRACE_MS = 50;
-
-// macOS app bundles only; add Linux paths when this runs anywhere else.
-export const BINARIES = [
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary",
-  "/Applications/Chromium.app/Contents/MacOS/Chromium",
-];
 
 const VALUE_FLAGS = new Set(["--id", "--size", "--output"]);
 
@@ -74,13 +73,40 @@ export function parseArgs(argv: string[]): Invocation {
   return invocation;
 }
 
-async function launch(invocation: Invocation): Promise<Instance> {
-  const binary = resolveBinary("chrome", BINARIES);
+export type LaunchOptions = {
+  input?: PlatformInput;
+  timeoutMs?: number;
+  stateDir?: string;
+  resolve?: (
+    name: string,
+    candidates: string[],
+    input: PlatformInput,
+  ) => string;
+  spawn?: (argv: string[]) => { pid: number; unref: () => void };
+};
+
+export async function launch(
+  invocation: Invocation,
+  options: LaunchOptions = {},
+): Promise<Instance> {
+  const input = options.input ?? nativePlatformInput();
+  const stateDir =
+    options.stateDir ?? browserStateDir("chrome", input.platform, input.env);
+  const resolve = options.resolve ?? resolveBinary;
+  const spawn =
+    options.spawn ??
+    ((argv) =>
+      Bun.spawn(argv, {
+        stdio: ["ignore", "ignore", "ignore"],
+        detached: true,
+      }));
+  const binary = resolve("chrome", browserCandidates("chrome", input), input);
   const { width, height } = parseSize(invocation.size ?? DEFAULT_SIZE);
-  const { id, profile } = newProfile(STATE_DIR);
+  const { id, profile } = newProfile(stateDir);
   const headless = !invocation.headed;
-  const child = Bun.spawn(
-    [
+  let child: { pid: number; unref: () => void };
+  try {
+    child = spawn([
       binary,
       // Port 0: Chrome binds a free port itself and writes it to DevToolsActivePort,
       // so there is no window between choosing a port and another process taking it.
@@ -91,9 +117,11 @@ async function launch(invocation: Invocation): Promise<Instance> {
       `--window-size=${width},${height}`,
       ...(headless ? ["--headless=new"] : []),
       "about:blank",
-    ],
-    { stdio: ["ignore", "ignore", "ignore"], detached: true },
-  );
+    ]);
+  } catch (error) {
+    rmSync(profile, { recursive: true, force: true });
+    throw error;
+  }
   child.unref();
 
   const instance: Instance = {
@@ -104,22 +132,23 @@ async function launch(invocation: Invocation): Promise<Instance> {
     browser: "chrome",
     headless,
   };
+  recordInstance(stateDir, instance);
   const portFile = join(profile, "DevToolsActivePort");
-  const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? LAUNCH_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const lines = existsSync(portFile)
-      ? readFileSync(portFile, "utf8").split("\n")
-      : [];
+    let lines: string[] = [];
+    try {
+      lines = readFileSync(portFile, "utf8").split("\n");
+    } catch {}
     if (lines.length > 1) {
       instance.port = Number(lines[0]);
-      recordInstance(STATE_DIR, instance);
+      recordInstance(stateDir, instance);
       return instance;
     }
     if (Date.now() > deadline || !isAlive(child.pid)) {
-      await shutdown(STATE_DIR, instance);
-      throw new Error(
-        `chrome did not open DevTools within ${LAUNCH_TIMEOUT_MS}ms`,
-      );
+      await shutdown(stateDir, instance);
+      throw new Error(`chrome did not open DevTools within ${timeoutMs}ms`);
     }
     await Bun.sleep(50);
   }
@@ -170,7 +199,10 @@ export async function interacted(
 ): Promise<void> {
   // Grace window, not a guarantee: a navigation a page timer starts later than this is not waited for.
   const started = page
-    .nextEvent(["Page.frameStartedLoading"], LOAD_TIMEOUT_MS)
+    .nextEvent(
+      ["Page.frameRequestedNavigation", "Page.frameStartedLoading"],
+      LOAD_TIMEOUT_MS,
+    )
     .catch(() => null);
   const stopped = page.nextEvent(["Page.frameStoppedLoading"], LOAD_TIMEOUT_MS);
   stopped.catch(() => {});
@@ -250,7 +282,9 @@ async function run(invocation: Invocation): Promise<string> {
 
   if (command === "close") {
     const instance = pickInstance(liveInstances(STATE_DIR), invocation.id);
-    await shutdown(STATE_DIR, instance);
+    await shutdown(STATE_DIR, instance, {
+      close: () => withPage(instance, (page) => page.send("Browser.close")),
+    });
     return `closed ${instance.id}`;
   }
 

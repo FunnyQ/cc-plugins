@@ -43,8 +43,25 @@ a headed window takes focus on the user's screen.
 `open` prints the instance id first. With several instances open, every command
 refuses to guess — pass `--id`, and the error lists the candidates.
 
-The browser comes from the first installed of Google Chrome, Chrome Canary, and
-Chromium.
+## Installed browser discovery
+
+Require `bun` and an installed browser. On macOS, search the `/Applications`
+app bundles in order: Google Chrome, Google Chrome Canary, Chromium.
+On Linux, search `PATH` in order for `chrome`, `google-chrome`,
+`google-chrome-stable`, `chromium`, `chromium-browser`, then the fixed candidates
+`/opt/google/chrome/chrome`, `/usr/bin/google-chrome`,
+`/usr/bin/google-chrome-stable`, `/usr/bin/chromium`,
+`/usr/bin/chromium-browser`. Skip a Snap build (one resolving to `/snap/` or
+`/usr/bin/snap`, or a shell script that execs `/snap/bin/`, like Ubuntu's
+`chromium-browser`): its private `/tmp` hides the profile, so it never starts.
+On native Windows, search `Google\Chrome\Application\chrome.exe` under
+`ProgramFiles`, `ProgramFiles(x86)` and `LOCALAPPDATA`, in that order.
+Do not promise arbitrary portable installations.
+
+On WSL, use Linux-installed browsers only; never launch a Windows browser.
+If discovery fails, report all attempted candidates and the hint
+`Install a Linux build of chrome inside WSL.` Report missing prerequisites
+without automatically installing them.
 
 ## Read and drive the page
 
@@ -82,4 +99,7 @@ until `close`.
 There is no console stream and no network log. Use herdr-browser when a bug needs
 them.
 
-Instance records live under `/tmp/q-lab/browsers/chrome/instances/`.
+Instance records live under `/tmp/q-lab/browsers/chrome/instances/` on macOS/Linux
+and `<system-temp>\q-lab\browsers\chrome\instances\` on native Windows.
+For isolated smoke, set an absolute `Q_BROWSER_STATE_DIR`; records then live
+under `<Q_BROWSER_STATE_DIR>/chrome/instances/`.

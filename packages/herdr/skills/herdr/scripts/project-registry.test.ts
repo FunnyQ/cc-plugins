@@ -17,11 +17,11 @@ async function withRegistry(
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "herdr-registry-"));
   const path = join(dir, "registry.json");
-  await writeFile(
-    path,
-    typeof contents === "string" ? contents : JSON.stringify(contents),
-  );
   try {
+    await writeFile(
+      path,
+      typeof contents === "string" ? contents : JSON.stringify(contents),
+    );
     await fn(path);
   } finally {
     await rm(dir, { recursive: true, force: true });
@@ -229,5 +229,57 @@ describe("queryZoxide", () => {
     });
     expect(path).toBeNull();
     expect(called).toBe(false);
+  });
+});
+
+describe("Windows registry paths", () => {
+  const tempRoot = "C:\\Users\\Q\\AppData\\Local\\Temp";
+
+  test("matches slashes and case without changing returned path spelling", () => {
+    const stored = { path: "C:/Projects/Demo", name: "demo", aliases: ["example"] };
+    const backslashes = { path: "D:\\Clients\\Demo", name: "client", aliases: [] };
+    expect(matchProjects([stored], "c:\\PROJECTS\\demo")).toEqual([stored]);
+    expect(matchProjects([backslashes], "d:/clients/demo")).toEqual([backslashes]);
+    expect(stored.path).toBe("C:/Projects/Demo");
+  });
+
+  test("filters the system temp root and descendants, not prefix siblings", () => {
+    for (const path of [tempRoot, `${tempRoot}\\`, `${tempRoot}\\ask`, "c:/users/q/appdata/local/temp/ask", `${tempRoot}\\child\\..`]) {
+      expect(isTempPath(path, tempRoot)).toBe(true);
+    }
+    for (const path of [`${tempRoot}orary/project`, `${tempRoot}2/project`, "C:/Projects/demo"]) {
+      expect(isTempPath(path, tempRoot)).toBe(false);
+    }
+    expect(isTempPath("D:/Scratch/project", "D:/Scratch")).toBe(true);
+    expect(isTempPath("//server/share/temp/project", "\\\\server\\share\\temp")).toBe(true);
+    expect(isTempPath("/projects/demo", "/projects")).toBe(false);
+  });
+
+  test("matching filters injected Windows temp paths but preserves aliases and order", () => {
+    const candidates = [
+      { path: `${tempRoot}\\demo`, name: "demo", aliases: [] },
+      { path: `${tempRoot}2/demo`, name: "demo", aliases: ["example"] },
+      { path: "C:/Projects/demo", name: "demo", aliases: ["example"] },
+    ];
+    expect(matchProjects(candidates, "demo", tempRoot)).toEqual(candidates.slice(1));
+    expect(matchProjects(candidates, "example", tempRoot)).toEqual(candidates.slice(1));
+  });
+});
+
+test("Windows registry spellings, schema, aliases and timestamps remain read-only", async () => {
+  const registry = {
+    version: 1,
+    projects: {
+      "C:/Projects/Demo": { name: "demo", aliases: ["Example"], last_used_at: 100 },
+      "D:\\Projects\\Hidden": { name: "hidden", hidden: true },
+    },
+  };
+  await withRegistry(registry, async (path) => {
+    const before = await Bun.file(path).text();
+    const candidates = await readRegistry(path);
+    expect(matchProjects(candidates, "c:\\projects\\DEMO")).toEqual([{
+      path: "C:/Projects/Demo", name: "demo", aliases: ["Example"], lastUsedAt: 100,
+    }]);
+    expect(await Bun.file(path).text()).toBe(before);
   });
 });

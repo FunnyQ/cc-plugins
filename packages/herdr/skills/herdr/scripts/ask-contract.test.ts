@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { realpathSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, win32 } from "node:path";
 import {
   appendFileContract,
   ASK_RESULT_END_MARKER,
   createAskRunDir,
+  askRunPath,
   extractFinalText,
 } from "./ask-contract.ts";
 
@@ -54,20 +56,33 @@ describe("createAskRunDir", () => {
   });
 
   test("two calls with no override never collide", async () => {
-    const a = createAskRunDir();
-    const b = createAskRunDir();
-    expect(a).not.toBe(b);
-    expect(a.startsWith("/tmp/q-lab/herdr/ask/")).toBe(true);
-    await rm(a, { recursive: true, force: true });
-    await rm(b, { recursive: true, force: true });
+    const dirs: string[] = [];
+    try {
+      dirs.push(createAskRunDir());
+      dirs.push(createAskRunDir());
+      expect(dirs[0]).not.toBe(dirs[1]);
+      for (const dir of dirs) {
+        const root =
+          process.platform === "win32"
+            ? join(tmpdir(), "q-lab", "herdr", "ask")
+            : "/tmp/q-lab/herdr/ask";
+        expect(realpathSync.native(dirname(dir))).toBe(realpathSync.native(root));
+        expect(basename(dir)).toMatch(/^\d+-\d+-[a-f0-9]{8}$/);
+        expect((await Bun.file(dir).stat()).isDirectory()).toBe(true);
+      }
+    } finally {
+      await Promise.all(
+        dirs.map((dir) => rm(dir, { recursive: true, force: true })),
+      );
+    }
   });
 });
 
 describe("package boundaries", () => {
   const herdrRoot = join(import.meta.dir, "../../..");
-  const sources = [...new Bun.Glob("**/*.ts").scanSync(herdrRoot)].filter(
-    (path) => !path.includes("node_modules"),
-  );
+  const sources = [...new Bun.Glob("**/*.ts").scanSync(herdrRoot)]
+    .map((path) => path.replaceAll("\\", "/"))
+    .filter((path) => !path.includes("node_modules"));
   const read = (path: string) => Bun.file(join(herdrRoot, path)).text();
 
   test("nothing in herdr imports relay, since relay versions separately", async () => {
@@ -87,5 +102,52 @@ describe("package boundaries", () => {
       if ((await read(path)).includes("mkdirSync")) callers.push(path);
     }
     expect(callers).toEqual(["skills/herdr/scripts/ask-contract.ts"]);
+  });
+});
+
+describe("ask platform paths", () => {
+  test("uses the injected Windows temp root and preserves exact overrides", () => {
+    const root = "C:\\Users\\Q\\AppData\\Local\\Temp";
+    const path = askRunPath(undefined, "win32", root);
+    expect(win32.dirname(path)).toBe(win32.join(root, "q-lab", "herdr", "ask"));
+    expect(win32.basename(path)).toMatch(/^\d+-\d+-[a-f0-9]{8}$/);
+    expect(askRunPath("C:/exact path/../run", "win32", root)).toBe(
+      "C:/exact path/../run",
+    );
+  });
+
+  test("keeps Unix roots on macOS, Linux and WSL regardless of temp override", () => {
+    for (const platform of ["darwin", "linux"] as const) {
+      expect(askRunPath(undefined, platform, "/some/custom/temp")).toMatch(
+        /^\/tmp\/q-lab\/herdr\/ask\/\d+-\d+-[a-f0-9]{8}$/,
+      );
+    }
+  });
+
+  test("UUID keeps repeated calls unique even within the same timestamp", () => {
+    const now = Date.now;
+    Date.now = () => 123;
+    try {
+      const paths = Array.from({ length: 100 }, () =>
+        askRunPath(undefined, "win32", "C:/Temp"),
+      );
+      expect(new Set(paths).size).toBe(100);
+      expect(paths.every((path) =>
+        win32.basename(path).startsWith(`123-${process.pid}-`),
+      )).toBe(true);
+    } finally {
+      Date.now = now;
+    }
+  });
+
+  test("keeps the complete multiline result contract for Windows paths", () => {
+    const result = "C:\\Users\\Q\\Temp\\ask run\\result.md";
+    const contract = appendFileContract("Question", result);
+    expect(contract).toContain(result);
+    expect(contract).toContain("complete final answer");
+    expect(contract).toContain("caller does not read your pane");
+    expect(contract).toContain(`last line must be exactly: ${ASK_RESULT_END_MARKER}`);
+    const answer = "# Answer\n\nFirst paragraph.\n\nSecond paragraph.";
+    expect(extractFinalText(`${answer}\r\n${ASK_RESULT_END_MARKER}\r\n`)).toBe(answer);
   });
 });

@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import {
   newcomer,
+  prerequisiteHint,
+  requireExecutable,
   cdpBase,
   parseTerminalBrowsers,
   selectTarget,
@@ -251,5 +253,34 @@ describe("herdrTabLabel", () => {
     expect(herdrTabLabel(raw(undefined))).toBeNull();
     expect(herdrTabLabel("{}")).toBeNull();
     expect(herdrTabLabel("not json")).toBeNull();
+  });
+});
+
+describe("prerequisite diagnostics", () => {
+  for (const dependency of ["terminal-browser", "herdr"] as const) {
+    test(`${dependency} gives native Windows guidance without an invented installer`, () => {
+      const message = prerequisiteHint(dependency, "win32");
+      expect(message).toContain(`${dependency} is not installed`);
+      expect(message).toContain("native Windows");
+      expect(message).toContain("WSL");
+      expect(message).not.toMatch(/curl|bash|powershell|winget|npm/);
+      const calls: string[] = [];
+      expect(() => requireExecutable(dependency, dependency, "win32", (bin) => {
+        calls.push(bin);
+        return null;
+      })).toThrow(message);
+      expect(calls).toEqual([dependency]);
+    });
+
+    test(`${dependency} accepts an available executable without running it`, () => {
+      expect(() => requireExecutable("C:/Program Files/CLI/tool.exe", dependency, "win32", () => "C:/Program Files/CLI/tool.exe")).not.toThrow();
+    });
+  }
+
+  test("retains Unix installation guidance on macOS and Linux including WSL", () => {
+    for (const platform of ["darwin", "linux"] as const) {
+      expect(prerequisiteHint("terminal-browser", platform)).toContain("curl -fsSL https://terminal-browser.sh/install | bash");
+      expect(prerequisiteHint("herdr", platform)).toContain("herdr");
+    }
   });
 });

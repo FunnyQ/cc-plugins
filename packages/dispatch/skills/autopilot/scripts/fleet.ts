@@ -175,7 +175,7 @@ function aggregateByTask(
     if (entry.kind === "score") {
       if (
         !aggregate.latestScore ||
-        entry.attempt > aggregate.latestScore.attempt
+        entry.attempt >= aggregate.latestScore.attempt
       ) {
         aggregate.latestScore = entry;
       }

@@ -3,9 +3,10 @@ import { expect, mock, test } from "claude-code/testing";
 
 import type { ExplainEntry, ExplainView } from "../../types";
 import { THEMES } from "../config";
+import { platformCommand, runtime, type PlatformOperation } from "../platform";
 import { CONFIG, HOME, startSession } from "../transcript/test-session";
 import { where } from "../transcript/where";
-import { CHECK_TIMEOUT_MS, CHECKER, CHROME } from "./checker";
+import { CHECK_TIMEOUT_MS, CHECKER } from "./checker";
 import {
   explainAsk,
   explainClear,
@@ -78,10 +79,14 @@ const rig = async (
     entries?: ExplainEntry[];
     language?: string;
     trashFails?: boolean;
+    openFails?: boolean;
+    mkdirFails?: boolean;
+    firstRun?: boolean;
   } = {},
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
   where.home = HOME;
+  runtime.info = { platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: "/test/chrome" };
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
@@ -92,7 +97,6 @@ const rig = async (
           '<html lang="{{lang}}">{{main}}</html>',
         ] as const,
     ),
-    [CHROME, ""],
   ]);
   const forks: string[] = [];
   const replies: (Fork | Promise<Fork> | Error)[] = [];
@@ -100,6 +104,8 @@ const rig = async (
   const focuses: unknown[] = [];
   const toasts: string[] = [];
   const runs: string[][] = [];
+  const operations: PlatformOperation[] = [];
+  const directories = new Set<string>();
   const spawns: { prompt: string }[] = [];
   const agents: { id: string; type: string }[] = [];
   const $ = {
@@ -135,13 +141,33 @@ const rig = async (
       read: async (p: string) => files.get(p),
       write: async (p: string, text: string) => {
         if (opts.writeFails) throw new Error("disk full");
+        if (opts.firstRun && !directories.has(p.slice(0, p.lastIndexOf("/"))))
+          throw new Error("parent directory does not exist");
         files.set(p, text);
       },
       exists: async (p: string) => files.has(p),
     },
     process: {
-      run: async (argv: string[]) => {
+      run: async (argv: string[], init?: { stdin?: string }) => {
         runs.push(argv);
+        if (argv[0] === "mkdir") throw new Error("mkdir is not on PATH");
+        if (argv[1] === `${ROOT}/hooks/platform-cli.ts`) {
+          const op = JSON.parse(init?.stdin ?? "") as PlatformOperation;
+          operations.push(op);
+          const failure =
+            op.op === "trash" && opts.trashFails
+              ? "trash: no such file"
+              : op.op === "open" && opts.openFails
+                ? "xdg-open exited 3: no opener"
+                : op.op === "mkdir" && opts.mkdirFails
+                  ? "mkdir: access denied"
+                  : undefined;
+          if (failure) return { exitCode: 1, stdout: "", stderr: failure };
+          if (op.op === "mkdir") directories.add(op.directory);
+          if (op.op === "trash")
+            for (const path of op.paths) files.delete(path);
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
         const git = argv[0] === "git";
         if (argv[0] === "trash" && opts.trashFails)
           return { exitCode: 1, stdout: "", stderr: "trash: no such file" };
@@ -205,12 +231,14 @@ const rig = async (
     focuses,
     toasts,
     runs,
+    operations,
+    directories,
     spawns,
     files,
     turnEnd,
     view: () => explain,
     token: (i: number) =>
-      spawns[i]!.prompt.split("token is ")[1]!.replace(".", ""),
+      spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!,
     setNow: (n: number) => (now = n),
   };
 };
@@ -220,7 +248,8 @@ const answered = (text: string): Fork => ({
   text,
   usage: USAGE,
 });
-const opened = (runs: string[][]) => runs.filter((a) => a[0] === "open");
+const opened = (operations: PlatformOperation[]) =>
+  operations.filter((op) => op.op === "open").map((op) => ["open", op.path]);
 
 test("press with a text reply opens the pane, forks once, and stores a selected text entry", async () => {
   const r = await rig();
@@ -281,13 +310,13 @@ test("press with an html reply writes the file, stores pending, and the checker'
   ).toBe(true);
   expect(r.files.has(entry.path)).toBe(true);
   expect(r.spawns).toHaveLength(1);
-  expect(opened(r.runs)).toEqual([]);
+  expect(opened(r.operations)).toEqual([]);
   expect(r.view().isRunning).toBe(false);
   await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} FIXED 2` });
   expect(r.view().entries[0]).toEqual(
     expect.objectContaining({ check: "fixed", note: "2 fix(es)" }),
   );
-  expect(opened(r.runs)).toEqual([["open", entry.path]]);
+  expect(opened(r.operations)).toEqual([["open", entry.path]]);
 });
 
 test("an html reply with a diagram renders it in a bun child, after the entry lands and before the geometry check", async () => {
@@ -299,7 +328,7 @@ test("an html reply with a diagram renders it in a bun child, after the entry la
   );
   await explainPress(r.$);
   const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
-  const bun = r.runs.filter((a) => a[0] === "bun");
+  const bun = r.runs.filter((a) => a[0] === "bun" && !a[1]?.endsWith("platform-cli.ts"));
   expect(bun[0]).toEqual([
     "bun",
     "/plugin/hooks/explain/pele-cli.ts",
@@ -381,7 +410,7 @@ test("a denied checker spawn still opens the page and fails the check", async ()
   await explainPress(r.$);
   const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
   expect(entry.check).toBe("failed");
-  expect(opened(r.runs)).toContainEqual(["open", entry.path]);
+  expect(opened(r.operations)).toContainEqual(["open", entry.path]);
 });
 
 test("a write that throws keeps the summary as a text entry and sets the error", async () => {
@@ -587,7 +616,8 @@ test("select sets selected; reopen opens an html entry and nothing else", async 
   await explainReopen(r.$, "t");
   expect(r.runs).toEqual([]);
   await explainReopen(r.$, "h");
-  expect(r.runs).toEqual([["open", "/p/h.html"]]);
+  expect(r.runs).toEqual([platformCommand(ROOT)]);
+  expect(r.operations).toEqual([{ op: "open", path: "/p/h.html" }]);
 });
 
 const pages: ExplainEntry[] = [
@@ -614,9 +644,12 @@ const pages: ExplainEntry[] = [
 
 test("explainDelete moves an html entry's page to the Trash and drops the entry; a text entry just drops", async () => {
   const r = await rig({ entries: pages });
+  r.files.set("/p/h2.html", "<html>recyclable</html>");
   await explainSelect(r.$, "h2");
   await explainDelete(r.$, "h2");
-  expect(r.runs).toEqual([["trash", "/p/h2.html"]]);
+  expect(r.files.has("/p/h2.html")).toBe(false);
+  expect(r.runs).toEqual([platformCommand(ROOT)]);
+  expect(r.operations).toEqual([{ op: "trash", paths: ["/p/h2.html"] }]);
   expect(r.view().entries.map((e) => e.id)).toEqual(["t", "h1"]);
   expect(r.view().selected).toBeUndefined();
   await explainDelete(r.$, "t");
@@ -636,7 +669,10 @@ test("a failed trash keeps the entry and names the page in the error", async () 
 test("explainClear trashes every html page in one call and empties the history", async () => {
   const r = await rig({ entries: pages });
   await explainClear(r.$);
-  expect(r.runs).toEqual([["trash", "/p/h2.html", "/p/h1.html"]]);
+  expect(r.runs).toEqual([platformCommand(ROOT)]);
+  expect(r.operations).toEqual([
+    { op: "trash", paths: ["/p/h2.html", "/p/h1.html"] },
+  ]);
   expect(r.view().entries).toEqual([]);
   expect(r.view().selected).toBeUndefined();
   const failing = await rig({ entries: pages, trashFails: true });
@@ -679,4 +715,51 @@ test("the whole plugin starts through register.tsx with explain on, and every tu
       turnId: "t",
       reason: "answer",
     } as never);
+});
+
+test("first-run HTML creation uses the structured recursive mkdir without Unix utilities", async () => {
+  const r = await rig({ firstRun: true });
+  r.replies.push(answered(htmlReply));
+  await explainPress(r.$);
+  const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
+  expect(entry.kind).toBe("html");
+  expect(r.files.get(entry.path)).toContain('<p class="answer">yes</p>');
+  expect(r.operations).toEqual([
+    {
+      op: "mkdir",
+      directory: entry.path.slice(0, entry.path.lastIndexOf("/")),
+    },
+  ]);
+  expect(r.view().error).toBeUndefined();
+});
+
+test("failed platform mkdir reports the failure and stores the summary fallback", async () => {
+  const r = await rig({ mkdirFails: true });
+  r.replies.push(answered(htmlReply));
+  await explainPress(r.$);
+  expect(r.view().entries[0]).toMatchObject({ kind: "text", body: "It flows." });
+  expect(r.view().error).toContain("mkdir: access denied");
+  expect(r.spawns).toHaveLength(0);
+});
+
+test("failed reopening preserves the completed page and history with hostile path data", async () => {
+  const path = "C:\\Users\\Q 空間 & %#'\\flow.html";
+  const page = { ...pages[0]!, path } as ExplainEntry;
+  const r = await rig({ entries: [page], openFails: true });
+  r.files.set(path, "<html>retained</html>");
+  await explainReopen(r.$, page.id);
+  expect(r.operations).toEqual([{ op: "open", path }]);
+  expect(r.runs).toEqual([platformCommand(ROOT)]);
+  expect(r.view().entries).toEqual([page]);
+  expect(r.files.get(path)).toBe("<html>retained</html>");
+  expect(r.view().error).toContain("xdg-open exited 3: no opener");
+});
+
+test("failed recycling preserves the HTML file as well as its history entry", async () => {
+  const r = await rig({ entries: pages, trashFails: true });
+  r.files.set("/p/h1.html", "<html>retained</html>");
+  await explainDelete(r.$, "h1");
+  expect(r.files.get("/p/h1.html")).toBe("<html>retained</html>");
+  expect(r.view().entries).toEqual(pages);
+  expect(r.operations).toEqual([{ op: "trash", paths: ["/p/h1.html"] }]);
 });

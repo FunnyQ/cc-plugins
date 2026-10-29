@@ -1,6 +1,7 @@
 import type { Hook, Register } from "claude-code";
 
 import { band } from "./band";
+import { modEnv, platformCommand, runtime, type RuntimeInfo } from "./platform";
 import { mascot } from "./clawd/mascot";
 import { registerChecker } from "./explain/checker";
 import { explainHooks } from "./explain/explain";
@@ -52,13 +53,15 @@ type Loaded = {
 };
 
 const loadConfig = async ($: $): Promise<Loaded> => {
-  const home = (await $.env.get("HOME")) ?? "";
-  where.home = home;
+  const home = where.home;
   const path = configPath(home);
   const parse = async (text: string) => {
     // a mod's child gets no HOME
     const r = await $.process
-      .run(PARSE, { stdin: text, env: { HOME: home } })
+      .run(PARSE, {
+        stdin: text,
+        env: modEnv(home),
+      })
       .catch((err: unknown) => {
         throw new Error(`bun did not start (${String(err)})`);
       });
@@ -72,6 +75,7 @@ const loadConfig = async ($: $): Promise<Loaded> => {
     return JSON.parse(r.stdout) as unknown;
   };
   try {
+    if (!home) throw new Error("could not resolve the runes home directory");
     if (!(await $.fs.exists(path))) {
       // the switches lived in $.store as `rune:<name>` before the config file
       const keys = RUNES.map((r) => `rune:${r}`);
@@ -119,7 +123,29 @@ const notice = (l: Loaded) =>
 export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     where.cwd = e.cwd;
-    const project = e.cwd.split("/").filter(Boolean).at(-1) ?? "";
+    runtime.info = undefined;
+    const home = await $.env.get("HOME");
+    const profile = await $.env.get("USERPROFILE");
+    where.home = home || profile || "";
+    let runtimeError: string | undefined;
+    try {
+      const result = await $.process.run(platformCommand($.plugin.root), {
+        stdin: JSON.stringify({ op: "info" }),
+        timeoutMs: 5_000,
+        env: {
+          ...(home !== undefined ? { HOME: home } : {}),
+          ...(profile !== undefined ? { USERPROFILE: profile } : {}),
+        },
+      });
+      if (result.exitCode !== 0)
+        throw new Error(result.stderr.trim() || `bun exited ${result.exitCode}`);
+      const info = JSON.parse(result.stdout) as RuntimeInfo;
+      runtime.info = info;
+      where.home = info.home;
+    } catch (error) {
+      runtimeError = `runes: runtime probe failed — ${String(error)}`;
+    }
+    const project = e.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
     const [loaded] = await Promise.all([
       loadConfig($),
       $.command.register({
@@ -128,7 +154,7 @@ export const register: Register = (on) => {
         argumentHint: USAGE,
       }),
     ]);
-    const said = notice(loaded);
+    const said = [notice(loaded), runtimeError].filter(Boolean).join("\n");
     // a toast raised during session.start is dropped (seen live after /reload-plugins), so it waits a beat
     if (said) $.clock.after(1000, () => $.ui.toast(said));
     $.ui.invalidate("ui.render");
@@ -181,7 +207,7 @@ export const register: Register = (on) => {
                   model: MODEL,
                   effort: EFFORT,
                 }),
-                env: { HOME: home },
+                env: modEnv(home),
               },
             ),
           )
