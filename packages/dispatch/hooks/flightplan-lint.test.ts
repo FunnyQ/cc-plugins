@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, sep } from "node:path";
 
 const HOOK = join(import.meta.dir, "flightplan-lint.sh");
 const PLUGIN_ROOT = join(import.meta.dir, "..");
@@ -147,6 +147,19 @@ describe("flightplan-lint hook", () => {
     const { root, taskFile } = await makeTaskTree(bad);
     const { code } = await runHook(payload(taskFile).replaceAll("/", "\\/"));
     expect(code).toBe(2);
+    await rm(root, { recursive: true });
+  });
+
+  test("a backslash-separated task path reaches the lint (real file; on POSIX one file name holding the backslashes)", async () => {
+    const bad = VALID_TASK.replace("One sentence.", "See PLAN.md for context.");
+    const root = await mkdtemp(join(tmpdir(), "flightplan-hook-"));
+    const file = `${root}${sep}docs\\sample\\tasks\\ui\\01-foo.md`;
+    await mkdir(dirname(file), { recursive: true });
+    await writeFile(file, bad);
+    const { code, stderr } = await runHook(payload(file));
+    expect(code).toBe(2);
+    expect(stderr).toMatch(/flightplan lint violations/);
+    expect(stderr).toMatch(/self-containment/);
     await rm(root, { recursive: true });
   });
 

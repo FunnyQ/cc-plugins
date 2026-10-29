@@ -9,11 +9,12 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   create,
   fingerprint,
@@ -21,6 +22,7 @@ import {
   rebase,
   remove,
   reset,
+  samePathKey,
   show,
   sweep,
   unland,
@@ -82,6 +84,20 @@ function fixture() {
   git(repo, "add", ".");
   git(repo, "commit", "-qm", "fixture");
   return { repo, slug: "test-plan", ref: "work-tree/01" };
+}
+
+function aliasedFixture() {
+  const options = fixture();
+  const alias = join(dirname(dirname(options.repo)), "alias");
+  symlinkSync(dirname(options.repo), alias, "junction");
+  return { ...options, repo: join(alias, "repo") };
+}
+
+function registered(repo: string): string[] {
+  return git(repo, "worktree", "list", "--porcelain")
+    .split("\n")
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => samePath(line.slice("worktree ".length)));
 }
 
 function rootOf(options: { repo: string; slug: string }) {
@@ -480,6 +496,22 @@ describe("worktree lifecycle", () => {
     expect(readFileSync(join(path, "a.txt"), "utf8")).toBe("base\n");
   });
 
+  test("first create through a repo alias, before its worktree root exists, registers the path under the same key", () => {
+    const options = aliasedFixture();
+    expect(existsSync(dirname(rootOf(options)))).toBe(false);
+    const { path } = create(options);
+    expect(registered(options.repo)).toContain(samePathKey(path));
+  });
+
+  test("remove prunes a worktree deleted by hand, reached through a repo alias so git's spelling differs from pathOf's", () => {
+    const options = aliasedFixture();
+    const { path } = create(options);
+    expect(registered(options.repo)).toContain(samePath(path));
+    rmSync(path, { recursive: true, force: true });
+    expect(remove(options)).toEqual({ removed: true });
+    expect(registered(options.repo)).not.toContain(samePath(path));
+  });
+
   test("sweep keep-all leaves state and registrations untouched; keep scopes removals to this slug", () => {
     const options = fixture();
     const first = create(options);
@@ -699,6 +731,41 @@ describe("worktree lifecycle", () => {
     expect(unland({ ...options, op: "a1-unland" })).toEqual({
       restored: ["a.txt"],
     });
+  });
+});
+
+describe("samePathKey", () => {
+  test("re-joins missing trailing segments onto the realpath of the nearest existing ancestor", () => {
+    const options = fixture();
+    const expected = join(realpathSync.native(options.repo), "gone", "too");
+    expect(samePathKey(join(options.repo, "gone", "too"))).toBe(
+      process.platform === "win32" ? expected.toLowerCase() : expected,
+    );
+  });
+
+  test("lower-cases on win32 only, so two case spellings of an existing directory share a key there", () => {
+    const options = fixture();
+    const mixed = join(options.repo, "Mixed", "Case");
+    mkdirSync(mixed, { recursive: true });
+    expect(samePathKey(mixed, "win32")).toBe(
+      samePathKey(mixed, "win32").toLowerCase(),
+    );
+    expect(samePathKey(mixed, "win32")).toBe(
+      samePathKey(join(options.repo, "MIXED", "case"), "win32"),
+    );
+    expect(samePathKey(mixed, "darwin")).toEndWith(`${sep}Mixed${sep}Case`);
+  });
+
+  test("win32 keys match git's C:/ spelling and resolve()'s C:\\ spelling, driven through path.win32 on any OS", () => {
+    expect(
+      samePathKey("C:/Users/runneradmin/.repo-autopilot/plan/ui-01", "win32"),
+    ).toBe("c:\\users\\runneradmin\\.repo-autopilot\\plan\\ui-01");
+    expect(
+      samePathKey(
+        "c:\\Users\\RunnerAdmin\\.repo-autopilot\\plan\\ui-01",
+        "win32",
+      ),
+    ).toBe("c:\\users\\runneradmin\\.repo-autopilot\\plan\\ui-01");
   });
 });
 

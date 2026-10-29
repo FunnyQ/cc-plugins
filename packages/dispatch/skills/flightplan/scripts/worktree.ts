@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   rmdirSync,
   statSync,
@@ -20,9 +21,11 @@ import {
   dirname,
   isAbsolute,
   join,
+  posix,
   relative,
   resolve,
   sep,
+  win32,
 } from "node:path";
 
 type Options = { repo: string; slug: string; planDir?: string };
@@ -326,22 +329,46 @@ function seedIgnored(repo: string, path: string, excluded: string): void {
   }
 }
 
-function registeredPaths(repo: string): Set<string> {
-  return new Set(
+export function samePathKey(
+  p: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const path = platform === "win32" ? win32 : posix;
+  let head = path.resolve(p);
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      head = realpathSync.native(head);
+      break;
+    } catch {
+      const parent = path.dirname(head);
+      if (parent === head) break;
+      rest.unshift(path.basename(head));
+      head = parent;
+    }
+  }
+  const key = path.join(head, ...rest);
+  return platform === "win32" ? key.toLowerCase() : key;
+}
+
+function registeredPaths(repo: string): Map<string, string> {
+  return new Map(
     git(repo, ["worktree", "list", "--porcelain", "-z"])
       .split("\0")
       .filter((field) => field.startsWith("worktree "))
-      .map((field) => field.slice("worktree ".length)),
+      .map((field) => field.slice("worktree ".length))
+      .map((path) => [samePathKey(path), path]),
   );
 }
 
 function removePath(
   repo: string,
   path: string,
-  registered: Set<string>,
+  registered: Map<string, string>,
 ): boolean {
-  if (registered.has(path)) {
-    git(repo, ["worktree", "remove", "--force", path]);
+  const registeredAs = registered.get(samePathKey(path));
+  if (registeredAs !== undefined) {
+    git(repo, ["worktree", "remove", "--force", registeredAs]);
     return true;
   }
   if (existsSync(path)) {
@@ -356,7 +383,11 @@ export function create(options: RefOptions): Location {
   const root = rootOf(options);
   const state = readState(root);
   const registered = registeredPaths(options.repo);
-  if (state[options.ref] || existsSync(path) || registered.has(path)) {
+  if (
+    state[options.ref] ||
+    existsSync(path) ||
+    registered.has(samePathKey(path))
+  ) {
     removePath(options.repo, path, registered);
     git(options.repo, ["worktree", "prune"]);
     delete state[options.ref];
@@ -515,6 +546,7 @@ export function remove(options: RefOptions): { removed: boolean } {
   const root = rootOf(options);
   const state = readState(root);
   const removed = removePath(options.repo, path, registeredPaths(options.repo));
+  git(options.repo, ["worktree", "prune"]);
   const hadState = Object.hasOwn(state, options.ref);
   if (hadState) {
     delete state[options.ref];

@@ -21,7 +21,7 @@ if [ -z "$file_path" ] || [ ! -f "$file_path" ]; then
   exit 0
 fi
 
-if ! [[ "$file_path" =~ (^|/)docs/.+/tasks/[a-z][a-z0-9]*/[0-9]{2}-.+\.md$ ]]; then
+if ! [[ "$file_path" =~ (^|[/\\])docs[/\\].+[/\\]tasks[/\\][a-z][a-z0-9]*[/\\][0-9]{2}-.+\.md$ ]]; then
   exit 0
 fi
 
