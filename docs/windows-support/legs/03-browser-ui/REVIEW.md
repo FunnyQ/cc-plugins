@@ -78,6 +78,6 @@ Local host: macOS 27.0.1 (26A434), arm64; Bun 1.4.4; Claude Code 2.1.312. Run af
 
 ## Limitations
 
-- An Ubuntu `/usr/bin/firefox` shell wrapper that execs the Snap is not detected; it still times out at launch. It is owed under the Snap row.
-- The runes checker does not apply the Snap rule to its Linux Chrome probe.
+- A shell wrapper that execs a Snap (Ubuntu's `/usr/bin/firefox` and `/usr/bin/chromium-browser`) is detected by a `#!` first line plus `/snap/bin/` in its first 4 KB, in `resolveBinary` and in the runes Chrome probe. A wrapper written another way still times out at launch. It is owed under the Snap row.
+- `fleet.ts` once kept the first score of an attempt as the task's `latestScore`, so the browsers/03 rescore showed the incomplete 0. A later score of the same attempt now wins; each judge row still shows its own score as history.
 - Remote CI result and run URL: owed, because no authorized PR exists.
