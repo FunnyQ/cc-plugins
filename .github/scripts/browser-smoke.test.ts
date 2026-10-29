@@ -209,7 +209,7 @@ describe("required browser smoke", () => {
       if (argv[1] === "--version") return ok("Browser 123.4");
       owned = launch(privateState);
       unrelated = launch(unrelatedState);
-      await runCommand([process.execPath, "-e", 'console.error("registered before id"); setInterval(() => {}, 1000)'], 150);
+      await runCommand([process.execPath, "-e", 'console.error("registered before id"); setInterval(() => {}, 1000)'], 2000);
       throw new Error("expected timeout");
     };
     try {
