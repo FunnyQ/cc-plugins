@@ -71,7 +71,7 @@ Local host: macOS 27.0.1 (26A434), arm64; Bun 1.4.4; Claude Code 2.1.312. Run af
 ## Evidence categories
 
 - Native automated, run: macOS only, locally (table above).
-- Native automated, configured but not run: Linux and Windows `required` and `smoke` CI jobs. They run only on an implementation PR, and none has run.
+- Native automated, run in CI: PR #19 run [40863559727](https://github.com/FunnyQ/cc-plugins/actions/runs/40863559727) on `e5292a2` passed `required`, `smoke` and `report` on macOS, Ubuntu and Windows, including the real Chrome smoke and live tests on Windows. The four rounds before it found and fixed a locked `DevToolsActivePort` read, `chrome.exe --version` opening a browser, a 2s PowerShell ownership timeout, a click grace miss under load, and two runes specs whose premise fails on Windows.
 - Injected platform tests: Windows, WSL and Snap behavior is driven by injected platform input on the macOS host.
 - Full local mod tests: `claude plugin test packages/runes` on macOS.
 - Actual Windows/WSL human interactions: none. Every one is listed in [OWED-CHECKS.md](./OWED-CHECKS.md), the persistent source for unperformed checks; leg-2 debts stay in `../02-core-workflow/`.
@@ -80,4 +80,4 @@ Local host: macOS 27.0.1 (26A434), arm64; Bun 1.4.4; Claude Code 2.1.312. Run af
 
 - A shell wrapper that execs a Snap (Ubuntu's `/usr/bin/firefox` and `/usr/bin/chromium-browser`) is detected by a `#!` first line plus `/snap/bin/` in its first 4 KB, in `resolveBinary` and in the runes Chrome probe. A wrapper written another way still times out at launch. It is owed under the Snap row.
 - `fleet.ts` once kept the first score of an attempt as the task's `latestScore`, so the browsers/03 rescore showed the incomplete 0. A later score of the same attempt now wins; each judge row still shows its own score as history.
-- Remote CI result and run URL: owed, because no authorized PR exists.
+- Remote CI passed on PR #19 (see Evidence categories). A Windows live Chrome test takes 11–17s, because each ownership check starts PowerShell.
