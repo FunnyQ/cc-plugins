@@ -617,9 +617,12 @@ describe("attach", () => {
 });
 
 describe("run timeout", () => {
+  const hang = [process.execPath, "-e", "setTimeout(() => {}, 10_000)"];
+  const echo = [process.execPath, "-e", 'console.log("hi")'];
+
   test("kills a command that hangs, instead of waiting on it forever", async () => {
     const startedAt = Date.now();
-    expect(run(["sleep", "10"], { timeoutMs: 200 })).rejects.toThrow(
+    await expect(run(hang, { timeoutMs: 200 })).rejects.toThrow(
       /timed out/,
     );
     await Bun.sleep(600);
@@ -627,17 +630,17 @@ describe("run timeout", () => {
   });
 
   test("names the command it gave up on", async () => {
-    expect(run(["sleep", "10"], { timeoutMs: 100 })).rejects.toThrow(
-      /sleep 10/,
+    await expect(run(hang, { timeoutMs: 100 })).rejects.toThrow(
+      hang.join(" "),
     );
   });
 
   test("leaves a command that answers in time alone", async () => {
-    expect((await run(["echo", "hi"], { timeoutMs: 5_000 })).trim()).toBe("hi");
+    expect((await run(echo, { timeoutMs: 5_000 })).trim()).toBe("hi");
   });
 
   test("waits indefinitely when no timeout is given", async () => {
-    expect((await run(["echo", "hi"])).trim()).toBe("hi");
+    expect((await run(echo)).trim()).toBe("hi");
   });
 });
 

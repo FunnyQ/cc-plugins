@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   appendFileContract,
   ASK_RESULT_END_MARKER,
@@ -54,20 +54,28 @@ describe("createAskRunDir", () => {
   });
 
   test("two calls with no override never collide", async () => {
-    const a = createAskRunDir();
-    const b = createAskRunDir();
-    expect(a).not.toBe(b);
-    expect(a.startsWith("/tmp/q-lab/herdr/ask/")).toBe(true);
-    await rm(a, { recursive: true, force: true });
-    await rm(b, { recursive: true, force: true });
+    const dirs: string[] = [];
+    try {
+      dirs.push(createAskRunDir());
+      dirs.push(createAskRunDir());
+      expect(dirs[0]).not.toBe(dirs[1]);
+      for (const dir of dirs) {
+        expect(dirname(dir)).toBe(join("/tmp", "q-lab", "herdr", "ask"));
+        expect((await Bun.file(dir).stat()).isDirectory()).toBe(true);
+      }
+    } finally {
+      await Promise.all(
+        dirs.map((dir) => rm(dir, { recursive: true, force: true })),
+      );
+    }
   });
 });
 
 describe("package boundaries", () => {
   const herdrRoot = join(import.meta.dir, "../../..");
-  const sources = [...new Bun.Glob("**/*.ts").scanSync(herdrRoot)].filter(
-    (path) => !path.includes("node_modules"),
-  );
+  const sources = [...new Bun.Glob("**/*.ts").scanSync(herdrRoot)]
+    .map((path) => path.replaceAll("\\", "/"))
+    .filter((path) => !path.includes("node_modules"));
   const read = (path: string) => Bun.file(join(herdrRoot, path)).text();
 
   test("nothing in herdr imports relay, since relay versions separately", async () => {

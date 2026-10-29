@@ -17,11 +17,11 @@ async function withRegistry(
 ): Promise<void> {
   const dir = await mkdtemp(join(tmpdir(), "herdr-registry-"));
   const path = join(dir, "registry.json");
-  await writeFile(
-    path,
-    typeof contents === "string" ? contents : JSON.stringify(contents),
-  );
   try {
+    await writeFile(
+      path,
+      typeof contents === "string" ? contents : JSON.stringify(contents),
+    );
     await fn(path);
   } finally {
     await rm(dir, { recursive: true, force: true });

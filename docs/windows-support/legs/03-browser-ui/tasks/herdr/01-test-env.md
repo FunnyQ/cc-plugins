@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: herdr/02
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -51,19 +51,19 @@ Do not add broad Windows skips or import helpers from the browsers or relay plug
 
 ## Acceptance criteria
 
-- [ ] Source discovery normalizes separators before filtering and still inspects actual files, finding exactly the result-directory creation seam instead of accepting an empty caller list.
-- [ ] Ask-directory tests assert collision resistance, exact overrides and the current host-shaped default root without prematurely changing product scratch behavior.
-- [ ] The pending collect-command expectation uses `fileURLToPath` and still verifies the report's collect action, result path and native module path.
-- [ ] Touched filesystem and environment fixtures isolate their own resources, restore overrides and clean up owned leaves even when assertions fail.
-- [ ] Pane targeting, workspace selection, registry ranking, result-file and CLI protocol assertions retain their existing meaning; no broad platform skip or hardcoded source list hides failures.
-- [ ] Changes stay within the declared test files, production modules remain unchanged, and no fixture imports another plugin's helpers.
+- [x] Source discovery normalizes separators before filtering and still inspects actual files, finding exactly the result-directory creation seam instead of accepting an empty caller list.
+- [x] Ask-directory tests assert collision resistance, exact overrides and the current host-shaped default root without prematurely changing product scratch behavior.
+- [x] The pending collect-command expectation uses `fileURLToPath` and still verifies the report's collect action, result path and native module path.
+- [x] Touched filesystem and environment fixtures isolate their own resources, restore overrides and clean up owned leaves even when assertions fail.
+- [x] Pane targeting, workspace selection, registry ranking, result-file and CLI protocol assertions retain their existing meaning; no broad platform skip or hardcoded source list hides failures.
+- [x] Changes stay within the declared test files, production modules remain unchanged, and no fixture imports another plugin's helpers.
 
 ## Verification
 
-- [ ] Run `bun test packages/herdr` from the repository root before editing and record the baseline.
-- [ ] Run `bun test packages/herdr` after fixture corrections and require exit 0 on the execution host.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0 with no diagnostics.
-- [ ] Inspect `git diff -- packages/herdr/skills/herdr/scripts/ask-contract.test.ts packages/herdr/skills/herdr/scripts/herd.test.ts packages/herdr/skills/herdr/scripts/project-registry.test.ts packages/herdr/skills/herdr-browser/scripts/browser.test.ts packages/herdr/skills/herdr-browser/scripts/terminal-browser.test.ts` and confirm each changed assertion preserves the behavior it tests.
+- [x] Run `bun test packages/herdr` from the repository root before editing and record the baseline.
+- [x] Run `bun test packages/herdr` after fixture corrections and require exit 0 on the execution host.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0 with no diagnostics.
+- [x] Inspect `git diff -- packages/herdr/skills/herdr/scripts/ask-contract.test.ts packages/herdr/skills/herdr/scripts/herd.test.ts packages/herdr/skills/herdr/scripts/project-registry.test.ts packages/herdr/skills/herdr-browser/scripts/browser.test.ts packages/herdr/skills/herdr-browser/scripts/terminal-browser.test.ts` and confirm each changed assertion preserves the behavior it tests.
 
 ## Eval rubric
 
