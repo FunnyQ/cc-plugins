@@ -47,9 +47,12 @@ test.each(SHELLS)(
   "%s's =~ with the flightplan-lint.sh pattern accepts / and \\ separators and rejects a dashed bucket",
   async (shell) => {
     const pattern = await shPattern();
+    // Script on stdin and path in env, as the hook reads both: MSYS halves every \\ in a quoted argv entry.
     const verdict = (path: string) =>
-      Bun.spawnSync([shell, "-c", `[[ "$1" =~ ${pattern} ]]`, "_", path])
-        .exitCode === 0;
+      Bun.spawnSync([shell], {
+        stdin: new TextEncoder().encode(`[[ "$TASK_FILE" =~ ${pattern} ]]`),
+        env: { ...process.env, TASK_FILE: path },
+      }).exitCode === 0;
     for (const path of MATCHES)
       expect([path, verdict(path)]).toEqual([path, true]);
     for (const path of REJECTS)
