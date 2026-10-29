@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "fs";
 import { homedir, tmpdir } from "os";
 import { basename, join } from "path";
 import { SPAWN_IDLE_WAIT_MS } from "./live";
@@ -135,16 +141,23 @@ describe("writeDelegationMarker", () => {
   });
 
   it("returns null instead of failing the run when the store is unwritable", () => {
-    const path = writeDelegationMarker(
-      buildMarker({
-        cwd: "/repo",
-        backend: "codex",
-        now: NOW,
-        waitTimeoutMs: 480_000,
-      }),
-      { Q_DELEGATION_HOME: "/dev/null/nope" },
-    );
-    expect(path).toBe(null);
+    const dir = mkdtempSync(join(tmpdir(), "relay-marker-"));
+    const regularFile = join(dir, "file");
+    writeFileSync(regularFile, "");
+    try {
+      const path = writeDelegationMarker(
+        buildMarker({
+          cwd: "/repo",
+          backend: "codex",
+          now: NOW,
+          waitTimeoutMs: 480_000,
+        }),
+        { Q_DELEGATION_HOME: join(regularFile, "nope") },
+      );
+      expect(path).toBe(null);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("gives concurrent delegates distinct files", () => {

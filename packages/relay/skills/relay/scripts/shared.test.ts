@@ -1,5 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { readFileSync } from "fs";
+import { join } from "path";
 import {
   CLI_DEFAULT,
   SUGGESTED_CONFIG_PATH,
@@ -83,7 +84,8 @@ describe("addTimestampSuffix", () => {
 
   it("handles nested paths", () => {
     const result = addTimestampSuffix("dir/subdir/file.txt");
-    expect(result).toMatch(/^dir\/subdir\/file_\d{8}-\d{4}\.txt$/);
+    expect(result.startsWith(join("dir", "subdir", "file_"))).toBe(true);
+    expect(result).toMatch(/file_\d{8}-\d{4}\.txt$/);
   });
 
   it("treats a dot file as all name, no extension", () => {
@@ -93,7 +95,8 @@ describe("addTimestampSuffix", () => {
 
   it("preserves directory structure", () => {
     const result = addTimestampSuffix("/tmp/relay/report.md");
-    expect(result).toMatch(/^\/tmp\/relay\/report_\d{8}-\d{4}\.md$/);
+    expect(result.startsWith(join("/tmp/relay", "report_"))).toBe(true);
+    expect(result).toMatch(/report_\d{8}-\d{4}\.md$/);
   });
 });
 

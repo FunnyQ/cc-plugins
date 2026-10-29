@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { join } from "path";
+import { join, resolve } from "path";
 import {
   BOOTSTRAP_ACTIVITY_WAIT_MS,
   collectLive,
@@ -20,13 +20,18 @@ import {
 import { RESULT_END_MARKER } from "./relay-prompt";
 import { BACKENDS } from "./backends";
 
-const SIBLING = "/repo/packages/herdr/skills/herdr/scripts/herd.ts";
+const SCRIPT_DIR = resolve("/repo/packages/relay/skills/relay/scripts");
+const HOME_DIR = resolve("/home/q");
+const SIBLING = join(
+  SCRIPT_DIR,
+  "../../../../herdr/skills/herdr/scripts/herd.ts",
+);
 
 function locator(overrides: Partial<LocatorDeps> = {}): LocatorDeps {
   return {
     env: {},
-    scriptDir: "/repo/packages/relay/skills/relay/scripts",
-    homeDir: "/home/q",
+    scriptDir: SCRIPT_DIR,
+    homeDir: HOME_DIR,
     fileExists: () => false,
     listDir: () => [],
     ...overrides,
@@ -59,15 +64,27 @@ describe("resolveHerdScript", () => {
   });
 
   it("scans plugin caches newest-version-first, across both harnesses", () => {
-    const claudeRoot = "/home/q/.claude/plugins/cache";
-    const codexRoot = "/home/q/.codex/plugins/cache";
+    const claudeRoot = join(HOME_DIR, ".claude", "plugins", "cache");
+    const codexRoot = join(HOME_DIR, ".codex", "plugins", "cache");
     const newest = join(
       codexRoot,
-      "q-lab-marketplace/herdr/0.10.0/skills/herdr/scripts/herd.ts",
+      "q-lab-marketplace",
+      "herdr",
+      "0.10.0",
+      "skills",
+      "herdr",
+      "scripts",
+      "herd.ts",
     );
     const older = join(
       codexRoot,
-      "q-lab-marketplace/herdr/0.9.1/skills/herdr/scripts/herd.ts",
+      "q-lab-marketplace",
+      "herdr",
+      "0.9.1",
+      "skills",
+      "herdr",
+      "scripts",
+      "herd.ts",
     );
 
     const deps = locator({
@@ -75,7 +92,7 @@ describe("resolveHerdScript", () => {
       listDir: (p) => {
         if (p === claudeRoot) return []; // herdr not installed for Claude here
         if (p === codexRoot) return ["q-lab-marketplace"];
-        if (p === join(codexRoot, "q-lab-marketplace/herdr"))
+        if (p === join(codexRoot, "q-lab-marketplace", "herdr"))
           return ["0.9.1", "0.10.0"];
         return [];
       },
