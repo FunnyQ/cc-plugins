@@ -216,6 +216,18 @@ describe("deriveTaskViews", () => {
     expect(view.latestScore?.weighted).toBe(4.7);
   });
 
+  test("a rescore of the same attempt replaces its earlier score", () => {
+    const incomplete = {
+      ...score("ui/03", 2, "2026-01-01T00:03:00Z"),
+      weighted: 0,
+      passed: false,
+    };
+    const entries = [incomplete, score("ui/03", 2, "2026-01-01T00:04:00Z")];
+    const [view] = deriveTaskViews({ "ui/03": task("ui/03") }, entries);
+    expect(view.latestScore?.weighted).toBe(4.7);
+    expect(view.latestScore?.passed).toBe(true);
+  });
+
   test("carries the judge rationale onto latestScore, and omits it when absent", () => {
     const withProse = {
       ...score("ui/03", 1, "2026-01-01T00:03:00Z"),
