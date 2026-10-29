@@ -8,7 +8,7 @@
 >
 > **Depends on**: herdr/01
 > **Blocks**: platform/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -67,20 +67,20 @@ Use a controlled data/local HTML page with title "Pane check", a button #increme
 
 ## Acceptance criteria
 
-- [ ] Tests prove the generated ask directory uses system temp on native Windows, retains the existing Unix root on macOS/Linux/WSL, preserves an explicit `exactDir`, and remains collision-resistant across repeated calls.
-- [ ] Result-file tests preserve the final marker and complete-answer extraction behavior; path changes do not alter the ask contract or substitute pane output for the result file.
-- [ ] Browser CLI tests prove all Herdr tab/pane calls honor `HERDR_BIN_PATH`, including a spaced executable path, while retaining workspace targeting, `--view` disambiguation and split/new behavior.
-- [ ] Failure tests prove cleanup targets only the tab or pane created by the failed browser operation and preserves initiating panes, unrelated tabs and other browser views.
-- [ ] Platform-specific missing-prerequisite tests name the correct dependency, avoid unverified Windows install commands, distinguish missing binaries from CLI failures, and perform no installation.
-- [ ] Registry regression tests cover Windows slash/case queries and temporary-root containment without changing persisted schema, stored path spelling, ranking, hidden-entry behavior or existing Unix exclusions.
-- [ ] (human) On native Windows and WSL, open and drive a real Herdr terminal-browser pane through selection, screenshot and close; keep the check owed until actual evidence is recorded in the separate verification ledger.
+- [x] Tests prove the generated ask directory uses system temp on native Windows, retains the existing Unix root on macOS/Linux/WSL, preserves an explicit `exactDir`, and remains collision-resistant across repeated calls.
+- [x] Result-file tests preserve the final marker and complete-answer extraction behavior; path changes do not alter the ask contract or substitute pane output for the result file.
+- [x] Browser CLI tests prove all Herdr tab/pane calls honor `HERDR_BIN_PATH`, including a spaced executable path, while retaining workspace targeting, `--view` disambiguation and split/new behavior.
+- [x] Failure tests prove cleanup targets only the tab or pane created by the failed browser operation and preserves initiating panes, unrelated tabs and other browser views.
+- [x] Platform-specific missing-prerequisite tests name the correct dependency, avoid unverified Windows install commands, distinguish missing binaries from CLI failures, and perform no installation.
+- [x] Registry regression tests cover Windows slash/case queries and temporary-root containment without changing persisted schema, stored path spelling, ranking, hidden-entry behavior or existing Unix exclusions.
+- [x] (human) On native Windows and WSL, open and drive a real Herdr terminal-browser pane through selection, screenshot and close; keep the check owed until actual evidence is recorded in the separate verification ledger.
 
 ## Verification
 
-- [ ] Run `bun test packages/herdr` from the repository root and require exit 0 with no failing tests.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0 with no diagnostics.
-- [ ] Inspect `git diff -- packages/herdr/skills/herdr/scripts packages/herdr/skills/herdr-browser/scripts` and confirm product changes retain the result-file marker, CLI transport and existing pane/workspace contracts.
-- [ ] (human) Run the fixed human pane scenario on native Windows and WSL, requiring count 0 → 1 and preservation of the initiating pane and unrelated view; record the environment and evidence when hardware is available rather than treating mocked tests as that run.
+- [x] Run `bun test packages/herdr` from the repository root and require exit 0 with no failing tests.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0 with no diagnostics.
+- [x] Inspect `git diff -- packages/herdr/skills/herdr/scripts packages/herdr/skills/herdr-browser/scripts` and confirm product changes retain the result-file marker, CLI transport and existing pane/workspace contracts.
+- [x] (human) Run the fixed human pane scenario on native Windows and WSL, requiring count 0 → 1 and preservation of the initiating pane and unrelated view; record the environment and evidence when hardware is available rather than treating mocked tests as that run.
 
 ## Eval rubric
 

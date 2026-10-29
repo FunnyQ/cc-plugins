@@ -15,6 +15,7 @@ import {
   resolveMetrics,
   resolveTargetId,
   run,
+  terminalTargets,
   type Deps,
   type Tab,
   type Target,
@@ -780,5 +781,162 @@ describe("openTerminal", () => {
       }
     }
     expect(calls.at(-1)?.slice(1)).toEqual(["tab", "close", "T9"]);
+  });
+});
+
+describe("browser prerequisite boundary", () => {
+  test("a missing terminal-browser reports its platform, without invoking a CLI", async () => {
+    let ran = false;
+    await expect(terminalTargets(async () => {
+      ran = true;
+      return "";
+    }, "win32", () => null)).rejects.toThrow(/terminal-browser is not installed[\s\S]*native Windows/);
+    expect(ran).toBe(false);
+  });
+
+  test("a found terminal-browser CLI error is propagated as a CLI error", async () => {
+    const error = new Error("terminal-browser ls failed: connection refused");
+    await expect(terminalTargets(async (command) => {
+      expect(command).toEqual(["terminal-browser", "ls", "--all", "--json"]);
+      throw error;
+    }, "win32", () => "C:/Program Files/terminal-browser.exe")).rejects.toBe(error);
+  });
+
+  test("run diagnoses a missing Herdr executable before spawning", async () => {
+    const which = spyOn(Bun, "which").mockReturnValue(null);
+    const spawn = spyOn(Bun, "spawn");
+    try {
+      await expect(run([process.env.HERDR_BIN_PATH || "herdr", "tab", "create"])).rejects.toThrow(/herdr is not installed/);
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      which.mockRestore();
+      spawn.mockRestore();
+    }
+  });
+
+  test("run preserves errors from a found Herdr CLI override", async () => {
+    const saved = process.env.HERDR_BIN_PATH;
+    process.env.HERDR_BIN_PATH = process.execPath;
+    try {
+      const modulePath = `./browser.ts?found-cli=${Date.now()}`;
+      const isolated: typeof import("./browser") = await import(modulePath);
+      await expect(isolated.run([
+        process.execPath,
+        "-e",
+        'console.error("connection refused"); process.exit(7)',
+      ])).rejects.toThrow(/failed: connection refused/);
+    } finally {
+      if (saved === undefined) delete process.env.HERDR_BIN_PATH;
+      else process.env.HERDR_BIN_PATH = saved;
+    }
+  });
+});
+
+describe("Herdr executable and cleanup ownership", () => {
+  test("all tab and pane calls keep a spaced override as one argv element", async () => {
+    const keys = ["HERDR_BIN_PATH", "HERDR_PANE_ID", "HERDR_WORKSPACE_ID"] as const;
+    const saved = keys.map((key) => process.env[key]);
+    const executable = "C:/Program Files/Herdr/herdr.exe";
+    process.env.HERDR_BIN_PATH = executable;
+    process.env.HERDR_PANE_ID = "initiator";
+    process.env.HERDR_WORKSPACE_ID = "workspace";
+    const modulePath = `./browser.ts?override=${Date.now()}`;
+    const isolated: typeof import("./browser") = await import(modulePath);
+    const calls: string[][] = [];
+    const own: Target = {
+      id: "new-view", cdpHttp: "http://127.0.0.1:1", activeTargetId: "target",
+      pane: "new-browser-pane", hostTab: "new-tab", url: "about:blank", title: "", tabs: [],
+    };
+    const other: Target = { ...own, id: "other-view", pane: "other-pane", hostTab: "other-tab" };
+    const created = JSON.stringify({ result: { root_pane: { pane_id: "new-shell", tab_id: "new-tab" } } });
+    const deps: Deps = {
+      run: async (command, options) => {
+        calls.push(command);
+        if (command[0] === "terminal-browser") {
+          expect(options?.env).toEqual({ HERDR_PANE_ID: "new-shell", HERDR_TAB_ID: "new-tab" });
+          return "";
+        }
+        return created;
+      },
+      terminalTargets: async () => [other, own],
+    };
+    const log = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await isolated.main(["open", "https://example.com/?q=a&b=%20", "--new"], {
+        ...deps,
+        terminalTargets: (() => {
+          let reads = 0;
+          return async () => reads++ === 0 ? [other] : [other, own];
+        })(),
+      });
+      expect(calls).toEqual([
+        [executable, "tab", "create", "--workspace", "workspace", "--cwd", process.cwd(), "--label", "browser", "--no-focus"],
+        ["terminal-browser", "open", "https://example.com/?q=a&b=%20"],
+        [executable, "pane", "close", "new-shell"],
+      ]);
+
+      calls.length = 0;
+      await expect(isolated.main(["raw", "--", "get", "title"], deps)).rejects.toThrow(/--view/);
+      await isolated.main(["raw", "--view", "other-view", "--", "get", "title"], {
+        ...deps,
+        run: async (command) => { calls.push(command); return "Other view"; },
+      });
+      expect(calls).toEqual([["terminal-browser", "action", "--browser", "other-view", "--", "get", "title"]]);
+
+      const server = Bun.serve({ port: 0, fetch: () => new Response("Target is closing") });
+      try {
+        for (const label of ["browser", "unrelated"]) {
+          calls.length = 0;
+          let reads = 0;
+          await isolated.main(["close", "1", "--view", "new-view"], {
+            run: async (command) => {
+              calls.push(command);
+              return JSON.stringify({ result: { tab: { label } } });
+            },
+            terminalTargets: async () => reads++ === 0
+              ? [other, { ...own, cdpHttp: `http://127.0.0.1:${server.port}`, tabs: [{ ...tab("target", true), id: 7 }] }]
+              : [other],
+          });
+          expect(calls).toEqual(label === "browser"
+            ? [[executable, "tab", "get", "new-tab"], [executable, "tab", "close", "new-tab"]]
+            : [[executable, "tab", "get", "new-tab"]]);
+        }
+      } finally {
+        server.stop(true);
+      }
+
+      calls.length = 0;
+      const failure = new Error("open failed after tab creation");
+      await expect(isolated.openTerminal("about:blank", null, null, [other], {
+        ...deps,
+        run: async (command) => {
+          calls.push(command);
+          if (command[0] === "terminal-browser") throw failure;
+          return created;
+        },
+      })).rejects.toBe(failure);
+      expect(calls.at(-1)).toEqual([executable, "tab", "close", "new-tab"]);
+      expect(calls.filter((command) => command.includes("close"))).toEqual([[executable, "tab", "close", "new-tab"]]);
+
+      calls.length = 0;
+      await expect(isolated.openTerminal("about:blank", "right", "0.4", [other], {
+        ...deps,
+        run: async (command) => { calls.push(command); throw failure; },
+      })).rejects.toBe(failure);
+      expect(calls).toEqual([["terminal-browser", "open", "about:blank", "--split", "right", "--size", "0.4"]]);
+
+      calls.length = 0;
+      await expect(isolated.openTerminal("about:blank", null, null, [other], {
+        ...deps,
+        terminalTargets: async () => { throw failure; },
+      })).rejects.toBe(failure);
+      expect(calls.filter((command) => command.includes("close"))).toEqual([[executable, "tab", "close", "new-tab"]]);
+    } finally {
+      log.mockRestore();
+      keys.forEach((key, index) => {
+        if (saved[index] === undefined) delete process.env[key];
+        else process.env[key] = saved[index];
+      });
+    }
   });
 });

@@ -24,9 +24,29 @@ export type Target = {
 
 export const SPLIT_DIRECTIONS = ["right", "left", "down", "up"] as const;
 
-export const INSTALL_HINT =
-  "terminal-browser is not installed\n" +
-  "  install it: curl -fsSL https://terminal-browser.sh/install | bash";
+export type Prerequisite = "terminal-browser" | "herdr";
+
+export function prerequisiteHint(
+  dependency: Prerequisite,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const missing = `${dependency} is not installed`;
+  if (platform === "win32") {
+    return `${missing}\n  Install ${dependency} for native Windows and add it to PATH, or use an available WSL installation.`;
+  }
+  return dependency === "terminal-browser"
+    ? `${missing}\n  install it: curl -fsSL https://terminal-browser.sh/install | bash`
+    : `${missing}\n  Install Herdr and add its executable to PATH, or set HERDR_BIN_PATH to the installed executable.`;
+}
+
+export function requireExecutable(
+  executable: string,
+  dependency: Prerequisite,
+  platform: NodeJS.Platform = process.platform,
+  which: (executable: string) => string | null = Bun.which,
+): void {
+  if (!which(executable)) throw new Error(prerequisiteHint(dependency, platform));
+}
 
 export function cdpBase(port: number): string {
   return `http://127.0.0.1:${port}`;

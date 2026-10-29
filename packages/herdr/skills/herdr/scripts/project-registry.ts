@@ -9,8 +9,8 @@
  * registry; `last_used_at` upkeep stays workbench's job.
  */
 
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, win32 } from "node:path";
 
 export type ProjectEntry = {
   name: string;
@@ -63,9 +63,17 @@ export async function readRegistry(
     }));
 }
 
-/** Four temp-directory shapes a registry sweep should never surface, mirroring
- *  herdr-workbench's src/registry/project.rs filter. */
-export function isTempPath(path: string): boolean {
+export function isTempPath(path: string, tempRoot: string = tmpdir()): boolean {
+  if (/^(?:[a-z]:[\\/]|[\\/]{2}[^\\/])/i.test(tempRoot)) {
+    const normalized = win32.normalize(path).toLowerCase();
+    const root = win32.normalize(tempRoot).toLowerCase().replace(/[\\/]+$/, "");
+    if (
+      normalized.replace(/[\\/]+$/, "") === root ||
+      normalized.startsWith(`${root}\\`)
+    ) {
+      return true;
+    }
+  }
   return (
     /^\/tmp(\/|$)/.test(path) ||
     /^\/private\/tmp(\/|$)/.test(path) ||
@@ -77,14 +85,17 @@ export function isTempPath(path: string): boolean {
 export function matchProjects(
   candidates: ProjectCandidate[],
   fragment: string,
+  tempRoot: string = tmpdir(),
 ): ProjectCandidate[] {
-  const query = fragment.trim().toLowerCase();
+  const query = fragment.trim().replaceAll("\\", "/").toLowerCase();
   if (!query) return [];
 
   const parts = query.split("/").filter(Boolean);
   return candidates.filter((c) => {
-    if (isTempPath(c.path)) return false;
-    const haystack = [c.name, ...c.aliases, c.path].map((v) => v.toLowerCase());
+    if (isTempPath(c.path, tempRoot)) return false;
+    const haystack = [c.name, ...c.aliases, c.path].map((v) =>
+      v.replaceAll("\\", "/").toLowerCase(),
+    );
     return parts.every((part) => haystack.some((v) => v.includes(part)));
   });
 }
