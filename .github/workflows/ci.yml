@@ -37,6 +37,25 @@ jobs:
         run: bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts
       - if: runner.os == 'Windows'
         run: "! grep -q $'\\r' packages/monitor/skills/cockpit/bin/cockpit"
+      - run: bun test packages/chronicle
+      - run: bun test packages/dispatch
+      - run: bun test packages/guard
+      - run: bun test packages/relay
+      - run: bun test opencode/
+
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun .github/scripts/smoke.ts
 
   report:
     continue-on-error: true

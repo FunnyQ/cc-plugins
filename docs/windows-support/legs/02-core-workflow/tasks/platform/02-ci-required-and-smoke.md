@@ -8,7 +8,7 @@
 >
 > **Depends on**: chronicle/02, chronicle/03, dispatch/03, guard/02, relay/02, platform/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -160,22 +160,22 @@ The order chains the flows: the scaffolded tree and the landed file are what the
 
 ## Acceptance criteria
 
-- [ ] `.github/scripts/smoke.ts` exists and `bun .github/scripts/smoke.ts` exits 0 on macOS, printing exactly five lines matching `^ok (flightplan|worktree|commit|sweep|release)$`, in that order.
-- [ ] After the run, no `q-lab-smoke-*` directory remains under `tmpdir()`, so the script cleans up after itself.
-- [ ] Breaking one step makes the script exit non-zero and name that step. For example, change the asserted `status` to `"conflict"`, confirm the script prints `FAIL worktree`, then revert.
-- [ ] `ci.yml` parses as YAML, its `jobs` keys are exactly `required`, `report` and `smoke`, and `smoke` has no `continue-on-error`.
-- [ ] The `required` job's `run` lines include `bun test packages/chronicle`, `bun test packages/dispatch`, `bun test packages/guard`, `bun test packages/relay` and `bun test opencode/`, each as its own step with no `if:`.
-- [ ] The `report` job is byte-for-byte unchanged.
-- [ ] (human) On the leg's PR, the `required` and `smoke` jobs are green on windows-latest, macos-latest and ubuntu-latest.
+- [x] `.github/scripts/smoke.ts` exists and `bun .github/scripts/smoke.ts` exits 0 on macOS, printing exactly five lines matching `^ok (flightplan|worktree|commit|sweep|release)$`, in that order.
+- [x] After the run, no `q-lab-smoke-*` directory remains under `tmpdir()`, so the script cleans up after itself.
+- [x] Breaking one step makes the script exit non-zero and name that step. For example, change the asserted `status` to `"conflict"`, confirm the script prints `FAIL worktree`, then revert.
+- [x] `ci.yml` parses as YAML, its `jobs` keys are exactly `required`, `report` and `smoke`, and `smoke` has no `continue-on-error`.
+- [x] The `required` job's `run` lines include `bun test packages/chronicle`, `bun test packages/dispatch`, `bun test packages/guard`, `bun test packages/relay` and `bun test opencode/`, each as its own step with no `if:`.
+- [x] The `report` job is byte-for-byte unchanged.
+- [x] (human) On the leg's PR, the `required` and `smoke` jobs are green on windows-latest, macos-latest and ubuntu-latest.
 
 ## Verification
 
-- [ ] `bun .github/scripts/smoke.ts` exits 0 and prints five `ok` lines.
-- [ ] `bun -e 'const y = Bun.YAML.parse(await Bun.file(".github/workflows/ci.yml").text()); const runs = y.jobs.required.steps.map((s) => s.run); for (const s of ["bun test packages/chronicle","bun test packages/dispatch","bun test packages/guard","bun test packages/relay","bun test opencode/"]) if (!runs.includes(s)) throw new Error(s); if (Object.keys(y.jobs).sort().join() !== "report,required,smoke") throw new Error("jobs"); if (y.jobs.smoke["continue-on-error"]) throw new Error("smoke not blocking"); if (!y.jobs.smoke.steps.some((s) => s.run === "bun .github/scripts/smoke.ts")) throw new Error("smoke step");'` exits 0. `actionlint` is not installed on the authoring machine, so YAML structure is checked through `Bun.YAML`.
-- [ ] `git status --short -- .github/workflows/ci.yml .github/scripts/smoke.ts` shows both paths dirty.
-- [ ] `git diff -- .github/workflows/ci.yml` shows no hunk that touches a line between `  report:` and the end of that job.
-- [ ] Root `tsconfig.json` `include` lists `.github/scripts/**/*.ts`, and `bunx --bun tsc --noEmit` prints nothing.
-- [ ] (human) Open the leg's PR and confirm the `required` (×3) and `smoke` (×3) checks pass.
+- [x] `bun .github/scripts/smoke.ts` exits 0 and prints five `ok` lines.
+- [x] `bun -e 'const y = Bun.YAML.parse(await Bun.file(".github/workflows/ci.yml").text()); const runs = y.jobs.required.steps.map((s) => s.run); for (const s of ["bun test packages/chronicle","bun test packages/dispatch","bun test packages/guard","bun test packages/relay","bun test opencode/"]) if (!runs.includes(s)) throw new Error(s); if (Object.keys(y.jobs).sort().join() !== "report,required,smoke") throw new Error("jobs"); if (y.jobs.smoke["continue-on-error"]) throw new Error("smoke not blocking"); if (!y.jobs.smoke.steps.some((s) => s.run === "bun .github/scripts/smoke.ts")) throw new Error("smoke step");'` exits 0. `actionlint` is not installed on the authoring machine, so YAML structure is checked through `Bun.YAML`.
+- [x] `git status --short -- .github/workflows/ci.yml .github/scripts/smoke.ts` shows both paths dirty.
+- [x] `git diff -- .github/workflows/ci.yml` shows no hunk that touches a line between `  report:` and the end of that job.
+- [x] Root `tsconfig.json` `include` lists `.github/scripts/**/*.ts`, and `bunx --bun tsc --noEmit` prints nothing.
+- [x] (human) Open the leg's PR and confirm the `required` (×3) and `smoke` (×3) checks pass.
 
 ## Eval rubric
 
