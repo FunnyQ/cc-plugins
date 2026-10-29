@@ -1473,7 +1473,7 @@ describe("plan concurrency", () => {
     );
     const result = await runCli(join(root, "tasks"));
     expect(result.stdout).toContain("[serial-undeclared]");
-    expect(result.stdout).toContain("_context/shared.md");
+    expect(result.stdout).toContain(join("_context", "shared.md"));
     await rm(root, { recursive: true });
   });
 

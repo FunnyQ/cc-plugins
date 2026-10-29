@@ -22,6 +22,7 @@ const SCRIPT = join(import.meta.dir, "codex-run.ts");
 
 let dir: string;
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 let fakeCodex: string;
 let argsLog: string;
 
@@ -36,7 +37,9 @@ if (oi !== -1) writeFileSync(argv[oi + 1], "CODEX SAYS: did the thing");
 
 function isolateHomeFromDeveloperRelayConfig() {
   originalHome = process.env.HOME;
+  originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = dir;
+  process.env.USERPROFILE = dir;
 }
 
 beforeAll(async () => {
@@ -49,14 +52,28 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  process.env.HOME = originalHome;
+  restoreEnv("HOME", originalHome);
+  restoreEnv("USERPROFILE", originalUserProfile);
   await rm(dir, { recursive: true, force: true });
 });
 
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}
+
+const shim = (fake: string) => `@"${process.execPath}" "${fake}" %*\r\n`;
+
 let codexBin: string;
 beforeAll(async () => {
-  codexBin = join(dir, "codex");
-  await writeFile(codexBin, `#!/bin/sh\nexec bun ${fakeCodex} "$@"\n`);
+  codexBin =
+    process.platform === "win32" ? join(dir, "codex.cmd") : join(dir, "codex");
+  await writeFile(
+    codexBin,
+    process.platform === "win32"
+      ? shim(fakeCodex)
+      : `#!/bin/sh\nexec bun ${fakeCodex} "$@"\n`,
+  );
   await chmod(codexBin, 0o755);
 });
 
@@ -265,6 +282,8 @@ describe("codex-run errors", () => {
       env: {
         ...process.env,
         TMPDIR: tmp,
+        TEMP: tmp,
+        TMP: tmp,
         CODEX_BIN: codexBin,
         ARGS_LOG: argsLog,
       },

@@ -13,7 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   create,
   fingerprint,
@@ -49,6 +49,19 @@ function put(root: string, path: string, content: string | Uint8Array) {
   writeFileSync(full, content);
 }
 
+function samePath(p: string): string {
+  let head = resolve(p);
+  const rest: string[] = [];
+  while (!existsSync(head)) {
+    const parent = dirname(head);
+    if (parent === head) break;
+    rest.unshift(basename(head));
+    head = parent;
+  }
+  const real = join(realpathSync.native(head), ...rest);
+  return process.platform === "win32" ? real.toLowerCase() : real;
+}
+
 function fixture() {
   const temp = realpathSync(
     mkdtempSync(join(tmpdir(), "dispatch-worktree-test-")),
@@ -57,6 +70,8 @@ function fixture() {
   const repo = join(temp, "parent", "repo");
   mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q");
+  git(repo, "config", "core.autocrlf", "false");
+  git(repo, "config", "core.eol", "lf");
   git(repo, "config", "user.name", "Worktree Test");
   git(repo, "config", "user.email", "worktree@example.invalid");
   git(repo, "config", "commit.gpgsign", "false");
@@ -494,8 +509,12 @@ describe("worktree lifecycle", () => {
     expect(existsSync(other.path)).toBe(true);
     expect(existsSync(userPath)).toBe(true);
     const remaining = git(options.repo, "worktree", "list", "--porcelain");
-    expect(remaining).toContain(second.path);
-    expect(remaining).not.toContain(first.path);
+    const listed = remaining
+      .split("\n")
+      .filter((line) => line.startsWith("worktree "))
+      .map((line) => samePath(line.slice("worktree ".length)));
+    expect(listed).toContain(samePath(second.path));
+    expect(listed).not.toContain(samePath(first.path));
     expect(remaining.split("worktree ").length - 1).toBe(4);
     for (const removed of [true, false]) {
       const response = cli([
@@ -533,7 +552,11 @@ describe("worktree lifecycle", () => {
   test("binary, added, deleted and oddly named paths land and restore", () => {
     const options = fixture();
     const wt = create(options);
-    const oddName = "space and\nnewline.txt";
+    // NTFS forbids a newline in a file name.
+    const oddName =
+      process.platform === "win32"
+        ? "space and name.txt"
+        : "space and\nnewline.txt";
     put(wt.path, oddName, "odd\n");
     put(wt.path, "binary.dat", new Uint8Array([0, 255, 1, 128, 2]));
     put(wt.path, "bytes.txt", new Uint8Array([255, 254, 10]));
@@ -601,33 +624,37 @@ describe("worktree lifecycle", () => {
     expect(git(options.repo, "show", ":a.txt")).toBe("staged");
   });
 
-  test("ignored seeds fall back from clone copies and tolerate complete copy failure", () => {
-    const options = fixture();
-    put(options.repo, "node_modules/x/index.js", "dependency\n");
-    const bin = join(dirname(options.repo), "bin");
-    put(
-      bin,
-      "cp",
-      '#!/bin/sh\nif [ "$1" = "-c" ]; then exit 1; fi\nexec /bin/cp "$@"\n',
-    );
-    chmodSync(join(bin, "cp"), 0o755);
-    const originalPath = process.env.PATH;
-    process.env.PATH = `${bin}:${originalPath}`;
-    try {
-      const first = create(options);
-      expect(
-        readFileSync(join(first.path, "node_modules/x/index.js"), "utf8"),
-      ).toBe("dependency\n");
-      put(bin, "cp", "#!/bin/sh\nexit 1\n");
-      const second = create(options);
-      expect(show(options)).toEqual({ ...second, exists: true });
-      expect(existsSync(join(second.path, "node_modules/x/index.js"))).toBe(
-        false,
+  // Windows cannot run a #!/bin/sh stub, and its PATH separator is ";", not ":".
+  test.skipIf(process.platform === "win32")(
+    "ignored seeds fall back from clone copies and tolerate complete copy failure",
+    () => {
+      const options = fixture();
+      put(options.repo, "node_modules/x/index.js", "dependency\n");
+      const bin = join(dirname(options.repo), "bin");
+      put(
+        bin,
+        "cp",
+        '#!/bin/sh\nif [ "$1" = "-c" ]; then exit 1; fi\nexec /bin/cp "$@"\n',
       );
-    } finally {
-      process.env.PATH = originalPath;
-    }
-  });
+      chmodSync(join(bin, "cp"), 0o755);
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${bin}:${originalPath}`;
+      try {
+        const first = create(options);
+        expect(
+          readFileSync(join(first.path, "node_modules/x/index.js"), "utf8"),
+        ).toBe("dependency\n");
+        put(bin, "cp", "#!/bin/sh\nexit 1\n");
+        const second = create(options);
+        expect(show(options)).toEqual({ ...second, exists: true });
+        expect(existsSync(join(second.path, "node_modules/x/index.js"))).toBe(
+          false,
+        );
+      } finally {
+        process.env.PATH = originalPath;
+      }
+    },
+  );
 
   test("ignored ancestor directories never seed the excluded plan", () => {
     const options = fixture();

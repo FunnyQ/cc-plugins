@@ -658,7 +658,12 @@ describe("review-plan CLI exit codes", () => {
     const res = Bun.spawnSync(["bun", SCRIPT, root, "--engine", "opencode", "--lens", "sim-instructor"], {
       stdout: "pipe",
       stderr: "pipe",
-      env: { ...process.env, OPENCODE_BIN: join(root, "no-opencode") },
+      env: {
+        ...process.env,
+        HOME: root,
+        USERPROFILE: root,
+        OPENCODE_BIN: join(root, "no-opencode"),
+      },
     });
     expect(res.exitCode).toBe(0);
     expect(res.stderr.toString()).toContain("opencode unreachable");

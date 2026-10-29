@@ -39,7 +39,7 @@ function run(config: string | null) {
     }
   `;
   const proc = Bun.spawnSync(["bun", "-e", script], {
-    env: { ...process.env, HOME: home },
+    env: { ...process.env, HOME: home, USERPROFILE: home },
   });
   return JSON.parse(proc.stdout.toString());
 }
@@ -52,7 +52,7 @@ describe("relayModel", () => {
     ]) {
       const proc = Bun.spawnSync(
         ["bun", RELAY_CLI, "config", "set-model", "codex", mode, model],
-        { env: { ...process.env, HOME: home } },
+        { env: { ...process.env, HOME: home, USERPROFILE: home } },
       );
       expect(proc.exitCode).toBe(0);
     }

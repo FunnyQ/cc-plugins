@@ -22,6 +22,7 @@ const SCRIPT = join(import.meta.dir, "opencode-run.ts");
 
 let dir: string;
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 let fakeOpencode: string;
 let argsLog: string;
 
@@ -39,7 +40,9 @@ beforeAll(async () => {
   // Every spawn inherits this HOME, so the developer's own relay config never
   // reaches a test that expects the wrapper default.
   originalHome = process.env.HOME;
+  originalUserProfile = process.env.USERPROFILE;
   process.env.HOME = dir;
+  process.env.USERPROFILE = dir;
   fakeOpencode = join(dir, "fake-opencode.ts");
   argsLog = join(dir, "args.json");
   await writeFile(fakeOpencode, FAKE);
@@ -47,14 +50,30 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  process.env.HOME = originalHome;
+  restoreEnv("HOME", originalHome);
+  restoreEnv("USERPROFILE", originalUserProfile);
   await rm(dir, { recursive: true, force: true });
 });
 
+function restoreEnv(key: string, value: string | undefined) {
+  if (value === undefined) delete process.env[key];
+  else process.env[key] = value;
+}
+
+const shim = (fake: string) => `@"${process.execPath}" "${fake}" %*\r\n`;
+
 let opencodeBin: string;
 beforeAll(async () => {
-  opencodeBin = join(dir, "opencode");
-  await writeFile(opencodeBin, `#!/bin/sh\nexec bun ${fakeOpencode} "$@"\n`);
+  opencodeBin =
+    process.platform === "win32"
+      ? join(dir, "opencode.cmd")
+      : join(dir, "opencode");
+  await writeFile(
+    opencodeBin,
+    process.platform === "win32"
+      ? shim(fakeOpencode)
+      : `#!/bin/sh\nexec bun ${fakeOpencode} "$@"\n`,
+  );
   await chmod(opencodeBin, 0o755);
 });
 

@@ -94,7 +94,7 @@ test("bakeConfig touches only the CFG block", () => {
 
 test("bakedScriptPath lands in the plan's .flightlog", () => {
   expect(bakedScriptPath("/r/docs/my-plan/PLAN.md")).toBe(
-    "/r/docs/my-plan/.flightlog/orchestrator.js",
+    join("/r/docs/my-plan", ".flightlog", "orchestrator.js"),
   );
 });
 

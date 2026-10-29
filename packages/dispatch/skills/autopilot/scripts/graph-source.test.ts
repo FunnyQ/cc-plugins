@@ -479,7 +479,9 @@ describe("applyStateEntries", () => {
           validity: { kind: "invalid", rule: "unknown-state", reason },
         },
       },
-      errors: [{ file: ".flightlog/run.jsonl", bucket: "build-step", reason }],
+      errors: [
+        { file: join(".flightlog", "run.jsonl"), bucket: "build-step", reason },
+      ],
     });
     expect(
       applyStateEntries({ [original.ref]: original }, [
@@ -535,7 +537,7 @@ describe("applyStateEntries", () => {
         "missing-score/01",
         "__proto__",
       ].map((ref) => ({
-        file: ".flightlog/run.jsonl",
+        file: join(".flightlog", "run.jsonl"),
         bucket: "",
         reason: `Entry task ${JSON.stringify(ref)} references an undeclared node`,
       })),
