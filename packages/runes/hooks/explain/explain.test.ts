@@ -3,10 +3,10 @@ import { expect, mock, test } from "claude-code/testing";
 
 import type { ExplainEntry, ExplainView } from "../../types";
 import { THEMES } from "../config";
-import { platformCommand, type PlatformOperation } from "../platform";
+import { platformCommand, runtime, type PlatformOperation } from "../platform";
 import { CONFIG, HOME, startSession } from "../transcript/test-session";
 import { where } from "../transcript/where";
-import { CHECK_TIMEOUT_MS, CHECKER, CHROME } from "./checker";
+import { CHECK_TIMEOUT_MS, CHECKER } from "./checker";
 import {
   explainAsk,
   explainClear,
@@ -86,6 +86,7 @@ const rig = async (
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
   where.home = HOME;
+  runtime.info = { platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: "/test/chrome" };
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
@@ -96,7 +97,6 @@ const rig = async (
           '<html lang="{{lang}}">{{main}}</html>',
         ] as const,
     ),
-    [CHROME, ""],
   ]);
   const forks: string[] = [];
   const replies: (Fork | Promise<Fork> | Error)[] = [];
@@ -238,7 +238,7 @@ const rig = async (
     turnEnd,
     view: () => explain,
     token: (i: number) =>
-      spawns[i]!.prompt.split("token is ")[1]!.replace(".", ""),
+      spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!,
     setNow: (n: number) => (now = n),
   };
 };
@@ -248,7 +248,8 @@ const answered = (text: string): Fork => ({
   text,
   usage: USAGE,
 });
-const opened = (runs: string[][]) => runs.filter((a) => a[0] === "open");
+const opened = (operations: PlatformOperation[]) =>
+  operations.filter((op) => op.op === "open").map((op) => ["open", op.path]);
 
 test("press with a text reply opens the pane, forks once, and stores a selected text entry", async () => {
   const r = await rig();
@@ -309,13 +310,13 @@ test("press with an html reply writes the file, stores pending, and the checker'
   ).toBe(true);
   expect(r.files.has(entry.path)).toBe(true);
   expect(r.spawns).toHaveLength(1);
-  expect(opened(r.runs)).toEqual([]);
+  expect(opened(r.operations)).toEqual([]);
   expect(r.view().isRunning).toBe(false);
   await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} FIXED 2` });
   expect(r.view().entries[0]).toEqual(
     expect.objectContaining({ check: "fixed", note: "2 fix(es)" }),
   );
-  expect(opened(r.runs)).toEqual([["open", entry.path]]);
+  expect(opened(r.operations)).toEqual([["open", entry.path]]);
 });
 
 test("an html reply with a diagram renders it in a bun child, after the entry lands and before the geometry check", async () => {
@@ -409,7 +410,7 @@ test("a denied checker spawn still opens the page and fails the check", async ()
   await explainPress(r.$);
   const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
   expect(entry.check).toBe("failed");
-  expect(opened(r.runs)).toContainEqual(["open", entry.path]);
+  expect(opened(r.operations)).toContainEqual(["open", entry.path]);
 });
 
 test("a write that throws keeps the summary as a text entry and sets the error", async () => {

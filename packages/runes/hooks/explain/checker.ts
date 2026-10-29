@@ -1,20 +1,19 @@
 import { atom, update } from "claude-code";
 import type { EngineInterface, Hook, On } from "claude-code";
 import type { ExplainCheck, ExplainView } from "../../types";
+import { childEnv, platformCommand, runtime } from "../platform";
 import { where } from "../transcript/where";
 import { explainRoot } from "./html";
 import { patchEntry } from "./state";
 
 export const CHECKER = "runes:explain-checker";
-export const CHROME =
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 export const CHECK_TIMEOUT_MS = 180_000;
 const GEOMETRY_TIMEOUT_MS = 20_000;
 export type CheckResult = { check: ExplainCheck; note?: string };
 
 export const CHECKER_PROMPT = [
   "You check one HTML explainer page. The task message gives its absolute path and a check token.",
-  `Screenshot it with exactly \`"${CHROME}" --headless=new --disable-gpu --hide-scrollbars --window-size=1280,4000 --screenshot=<dir>/<name>.check.png file://<html>\`, and for the narrow pass use \`--window-size=420,7000\` with \`--screenshot=<dir>/<name>.check-narrow.png\`, where <dir> is the page's own directory and <name> its file name without .html. Keep the Chrome path in double quotes. Write no screenshot anywhere else. Then Read each PNG. Chrome captures the window, not the whole page, so the heights are tall on purpose: check that the colophon (\`Written by a fork of this session\`) is visible at the bottom of each shot. When it is not, the page is taller than the shot: answer \`FAILED page taller than the screenshot\` rather than \`OK\`. One round is one wide plus one narrow shot.`,
+  "The task message gives the exact wide and narrow screenshot commands. Run each command, then Read each PNG. Write no screenshot anywhere else. Chrome captures the window, not the whole page, so the heights are tall on purpose: check that the colophon (`Written by a fork of this session`) is visible at the bottom of each shot. When it is not, the page is taller than the shot: answer `FAILED page taller than the screenshot` rather than `OK`. One round is one wide plus one narrow shot.",
   "Fix only: overlapping or clipped labels, arrows pointing at the wrong box, text outside its box, illegible contrast. Fix by editing the HTML file with Edit, inside `<main>` only. Never rewrite prose, never add or remove a section, never touch `<head>`, the CSP meta, or the `#wash` filter, and never edit an `svg` with class `pele`: a layout engine drew it, and the rules below are for hand-drawn ones.",
   "The drawing's rules, so a fix moves toward them: SVG elements use only the classes `ink`, `ink-accent`, `dash`, `wash-warm`, `wash-cool`, `wash-sage`, `label`, `label-soft`, `part`; no literal colours, no `style` attributes, no `width`/`height` on the `svg`; every `svg` keeps its `viewBox` and `<title>`; wash paths come before the ink they sit behind; labels sit at least 24 viewBox units apart and never on a line; a part's label starts with its capital letter (`A · the session`). Labels grow to 24px (label) and 21px (label-soft) at 420 wide, so leave room for that: prefer moving a label or widening the `viewBox` to shrinking text.",
   "Take at most 3 screenshot rounds in total.",
@@ -53,6 +52,7 @@ type Pending = {
   path: string;
   agentId?: string;
   startedAt: number;
+  commands: string[];
 };
 
 // the engine's state scan reads only an atom made in this file, so each reader makes its own
@@ -74,14 +74,24 @@ async function settle(
   await update($, view, (v) =>
     patchEntry(v, entryId, { check: r.check, note: r.note }),
   );
-  await $.process.run(["open", path]);
-  const shot = path.replace(/\.html$/, "");
-  await $.process.run([
-    "rm",
-    "-f",
-    `${shot}.check.png`,
-    `${shot}.check-narrow.png`,
-  ]);
+  const operation = async (op: "open" | "cleanup-check") => {
+    const result = await $.process.run(platformCommand($.plugin.root), {
+      stdin: JSON.stringify(op === "open" ? { op, path } : { op, page: path }),
+      ...(runtime.info ? { env: childEnv(runtime.info) } : {}),
+    });
+    if (result.exitCode !== 0)
+      throw new Error(result.stderr.trim() || `${op} exited ${result.exitCode}`);
+  };
+  try {
+    await operation("open");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await update($, view, (v) =>
+      patchEntry(v, entryId, { note: [r.note, `open failed: ${message}`].filter(Boolean).join("; ") }),
+    );
+  } finally {
+    await operation("cleanup-check");
+  }
 }
 
 async function expire($: EngineInterface) {
@@ -123,7 +133,7 @@ async function measure(
 ): Promise<string[] | undefined> {
   try {
     const run = await $.process.run(
-      ["bun", `${$.plugin.root}/hooks/explain/geometry-cli.ts`, CHROME, path],
+      ["bun", `${$.plugin.root}/hooks/explain/geometry-cli.ts`, runtime.info!.chrome!, path],
       { timeoutMs: GEOMETRY_TIMEOUT_MS },
     );
     const { faults } = JSON.parse(run.stdout) as { faults?: unknown };
@@ -141,7 +151,7 @@ export async function startCheck(
   path: string,
 ): Promise<void> {
   await expire($);
-  if (!(await $.fs.exists(CHROME))) {
+  if (!runtime.info?.chrome) {
     await settle($, entryId, path, { check: "skipped", note: "no Chrome" });
     return;
   }
@@ -151,10 +161,16 @@ export async function startCheck(
     return;
   }
   const token = `c${++checks}`;
+  const root = $.plugin.root.replaceAll("\\", "/");
+  const page = path.replaceAll("\\", "/");
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
+  const commands = ["wide", "narrow"].map(mode =>
+    `bun ${quote(`${root}/hooks/explain/checker-cli.ts`)} ${mode} ${quote(page)}`,
+  );
   const spawned = await $.agent.spawn({
     subagentType: CHECKER,
     prompt:
-      `Check this explainer page: ${path}\nYour check token is ${token}.` +
+      `Check this explainer page: ${path}\nYour check token is ${token}.\nWide screenshot: ${commands[0]}\nNarrow screenshot: ${commands[1]}` +
       (found
         ? `\nA geometry check found:\n${found.map((f) => `- ${f}`).join("\n")}`
         : ""),
@@ -167,46 +183,25 @@ export async function startCheck(
   pending.set(token, {
     entryId,
     path,
+    commands: /['\r\n]/.test($.plugin.root + path) ? [] : commands,
     agentId: spawned.agentId,
     startedAt: await $.clock.now(),
   });
 }
 
-const inside = (path: string) =>
-  explainDir !== "" &&
-  path.startsWith(explainDir) &&
-  !path.split("/").includes("..");
-
-const FLAGS = new Set([
-  "--headless=new",
-  "--disable-gpu",
-  "--hide-scrollbars",
-  "--window-size=1280,4000",
-  "--window-size=420,7000",
-]);
-
-// every argument is a known flag, one screenshot target or one page: any other flag (`--log-net-log=…`) or URL could write or fetch outside the root
-const allowsBash = (command: string) => {
-  if (explainDir === "" || explainDir.includes(" ")) return false;
-  const prefix = `"${CHROME}" `;
-  if (!command.startsWith(prefix)) return false;
-  const args = command.slice(prefix.length);
-  if (/[^\p{L}\p{N}\/._,=:-]/u.test(args.replaceAll(" ", ""))) return false;
-  const files: string[] = [];
-  const shots: string[] = [];
-  for (const arg of args.split(" ").filter(Boolean)) {
-    if (FLAGS.has(arg)) continue;
-    if (arg.startsWith("file://")) files.push(arg.slice("file://".length));
-    else if (arg.startsWith("--screenshot="))
-      shots.push(arg.slice("--screenshot=".length));
-    else return false;
+const inside = (path: string) => {
+  let root = explainDir.replaceAll("\\", "/").replace(/\/+$/, "");
+  path = path.replaceAll("\\", "/");
+  if (runtime.info?.platform === "win32") {
+    root = root.toLowerCase();
+    path = path.toLowerCase();
   }
-  return (
-    files.length === 1 &&
-    shots.length <= 1 &&
-    [...files, ...shots].every(inside)
-  );
+  return root !== "" && !path.split("/").includes("..") &&
+    !root.split("/").includes("..") && path.startsWith(root + "/");
 };
+
+const allowsBash = (command: string) =>
+  [...pending.values()].some(p => p.commands.includes(command));
 
 type TurnComplete = Hook<"turn.complete">;
 

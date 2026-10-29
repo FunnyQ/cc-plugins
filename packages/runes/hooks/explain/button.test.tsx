@@ -1,8 +1,7 @@
 import type { On } from "claude-code";
 import { expect, mock, test, type Engine } from "claude-code/testing";
 
-import { CONFIG, fakeHost } from "../transcript/test-session";
-import { CHROME } from "./checker";
+import { CONFIG, HOME, fakeHost, ran } from "../transcript/test-session";
 
 const BAND = {
   component: "AbovePrompt",
@@ -208,10 +207,10 @@ test("a press that writes an html page spawns the checker from inside runes' own
     "<mode>html</mode><title>Flow</title><summary>s</summary><main><p>m</p></main>";
   mock.clock(on);
   fakeHost(on, {
-    files: new Map([
-      [CONFIG, ""],
-      [CHROME, ""],
-    ]),
+    files: new Map([[CONFIG, ""]]),
+    probe: () => ran(JSON.stringify({
+      platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: "/test/chrome",
+    })),
     run: () => ({
       value: {
         exitCode: 0,

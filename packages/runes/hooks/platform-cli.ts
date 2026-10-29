@@ -1,16 +1,46 @@
 /// <reference types="bun" />
 import { mkdir, unlink } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { win32 } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseOperation, resolveRuntime, type PlatformOperation, type RuntimeInfo } from "./platform";
+
+export const discoverChrome = (
+  platform: string = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  usable: (path: string) => boolean = path => {
+    try { return statSync(path).isFile(); } catch { return false; }
+  },
+  which: (name: string) => string | null = name => Bun.which(name, { PATH: env.PATH ?? env.Path ?? "" }),
+): string | null => {
+  if (platform === "darwin") {
+    const path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+    return usable(path) ? path : null;
+  }
+  if (platform === "win32") {
+    for (const name of ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"]) {
+      const root = env[name];
+      if (!root) continue;
+      const path = win32.join(root, "Google", "Chrome", "Application", "chrome.exe");
+      if (usable(path)) return path;
+    }
+  }
+  if (platform === "linux") {
+    for (const name of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]) {
+      const path = which(name);
+      if (path && !/\.exe$/i.test(path)) return path;
+    }
+  }
+  return null;
+};
 
 export const runtimeInfo = (): RuntimeInfo => {
   let version = "";
   if (process.platform === "linux") {
     try { version = readFileSync("/proc/version", "utf8"); } catch {}
   }
-  return resolveRuntime(process.platform, process.env, tmpdir(), version);
+  return { ...resolveRuntime(process.platform, process.env, tmpdir(), version), chrome: discoverChrome() };
 };
 
 type Result = { exitCode: number; stdout: string; stderr: string };

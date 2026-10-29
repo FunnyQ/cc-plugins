@@ -99,7 +99,7 @@ for (const homeState of ["supplied", "absent", "empty"] as const) {
 }
 
 import { childEnv, parseOperation, resolveRuntime, scratchRoot } from "./platform";
-import { executeOperation, openArtifact } from "./platform-cli";
+import { discoverChrome, executeOperation, openArtifact } from "./platform-cli";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const CLI = join(import.meta.dir, "platform-cli.ts");
@@ -221,7 +221,7 @@ test("actual info child returns the runtime snapshot and preserves supplied HOME
   const info = JSON.parse(result.stdout);
   expect(info.platform).toBe(process.platform);
   expect(info.home).toBe(process.env.HOME || process.env.USERPROFILE);
-  expect(info.chrome).toBeNull();
+  expect(info.chrome).toBe(discoverChrome());
   expect(typeof info.wsl).toBe("boolean");
   expect(typeof info.tmp).toBe("string");
 });
@@ -329,3 +329,84 @@ for (const home of [undefined, ""]) {
     }
   });
 }
+
+test("Chrome discovery uses the platform order and environment roots", () => {
+  const mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  expect(discoverChrome("darwin", {}, path => path === mac)).toBe(mac);
+  expect(discoverChrome("darwin", {}, () => false)).toBeNull();
+  const env = { ProgramFiles: "D:\\Apps", "ProgramFiles(x86)": "E:\\Apps", LOCALAPPDATA: "F:\\Q Space" };
+  const candidates = Object.values(env).map(root => root + "\\Google\\Chrome\\Application\\chrome.exe");
+  for (let first = 0; first < candidates.length; first++) {
+    expect(discoverChrome("win32", env, path => candidates.slice(first).includes(path))).toBe(candidates[first]);
+  }
+  expect(discoverChrome("win32", env, () => false)).toBeNull();
+  expect(discoverChrome("win32", {}, () => true)).toBeNull();
+  const names = ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"];
+  for (let first = 0; first < names.length; first++) {
+    const tried: string[] = [];
+    expect(discoverChrome("linux", { WSL_DISTRO_NAME: "Ubuntu", ...env }, () => true, name => {
+      tried.push(name);
+      return names.indexOf(name) >= first ? "/usr/bin/" + name : null;
+    })).toBe("/usr/bin/" + names[first]);
+    expect(tried).toEqual(names.slice(0, first + 1));
+  }
+  expect(discoverChrome("linux", env, () => true, () => null)).toBeNull();
+  expect(discoverChrome("linux", env, () => true, () => "/mnt/c/chrome.exe")).toBeNull();
+});
+
+import { parseScreenshotArgs, takeScreenshot } from "./explain/checker-cli";
+import { pathToFileURL } from "node:url";
+
+test("screenshot helper accepts exactly one mode and one HTML page", () => {
+  for (const args of [[], ["wide"], ["other", "page.html"], ["wide", "page.png"], ["wide", "page.html", "extra"], ["wide", ""], ["wide", "page.html\0"]]) {
+    expect(() => parseScreenshotArgs(args)).toThrow();
+  }
+  expect(parseScreenshotArgs(["wide", "page.html"])).toEqual({ mode: "wide", page: "page.html" });
+  expect(parseScreenshotArgs(["narrow", "page.html"])).toEqual({ mode: "narrow", page: "page.html" });
+});
+
+test("screenshot helper encodes the URL, derives outputs and removes profiles after exit", async () => {
+  for (const mode of ["wide", "narrow"] as const) {
+    const page = join(import.meta.dir, "page 空間 & %#'.html");
+    let profile = "";
+    const output = await takeScreenshot({ mode, page }, () => "/chrome", async argv => {
+      expect(argv[0]).toBe("/chrome");
+      expect(argv).toContain("--window-size=" + (mode === "wide" ? "1280,4000" : "420,7000"));
+      expect(argv.at(-1)).toBe(pathToFileURL(page).href);
+      profile = argv.find(arg => arg.startsWith("--user-data-dir="))!.slice("--user-data-dir=".length);
+      expect(existsSync(profile)).toBe(true);
+      const output = page.replace(/\.html$/, mode === "wide" ? ".check.png" : ".check-narrow.png");
+      expect(argv).toContain("--screenshot=" + output);
+      return 0;
+    });
+    expect(output).toBe(page.replace(/\.html$/, mode === "wide" ? ".check.png" : ".check-narrow.png"));
+    expect(existsSync(profile)).toBe(false);
+  }
+});
+
+test("screenshot helper reports failure and removes profiles on nonzero exit or spawn failure", async () => {
+  for (const throws of [false, true]) {
+    let profile = "";
+    await expect(takeScreenshot({ mode: "wide", page: "page.html" }, () => "/chrome", async argv => {
+      profile = argv.find(arg => arg.startsWith("--user-data-dir="))!.slice("--user-data-dir=".length);
+      if (throws) throw new Error("spawn refused");
+      return 7;
+    })).rejects.toThrow(throws ? "spawn refused" : "Chrome exited 7");
+    expect(existsSync(profile)).toBe(false);
+  }
+  await expect(takeScreenshot({ mode: "wide", page: "page.html" }, () => null)).rejects.toThrow("no Chrome");
+});
+
+test("actual screenshot CLI rejects invalid arguments with a diagnostic and no stdout", async () => {
+  for (const args of [[], ["wide"], ["unknown", "page.html"], ["wide", "page.png"], ["narrow", "page.html", "extra"]]) {
+    const child = Bun.spawn([process.execPath, join(import.meta.dir, "explain/checker-cli.ts"), ...args], {
+      stdout: "pipe", stderr: "pipe",
+    });
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+    ]);
+    expect(exitCode).not.toBe(0);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("runes checker: expected wide|narrow and one .html page");
+  }
+});

@@ -2,6 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { faults, MEASURE } from "./geometry";
 import type { Measure } from "./geometry";
@@ -64,7 +65,7 @@ try {
       deviceScaleFactor: 1,
       mobile: false,
     });
-    await send("Page.navigate", { url: `file://${page}` });
+    await send("Page.navigate", { url: pathToFileURL(page).href });
     for (
       let i = 0;
       i < 100 && (await evaluate("document.readyState")) !== "complete";
