@@ -7,7 +7,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: herdr/02
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 

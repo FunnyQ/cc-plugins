@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: browsers/02
-> **Status**: todo
+> **Status**: blocked
 
 ## Goal
 
