@@ -22,6 +22,7 @@ beforeEach(() => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "core.autocrlf", "false");
 });
 
 afterEach(async () => {
@@ -183,7 +184,7 @@ describe("comment-guard records what it reported", () => {
     const file = join(repo, "app.ts");
     await Bun.write(file, BLOCK);
     const proc = Bun.spawn(
-      ["bun", new URL("./comment-guard.ts", import.meta.url).pathname],
+      ["bun", join(import.meta.dir, "comment-guard.ts")],
       {
         stdin: new TextEncoder().encode(
           JSON.stringify({

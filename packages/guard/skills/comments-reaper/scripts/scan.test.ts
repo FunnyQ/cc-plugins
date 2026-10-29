@@ -24,6 +24,7 @@ beforeEach(() => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "core.autocrlf", "false");
   put("src/a.ts", "// header\nconst a = 1;\n// lone\nconst b = 2;\n");
   put("src/b.ts", "const c = 3;\n");
   put("lib/c.rb", "x = 1\n# ruby\n");
@@ -132,7 +133,7 @@ describe("writeDeck", () => {
     const home = realpathSync(mkdtempSync(join(tmpdir(), "reaper-deck-")));
     const dir = writeDeck(home, repo, "scan-abc123", 3);
     expect(dir).toBe(
-      join(home, "q-lab/flightdeck/comments-reaper-scan-abc123"),
+      join(home, "q-lab", "flightdeck", "comments-reaper-scan-abc123"),
     );
     const graph = JSON.parse(readFileSync(join(dir!, "graph.json"), "utf8"));
     expect(graph.version).toBe(1);
@@ -161,7 +162,7 @@ describe("writeDeck", () => {
       .split("\n");
     expect(lines[1]).toMatch(/^shards 1 in \/\S+\/scan-\w+$/);
     expect(lines[2]).toStartWith(
-      `deck ${home}/q-lab/flightdeck/comments-reaper-scan-`,
+      `deck ${join(home, "q-lab", "flightdeck", "comments-reaper-scan-")}`,
     );
     expect(lines.some((l) => l.startsWith("report "))).toBe(false);
   });

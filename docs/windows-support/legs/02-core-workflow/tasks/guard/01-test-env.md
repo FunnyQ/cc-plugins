@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: guard/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -81,18 +81,18 @@ grep -rnE 'HOME|TMPDIR|#!/bin/sh' --include='*.test.ts' packages/guard | grep -v
 
 ## Acceptance criteria
 
-- [ ] `grep -rn "import.meta.url" --include='*.test.ts' packages/guard | grep -v '\.mod\.test\.ts'` prints nothing.
-- [ ] `grep -rn "/tmp/cg-main" packages/guard` prints nothing.
-- [ ] `grep -c '"core.autocrlf", "false"' packages/guard/hooks/comment-sweep.test.ts packages/guard/skills/comments-reaper/scripts/scan.test.ts` reports at least 1 per file.
-- [ ] `grep -n 'flightdeck/comments-reaper-scan-' packages/guard/skills/comments-reaper/scripts/scan.test.ts` prints nothing (the expectation is built with `join`).
-- [ ] Every `HOME` override in guard's bun tests sets `USERPROFILE` too, and every `TMPDIR` override sets `TEMP` and `TMP` (the grep in Implementation notes shows none unpaired).
-- [ ] `git diff --name-only -- packages/guard` lists only `*.test.ts` files, and none ends in `.mod.test.ts`.
+- [x] `grep -rn "import.meta.url" --include='*.test.ts' packages/guard | grep -v '\.mod\.test\.ts'` prints nothing.
+- [x] `grep -rn "/tmp/cg-main" packages/guard` prints nothing.
+- [x] `grep -c '"core.autocrlf", "false"' packages/guard/hooks/comment-sweep.test.ts packages/guard/skills/comments-reaper/scripts/scan.test.ts` reports at least 1 per file.
+- [x] `grep -n 'flightdeck/comments-reaper-scan-' packages/guard/skills/comments-reaper/scripts/scan.test.ts` prints nothing (the expectation is built with `join`).
+- [x] Every `HOME` override in guard's bun tests sets `USERPROFILE` too, and every `TMPDIR` override sets `TEMP` and `TMP` (the grep in Implementation notes shows none unpaired).
+- [x] `git diff --name-only -- packages/guard` lists only `*.test.ts` files, and none ends in `.mod.test.ts`.
 
 ## Verification
 
-- [ ] `bun test packages/guard` passes on macOS.
-- [ ] `bunx --bun tsc --noEmit` from the repo root prints nothing.
-- [ ] `git status --short -- packages/guard/hooks/comment-guard.test.ts packages/guard/hooks/comment-sweep.test.ts packages/guard/skills/comments-reaper/scripts/scan.test.ts` shows all three as modified.
+- [x] `bun test packages/guard` passes on macOS.
+- [x] `bunx --bun tsc --noEmit` from the repo root prints nothing.
+- [x] `git status --short -- packages/guard/hooks/comment-guard.test.ts packages/guard/hooks/comment-sweep.test.ts packages/guard/skills/comments-reaper/scripts/scan.test.ts` shows all three as modified.
 
 ## Eval rubric
 
