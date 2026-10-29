@@ -180,7 +180,8 @@ function processDetails(
             ],
             {
               env: { ...process.env, Q_BROWSER_PID: String(pid) },
-              timeout: 2000,
+              // Measured on a Windows runner: each PowerShell start takes ~1s, and over 2s under parallel load.
+              timeout: 10_000,
             },
           )
         : Bun.spawnSync(
