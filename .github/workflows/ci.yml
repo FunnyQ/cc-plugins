@@ -37,11 +37,7 @@ jobs:
         run: bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts
       - if: runner.os == 'Windows'
         run: "! grep -q $'\\r' packages/monitor/skills/cockpit/bin/cockpit"
-      - run: bun test packages/chronicle
-      - run: bun test packages/dispatch
-      - run: bun test packages/guard
-      - run: bun test packages/relay
-      - run: bun test opencode/
+      - run: bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay opencode/
 
   smoke:
     strategy:
@@ -54,7 +50,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - run: bun install --frozen-lockfile
       - run: bun .github/scripts/smoke.ts
 
   report:

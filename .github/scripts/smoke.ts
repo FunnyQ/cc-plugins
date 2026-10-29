@@ -180,7 +180,7 @@ try {
   });
 
   step("worktree", () => {
-    const REF = ["work", "01"].join("/");
+    const REF = "work/01";
     // --repo is left un-realpathed so a Windows 8.3 short tmpdir reaches the tool as autopilot would hand it.
     const common = ["--repo", repo, "--slug", "smoke", "--plan-dir", planDir];
     const created = JSON.parse(
