@@ -63,6 +63,7 @@ function session(
 
 function gitRepository(root: string, gitignore: string): void {
   spawnSync("git", ["init", "-q"], { cwd: root });
+  spawnSync("git", ["config", "core.autocrlf", "false"], { cwd: root });
   writeFileSync(join(root, ".gitignore"), gitignore);
 }
 

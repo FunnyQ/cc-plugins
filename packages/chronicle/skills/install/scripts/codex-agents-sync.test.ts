@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 
 // The Codex roles are prose rewrites of the Claude agents, so their bodies cannot be
 // compared byte for byte the way the OpenCode copies are. What drifted before was
@@ -41,7 +41,7 @@ const chronicleScripts = new Set(
   readdirSync(join(pluginRoot, "skills"), { recursive: true })
     .map(String)
     .filter((path) => path.endsWith(".ts") && !path.endsWith(".test.ts"))
-    .map((path) => path.split("/").at(-1)!),
+    .map((path) => basename(path)),
 );
 
 const scriptsNamed = (text: string) =>

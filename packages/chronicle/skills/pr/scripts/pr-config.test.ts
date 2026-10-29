@@ -153,6 +153,7 @@ describe("save CLI", () => {
     const repo = mkdtempSync(join(tmpdir(), "chronicle-pr-config-save-"));
     try {
       Bun.spawnSync(["git", "init", "-b", "main"], { cwd: repo });
+      Bun.spawnSync(["git", "config", "core.autocrlf", "false"], { cwd: repo });
       Bun.spawnSync(["git", "config", "user.name", "Chronicle Test"], {
         cwd: repo,
       });

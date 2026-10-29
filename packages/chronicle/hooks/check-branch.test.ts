@@ -15,6 +15,7 @@ let repo: string;
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), "chronicle-branch-guard-"));
   Bun.spawnSync(["git", "init", "-b", "main"], { cwd: repo });
+  Bun.spawnSync(["git", "config", "core.autocrlf", "false"], { cwd: repo });
 });
 
 afterEach(() => {
@@ -115,7 +116,8 @@ describe("check-branch", () => {
     writePrConfig({ workflow: "github-flow", base: "main" });
     const bin = mkdtempSync(join(tmpdir(), "chronicle-no-jq-"));
     for (const tool of ["git", "cat"]) {
-      symlinkSync(Bun.which(tool)!, join(bin, tool));
+      const name = process.platform === "win32" ? `${tool}.exe` : tool;
+      symlinkSync(Bun.which(tool)!, join(bin, name));
     }
     const noJq = Bun.spawnSync([Bun.which("bash")!, hook], {
       cwd: repo,
