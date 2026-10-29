@@ -8,7 +8,7 @@
 >
 > **Depends on**: browsers/01
 > **Blocks**: browsers/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -67,17 +67,17 @@ Guard each executable CLI boundary before argument execution, state creation or 
 
 ## Acceptance criteria
 
-- [ ] Injected-platform tests cover deterministic Chrome, Firefox and Zen candidate order on macOS and Linux, Windows Chrome environment roots, Linux-only candidates and the install hint on WSL, missing candidates, directories and non-executable files; a failed lookup names the browser and attempted candidates.
-- [ ] Chrome and Firefox command tests prove native selection and isolated state integration, including independent Zen selection and unchanged macOS ordering and registry locations.
-- [ ] State-root tests prove native Windows uses system temp while macOS and Linux retain existing paths, without host-platform separator leakage in injected tests.
-- [ ] Lifecycle tests prove registry reuse, stale record handling, bounded close, ownership validation and exit-before-profile-deletion ordering; a live browser or failed cleanup cannot be reported as a successful clean close.
-- [ ] Regression tests prove an unrelated process or normal user profile is never terminated or removed by instance cleanup.
-- [ ] Non-macOS Safari CLI tests assert a nonzero result containing `macOS only`, and native-Windows Firefox and Zen CLI tests assert `not supported on Windows`, each with zero driver/browser/state operations; parser/protocol tests remain portable and macOS live opt-in remains intact.
+- [x] Injected-platform tests cover deterministic Chrome, Firefox and Zen candidate order on macOS and Linux, Windows Chrome environment roots, Linux-only candidates and the install hint on WSL, missing candidates, directories and non-executable files; a failed lookup names the browser and attempted candidates.
+- [x] Chrome and Firefox command tests prove native selection and isolated state integration, including independent Zen selection and unchanged macOS ordering and registry locations.
+- [x] State-root tests prove native Windows uses system temp while macOS and Linux retain existing paths, without host-platform separator leakage in injected tests.
+- [x] Lifecycle tests prove registry reuse, stale record handling, bounded close, ownership validation and exit-before-profile-deletion ordering; a live browser or failed cleanup cannot be reported as a successful clean close.
+- [x] Regression tests prove an unrelated process or normal user profile is never terminated or removed by instance cleanup.
+- [x] Non-macOS Safari CLI tests assert a nonzero result containing `macOS only`, and native-Windows Firefox and Zen CLI tests assert `not supported on Windows`, each with zero driver/browser/state operations; parser/protocol tests remain portable and macOS live opt-in remains intact.
 
 ## Verification
 
-- [ ] Run `bun test packages/browsers` from the repository root and require zero failures; optional live tests may skip only for their existing absent-browser or Safari opt-in prerequisites.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit zero with no diagnostics.
+- [x] Run `bun test packages/browsers` from the repository root and require zero failures; optional live tests may skip only for their existing absent-browser or Safari opt-in prerequisites.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require exit zero with no diagnostics.
 
 ## Eval rubric
 

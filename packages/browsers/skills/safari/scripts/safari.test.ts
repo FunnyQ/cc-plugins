@@ -52,3 +52,30 @@ describe("settle", () => {
     expect(() => settle(502, null)).toThrow("safaridriver answered HTTP 502");
   });
 });
+
+import { execute } from "./safari";
+
+for (const platform of ["linux", "win32"]) {
+  test(`Safari refuses ${platform} before parsing or state/driver operations`, async () => {
+    let operations = 0;
+    await expect(
+      execute(["--headed"], platform, async () => {
+        operations++;
+        return "unexpected";
+      }),
+    ).rejects.toThrow("macOS only");
+    expect(operations).toBe(0);
+  });
+}
+
+test("unsupported Safari executable invocation exits nonzero", async () => {
+  const source = `import { execute } from ${JSON.stringify(new URL("./safari.ts", import.meta.url).href)};
+    try { await execute(["--headed"], "linux", async () => { throw new Error("driver operation reached"); }); }
+    catch (error) { console.error(error.message); process.exit(1); }`;
+  const child = Bun.spawn([process.execPath, "--eval", source], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  expect(await child.exited).not.toBe(0);
+  expect(await new Response(child.stderr).text()).toContain("macOS only");
+});

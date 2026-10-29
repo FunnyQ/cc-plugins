@@ -96,3 +96,146 @@ describe("interacted", () => {
     expect(performance.now() - started).toBeLessThan(400);
   });
 });
+
+import {
+  existsSync,
+  readdirSync,
+  mkdtempSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { launch } from "./chrome";
+
+test("native Chrome launch passes the executable as argv and records before readiness", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "chrome-launch-"));
+  const binary = "C:\\程式 空間\\Chrome\\chrome.exe";
+  let provisional: any;
+  try {
+    const instance = await launch(parseArgs(["open", "about:blank"]), {
+      input: {
+        platform: "win32",
+        env: { ProgramFiles: "C:\\程式 空間" },
+        wsl: false,
+      },
+      stateDir,
+      resolve: (name, candidates) => {
+        expect(name).toBe("chrome");
+        expect(candidates[0]).toContain("C:\\程式 空間");
+        return binary;
+      },
+      spawn: (argv) => {
+        expect(argv[0]).toBe(binary);
+        const profile = argv
+          .find((arg) => arg.startsWith("--user-data-dir="))!
+          .slice(16);
+        setTimeout(() => {
+          const id = profile.slice(profile.lastIndexOf("-") + 1);
+          provisional = JSON.parse(
+            readFileSync(join(stateDir, "instances", `${id}.json`), "utf8"),
+          );
+          writeFileSync(
+            join(profile, "DevToolsActivePort"),
+            "9222\n/devtools/browser/test\n",
+          );
+        }, 1);
+        return { pid: process.pid, unref() {} };
+      },
+    });
+    expect(provisional.port).toBe(0);
+    expect(instance.port).toBe(9222);
+    expect(instance.profile.startsWith(stateDir)).toBe(true);
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(stateDir, "instances", `${instance.id}.json`),
+          "utf8",
+        ),
+      ),
+    ).toEqual(instance);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
+test("launch timeout after registration reclaims its private instance and preserves a concurrent launch", async () => {
+  const root = mkdtempSync(join(tmpdir(), "chrome-timeout-"));
+  const unrelatedDir = join(root, "unrelated");
+  const privateDir = join(root, "private");
+  let child: ReturnType<typeof Bun.spawn> | undefined;
+  let failedProfile = "";
+  try {
+    const unrelated = await launch(parseArgs(["open", "about:blank"]), {
+      stateDir: unrelatedDir,
+      resolve: () => "chrome",
+      spawn: (argv) => {
+        const profile = argv
+          .find((arg) => arg.startsWith("--user-data-dir="))!
+          .slice(16);
+        writeFileSync(
+          join(profile, "DevToolsActivePort"),
+          "9333\n/devtools/browser/other\n",
+        );
+        return { pid: process.pid, unref() {} };
+      },
+    });
+    await expect(
+      launch(parseArgs(["open", "about:blank"]), {
+        stateDir: privateDir,
+        timeoutMs: 1,
+        resolve: () => "chrome",
+        spawn: (argv) => {
+          const flag = argv.find((arg) => arg.startsWith("--user-data-dir="))!;
+          failedProfile = flag.slice(16);
+          child = Bun.spawn(
+            [process.execPath, "--eval", "setInterval(() => {}, 1000)", flag],
+            {
+              stdio: ["ignore", "ignore", "ignore"],
+            },
+          );
+          return child;
+        },
+      }),
+    ).rejects.toThrow("chrome did not open DevTools within 1ms");
+    expect(child).toBeDefined();
+    await child!.exited;
+    expect(existsSync(failedProfile)).toBe(false);
+    expect(readdirSync(join(privateDir, "instances"))).toEqual([]);
+    expect(existsSync(unrelated.profile)).toBe(true);
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(unrelatedDir, "instances", `${unrelated.id}.json`),
+          "utf8",
+        ),
+      ),
+    ).toEqual(unrelated);
+  } finally {
+    if (child && child.exitCode === null) {
+      child.kill();
+      await child.exited;
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("spawn failure removes the fresh isolated profile", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "chrome-spawn-failure-"));
+  try {
+    await expect(
+      launch(parseArgs(["open", "about:blank"]), {
+        stateDir,
+        resolve: () => "chrome",
+        spawn: () => {
+          throw new Error("spawn failed");
+        },
+      }),
+    ).rejects.toThrow("spawn failed");
+    expect(readdirSync(stateDir)).toEqual(["instances"]);
+    expect(readdirSync(join(stateDir, "instances"))).toEqual([]);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});

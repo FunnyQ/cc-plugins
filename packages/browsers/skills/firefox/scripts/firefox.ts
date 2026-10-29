@@ -1,8 +1,14 @@
 #!/usr/bin/env bun
 
-import { writeFileSync } from "node:fs";
+import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { connect, type Client } from "./marionette";
+import {
+  browserCandidates,
+  browserStateDir,
+  nativePlatformInput,
+  type PlatformInput,
+} from "../../shared/platform";
 import {
   freePort,
   isAlive,
@@ -37,18 +43,21 @@ export type Invocation = {
   output: string | null;
 };
 
-const STATE_DIR = "/tmp/q-lab/browsers/firefox";
+function stateDir(): string {
+  return browserStateDir("firefox");
+}
 const DEFAULT_SIZE = "1440x900";
 const LAUNCH_TIMEOUT_MS = 20_000;
 
-// macOS app bundles only; add Linux paths when this runs anywhere else.
 export const BINARIES: Record<Browser, string[]> = {
-  firefox: [
-    "/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox",
-    "/Applications/Firefox.app/Contents/MacOS/firefox",
-    "/Applications/Firefox Nightly.app/Contents/MacOS/firefox",
-  ],
-  zen: ["/Applications/Zen.app/Contents/MacOS/zen"],
+  firefox:
+    process.platform === "win32"
+      ? []
+      : browserCandidates("firefox", nativePlatformInput()),
+  zen:
+    process.platform === "win32"
+      ? []
+      : browserCandidates("zen", nativePlatformInput()),
 };
 
 const VALUE_FLAGS = new Set(["--id", "--size", "--output"]);
@@ -83,11 +92,41 @@ export function parseArgs(argv: string[]): Invocation {
   return invocation;
 }
 
-async function launch(invocation: Invocation): Promise<Instance> {
+export type LaunchOptions = {
+  input?: PlatformInput;
+  timeoutMs?: number;
+  stateDir?: string;
+  resolve?: (
+    name: string,
+    candidates: string[],
+    input: PlatformInput,
+  ) => string;
+  spawn?: (argv: string[]) => { pid: number; unref: () => void };
+  ready?: (port: number) => Promise<void>;
+};
+
+export async function launch(
+  invocation: Invocation,
+  options: LaunchOptions = {},
+): Promise<Instance> {
+  const input = options.input ?? nativePlatformInput();
+  assertSupported(input.platform, invocation.zen);
+  const stateDir =
+    options.stateDir ?? browserStateDir("firefox", input.platform, input.env);
+  const resolve =
+    options.resolve ??
+    ((name, candidates, platform) => resolveBinary(name, candidates, platform));
+  const spawn =
+    options.spawn ??
+    ((argv) =>
+      Bun.spawn(argv, {
+        stdio: ["ignore", "ignore", "ignore"],
+        detached: true,
+      }));
   const browser: Browser = invocation.zen ? "zen" : "firefox";
-  const binary = resolveBinary(browser, BINARIES[browser]);
+  const binary = resolve(browser, browserCandidates(browser, input), input);
   const { width, height } = parseSize(invocation.size ?? DEFAULT_SIZE);
-  const { id, profile } = newProfile(STATE_DIR);
+  const { id, profile } = newProfile(stateDir);
   // Port picked then released: another process can take it in between, and the
   // launch then times out rather than attaching to a stranger.
   const port = await freePort();
@@ -116,10 +155,13 @@ async function launch(invocation: Invocation): Promise<Instance> {
     ...(headless ? ["--headless"] : []),
     "about:blank",
   ];
-  const child = Bun.spawn(argv, {
-    stdio: ["ignore", "ignore", "ignore"],
-    detached: true,
-  });
+  let child: { pid: number; unref: () => void };
+  try {
+    child = spawn(argv);
+  } catch (error) {
+    rmSync(profile, { recursive: true, force: true });
+    throw error;
+  }
   child.unref();
   const instance: Instance = {
     id,
@@ -129,18 +171,20 @@ async function launch(invocation: Invocation): Promise<Instance> {
     browser,
     headless,
   };
-  recordInstance(STATE_DIR, instance);
+  recordInstance(stateDir, instance);
 
-  const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
+  const timeoutMs = options.timeoutMs ?? LAUNCH_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      (await connect(port, 2_000)).close();
+      if (options.ready) await options.ready(port);
+      else (await connect(port, 2_000)).close();
       return instance;
     } catch {
       if (Date.now() > deadline || !isAlive(child.pid)) {
-        await shutdown(STATE_DIR, instance);
+        await shutdown(stateDir, instance);
         throw new Error(
-          `${browser} did not open Marionette on port ${port} within ${LAUNCH_TIMEOUT_MS}ms`,
+          `${browser} did not open Marionette on port ${port} within ${timeoutMs}ms`,
         );
       }
       await Bun.sleep(50);
@@ -192,7 +236,7 @@ async function run(invocation: Invocation): Promise<string> {
       1,
       "open <url> [--new] [--zen] [--headed] [--size WxH]",
     );
-    const live = liveInstances(STATE_DIR);
+    const live = liveInstances(stateDir());
     const reuse = !invocation.fresh && live.length > 0;
     const instance = reuse
       ? pickInstance(live, invocation.id)
@@ -208,7 +252,7 @@ async function run(invocation: Invocation): Promise<string> {
   }
 
   if (command === "status") {
-    const live = liveInstances(STATE_DIR);
+    const live = liveInstances(stateDir());
     if (live.length === 0) return "no instance is open";
     const lines = await Promise.all(
       live.map(async (instance) => {
@@ -224,12 +268,22 @@ async function run(invocation: Invocation): Promise<string> {
   }
 
   if (command === "close") {
-    const instance = pickInstance(liveInstances(STATE_DIR), invocation.id);
-    await shutdown(STATE_DIR, instance);
+    const instance = pickInstance(liveInstances(stateDir()), invocation.id);
+    await shutdown(stateDir(), instance, {
+      close: async () => {
+        const client = await connect(instance.port);
+        try {
+          await client.send("WebDriver:NewSession", { capabilities: {} });
+          await client.send("Marionette:Quit", { flags: ["eForceQuit"] });
+        } finally {
+          client.close();
+        }
+      },
+    });
     return `closed ${instance.id}`;
   }
 
-  const instance = pickInstance(liveInstances(STATE_DIR), invocation.id);
+  const instance = pickInstance(liveInstances(stateDir()), invocation.id);
   return withSession(instance, async (send) => {
     switch (command) {
       case "goto": {
@@ -323,9 +377,26 @@ async function run(invocation: Invocation): Promise<string> {
   });
 }
 
+export function assertSupported(platform: string, zen = false): void {
+  if (platform === "win32") {
+    throw new Error(
+      `${zen ? "zen" : "firefox"} is not supported on Windows; use the chrome skill`,
+    );
+  }
+}
+
+export async function execute(
+  argv: string[],
+  platform: string = process.platform,
+  executeInvocation: (invocation: Invocation) => Promise<string> = run,
+): Promise<string> {
+  assertSupported(platform, argv.includes("--zen"));
+  return executeInvocation(parseArgs(argv));
+}
+
 if (import.meta.main) {
   try {
-    console.log(await run(parseArgs(Bun.argv.slice(2))));
+    console.log(await execute(Bun.argv.slice(2)));
     process.exit(0);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
