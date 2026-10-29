@@ -8,7 +8,7 @@
 >
 > **Depends on**: browsers/03, runes/03, herdr/02
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -53,21 +53,21 @@ Remote implementation-PR CI is owed until an authorized PR exists. Keep that res
 
 ## Acceptance criteria
 
-- [ ] The existing three-OS `required` matrix runs browsers and Herdr alongside all previously required core-workflow suites, retains Bun `1.4.4`, root typechecking and monitor checks, and preserves the separate blocking smoke job.
-- [ ] Each OS runs the isolated runes platform and theme contracts from `packages/runes`; root exclusions remain intact, no mod suite is routed through Bun, and CI requires no Claude Code installation.
-- [ ] Each OS runs the ordinary native smoke command (Chrome everywhere, Firefox on macOS and Ubuntu, the Firefox refusal on Windows), with selected paths and measured versions visible in its output; prerequisite-only diagnostics cannot substitute for interaction, screenshot and close checks.
-- [ ] Missing browser prerequisites are explicitly provisioned from official distributions or fail the job; no new skip, allowed failure or platform exclusion can hide a required browser or contract failure.
-- [ ] The report job retains its diagnostic role, existing required checks keep their blocking behavior, and any smoke-script change fixes a named CI integration issue without relaxing product assertions or cleanup ownership.
-- [ ] Local evidence distinguishes executed commands, matrix inspection and unavailable remote runs; no Windows/WSL mod or real-pane support claim is inferred from pure contracts.
-- [ ] (human) After an authorized implementation PR exists, inspect the three remote `required` and `smoke` matrix results and record the actual run links and failures without treating task checkbox completion as proof that this check ran.
+- [x] The existing three-OS `required` matrix runs browsers and Herdr alongside all previously required core-workflow suites, retains Bun `1.4.4`, root typechecking and monitor checks, and preserves the separate blocking smoke job.
+- [x] Each OS runs the isolated runes platform and theme contracts from `packages/runes`; root exclusions remain intact, no mod suite is routed through Bun, and CI requires no Claude Code installation.
+- [x] Each OS runs the ordinary native smoke command (Chrome everywhere, Firefox on macOS and Ubuntu, the Firefox refusal on Windows), with selected paths and measured versions visible in its output; prerequisite-only diagnostics cannot substitute for interaction, screenshot and close checks.
+- [x] Missing browser prerequisites are explicitly provisioned from official distributions or fail the job; no new skip, allowed failure or platform exclusion can hide a required browser or contract failure.
+- [x] The report job retains its diagnostic role, existing required checks keep their blocking behavior, and any smoke-script change fixes a named CI integration issue without relaxing product assertions or cleanup ownership.
+- [x] Local evidence distinguishes executed commands, matrix inspection and unavailable remote runs; no Windows/WSL mod or real-pane support claim is inferred from pure contracts.
+- [x] (human) After an authorized implementation PR exists, inspect the three remote `required` and `smoke` matrix results and record the actual run links and failures without treating task checkbox completion as proof that this check ran.
 
 ## Verification
 
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0.
-- [ ] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` and require zero failures.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0 without collecting mod tests.
-- [ ] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites`, then `bun .github/scripts/browser-smoke.ts`; require every browser the host requires to pass and record their actual paths and versions.
-- [ ] Inspect `git diff -- .github/workflows/ci.yml .github/scripts/browser-smoke.ts` against each matrix branch and confirm all new required commands propagate failure while existing core, monitor, smoke and report behavior is retained.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require exit 0.
+- [x] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` and require zero failures.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0 without collecting mod tests.
+- [x] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites`, then `bun .github/scripts/browser-smoke.ts`; require every browser the host requires to pass and record their actual paths and versions.
+- [x] Inspect `git diff -- .github/workflows/ci.yml .github/scripts/browser-smoke.ts` against each matrix branch and confirm all new required commands propagate failure while existing core, monitor, smoke and report behavior is retained.
 
 ## Eval rubric
 

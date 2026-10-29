@@ -37,7 +37,9 @@ jobs:
         run: bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts
       - if: runner.os == 'Windows'
         run: "! grep -q $'\\r' packages/monitor/skills/cockpit/bin/cockpit"
-      - run: bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay opencode/
+      - run: bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ ./.github/scripts/browser-smoke.test.ts
+      - run: (cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
+      - run: bun .github/scripts/browser-smoke.ts
 
   smoke:
     strategy:
