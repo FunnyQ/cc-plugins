@@ -202,13 +202,13 @@ describe("plan", () => {
     const shim = join(dir, "..", `${basename(dir)}-bin`);
     scratch.push(shim);
     mkdirSync(shim);
+    const realGit = Bun.which("git");
     if (process.platform === "win32") {
       writeFileSync(
         join(shim, "git.cmd"),
-        `@echo %*>> "${log}"\r\n@"${Bun.which("git")}" %*\r\n`,
+        `@echo %*>> "${log}"\r\n@"${realGit}" %*\r\n`,
       );
     } else {
-      const realGit = (await $`which git`.quiet()).stdout.toString().trim();
       writeFileSync(
         join(shim, "git"),
         `#!/bin/sh\necho "$*" >> "${log}"\nexec "${realGit}" "$@"\n`,

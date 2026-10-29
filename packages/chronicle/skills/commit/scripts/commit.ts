@@ -98,11 +98,7 @@ export function canonicalPath(
     missing.unshift(basename(existing));
     existing = dirname(existing);
   }
-  let real = existing;
-  try {
-    real = realpathSync.native(existing);
-  } catch {}
-  const full = join(real, ...missing);
+  const full = join(realpathSync.native(existing), ...missing);
   // windows.md: Windows paths are case-insensitive and may differ in case between sources.
   return platform === "win32" ? full.toLowerCase() : full;
 }

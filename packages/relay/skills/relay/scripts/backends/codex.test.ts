@@ -17,7 +17,7 @@ import {
   codexBackend,
 } from "./codex";
 import type { InvokeOpts } from "../types";
-import { SPAWN_PROMPT, spawnStub } from "./spawn-stub";
+import { SPAWN_PROMPT, SPAWN_PROMPT_PIECES, spawnStub } from "./spawn-stub";
 
 describe("codexBackend", () => {
   describe("invokeLive", () => {
@@ -194,7 +194,7 @@ describe("codexBackend", () => {
           lastFile: "/tmp/last.txt",
         });
         for (const arg of result.argv) {
-          for (const bad of ["hi", "%", "&", '"', "\n"]) {
+          for (const bad of SPAWN_PROMPT_PIECES) {
             expect(arg).not.toContain(bad);
           }
         }

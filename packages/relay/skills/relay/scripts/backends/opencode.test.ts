@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { opencodeBackend, parseError, parseJsonl } from "./opencode";
 import type { InvokeOpts } from "../types";
-import { SPAWN_PROMPT, spawnStub } from "./spawn-stub";
+import { SPAWN_PROMPT, SPAWN_PROMPT_PIECES, spawnStub } from "./spawn-stub";
 
 describe("opencodeBackend", () => {
   describe("invokeLive", () => {
@@ -163,7 +163,7 @@ describe("opencodeBackend", () => {
         promptText: SPAWN_PROMPT,
       });
       for (const arg of result.argv) {
-        for (const bad of ["hi", "%", "&", '"', "\n"]) {
+        for (const bad of SPAWN_PROMPT_PIECES) {
           expect(arg).not.toContain(bad);
         }
       }

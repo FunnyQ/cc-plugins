@@ -3,6 +3,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 
 export const SPAWN_PROMPT = 'say "hi" 100% & stop\nsecond line';
+export const SPAWN_PROMPT_PIECES = ["hi", "%", "&", '"', "\n"];
 
 /**
  * Runs `argv` with its binary swapped for a stub that saves its stdin, and
@@ -12,7 +13,6 @@ export const SPAWN_PROMPT = 'say "hi" 100% & stop\nsecond line';
 export function spawnStub(
   argv: string[],
   stdin: string | undefined,
-  platform: NodeJS.Platform = process.platform,
 ): string {
   const dir = mkdtempSync(join(tmpdir(), "relay-stub-"));
   try {
@@ -23,7 +23,7 @@ export function spawnStub(
       `require("fs").writeFileSync(${JSON.stringify(out)}, await Bun.stdin.text());\n`,
     );
     let bin = [process.execPath, fake];
-    if (platform === "win32") {
+    if (process.platform === "win32") {
       const cmd = join(dir, "fake.cmd");
       writeFileSync(cmd, `@"${process.execPath}" "${fake}" %*\r\n`);
       bin = [cmd];

@@ -463,6 +463,8 @@ describe("withOpenCodeNote", () => {
 // first request is the throwaway title generator, so consume-once would lose
 // it), and session.idle retires the entry.
 describe("experimental.chat.system.transform", () => {
+  // No Windows cockpit build, and the shim is a POSIX sh script.
+  const cockpitTest = test.skipIf(process.platform === "win32");
   const root = dirname(import.meta.dir);
 
   async function createdAndTransform(
@@ -477,8 +479,7 @@ describe("experimental.chat.system.transform", () => {
     return output;
   }
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "injects the decision-log guidance into the system prompt",
     async () => {
       const { system } = await createdAndTransform();
@@ -489,8 +490,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "the created seed survives a fire-and-forget dispatch (S20)",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
@@ -510,8 +510,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "rides the title request AND the real request (S21)",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
@@ -533,8 +532,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "materializes the seed once and replays the cache (S21)",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
@@ -580,8 +578,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "stops pushing after PUSH_CAP requests (S21)",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
@@ -609,8 +606,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "session.idle retires the turn's entry and seeds the nudge (S21)",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
@@ -635,8 +631,7 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  // No Windows cockpit build, and the shim is a POSIX sh script.
-  test.skipIf(process.platform === "win32")(
+  cockpitTest(
     "runs the stop hook through the shim with the OpenCode payload",
     async () => {
       const hooks = await QLabPlugin({ directory: root });
