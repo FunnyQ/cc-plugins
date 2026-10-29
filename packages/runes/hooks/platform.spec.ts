@@ -78,7 +78,12 @@ for (const homeState of ["supplied", "absent", "empty"] as const) {
       const expectedHome =
         homeState === "absent" ? null : homeState === "empty" ? "" : home;
       expect(result.env.HOME).toBe(expectedHome);
-      expect(result.env.USERPROFILE).toBe(expectedHome);
+      // libuv copies a missing USERPROFILE from the parent into every Windows child.
+      expect(result.env.USERPROFILE).toBe(
+        process.platform === "win32" && homeState === "absent"
+          ? process.env.USERPROFILE
+          : expectedHome,
+      );
       for (const name of ["TMPDIR", "TEMP", "TMP"])
         expect(result.env[name]).toBe(tmp);
       for (const name of ["PATH", "Path"]) {
@@ -233,11 +238,12 @@ test("actual opener process receives hostile Windows paths only on structured st
     const script = join(root, "receiver.ts");
     const capture = join(root, "received.json");
     writeFileSync(script, 'await Bun.write(process.env.RUNES_CAPTURE!, JSON.stringify({argv: process.argv.slice(2), stdin: await Bun.stdin.text()}));');
-    const executable = process.platform === "win32" ? join(root, "powershell.exe.cmd") : join(root, "powershell.exe");
-    writeFileSync(executable, process.platform === "win32"
-      ? `@"${process.execPath}" "${script}" %*\r\n`
-      : `#!${process.execPath}\n${readFileSync(script, "utf8")}`);
-    if (process.platform !== "win32") {
+    const executable = join(root, "powershell.exe");
+    // Windows resolves a name that already ends in .exe to an .exe alone, so the fake must be a real executable.
+    if (process.platform === "win32") {
+      expect(Bun.spawnSync([process.execPath, "build", "--compile", script, "--outfile", executable]).exitCode).toBe(0);
+    } else {
+      writeFileSync(executable, `#!${process.execPath}\n${readFileSync(script, "utf8")}`);
       const { chmodSync } = await import("node:fs"); chmodSync(executable, 0o755);
     }
     const env = { ...process.env, RUNES_CAPTURE: capture };
@@ -247,14 +253,13 @@ test("actual opener process receives hostile Windows paths only on structured st
     const code = `import {openArtifact} from ${JSON.stringify(join(import.meta.dir, "platform-cli.ts"))}; await openArtifact(${JSON.stringify(path)}, ${JSON.stringify(win)});`;
     const child = Bun.spawn([process.execPath, "-e", code], { env, stdout: "pipe", stderr: "pipe" });
     const stderr = await new Response(child.stderr).text();
-    expect(await child.exited).toBe(0);
-    expect(stderr).toBe("");
+    expect({ code: await child.exited, stderr }).toEqual({ code: 0, stderr: "" });
     const received = JSON.parse(readFileSync(capture, "utf8"));
     expect(JSON.parse(received.stdin)).toEqual({ path });
     expect(received.argv).not.toContain(path);
     expect(received.argv.at(-1)).not.toContain(path);
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
+}, 60_000);
 
 test("actual trash child reports missing facility and retains the page", async () => {
   const root = mkdtempSync(join(import.meta.dir, ".platform-fixture-"));
