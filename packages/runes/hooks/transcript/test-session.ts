@@ -1,6 +1,16 @@
 import type { Hook, On } from "claude-code";
 import type { Engine } from "claude-code/testing";
 
+import { PARSE } from "../config";
+
+export type FixtureEnv = Record<string, string | undefined>;
+export type FixtureRuntimeInfo = {
+  platform: "darwin" | "linux" | "win32";
+  wsl: boolean;
+  home: string;
+  tmp: string;
+};
+
 export const HOME = "/home/q";
 export const CONFIG = `${HOME}/.config/q-lab/cc-plugins/runes/config.yaml`;
 
@@ -54,7 +64,7 @@ export const fakeHost = (
   }: {
     files?: Map<string, string>;
     run?: (e: Run[1]) => unknown;
-    env?: Record<string, string>;
+    env?: FixtureEnv;
     messages?: unknown[];
   } = {},
 ) => {
@@ -78,7 +88,11 @@ export const fakeHost = (
     "env.get",
     (_$, e) =>
       ({
-        value: env[e.name] ?? (e.name === "HOME" ? HOME : undefined),
+        value: Object.prototype.hasOwnProperty.call(env, e.name)
+          ? env[e.name]
+          : e.name === "HOME"
+            ? HOME
+            : undefined,
       }) as never,
   );
   on("fs.exists", (_$, e) => ({ value: files.has(e.path) }) as never);
@@ -91,9 +105,14 @@ export const fakeHost = (
     toasts.push(e.text);
     return { value: undefined } as never;
   });
-  on("process.run", (_$, e, next) => {
-    if (e.argv[0] !== "bun" || e.argv[1] !== "-e")
-      return (run ? run(e) : next(e)) as never;
+  on("process.run", (_$, e) => {
+    if (
+      e.argv.length !== PARSE.length ||
+      !PARSE.every((arg, i) => e.argv[i] === arg)
+    )
+      return (
+        run ? run(e) : ran("", 127, `Unhandled fixture command: ${e.argv[0]}`)
+      ) as never;
     const parsed = fakeYaml(e.init?.stdin ?? "");
     return {
       value: {
@@ -177,11 +196,11 @@ export const within = async (
   return card ? walk(card) : undefined;
 };
 
-export const ran = (stdout: string) => ({
+export const ran = (stdout: string, exitCode = 0, stderr = "") => ({
   value: {
-    exitCode: 0,
+    exitCode,
     stdout,
-    stderr: "",
+    stderr,
     isStdoutTruncated: false,
     isStderrTruncated: false,
   },

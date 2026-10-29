@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: runes/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -61,19 +61,19 @@ Keep all mod filesystem operations in the fixture's Map and pass plain fixture v
 
 ## Acceptance criteria
 
-- [ ] `hooks/platform.spec.ts` executes environment-isolation and JSON child-transport assertions through Bun without importing the Claude Code runtime or test kit.
-- [ ] Mod fixtures distinguish an omitted HOME property, explicit undefined and an empty string; tests cover USERPROFILE present and absent without using the real profile.
-- [ ] Native Windows, macOS, ordinary Linux and WSL runtime snapshots plus successful, nonzero and throwing process outcomes can be injected without executing a real opener.
-- [ ] YAML parsing still uses its existing fixture behavior, while non-YAML Bun probes reach the injected process callback and keep the test kit's expected response envelopes.
-- [ ] The complete existing mod suite remains passing without deleted tests, blanket platform skips, fabricated production stubs or changes to root `bunfig.toml` and `tsconfig.json` exclusions.
-- [ ] Temporary child fixtures isolate HOME/USERPROFILE and TMPDIR/TEMP/TMP together, preserve the remaining environment and clean only their owned paths.
+- [x] `hooks/platform.spec.ts` executes environment-isolation and JSON child-transport assertions through Bun without importing the Claude Code runtime or test kit.
+- [x] Mod fixtures distinguish an omitted HOME property, explicit undefined and an empty string; tests cover USERPROFILE present and absent without using the real profile.
+- [x] Native Windows, macOS, ordinary Linux and WSL runtime snapshots plus successful, nonzero and throwing process outcomes can be injected without executing a real opener.
+- [x] YAML parsing still uses its existing fixture behavior, while non-YAML Bun probes reach the injected process callback and keep the test kit's expected response envelopes.
+- [x] The complete existing mod suite remains passing without deleted tests, blanket platform skips, fabricated production stubs or changes to root `bunfig.toml` and `tsconfig.json` exclusions.
+- [x] Temporary child fixtures isolate HOME/USERPROFILE and TMPDIR/TEMP/TMP together, preserve the remaining environment and clean only their owned paths.
 
 ## Verification
 
-- [ ] Run `claude plugin test packages/runes`; require zero failures and preserve the existing 428-test baseline while allowing added fixture tests.
-- [ ] Run `claude plugin validate packages/runes`; require a successful exit.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)`; require both explicitly selected contract files to execute successfully.
-- [ ] Inspect the new contract's import graph and confirm it contains no `claude-code` or `claude-code/testing` dependency; confirm root `bunfig.toml` and `tsconfig.json` are unchanged by this task.
+- [x] Run `claude plugin test packages/runes`; require zero failures and preserve the existing 428-test baseline while allowing added fixture tests.
+- [x] Run `claude plugin validate packages/runes`; require a successful exit.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)`; require both explicitly selected contract files to execute successfully.
+- [x] Inspect the new contract's import graph and confirm it contains no `claude-code` or `claude-code/testing` dependency; confirm root `bunfig.toml` and `tsconfig.json` are unchanged by this task.
 
 ## Eval rubric
 
