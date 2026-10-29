@@ -7,8 +7,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { SHARD_BLOCKS, WAVE_SHARDS, scan, writeDeck } from "./scan.ts";
+import { basename, join } from "node:path";
+import {
+  SHARD_BLOCKS,
+  WAVE_SHARDS,
+  scan,
+  scanRoot,
+  writeDeck,
+} from "./scan.ts";
 
 let repo: string;
 
@@ -97,7 +103,7 @@ describe("scan with paths", () => {
     expect(out).toHaveLength(2);
     for (const line of out)
       expect(line).toMatch(
-        /^report (\S+)\/report-(\d)\.txt verdicts \1\/verdicts-\2\.txt$/,
+        /^report (\S+)[\\/]report-(\d)\.txt verdicts \1[\\/]verdicts-\2\.txt$/,
       );
   });
 
@@ -125,6 +131,20 @@ describe("scan with paths", () => {
     }
     expect(waves).toEqual([WAVE_SHARDS, 1]);
     expect(lines).toContain("wave 1 of 2");
+  });
+});
+
+describe("scanRoot", () => {
+  test("off win32 it stays the literal /tmp root", () => {
+    expect(scanRoot("darwin")).toBe("/tmp/q-lab/guard/comments-reaper");
+    expect(scanRoot("linux")).toBe("/tmp/q-lab/guard/comments-reaper");
+  });
+
+  // windows.md: `\tmp\x` is drive-relative, so win32 roots under tmpdir().
+  test("on win32 it lies under the user's temp dir", () => {
+    expect(scanRoot("win32")).toBe(
+      join(tmpdir(), "q-lab", "guard", "comments-reaper"),
+    );
   });
 });
 
@@ -160,7 +180,9 @@ describe("writeDeck", () => {
       .stdout.toString()
       .trim()
       .split("\n");
-    expect(lines[1]).toMatch(/^shards 1 in \/\S+\/scan-\w+$/);
+    const scanDir = lines[1].replace(/^shards 1 in /, "");
+    expect(scanDir).toStartWith(scanRoot());
+    expect(basename(scanDir)).toMatch(/^scan-\w+$/);
     expect(lines[2]).toStartWith(
       `deck ${join(home, "q-lab", "flightdeck", "comments-reaper-scan-")}`,
     );

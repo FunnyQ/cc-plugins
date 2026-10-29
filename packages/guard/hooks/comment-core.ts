@@ -200,7 +200,8 @@ export const BY_NAME: Record<string, Syntax> = {
 
 export function isGuardedPath(filePath: string): boolean {
   if (/\.min\.(js|css)$/.test(filePath)) return false;
-  if (filePath.split("/").some((part) => SKIP_SEGMENTS.has(part))) return false;
+  if (filePath.split(/[\\/]/).some((part) => SKIP_SEGMENTS.has(part)))
+    return false;
   return !SKIP_EXTS.has(extName(filePath));
 }
 

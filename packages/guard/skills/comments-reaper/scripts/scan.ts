@@ -15,7 +15,7 @@
  */
 
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import {
   flaggedBlocks,
@@ -27,6 +27,11 @@ import {
 import { parseHunks } from "../../../hooks/comment-sweep.ts";
 
 // Measured: one reviewer handed 357 blocks judged them from the comment text alone, reading no code.
+export const scanRoot = (platform: string = process.platform): string =>
+  platform === "win32"
+    ? join(tmpdir(), "q-lab", "guard", "comments-reaper")
+    : "/tmp/q-lab/guard/comments-reaper";
+
 export const SHARD_BLOCKS = 60;
 export const WAVE_SHARDS = 8;
 
@@ -191,7 +196,7 @@ if (import.meta.main) {
     console.log(`${LABEL}: no comments in ${scope}`);
     process.exit(0);
   }
-  const base = "/tmp/q-lab/guard/comments-reaper";
+  const base = scanRoot();
   mkdirSync(base, { recursive: true });
   const dir = mkdtempSync(join(base, "scan-"));
   console.log(

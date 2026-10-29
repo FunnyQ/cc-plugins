@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdtempSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ASK } from "./comment-core.ts";
@@ -116,6 +116,19 @@ describe("sweep", () => {
     await snapshot(payload);
     await Bun.write(join(repo, "app.ts"), BLOCK);
     recordReported(SESSION, join(repo, "app.ts"), [
+      "// one",
+      "// two",
+      "// three",
+    ]);
+    expect(await sweep(payload)).toBeNull();
+  });
+
+  test("a block reported under a symlinked spelling of the repo is not asked again", async () => {
+    const link = join(mkdtempSync(join(tmpdir(), "sweep-link-")), "repo");
+    symlinkSync(repo, link);
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    recordReported(SESSION, join(link, "app.ts"), [
       "// one",
       "// two",
       "// three",

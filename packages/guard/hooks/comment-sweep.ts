@@ -23,6 +23,7 @@ import { triage } from "./jev-triage.ts";
 import {
   clearBaseline,
   clearReported,
+  ledgerKey,
   readBaseline,
   readReported,
   writeBaseline,
@@ -219,7 +220,7 @@ export async function collect(
     }
     const lines = text.split("\n").map((l) => l.trim());
     const added = without(
-      without(resolveAdded(hunks, lines), lines, reported.get(abs)),
+      without(resolveAdded(hunks, lines), lines, reported.get(ledgerKey(abs))),
       lines,
       moved,
     );
