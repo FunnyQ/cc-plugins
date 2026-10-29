@@ -66,6 +66,7 @@ import {
   recordInstance,
   liveInstances,
   shutdown,
+  isAlive,
 } from "./instances";
 
 describe("owned lifecycle", () => {
@@ -383,7 +384,7 @@ test("a real exited launch wrapper cannot authorize deletion of its live descend
     expect(existsSync(owned.profile)).toBe(true);
     expect(liveInstances(root).map((item) => item.id)).toEqual([owned.id]);
   } finally {
-    if (childPid) process.kill(childPid, "SIGTERM");
+    if (childPid && isAlive(childPid)) process.kill(childPid, "SIGTERM");
     if (wrapper && wrapper.exitCode === null) {
       wrapper.kill();
       await wrapper.exited;

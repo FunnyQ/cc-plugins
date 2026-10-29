@@ -70,11 +70,11 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
         "--new",
         `http://127.0.0.1:${server.port}/`,
       );
-      expect(opened.code).toBe(0);
+      expect(opened).toMatchObject({ code: 0 });
       const id = opened.out.split(" ")[0]!;
 
       try {
-        expect((await runAsync("click", "--id", id, "#go")).code).toBe(0);
+        expect(await runAsync("click", "--id", id, "#go")).toMatchObject({ code: 0 });
         expect(
           (
             await runAsync(
@@ -97,7 +97,7 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
     const page =
       "data:text/html,<title>T</title><form onsubmit=\"document.title='sent:'+q.value;return false\"><input id=q></form>";
     const opened = run("open", "--new", page);
-    expect(opened.code).toBe(0);
+    expect(opened).toMatchObject({ code: 0 });
     const id = opened.out.split(" ")[0]!;
 
     try {

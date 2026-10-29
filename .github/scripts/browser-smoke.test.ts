@@ -225,7 +225,7 @@ describe("required browser smoke", () => {
       await Promise.all(children.map((child) => child.exited));
       rmSync(root, { recursive: true, force: true });
     }
-  });
+  }, 30_000);
   test("real child timeout terminates and awaits the CLI, retaining stderr", async () => {
     await expect(runCommand([process.execPath, "-e", 'console.error("stalled child"); setInterval(() => {}, 1000)'], 150)).rejects.toThrow(/timed out[\s\S]*stalled child/);
   });

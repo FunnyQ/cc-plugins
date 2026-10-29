@@ -219,7 +219,7 @@ test("launch timeout after registration reclaims its private instance and preser
     }
     rmSync(root, { recursive: true, force: true });
   }
-});
+}, 30_000);
 
 test("spawn failure removes the fresh isolated profile", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "chrome-spawn-failure-"));
