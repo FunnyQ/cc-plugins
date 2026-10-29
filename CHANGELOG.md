@@ -1,5 +1,50 @@
 # Changelog
 
+## [dispatch 5.8.4] - 2026-10-30
+
+_tracks tag `dispatch-v5.8.4`_
+
+### Fixed
+- A task rescored within the same attempt now shows the later score instead of the earlier incomplete 0-point FAIL.
+
+## [browsers 0.1.4] - 2026-10-30
+
+_tracks tag `browsers-v0.1.4`_
+
+### Added
+- The chrome, firefox and safari skills now run natively across platforms, with a shared platform module for browser discovery and clear refusals where a browser is unsupported.
+
+### Fixed
+- Snap-packaged Firefox and Chromium on Linux, including the Ubuntu wrapper scripts that exec into Snap, are detected and reported as unsupported instead of waiting for a launch timeout.
+- On Windows, Chrome's locked port file no longer orphans the browser, and clicks that navigate are no longer missed under load.
+- The Windows process ownership check now allows 10 seconds, so a slow PowerShell start no longer leaves an owned browser running.
+- Browser lifecycle tests are more reliable on Windows, with longer timeouts and safer cleanup.
+
+## [herdr 0.7.15] - 2026-10-30
+
+_tracks tag `herdr-v0.7.15`_
+
+### Added
+- herdr-browser, terminal-browser, ask and the project registry are now host-aware, so they work across platforms.
+
+## [monitor 8.4.1] - 2026-10-30
+
+_tracks tag `monitor-v8.4.1`_
+
+### Fixed
+- First-time setup no longer fails with ENOENT on a machine without a ~/.claude directory.
+
+## [runes 0.13.2] - 2026-10-30
+
+_tracks tag `runes-v0.13.2`_
+
+### Added
+- Runes now handle opening files, glow, Quick Look, explain and lessons through a platform layer that works across operating systems.
+- The explain checker finds Chrome per platform and builds correct file URLs for Windows paths.
+
+### Fixed
+- On Linux, the Chrome probe now skips Snap builds and Snap wrapper scripts that could be picked but never start.
+
 ## [chronicle 0.22.7] - 2026-10-29
 
 _tracks tag `chronicle-v0.22.7`_
