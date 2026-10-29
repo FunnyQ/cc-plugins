@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.13.3] - 2026-10-30
+
+_tracks tag `runes-v0.13.3`_
+
+### Fixed
+- With Clawd turned off, the explain buttons now sit flush at the right edge of the minimap row instead of standing off the edge by Clawd's width.
+
 ## [dispatch 5.8.4] - 2026-10-30
 
 _tracks tag `dispatch-v5.8.4`_
