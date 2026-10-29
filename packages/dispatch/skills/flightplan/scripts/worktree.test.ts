@@ -527,6 +527,16 @@ describe("worktree lifecycle", () => {
     expect(registered(options.repo)).not.toContain(samePathKey(path));
   });
 
+  test("remove deletes the whole worktree directory, plan link included, and keeps the main-tree plan", () => {
+    const options = fixture();
+    const { path } = create(options);
+    expect(remove(options)).toEqual({ removed: true });
+    expect(existsSync(path)).toBe(false);
+    expect(
+      readFileSync(join(options.repo, "docs/test-plan/PLAN.md"), "utf8"),
+    ).toBe("plan\n");
+  });
+
   test("sweep keep-all leaves state and registrations untouched; keep scopes removals to this slug", () => {
     const options = fixture();
     const first = create(options);

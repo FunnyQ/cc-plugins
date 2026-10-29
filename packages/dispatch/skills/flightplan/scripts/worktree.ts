@@ -13,6 +13,7 @@ import {
   rmdirSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -393,8 +394,13 @@ function registeredPaths(repo: string): Map<string, string> {
 function removePath(
   repo: string,
   path: string,
+  plan: string,
   registered: Map<string, string>,
 ): boolean {
+  // Git for Windows' worktree remove keeps a junction, and its parents, yet exits 0.
+  const link = join(path, plan);
+  if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+    (linkType() ? rmdirSync : unlinkSync)(link);
   const registeredAs = registered.get(samePathKey(path));
   if (registeredAs !== undefined) {
     git(repo, ["worktree", "remove", "--force", registeredAs]);
@@ -417,7 +423,7 @@ export function create(options: RefOptions): Location {
     existsSync(path) ||
     registered.has(samePathKey(path))
   ) {
-    removePath(options.repo, path, registered);
+    removePath(options.repo, path, planOf(options), registered);
     git(options.repo, ["worktree", "prune"]);
     delete state[options.ref];
     writeState(root, state);
@@ -574,7 +580,12 @@ export function remove(options: RefOptions): { removed: boolean } {
   const path = pathOf(options);
   const root = rootOf(options);
   const state = readState(root);
-  const removed = removePath(options.repo, path, registeredPaths(options.repo));
+  const removed = removePath(
+    options.repo,
+    path,
+    planOf(options),
+    registeredPaths(options.repo),
+  );
   git(options.repo, ["worktree", "prune"]);
   const hadState = Object.hasOwn(state, options.ref);
   if (hadState) {
@@ -621,7 +632,12 @@ export function sweep(
       if (isDirectory(path)) kept.push({ ref, path });
       continue;
     }
-    const didRemove = removePath(options.repo, path, registered);
+    const didRemove = removePath(
+      options.repo,
+      path,
+      planOf(options),
+      registered,
+    );
     if (didRemove || Object.hasOwn(state, ref)) removed.push(ref);
     delete state[ref];
   }
