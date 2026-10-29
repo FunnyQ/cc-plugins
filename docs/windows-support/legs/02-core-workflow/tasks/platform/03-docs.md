@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -64,19 +64,19 @@ Do not claim anything a real Windows PC run would be needed to prove (the agent-
 
 ## Acceptance criteria
 
-- [ ] `grep -n 'join(tmpdir(), "q-lab"' CLAUDE.md` prints one line, inside the `## Code Conventions` scratch bullet.
-- [ ] `grep -n "drive-relative" CLAUDE.md` prints a line in that same bullet.
-- [ ] The README `## Windows` section names chronicle, dispatch, guard and relay as working, and monitor, herdr, browsers and runes as not yet supported: `awk '/^## Windows/,/^## usage-dashboard/' README.md | grep -c -E "chronicle|dispatch|guard|relay|monitor|herdr|browsers|runes"` prints a number ≥ 1, and each of the eight names appears in that range (check each with `grep -q`).
-- [ ] The README `## Windows` section mentions `wslview`, `bash` for the OpenCode lint hook, and the `q-lab` scratch location on Windows.
-- [ ] The README `## Windows` section still links `docs/windows-support/WAYPOINTS.md` and still lists both supported runtimes.
-- [ ] No claim in either file says a flow is verified on a real Windows machine.
+- [x] `grep -n 'join(tmpdir(), "q-lab"' CLAUDE.md` prints one line, inside the `## Code Conventions` scratch bullet.
+- [x] `grep -n "drive-relative" CLAUDE.md` prints a line in that same bullet.
+- [x] The README `## Windows` section names chronicle, dispatch, guard and relay as working, and monitor, herdr, browsers and runes as not yet supported: `awk '/^## Windows/,/^## usage-dashboard/' README.md | grep -c -E "chronicle|dispatch|guard|relay|monitor|herdr|browsers|runes"` prints a number ≥ 1, and each of the eight names appears in that range (check each with `grep -q`).
+- [x] The README `## Windows` section mentions `wslview`, `bash` for the OpenCode lint hook, and the `q-lab` scratch location on Windows.
+- [x] The README `## Windows` section still links `docs/windows-support/WAYPOINTS.md` and still lists both supported runtimes.
+- [x] No claim in either file says a flow is verified on a real Windows machine.
 
 ## Verification
 
-- [ ] `grep -n 'join(tmpdir(), "q-lab"' CLAUDE.md` hits the scratch bullet.
-- [ ] `for p in chronicle dispatch guard relay monitor herdr browsers runes wslview WAYPOINTS.md; do awk '/^## Windows/,/^## usage-dashboard/' README.md | grep -q "$p" || echo "missing $p"; done` prints nothing.
-- [ ] `git diff --name-only -- CLAUDE.md README.md` lists both `CLAUDE.md` and `README.md`.
-- [ ] `git diff --stat -- CLAUDE.md README.md` shows only small edits (the scratch bullet and the `## Windows` section), not a whole-file reformat.
+- [x] `grep -n 'join(tmpdir(), "q-lab"' CLAUDE.md` hits the scratch bullet.
+- [x] `for p in chronicle dispatch guard relay monitor herdr browsers runes wslview WAYPOINTS.md; do awk '/^## Windows/,/^## usage-dashboard/' README.md | grep -q "$p" || echo "missing $p"; done` prints nothing.
+- [x] `git diff --name-only -- CLAUDE.md README.md` lists both `CLAUDE.md` and `README.md`.
+- [x] `git diff --stat -- CLAUDE.md README.md` shows only small edits (the scratch bullet and the `## Windows` section), not a whole-file reformat.
 
 ## Eval rubric
 

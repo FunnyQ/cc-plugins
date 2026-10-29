@@ -137,7 +137,11 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 
 ## Windows
 
-Windows support is a work in progress. Plugins load without hook errors. monitor skips its cockpit hooks on native Windows, so the cockpit and the usage dashboard do not work there yet. Other features are not yet verified on Windows. The roadmap is [docs/windows-support/WAYPOINTS.md](./docs/windows-support/WAYPOINTS.md).
+Windows support is a work in progress. Plugins load without hook errors. The roadmap is [docs/windows-support/WAYPOINTS.md](./docs/windows-support/WAYPOINTS.md).
+
+**Works on native Windows:** chronicle, dispatch, guard and relay. Their test suites, and the OpenCode layer's (`opencode/`), pass in CI's blocking `required` job on windows-latest. A `smoke` CI job runs commit, release (local mode), flightplan scaffold and lint, worktree create and land, and the comment sweep on Linux, macOS and Windows. The agent-driven flows (such as `/chronicle:commit`, `/autopilot` and the guard reviewer) are not yet verified on a real Windows machine.
+
+**Not yet supported:** monitor (the cockpit and the usage dashboard), herdr, browsers and runes. They are later roadmap legs. monitor skips its cockpit hooks on native Windows.
 
 **Supported runtimes:**
 
@@ -150,8 +154,13 @@ Claude Code inside WSL is expected to behave like Linux, but is not yet verified
 
 - Put `bun` on `PATH`. monitor, guard and runes call it.
 - Install Git for Windows (recommended). Without it, Claude Code runs hooks through PowerShell, which these plugins also tolerate.
+- If you use OpenCode, put Git for Windows' `bash` on `PATH`. The OpenCode flightplan lint hook spawns `flightplan-lint.sh` through `bash`.
 
-Codex and OpenCode on Windows are not supported.
+Scratch files go under `%TEMP%\q-lab\<plugin>\` on native Windows (the `join(tmpdir(), "q-lab", …)` root), not under `/tmp/q-lab`.
+
+Inside WSL, URL openers use `wslview` when it is installed, and fall back to `cmd.exe /c start "" <url>`.
+
+The OpenCode layer's tests pass on Windows in CI, and relay's opencode backend no longer passes prompts in argv. The OpenCode layer's flightplan lint and comment guard hooks run on Windows. Its cockpit hooks do not, because no Windows cockpit binary ships. Codex and OpenCode on Windows are otherwise not verified on a real Windows machine.
 
 ## usage-dashboard
 
