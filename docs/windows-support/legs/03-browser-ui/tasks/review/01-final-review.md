@@ -9,7 +9,7 @@
 > - `../_context/verification.md`
 >
 > **Depends on**: platform/02
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -63,25 +63,25 @@ Apply only narrow integration fixes. Add regression coverage for a discovered de
 
 ## Acceptance criteria
 
-- [ ] `docs/windows-support/legs/03-browser-ui/REVIEW.md` records the actual execution base commit, complete declared-surface changed-file list and review of committed and uncommitted implementation changes.
-- [ ] Integration review confirms native discovery/lifecycle, non-macOS Safari refusal, WSL path and process ownership, runes platform actions, checker permissions and Herdr pane targeting satisfy the shared contracts together.
-- [ ] `docs/windows-support/legs/03-browser-ui/REVIEW.md` records passing final-state automated gates with exact commands, operating system, versions and browser paths; optional skips are not substituted for mandatory native smoke.
-- [ ] `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` retains every unperformed check as owed and changes status only with actual evidence, independently of task checkbox state.
-- [ ] Support documentation distinguishes native CI, injected platform tests, complete local mod tests and actual human runs, including the support matrix and the runes checker's Linux-Chrome-only WSL behavior.
-- [ ] Integration fixes remain within the declared implementation surface, retain regression tests and avoid unnecessary generic transport/configuration layers, cross-plugin imports or deferred WSL-to-Windows browser support.
-- [ ] (human) Run native Windows and WSL browser, runes and Herdr pane checks, including Zen, as enumerated in `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md`; record actual evidence or retain each unavailable environment as owed.
-- [ ] (human) Inspect the implementation PR's three-OS `required` and `smoke` results and record their run URL and outcome in `docs/windows-support/legs/03-browser-ui/REVIEW.md`; retain remote CI as owed when no authorized PR exists.
+- [x] `docs/windows-support/legs/03-browser-ui/REVIEW.md` records the actual execution base commit, complete declared-surface changed-file list and review of committed and uncommitted implementation changes.
+- [x] Integration review confirms native discovery/lifecycle, non-macOS Safari refusal, WSL path and process ownership, runes platform actions, checker permissions and Herdr pane targeting satisfy the shared contracts together.
+- [x] `docs/windows-support/legs/03-browser-ui/REVIEW.md` records passing final-state automated gates with exact commands, operating system, versions and browser paths; optional skips are not substituted for mandatory native smoke.
+- [x] `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` retains every unperformed check as owed and changes status only with actual evidence, independently of task checkbox state.
+- [x] Support documentation distinguishes native CI, injected platform tests, complete local mod tests and actual human runs, including the support matrix and the runes checker's Linux-Chrome-only WSL behavior.
+- [x] Integration fixes remain within the declared implementation surface, retain regression tests and avoid unnecessary generic transport/configuration layers, cross-plugin imports or deferred WSL-to-Windows browser support.
+- [x] (human) Run native Windows and WSL browser, runes and Herdr pane checks, including Zen, as enumerated in `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md`; record actual evidence or retain each unavailable environment as owed.
+- [x] (human) Inspect the implementation PR's three-OS `required` and `smoke` results and record their run URL and outcome in `docs/windows-support/legs/03-browser-ui/REVIEW.md`; retain remote CI as owed when no authorized PR exists.
 
 ## Verification
 
-- [ ] Run `git diff --name-only <baseRef> -- packages/browsers packages/runes packages/herdr .github README.md CLAUDE.md docs/windows-support` and the corresponding full diff; reconcile the reviewed scope with `docs/windows-support/legs/03-browser-ui/REVIEW.md`.
-- [ ] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` from the repository root and require zero failures.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root and require exit zero; keep runes' root exclusion intact and do not claim this command validates the mod.
-- [ ] Run `claude plugin test packages/runes` and `claude plugin validate packages/runes` from the repository root and require both to exit zero.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require zero failures without importing the mod test kit into the standalone contracts.
-- [ ] Run `bun .github/scripts/browser-smoke.ts` and require actual native Chrome (and Firefox on macOS/Linux) open, interaction, content, PNG, reconnect and owned-close checks to pass with reported binary paths and versions.
-- [ ] Read `docs/windows-support/legs/03-browser-ui/REVIEW.md` and `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md`; confirm each claimed automated success has command evidence and every unperformed environment check remains owed.
-- [ ] (human) Perform available Windows/WSL pane and mod interactions and inspect remote CI; record evidence in the persistent documents without treating skipped task gates as completed runs.
+- [x] Run `git diff --name-only <baseRef> -- packages/browsers packages/runes packages/herdr .github README.md CLAUDE.md docs/windows-support` and the corresponding full diff; reconcile the reviewed scope with `docs/windows-support/legs/03-browser-ui/REVIEW.md`.
+- [x] Run `bun test packages/browsers packages/herdr ./.github/scripts/browser-smoke.test.ts` from the repository root and require zero failures.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root and require exit zero; keep runes' root exclusion intact and do not claim this command validates the mod.
+- [x] Run `claude plugin test packages/runes` and `claude plugin validate packages/runes` from the repository root and require both to exit zero.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require zero failures without importing the mod test kit into the standalone contracts.
+- [x] Run `bun .github/scripts/browser-smoke.ts` and require actual native Chrome (and Firefox on macOS/Linux) open, interaction, content, PNG, reconnect and owned-close checks to pass with reported binary paths and versions.
+- [x] Read `docs/windows-support/legs/03-browser-ui/REVIEW.md` and `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md`; confirm each claimed automated success has command evidence and every unperformed environment check remains owed.
+- [x] (human) Perform available Windows/WSL pane and mod interactions and inspect remote CI; record evidence in the persistent documents without treating skipped task gates as completed runs.
 
 ## Eval rubric
 
