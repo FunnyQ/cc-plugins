@@ -28,4 +28,4 @@ const dir = join(scratchRoot(info), "images");
 await mkdir(dir, { recursive: true });
 const out = join(dir, `${sessionId}-${Bun.hash(text)}-${n}.${ext}`);
 await Bun.write(out, Buffer.from(image.data, "base64"));
-await quicklook(out);
+await quicklook(out, info);

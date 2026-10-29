@@ -23,6 +23,8 @@ export const childEnv = (info: RuntimeInfo): Record<string, string> =>
   info.platform === "win32"
     ? { HOME: info.home, USERPROFILE: info.home }
     : { HOME: info.home };
+export const modEnv = (home: string): Record<string, string> =>
+  runtime.info ? childEnv(runtime.info) : { HOME: home, USERPROFILE: home };
 
 export const resolveRuntime = (
   platform: string,

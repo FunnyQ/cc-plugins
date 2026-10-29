@@ -352,6 +352,10 @@ test("Chrome discovery uses the platform order and environment roots", () => {
   }
   expect(discoverChrome("linux", env, () => true, () => null)).toBeNull();
   expect(discoverChrome("linux", env, () => true, () => "/mnt/c/chrome.exe")).toBeNull();
+  const windowsLink = (name: string) => name === "google-chrome" ? "/usr/local/bin/google-chrome" : name === "chromium" ? "/usr/bin/chromium" : null;
+  const realChrome = (path: string) => path === "/usr/local/bin/google-chrome" ? "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" : path;
+  expect(discoverChrome("linux", env, () => true, windowsLink, realChrome)).toBe("/usr/bin/chromium");
+  expect(discoverChrome("linux", env, () => true, name => windowsLink(name) === "/usr/local/bin/google-chrome" ? "/usr/local/bin/google-chrome" : null, realChrome)).toBeNull();
 });
 
 import { parseScreenshotArgs, takeScreenshot } from "./explain/checker-cli";

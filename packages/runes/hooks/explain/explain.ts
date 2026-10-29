@@ -2,7 +2,7 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 import type { ExplainEntry, ExplainView } from "../../types";
 import { where } from "../transcript/where";
-import { childEnv, platformCommand, runtime, type PlatformOperation } from "../platform";
+import { childEnv, modEnv, platformCommand, runtime, type PlatformOperation } from "../platform";
 import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
 import { config } from "../config";
@@ -104,7 +104,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
         const git = await $.process
           .run(["git", "rev-parse", "--show-toplevel"], {
             cwd: where.cwd || undefined,
-            env: runtime.info ? childEnv(runtime.info) : { HOME: home },
+            env: modEnv(home),
           })
           .catch(() => undefined);
         const project =

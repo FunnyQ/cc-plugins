@@ -1,7 +1,7 @@
 import type { Hook, Register } from "claude-code";
 
 import { band } from "./band";
-import { childEnv, platformCommand, runtime, type RuntimeInfo } from "./platform";
+import { modEnv, platformCommand, runtime, type RuntimeInfo } from "./platform";
 import { mascot } from "./clawd/mascot";
 import { registerChecker } from "./explain/checker";
 import { explainHooks } from "./explain/explain";
@@ -60,9 +60,7 @@ const loadConfig = async ($: $): Promise<Loaded> => {
     const r = await $.process
       .run(PARSE, {
         stdin: text,
-        env: runtime.info
-          ? childEnv(runtime.info)
-          : { HOME: home, USERPROFILE: home },
+        env: modEnv(home),
       })
       .catch((err: unknown) => {
         throw new Error(`bun did not start (${String(err)})`);
@@ -142,13 +140,6 @@ export const register: Register = (on) => {
       if (result.exitCode !== 0)
         throw new Error(result.stderr.trim() || `bun exited ${result.exitCode}`);
       const info = JSON.parse(result.stdout) as RuntimeInfo;
-      if (
-        !info || !["darwin", "linux", "win32"].includes(info.platform) ||
-        typeof info.wsl !== "boolean" || typeof info.home !== "string" || !info.home ||
-        typeof info.tmp !== "string" || !info.tmp ||
-        (info.chrome !== null && typeof info.chrome !== "string")
-      )
-        throw new Error("invalid runtime snapshot");
       runtime.info = info;
       where.home = info.home;
     } catch (error) {
@@ -216,7 +207,7 @@ export const register: Register = (on) => {
                   model: MODEL,
                   effort: EFFORT,
                 }),
-                env: runtime.info ? childEnv(runtime.info) : { HOME: home, USERPROFILE: home },
+                env: modEnv(home),
               },
             ),
           )

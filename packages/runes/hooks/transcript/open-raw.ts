@@ -7,8 +7,9 @@ import { runtimeInfo } from "../platform-cli";
 import { scratchRoot } from "../platform";
 
 const [requestId = "reply"] = process.argv.slice(2);
-const dir = join(scratchRoot(runtimeInfo()), "raw");
+const info = runtimeInfo();
+const dir = join(scratchRoot(info), "raw");
 await mkdir(dir, { recursive: true });
 const out = join(dir, `${requestId.replace(/[^\w-]/g, "_")}.md`);
 await Bun.write(out, await Bun.stdin.text());
-await quicklook(out);
+await quicklook(out, info);

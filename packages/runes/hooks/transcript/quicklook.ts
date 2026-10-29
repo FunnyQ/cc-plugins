@@ -1,9 +1,9 @@
 /// <reference types="bun" />
 // Shared by the bun scripts a press runs: never imported by the mod, which has no Bun.
-import { openArtifact, runtimeInfo } from "../platform-cli";
+import { openArtifact } from "../platform-cli";
+import type { RuntimeInfo } from "../platform";
 
-export const quicklook = async (path: string) => {
-  const info = runtimeInfo();
+export const quicklook = async (path: string, info: RuntimeInfo) => {
   if (info.platform !== "darwin") return openArtifact(path, info);
   // qlmanage stays up until its panel closes, so it is left running detached; no pipes, or the mod's run would wait on it
   const look = Bun.spawn(["qlmanage", "-p", path], {

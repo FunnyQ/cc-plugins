@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { mkdir, unlink } from "node:fs/promises";
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, realpathSync, statSync } from "node:fs";
 import { win32 } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,9 @@ export const discoverChrome = (
     try { return statSync(path).isFile(); } catch { return false; }
   },
   which: (name: string) => string | null = name => Bun.which(name, { PATH: env.PATH ?? env.Path ?? "" }),
+  target: (path: string) => string = path => {
+    try { return realpathSync(path); } catch { return path; }
+  },
 ): string | null => {
   if (platform === "darwin") {
     const path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -29,7 +32,7 @@ export const discoverChrome = (
   if (platform === "linux") {
     for (const name of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]) {
       const path = which(name);
-      if (path && !/\.exe$/i.test(path)) return path;
+      if (path && !/\.exe$/i.test(path) && !/\.exe$/i.test(target(path))) return path;
     }
   }
   return null;
@@ -40,7 +43,7 @@ export const runtimeInfo = (): RuntimeInfo => {
   if (process.platform === "linux") {
     try { version = readFileSync("/proc/version", "utf8"); } catch {}
   }
-  return { ...resolveRuntime(process.platform, process.env, tmpdir(), version), chrome: discoverChrome() };
+  return resolveRuntime(process.platform, process.env, tmpdir(), version);
 };
 
 type Result = { exitCode: number; stdout: string; stderr: string };
@@ -125,7 +128,7 @@ export const executeOperation = async (
   run: RunPlatformCommand = runCommand,
 ): Promise<RuntimeInfo | undefined> => {
   switch (operation.op) {
-    case "info": return info ?? runtimeInfo();
+    case "info": return info ?? { ...runtimeInfo(), chrome: discoverChrome() };
     case "mkdir": await mkdir(operation.directory, { recursive: true }); return;
     case "open": await openArtifact(operation.path, info ?? runtimeInfo(), run); return;
     case "trash": {
