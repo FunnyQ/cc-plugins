@@ -41,8 +41,6 @@ const LOAD_TIMEOUT_MS = 15_000;
 // Measured on a local link: a 10ms window missed 1 in 5 navigations, 30ms missed none.
 const NAVIGATION_GRACE_MS = 50;
 
-export const BINARIES = browserCandidates("chrome", nativePlatformInput());
-
 const VALUE_FLAGS = new Set(["--id", "--size", "--output"]);
 
 export function parseArgs(argv: string[]): Invocation {
@@ -94,9 +92,7 @@ export async function launch(
   const input = options.input ?? nativePlatformInput();
   const stateDir =
     options.stateDir ?? browserStateDir("chrome", input.platform, input.env);
-  const resolve =
-    options.resolve ??
-    ((name, candidates, platform) => resolveBinary(name, candidates, platform));
+  const resolve = options.resolve ?? resolveBinary;
   const spawn =
     options.spawn ??
     ((argv) =>

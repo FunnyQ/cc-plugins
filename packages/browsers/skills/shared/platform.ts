@@ -50,7 +50,6 @@ const LINUX: Record<BrowserName, string[]> = {
     "/usr/bin/google-chrome-stable",
     "/usr/bin/chromium",
     "/usr/bin/chromium-browser",
-    "/snap/bin/chromium",
   ],
   firefox: [
     "firefox",
@@ -58,7 +57,6 @@ const LINUX: Record<BrowserName, string[]> = {
     "/usr/bin/firefox",
     "/usr/bin/firefox-esr",
     "/opt/firefox/firefox",
-    "/snap/bin/firefox",
   ],
   zen: [
     "zen",
@@ -118,8 +116,6 @@ export function browserStateDir(
   const systemTemp =
     windowsEnv(env, "TEMP") ||
     windowsEnv(env, "TMP") ||
-    (process.platform === "win32"
-      ? tmpdir()
-      : win32.join(windowsEnv(env, "SystemRoot") || "C:\\Windows", "Temp"));
+    tmpdir();
   return win32.join(systemTemp, "q-lab", "browsers", browser);
 }

@@ -51,7 +51,8 @@ On Linux, search `PATH` in order for `chrome`, `google-chrome`,
 `google-chrome-stable`, `chromium`, `chromium-browser`, then the fixed candidates
 `/opt/google/chrome/chrome`, `/usr/bin/google-chrome`,
 `/usr/bin/google-chrome-stable`, `/usr/bin/chromium`,
-`/usr/bin/chromium-browser`, `/snap/bin/chromium`.
+`/usr/bin/chromium-browser`. Skip a Snap build (one resolving to `/snap/` or
+`/usr/bin/snap`): its private `/tmp` hides the profile, so it never starts.
 On native Windows, search `Google\Chrome\Application\chrome.exe` under
 `ProgramFiles`, `ProgramFiles(x86)` and `LOCALAPPDATA`, in that order.
 Do not promise arbitrary portable installations.

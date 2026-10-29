@@ -100,8 +100,7 @@ describe("owned lifecycle", () => {
       const events: string[] = [];
       await shutdown(root, owned, {
         alive: () => alive,
-        command: () => `firefox -profile ${owned.profile}`,
-        identity: () => null,
+        details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
         busy: () => false,
         kill: () => {
           events.push("terminate");
@@ -123,8 +122,7 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          command: () => `firefox -profile ${owned.profile}`,
-          identity: () => null,
+          details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
           busy: () => false,
           kill: () => {},
           timeoutMs: 1,
@@ -143,8 +141,7 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          command: () => "unrelated --normal-profile",
-          identity: () => null,
+          details: () => ({ command: "unrelated --normal-profile", identity: null }),
           busy: () => false,
           kill: () => {
             killed = true;
@@ -166,8 +163,7 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          command: () => `firefox -profile ${owned.profile}`,
-          identity: () => "reused-start",
+          details: () => ({ command: `firefox -profile ${owned.profile}`, identity: "reused-start" }),
           busy: () => false,
           kill: () => {
             killed = true;
@@ -221,8 +217,7 @@ describe("owned lifecycle", () => {
       await shutdown(root, owned, {
         alive: () => alive,
         busy: () => false,
-        command: () => `firefox -profile ${owned.profile}`,
-        identity: () => null,
+        details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
         close: async () => {
           alive = false;
         },
@@ -291,6 +286,32 @@ describe("executable discovery", () => {
       "no firefox found; looked for firefox, /usr/bin/firefox\nInstall a Linux build of firefox inside WSL.",
     );
   });
+
+  test("Linux skips a Snap browser for a later candidate and names Snap when none is left", () => {
+    const snap = (path: string) =>
+      path === "/snap/bin/chromium" ? "/usr/bin/snap" : path;
+    const options = {
+      platform: "linux",
+      wsl: false,
+      validate: () => true,
+      target: snap,
+    } as const;
+    expect(
+      resolveBinary("chrome", ["chromium", "/opt/google/chrome/chrome"], {
+        ...options,
+        lookup: () => "/snap/bin/chromium",
+      }),
+    ).toBe("/opt/google/chrome/chrome");
+    expect(() =>
+      resolveBinary("chrome", ["chromium"], {
+        ...options,
+        lookup: () => "/snap/bin/chromium",
+      }),
+    ).toThrow("Snap builds of chrome are not supported");
+    expect(
+      resolveBinary("firefox", ["/snap/firefox/current/usr/lib/firefox/firefox", "/usr/bin/firefox"], options),
+    ).toBe("/usr/bin/firefox");
+  });
 });
 
 test("WSL rejects a Linux symlink to a Windows executable", () => {
@@ -352,6 +373,29 @@ test("a real exited launch wrapper cannot authorize deletion of its live descend
       wrapper.kill();
       await wrapper.exited;
     }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a live browser under a CJK and spaced state path verifies its real process ownership", async () => {
+  const root = mkdtempSync(join(import.meta.dir, ".使用者 Q-"));
+  const profile = newProfile(root);
+  const child = Bun.spawn(
+    [process.execPath, "-e", "setInterval(() => {}, 1000)", `--user-data-dir=${profile.profile}`],
+    { stdio: ["ignore", "ignore", "ignore"] },
+  );
+  try {
+    const owned = instance(profile.id, {
+      ...profile,
+      pid: child.pid,
+      port: 0,
+      browser: "chrome",
+    });
+    recordInstance(root, owned);
+    expect(liveInstances(root).map((item) => item.id)).toEqual([owned.id]);
+  } finally {
+    child.kill();
+    await child.exited;
     rmSync(root, { recursive: true, force: true });
   }
 });

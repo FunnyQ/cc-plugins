@@ -43,22 +43,9 @@ export type Invocation = {
   output: string | null;
 };
 
-function stateDir(): string {
-  return browserStateDir("firefox");
-}
+const STATE_DIR = browserStateDir("firefox");
 const DEFAULT_SIZE = "1440x900";
 const LAUNCH_TIMEOUT_MS = 20_000;
-
-export const BINARIES: Record<Browser, string[]> = {
-  firefox:
-    process.platform === "win32"
-      ? []
-      : browserCandidates("firefox", nativePlatformInput()),
-  zen:
-    process.platform === "win32"
-      ? []
-      : browserCandidates("zen", nativePlatformInput()),
-};
 
 const VALUE_FLAGS = new Set(["--id", "--size", "--output"]);
 
@@ -113,9 +100,7 @@ export async function launch(
   assertSupported(input.platform, invocation.zen);
   const stateDir =
     options.stateDir ?? browserStateDir("firefox", input.platform, input.env);
-  const resolve =
-    options.resolve ??
-    ((name, candidates, platform) => resolveBinary(name, candidates, platform));
+  const resolve = options.resolve ?? resolveBinary;
   const spawn =
     options.spawn ??
     ((argv) =>
@@ -236,7 +221,7 @@ async function run(invocation: Invocation): Promise<string> {
       1,
       "open <url> [--new] [--zen] [--headed] [--size WxH]",
     );
-    const live = liveInstances(stateDir());
+    const live = liveInstances(STATE_DIR);
     const reuse = !invocation.fresh && live.length > 0;
     const instance = reuse
       ? pickInstance(live, invocation.id)
@@ -252,7 +237,7 @@ async function run(invocation: Invocation): Promise<string> {
   }
 
   if (command === "status") {
-    const live = liveInstances(stateDir());
+    const live = liveInstances(STATE_DIR);
     if (live.length === 0) return "no instance is open";
     const lines = await Promise.all(
       live.map(async (instance) => {
@@ -268,8 +253,8 @@ async function run(invocation: Invocation): Promise<string> {
   }
 
   if (command === "close") {
-    const instance = pickInstance(liveInstances(stateDir()), invocation.id);
-    await shutdown(stateDir(), instance, {
+    const instance = pickInstance(liveInstances(STATE_DIR), invocation.id);
+    await shutdown(STATE_DIR, instance, {
       close: async () => {
         const client = await connect(instance.port);
         try {
@@ -283,7 +268,7 @@ async function run(invocation: Invocation): Promise<string> {
     return `closed ${instance.id}`;
   }
 
-  const instance = pickInstance(liveInstances(stateDir()), invocation.id);
+  const instance = pickInstance(liveInstances(STATE_DIR), invocation.id);
   return withSession(instance, async (send) => {
     switch (command) {
       case "goto": {

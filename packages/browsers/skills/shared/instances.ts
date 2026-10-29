@@ -61,6 +61,7 @@ export type BinaryOptions = {
   wsl?: boolean;
   validate?: (path: string) => boolean;
   lookup?: (name: string) => string | null;
+  target?: (path: string) => string;
   env?: Record<string, string | undefined>;
 };
 
@@ -86,26 +87,33 @@ export function resolveBinary(
     options.lookup ??
     ((name: string) =>
       Bun.which(name, { PATH: options.env?.PATH ?? options.env?.Path }));
+  const target =
+    options.target ??
+    ((path: string) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return path;
+      }
+    });
+  let snap = false;
   for (const candidate of candidates) {
     const path =
       isAbsolute(candidate) || /[\\/]/.test(candidate)
         ? candidate
         : lookup(candidate);
-    let target = path;
-    if (wsl && path) {
-      try {
-        target = realpathSync(path);
-      } catch {}
+    if (!path) continue;
+    const real = platform === "linux" ? target(path) : path;
+    if (wsl && (/\.exe$/i.test(real) || /^[a-z]:/i.test(real))) continue;
+    // A Snap confines the browser to its own /tmp, so it never sees the profile or DevToolsActivePort.
+    if (platform === "linux" && /^\/snap\/|^\/usr\/bin\/snap$/.test(real)) {
+      snap = true;
+      continue;
     }
-    if (
-      path &&
-      !(wsl && target && (/\.exe$/i.test(target) || /^[a-z]:/i.test(target))) &&
-      validate(path)
-    )
-      return path;
+    if (validate(path)) return path;
   }
   throw new Error(
-    `no ${name} found; looked for ${candidates.join(", ")}${wsl ? `\nInstall a Linux build of ${name} inside WSL.` : ""}`,
+    `no ${name} found; looked for ${candidates.join(", ")}${snap ? `\nSnap builds of ${name} are not supported: their private /tmp hides the profile. Install a non-Snap build.` : ""}${wsl ? `\nInstall a Linux build of ${name} inside WSL.` : ""}`,
   );
 }
 
@@ -150,7 +158,7 @@ function processDetails(
               "-NoProfile",
               "-NonInteractive",
               "-Command",
-              '$p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $env:Q_BROWSER_PID); if ($p) { @($p.CommandLine, $p.CreationDate.ToString("o")) | ConvertTo-Json -Compress }',
+              '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $env:Q_BROWSER_PID); if ($p) { @($p.CommandLine, $p.CreationDate.ToString("o")) | ConvertTo-Json -Compress }',
             ],
             {
               env: { ...process.env, Q_BROWSER_PID: String(pid) },
@@ -175,16 +183,7 @@ function processDetails(
 }
 
 function profileBusy(instance: Instance, terminatedTree = false): boolean {
-  if (process.platform !== "win32") {
-    try {
-      process.kill(-instance.pid, 0);
-      return true;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === "EPERM") return true;
-      if (code !== "ESRCH") throw error;
-    }
-  }
+  if (process.platform !== "win32" && isAlive(-instance.pid)) return true;
 
   try {
     const lock = readlinkSync(join(instance.profile, "SingletonLock"));
@@ -277,8 +276,7 @@ export function recordInstance(stateDir: string, instance: Instance): void {
 export type ShutdownOptions = {
   close?: () => Promise<unknown>;
   alive?: (pid: number) => boolean;
-  command?: (pid: number) => string | null;
-  identity?: (pid: number) => string | null;
+  details?: (pid: number) => { command: string; identity: string | null } | null;
   busy?: (instance: Instance) => boolean;
   kill?: (pid: number) => void;
   sleep?: (ms: number) => Promise<unknown>;
@@ -290,12 +288,9 @@ function verifyProcessOwnership(
   instance: Instance,
   options: ShutdownOptions = {},
 ): void {
-  const command = (
-    options.command ?? ((pid) => processDetails(pid)?.command ?? null)
-  )(instance.pid);
-  const identity = (
-    options.identity ?? ((pid) => processDetails(pid)?.identity ?? null)
-  )(instance.pid);
+  const { command, identity } = (options.details ?? processDetails)(
+    instance.pid,
+  ) ?? { command: null, identity: null };
   const owner = join(stateDir, "instances", `${instance.id}.owner`);
   const escaped = instance.profile.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   if (

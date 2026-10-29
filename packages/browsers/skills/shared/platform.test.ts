@@ -37,7 +37,6 @@ describe("browserCandidates", () => {
       "/usr/bin/google-chrome-stable",
       "/usr/bin/chromium",
       "/usr/bin/chromium-browser",
-      "/snap/bin/chromium",
     ]);
     expect(browserCandidates("firefox", input)).toEqual([
       "firefox",
@@ -45,7 +44,6 @@ describe("browserCandidates", () => {
       "/usr/bin/firefox",
       "/usr/bin/firefox-esr",
       "/opt/firefox/firefox",
-      "/snap/bin/firefox",
     ]);
     expect(browserCandidates("zen", input)).toEqual([
       "zen",

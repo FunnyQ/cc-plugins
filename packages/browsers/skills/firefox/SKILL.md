@@ -50,8 +50,8 @@ Require `bun` and an installed browser. On macOS, search `/Applications` app
 bundles in order: Firefox Developer Edition, Firefox, Firefox Nightly.
 With `--zen`, use `/Applications/Zen.app/Contents/MacOS/zen`.
 On Linux, search `PATH` for `firefox`, then `firefox-esr`, then
-`/usr/bin/firefox`, `/usr/bin/firefox-esr`, `/opt/firefox/firefox`,
-`/snap/bin/firefox`. For Zen, search `PATH` for `zen`, then `zen-browser`,
+`/usr/bin/firefox`, `/usr/bin/firefox-esr`, `/opt/firefox/firefox`, skipping
+a Snap build, whose private `/tmp` hides the profile. For Zen, search `PATH` for `zen`, then `zen-browser`,
 then `/usr/bin/zen`, `/usr/bin/zen-browser`, `/opt/zen/zen`.
 Do not promise arbitrary portable installations.
 
