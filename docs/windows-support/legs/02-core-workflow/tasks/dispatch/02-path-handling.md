@@ -9,7 +9,7 @@
 >
 > **Depends on**: dispatch/01
 > **Blocks**: dispatch/03, platform/01
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -159,20 +159,20 @@ Tests to add in `worktree.test.ts` (each test repo already sets `core.autocrlf f
 
 ## Acceptance criteria
 
-- [ ] `TASK_PATH`, the `flightplan-lint.sh` pattern and `FLIGHTPLAN_TASK` all match `C:\repo\docs\x\tasks\ui\01-a.md` and still reject a dashed bucket; `task-path.test.ts`'s two copy-equality tests compare the full pattern text and pass.
-- [ ] A test proves bash's `=~` with the sh pattern matches a backslash-separated task path.
-- [ ] `inferRefFromPath` returns the table's outputs for all four inputs.
-- [ ] `samePathKey` never throws for a missing path, re-joins missing segments onto the realpath of the nearest existing ancestor, and lower-cases only on `win32`.
-- [ ] `remove()` on a hand-deleted registered worktree leaves no registration in `git worktree list --porcelain`.
-- [ ] Every new test fails on the code before this task's change and passes after it.
-- [ ] No edit to `opencode/plugin.ts` outside the `FLIGHTPLAN_TASK` lines.
+- [x] `TASK_PATH`, the `flightplan-lint.sh` pattern and `FLIGHTPLAN_TASK` all match `C:\repo\docs\x\tasks\ui\01-a.md` and still reject a dashed bucket; `task-path.test.ts`'s two copy-equality tests compare the full pattern text and pass.
+- [x] A test proves bash's `=~` with the sh pattern matches a backslash-separated task path.
+- [x] `inferRefFromPath` returns the table's outputs for all four inputs.
+- [x] `samePathKey` never throws for a missing path, re-joins missing segments onto the realpath of the nearest existing ancestor, and lower-cases only on `win32`.
+- [x] `remove()` on a hand-deleted registered worktree leaves no registration in `git worktree list --porcelain`.
+- [x] Every new test fails on the code before this task's change and passes after it.
+- [x] No edit to `opencode/plugin.ts` outside the `FLIGHTPLAN_TASK` lines.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch` passes.
-- [ ] `bun test packages/dispatch/hooks/task-path.test.ts opencode/` passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `git diff --stat -- opencode/plugin.ts` shows at most the `FLIGHTPLAN_TASK` regex lines changed.
+- [x] `bun test packages/dispatch` passes.
+- [x] `bun test packages/dispatch/hooks/task-path.test.ts opencode/` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `git diff --stat -- opencode/plugin.ts` shows at most the `FLIGHTPLAN_TASK` regex lines changed.
 
 ## Eval rubric
 
