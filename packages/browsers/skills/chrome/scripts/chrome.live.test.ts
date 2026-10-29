@@ -8,7 +8,7 @@ const installed = BINARIES.some((path) => existsSync(path));
 const cli = join(import.meta.dir, "chrome.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
-  const result = Bun.spawnSync(["bun", cli, ...argv]);
+  const result = Bun.spawnSync([process.execPath, cli, ...argv]);
   return {
     code: result.exitCode,
     out: result.stdout.toString().trim(),
@@ -19,13 +19,17 @@ function run(...argv: string[]): { code: number; out: string; err: string } {
 // Async, unlike `run`: a server in this process cannot answer while spawnSync blocks it.
 async function runAsync(
   ...argv: string[]
-): Promise<{ code: number; out: string }> {
-  const child = Bun.spawn(["bun", cli, ...argv], {
+): Promise<{ code: number; out: string; err: string }> {
+  const child = Bun.spawn([process.execPath, cli, ...argv], {
     stdout: "pipe",
     stderr: "pipe",
   });
-  const out = (await new Response(child.stdout).text()).trim();
-  return { code: await child.exited, out };
+  const [code, out, err] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+  ]);
+  return { code, out: out.trim(), err: err.trim() };
 }
 
 describe.skipIf(!installed)("chrome CLI against a real browser", () => {
@@ -51,28 +55,31 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
         });
       },
     });
-    const opened = await runAsync(
-      "open",
-      "--new",
-      `http://127.0.0.1:${server.port}/`,
-    );
-    expect(opened.code).toBe(0);
-    const id = opened.out.split(" ")[0]!;
-
     try {
-      expect((await runAsync("click", "--id", id, "#go")).code).toBe(0);
-      expect(
-        (
-          await runAsync(
-            "eval",
-            "--id",
-            id,
-            "document.readyState + ' ' + document.title",
-          )
-        ).out,
-      ).toBe("complete Two");
+      const opened = await runAsync(
+        "open",
+        "--new",
+        `http://127.0.0.1:${server.port}/`,
+      );
+      expect(opened.code).toBe(0);
+      const id = opened.out.split(" ")[0]!;
+
+      try {
+        expect((await runAsync("click", "--id", id, "#go")).code).toBe(0);
+        expect(
+          (
+            await runAsync(
+              "eval",
+              "--id",
+              id,
+              "document.readyState + ' ' + document.title",
+            )
+          ).out,
+        ).toBe("complete Two");
+      } finally {
+        await runAsync("close", "--id", id);
+      }
     } finally {
-      await runAsync("close", "--id", id);
       server.stop(true);
     }
   }, 60_000);

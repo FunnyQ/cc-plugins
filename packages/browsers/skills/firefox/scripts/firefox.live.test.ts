@@ -8,7 +8,7 @@ const installed = BINARIES.firefox.some((path) => existsSync(path));
 const cli = join(import.meta.dir, "firefox.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
-  const result = Bun.spawnSync(["bun", cli, ...argv]);
+  const result = Bun.spawnSync([process.execPath, cli, ...argv]);
   return {
     code: result.exitCode,
     out: result.stdout.toString().trim(),

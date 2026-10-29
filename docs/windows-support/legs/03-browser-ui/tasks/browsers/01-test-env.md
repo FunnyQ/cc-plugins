@@ -8,7 +8,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: browsers/02
-> **Status**: blocked
+> **Status**: done
 
 ## Goal
 
@@ -54,19 +54,19 @@ When the audit finds no fixture defect in a listed file, leave that file untouch
 
 ## Acceptance criteria
 
-- [ ] Changed files are limited to concrete fixture corrections in the declared test files; product modules and browser selection behavior remain unchanged.
-- [ ] Real filesystem and executable expectations use host-aware path construction and native canonicalization where identity requires it; intentional pure-function path strings and protocol bytes retain their meaning.
-- [ ] Every home/temp override in touched fixtures isolates the Windows counterparts and restores process-global environment changes after use.
-- [ ] Any touched fake executable fixture uses a runnable Windows wrapper or explicit shell invocation, with arbitrary text kept out of unsafe `.cmd` arguments.
-- [ ] Temporary files and owned subprocesses are cleaned up without deleting shared state or blocking a parent-hosted test server.
-- [ ] Existing failure assertions remain effective, local absent-browser skips remain optional, and no broad platform skip substitutes for a fixture repair.
+- [x] Changed files are limited to concrete fixture corrections in the declared test files; product modules and browser selection behavior remain unchanged.
+- [x] Real filesystem and executable expectations use host-aware path construction and native canonicalization where identity requires it; intentional pure-function path strings and protocol bytes retain their meaning.
+- [x] Every home/temp override in touched fixtures isolates the Windows counterparts and restores process-global environment changes after use.
+- [x] Any touched fake executable fixture uses a runnable Windows wrapper or explicit shell invocation, with arbitrary text kept out of unsafe `.cmd` arguments.
+- [x] Temporary files and owned subprocesses are cleaned up without deleting shared state or blocking a parent-hosted test server.
+- [x] Existing failure assertions remain effective, local absent-browser skips remain optional, and no broad platform skip substitutes for a fixture repair.
 
 ## Verification
 
-- [ ] Run `bun test packages/browsers` before editing and record the baseline.
-- [ ] Run `bun test packages/browsers` after fixture corrections; require exit 0 on the execution host.
-- [ ] Run `bunx --bun tsc --noEmit` from the repository root; require exit 0.
-- [ ] Inspect `git diff -- packages/browsers` and confirm each changed assertion still checks the same behavior and each skip names a genuine prerequisite or impossible platform fact.
+- [x] Run `bun test packages/browsers` before editing and record the baseline.
+- [x] Run `bun test packages/browsers` after fixture corrections; require exit 0 on the execution host.
+- [x] Run `bunx --bun tsc --noEmit` from the repository root; require exit 0.
+- [x] Inspect `git diff -- packages/browsers` and confirm each changed assertion still checks the same behavior and each skip names a genuine prerequisite or impossible platform fact.
 
 ## Eval rubric
 

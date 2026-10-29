@@ -9,7 +9,7 @@ const enabled = process.env.SAFARI_LIVE === "1";
 const cli = join(import.meta.dir, "safari.ts");
 
 function run(...argv: string[]): { code: number; out: string; err: string } {
-  const result = Bun.spawnSync(["bun", cli, ...argv]);
+  const result = Bun.spawnSync([process.execPath, cli, ...argv]);
   return {
     code: result.exitCode,
     out: result.stdout.toString().trim(),
