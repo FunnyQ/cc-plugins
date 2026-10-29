@@ -504,7 +504,7 @@ export function serializeConfig(config: ReleaseConfig): string {
   return JSON.stringify(config, null, 2) + "\n";
 }
 
-const CONFIG_REL = ".chronicle/release.json";
+export const CONFIG_REL = ".chronicle/release.json";
 
 export function configPath(repoRoot: string): string {
   return join(repoRoot, CONFIG_REL);

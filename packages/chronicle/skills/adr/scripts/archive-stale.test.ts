@@ -18,6 +18,7 @@ import {
   type TrustedRoot,
 } from "../../../shared/scripts/cockpit-trail";
 import {
+  ARCHIVE_IGNORE_PATTERN,
   archiveIgnored,
   archiveTrail,
   findTrailRoots,
@@ -240,4 +241,8 @@ describe("CLI", () => {
       existsSync(join(root, ".cockpit", "archive", "done", "old.jsonl")),
     ).toBe(true);
   });
+});
+
+test("the archive ignore pattern is POSIX on every platform", () => {
+  expect(ARCHIVE_IGNORE_PATTERN).toBe(".cockpit/archive/");
 });

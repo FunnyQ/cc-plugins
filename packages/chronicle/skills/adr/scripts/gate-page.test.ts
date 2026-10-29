@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { renderGatePage, serveGatePage, type GatePayload } from "./gate-page";
+import {
+  openerCommands,
+  renderGatePage,
+  serveGatePage,
+  type GatePayload,
+} from "./gate-page";
 
 const GATE1 = {
   gate: 1 as const,
@@ -207,3 +212,53 @@ function extractPayload(html: string): any {
   if (!m) throw new Error("payload block not found");
   return JSON.parse(m[1].replace(/\\u003c/g, "<"));
 }
+
+describe("openerCommands", () => {
+  const url = "http://127.0.0.1:1/";
+  const notWsl = () => "Linux version 6.1.0 (gcc)";
+
+  test("darwin uses open", () => {
+    expect(openerCommands(url, "darwin", {}, notWsl)).toEqual([["open", url]]);
+  });
+
+  test("win32 runs start through cmd with an empty title", () => {
+    expect(openerCommands(url, "win32", {}, notWsl)).toEqual([
+      ["cmd", "/c", "start", "", url],
+    ]);
+  });
+
+  const wsl = [
+    ["wslview", url],
+    ["cmd.exe", "/c", "start", "", url],
+  ];
+
+  test("WSL detected by WSL_DISTRO_NAME tries wslview then cmd.exe", () => {
+    expect(
+      openerCommands(url, "linux", { WSL_DISTRO_NAME: "Ubuntu" }, notWsl),
+    ).toEqual(wsl);
+  });
+
+  test("WSL detected by /proc/version", () => {
+    expect(
+      openerCommands(
+        url,
+        "linux",
+        {},
+        () => "Linux 5.15-microsoft-standard-WSL2 Microsoft",
+      ),
+    ).toEqual(wsl);
+  });
+
+  test("plain linux uses xdg-open", () => {
+    expect(openerCommands(url, "linux", {}, notWsl)).toEqual([
+      ["xdg-open", url],
+    ]);
+  });
+
+  test("an unreadable /proc/version means not WSL", () => {
+    const boom = () => {
+      throw new Error("ENOENT");
+    };
+    expect(openerCommands(url, "linux", {}, boom)).toEqual([["xdg-open", url]]);
+  });
+});

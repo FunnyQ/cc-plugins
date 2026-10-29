@@ -10,8 +10,9 @@ import {
 } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { STALE_MS } from "../../../shared/scripts/cockpit-trail";
+import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
 import {
   planArchive,
   writePlan,
@@ -321,7 +322,7 @@ describe("CLI", () => {
     const result = run(directory, [{ sessionId: "a", target: "done" }]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().startsWith("/tmp/q-lab/chronicle/adr/")).toBe(
+    expect(result.stdout.trim().startsWith(join(TEMP_ROOT, "adr") + sep)).toBe(
       true,
     );
   });
@@ -345,7 +346,7 @@ describe("writePlan", () => {
     const outputPath = await writePlan(plan);
     const parsed = JSON.parse(await readFile(outputPath, "utf8"));
 
-    expect(outputPath.startsWith("/tmp/q-lab/chronicle/adr/")).toBe(true);
+    expect(outputPath.startsWith(join(TEMP_ROOT, "adr") + sep)).toBe(true);
     expect(parsed).toEqual(plan);
     expect(Object.keys(parsed)).toEqual(["trailRoot", "moves", "refused"]);
   });

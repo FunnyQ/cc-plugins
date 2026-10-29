@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, join, posix, relative, sep } from "node:path";
 import {
   logRoot,
   trustRoot,
@@ -144,7 +144,9 @@ export async function archiveTrail(
   };
 }
 
-const ARCHIVE_IGNORE_PATTERN = `${dirname(bucketDirectory("", "done"))}/`;
+export const ARCHIVE_IGNORE_PATTERN = `${posix.dirname(
+  bucketDirectory("", "done").replaceAll(sep, "/"),
+)}/`;
 
 export function formatTrail(result: TrailResult, apply: boolean): string[] {
   const reasons = new Map<string, number>();

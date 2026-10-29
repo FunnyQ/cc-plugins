@@ -1,7 +1,14 @@
 import { mkdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-export const TEMP_ROOT = join("/tmp", "q-lab", "chronicle");
+export function tempRoot(platform: NodeJS.Platform = process.platform): string {
+  // windows.md: "/tmp" is drive-relative on Windows, so use the per-user temp dir.
+  if (platform === "win32") return join(tmpdir(), "q-lab", "chronicle");
+  return "/tmp/q-lab/chronicle";
+}
+
+export const TEMP_ROOT = tempRoot();
 
 let payloadsWritten = 0;
 

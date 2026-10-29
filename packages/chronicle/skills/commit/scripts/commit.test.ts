@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
 import type { PlannedCommit, SimpleProse } from "./commit-plan";
+import { canonicalPath } from "./commit";
 
 const SCRIPT = resolve(import.meta.dir, "commit.ts");
 
@@ -691,5 +693,23 @@ describe("apply", () => {
     expect(exitCode).toBe(2);
     expect(json.error).toContain("exclude");
     expect(await subjects()).not.toContain("🐛 fix: resolve conflict");
+  });
+});
+
+describe("canonicalPath", () => {
+  test("appends missing segments to the real existing parent", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-canon-"));
+    expect(canonicalPath(join(dir, "nope", "plan.json"), "darwin")).toBe(
+      join(realpathSync.native(dir), "nope", "plan.json"),
+    );
+  });
+
+  test("lower-cases on win32 only", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-Canon-"));
+    const real = join(realpathSync.native(dir), "Plan.JSON");
+    expect(canonicalPath(join(dir, "Plan.JSON"), "win32")).toBe(
+      real.toLowerCase(),
+    );
+    expect(canonicalPath(join(dir, "Plan.JSON"), "darwin")).toBe(real);
   });
 });

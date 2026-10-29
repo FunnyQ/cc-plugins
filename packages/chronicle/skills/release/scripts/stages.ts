@@ -10,7 +10,7 @@
  */
 
 import {
-  configPath,
+  CONFIG_REL,
   effectiveWorkflow,
   hasChangelogEntry,
   normalizeVersion,
@@ -198,6 +198,6 @@ export function touchedFiles(
     for (const artifact of unit.artifacts) add(artifact.path);
   }
   add(config.changelog);
-  if (opts.persistConfig) add(configPath(""));
+  if (opts.persistConfig) add(CONFIG_REL);
   return out;
 }

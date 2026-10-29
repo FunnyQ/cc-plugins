@@ -8,6 +8,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 const ROLES = [
@@ -77,6 +78,13 @@ function managedBlock(targetDir: string): string {
   ].join("\n");
 }
 
+export function codexHome(
+  env: Record<string, string | undefined> = process.env,
+  home: string = homedir(),
+): string {
+  return env.CODEX_HOME || join(home, ".codex");
+}
+
 function main() {
   const pluginRootArg = argValue("--plugin-root");
   if (!pluginRootArg) {
@@ -86,10 +94,9 @@ function main() {
 
   const pluginRoot = resolve(pluginRootArg);
   const sourceDir = join(pluginRoot, "agents-codex");
-  const codexHome =
-    process.env.CODEX_HOME || join(process.env.HOME || "", ".codex");
-  const targetDir = join(codexHome, "agents", "chronicle");
-  const configPath = join(codexHome, "config.toml");
+  const home = codexHome();
+  const targetDir = join(home, "agents", "chronicle");
+  const configPath = join(home, "config.toml");
   const dryRun = process.argv.includes("--dry-run");
   const apply = process.argv.includes("--apply");
 

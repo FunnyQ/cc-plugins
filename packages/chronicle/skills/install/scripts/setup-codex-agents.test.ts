@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { RETIRED_ROLES } from "./setup-codex-agents";
+import { codexHome as resolveCodexHome, RETIRED_ROLES } from "./setup-codex-agents";
 
 const script = resolve(import.meta.dir, "setup-codex-agents.ts");
 const pluginRoot = resolve(import.meta.dir, "../../..");
@@ -113,5 +113,42 @@ describe("setup-codex-agents", () => {
     expect(readFileSync(join(targetDir, "personal.toml"), "utf8")).toBe(
       'name = "personal"\n',
     );
+  });
+
+  it("resolves CODEX_HOME first, then the OS home, never HOME", () => {
+    expect(resolveCodexHome({ CODEX_HOME: "/x" }, "/h")).toBe("/x");
+    expect(resolveCodexHome({}, "/h")).toBe(join("/h", ".codex"));
+    expect(resolveCodexHome({ HOME: "/wrong" }, "/h")).toBe(
+      join("/h", ".codex"),
+    );
+  });
+
+  it("falls back to the isolated profile, not the cwd, without CODEX_HOME", () => {
+    const profile = mkdtempSync(join(tmpdir(), "chronicle-codex-profile-"));
+    const cwd = mkdtempSync(join(tmpdir(), "chronicle-codex-cwd-"));
+    try {
+      const env: Record<string, string | undefined> = {
+        ...process.env,
+        HOME: profile,
+        USERPROFILE: profile,
+      };
+      delete env.CODEX_HOME;
+      const result = Bun.spawnSync(
+        ["bun", script, "--plugin-root", pluginRoot, "--dry-run"],
+        { env, cwd, stdout: "pipe", stderr: "pipe" },
+      );
+      const output = result.stdout.toString();
+      const configFile = output.match(/^config_file = (".*")$/m);
+
+      expect(result.exitCode).toBe(0);
+      expect(configFile).not.toBeNull();
+      expect(JSON.parse(configFile![1]).startsWith(join(profile, ".codex"))).toBe(
+        true,
+      );
+      expect(existsSync(join(cwd, ".codex"))).toBe(false);
+    } finally {
+      rmSync(profile, { recursive: true, force: true });
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
