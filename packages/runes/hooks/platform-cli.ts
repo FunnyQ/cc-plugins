@@ -1,10 +1,24 @@
 /// <reference types="bun" />
 import { mkdir, unlink } from "node:fs/promises";
-import { readFileSync, realpathSync, statSync } from "node:fs";
+import { closeSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { win32 } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { parseOperation, resolveRuntime, type PlatformOperation, type RuntimeInfo } from "./platform";
+
+const execsSnap = (path: string): boolean => {
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, "r");
+    const buffer = Buffer.alloc(4096);
+    const head = buffer.subarray(0, readSync(fd, buffer)).toString("latin1");
+    return head.startsWith("#!") && /\/snap\/bin\//.test(head);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+};
 
 export const discoverChrome = (
   platform: string = process.platform,
@@ -32,7 +46,11 @@ export const discoverChrome = (
   if (platform === "linux") {
     for (const name of ["google-chrome", "google-chrome-stable", "chromium", "chromium-browser"]) {
       const path = which(name);
-      if (path && !/\.exe$/i.test(path) && !/\.exe$/i.test(target(path))) return path;
+      if (!path || /\.exe$/i.test(path)) continue;
+      const real = target(path);
+      // A Snap's private /tmp hides the profile; Ubuntu's chromium-browser is a script that execs one.
+      if (/\.exe$/i.test(real) || /^\/snap\/|^\/usr\/bin\/snap$/.test(real) || execsSnap(real)) continue;
+      return path;
     }
   }
   return null;

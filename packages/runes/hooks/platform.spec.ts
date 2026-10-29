@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 const CHILD = `
 import { homedir, tmpdir } from "node:os";
@@ -356,6 +357,17 @@ test("Chrome discovery uses the platform order and environment roots", () => {
   const realChrome = (path: string) => path === "/usr/local/bin/google-chrome" ? "/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" : path;
   expect(discoverChrome("linux", env, () => true, windowsLink, realChrome)).toBe("/usr/bin/chromium");
   expect(discoverChrome("linux", env, () => true, name => windowsLink(name) === "/usr/local/bin/google-chrome" ? "/usr/local/bin/google-chrome" : null, realChrome)).toBeNull();
+  const realSnap = (path: string) => path === "/snap/bin/chromium" ? "/usr/bin/snap" : path;
+  expect(discoverChrome("linux", env, () => true, name => name === "chromium" ? "/snap/bin/chromium" : null, realSnap)).toBeNull();
+  expect(discoverChrome("linux", env, () => true, name => name === "chromium" ? "/snap/bin/chromium" : name === "chromium-browser" ? "/usr/bin/chromium-browser" : null, realSnap)).toBe("/usr/bin/chromium-browser");
+  const root = mkdtempSync(join(tmpdir(), "runes-snap-wrapper-"));
+  try {
+    const wrapper = join(root, "chromium-browser");
+    writeFileSync(wrapper, '#!/bin/sh\nexec /snap/bin/chromium "$@"\n');
+    expect(discoverChrome("linux", env, () => true, name => name === "chromium-browser" ? wrapper : null)).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 import { parseScreenshotArgs, takeScreenshot } from "./explain/checker-cli";
