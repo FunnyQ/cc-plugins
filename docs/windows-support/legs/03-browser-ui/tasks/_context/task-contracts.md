@@ -59,6 +59,7 @@ Every task starts todo. Every non-final task uses the common weighted rubric. On
 - Depends on: runes/01. Blocks: runes/03.
 - Required reading: shared.md, rubric.md, windows.md, runes.md.
 - Own packages/runes/hooks/{platform.ts,platform-cli.ts,platform.spec.ts,register.tsx}, transcript/{quicklook.ts,open-raw.ts,open-image.ts,glow.ts}, minimap/index.ts, teacher/lessons-cli.ts, explain/explain.ts and bounded adjacent mod regression tests.
+- Update transcript/test-session.ts only to recognize the exact platform runtime probe while retaining injected snapshots, failures and strict rejection of unhandled commands.
 - Implement RuntimeInfo and closed JSON-stdin platform operations from runes.md, including recursive mkdir replacing explain's Unix mkdir -p call. Test first-run generation without Unix mkdir. Populate platform data without assuming a Bun runtime inside the mod. Keep engine objects local to their hook module.
 - Resolve HOME/USERPROFILE, including the three direct `process.env.HOME` readers in runes.md, preserve persisted config/data roots and use native Windows scratch paths. Make glow's home environment and install hint portable while preserving missing-glow fallback.
 - Keep Quick Look on macOS and use file openers elsewhere. Reopen explanations through the same operation contract the checker can call. Convert WSL local paths and keep arbitrary paths out of shell source.

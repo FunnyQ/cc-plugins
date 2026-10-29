@@ -2,6 +2,7 @@ import type { Hook, On } from "claude-code";
 import type { Engine } from "claude-code/testing";
 
 import { PARSE } from "../config";
+import { resolveRuntime } from "../platform";
 
 export type FixtureEnv = Record<string, string | undefined>;
 export type FixtureRuntimeInfo = {
@@ -53,17 +54,26 @@ const fakeYaml = (text: string) => {
 
 type Run = Parameters<Hook<"process.run">>;
 
+const isRuntimeProbe = (e: Run[1]) =>
+  e.argv.length === 2 &&
+  e.argv[0] === "bun" &&
+  /[\\/]hooks[\\/]platform-cli\.ts$/.test(e.argv[1] ?? "") &&
+  e.init?.stdin === JSON.stringify({ op: "info" });
+
 // the kit has no store, fs, env or process; these stand in for the host's, and `run` answers every command but the YAML parse
+// and the runtime probe, which `probe` answers when given and a macOS snapshot of `env` otherwise
 export const fakeHost = (
   on: On,
   {
     files = new Map<string, string>(),
     run,
+    probe,
     env = {},
     messages = [],
   }: {
     files?: Map<string, string>;
     run?: (e: Run[1]) => unknown;
+    probe?: (e: Run[1]) => unknown;
     env?: FixtureEnv;
     messages?: unknown[];
   } = {},
@@ -106,6 +116,21 @@ export const fakeHost = (
     return { value: undefined } as never;
   });
   on("process.run", (_$, e) => {
+    if (isRuntimeProbe(e)) {
+      if (probe) return probe(e) as never;
+      const home = Object.prototype.hasOwnProperty.call(env, "HOME")
+        ? env.HOME
+        : HOME;
+      try {
+        return ran(
+          JSON.stringify(
+            resolveRuntime("darwin", { ...env, HOME: home }, "/tmp", ""),
+          ),
+        ) as never;
+      } catch (error) {
+        return ran("", 1, String(error)) as never;
+      }
+    }
     if (
       e.argv.length !== PARSE.length ||
       !PARSE.every((arg, i) => e.argv[i] === arg)

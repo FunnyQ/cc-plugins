@@ -1,4 +1,5 @@
 import { config } from "../config";
+import { childEnv, runtime, scratchRoot } from "../platform";
 import { dropLead, leadingSpaces, parseAnsi, type Run } from "./ansi";
 
 // glow's dark style indents every line by this much
@@ -15,12 +16,16 @@ const glowArgv = (width: number, style: string) => [
 ];
 
 // a mod's child gets no HOME, so glow wrote its config and log under a literal ~ in the session's cwd
-const GLOW_INIT = { env: { HOME: "/tmp/q-lab/runes/glow" } };
+const glowInit = () => {
+  const info = runtime.info;
+  const home = `${info ? scratchRoot(info) : "/tmp/q-lab/runes"}/glow`;
+  return { env: info ? childEnv({ ...info, home }) : { HOME: home } };
+};
 
 // $ may not leave its hook, so session.start hands the worker closures that use it
 type RunCommand = (
   argv: string[],
-  init: typeof GLOW_INIT & { stdin: string },
+  init: ReturnType<typeof glowInit> & { stdin: string },
 ) => Promise<{ exitCode: number; stdout: string }>;
 
 type Job = { key: string; width: number; text: string; style: string };
@@ -40,8 +45,9 @@ const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   if (map.size > CACHE_SIZE) map.delete(map.keys().next().value!);
 };
 
-export const INSTALL_HINT =
-  "runes: install glow for markdown bubbles — brew install glow";
+const UNKNOWN_INSTALL_HINT =
+  "runes: install glow for markdown bubbles — macOS: brew install glow; Windows: winget install charmbracelet.glow; Linux: https://github.com/charmbracelet/glow#installation";
+export let INSTALL_HINT = UNKNOWN_INSTALL_HINT;
 let hinted = false;
 
 export const glow = {
@@ -67,6 +73,16 @@ export const glow = {
   // glow ran inside the render dispatch and died with it when a redraw superseded that draw;
   // run from session.start, it outlives every draw and only a real failure to start stops it
   work(run: RunCommand, redraw: () => void) {
+    const platform = runtime.info?.platform;
+    INSTALL_HINT = UNKNOWN_INSTALL_HINT;
+    if (platform)
+      INSTALL_HINT = `runes: install glow for markdown bubbles — ${
+        platform === "darwin"
+          ? "brew install glow"
+          : platform === "win32"
+            ? "winget install charmbracelet.glow"
+            : "https://github.com/charmbracelet/glow#installation"
+      }`;
     transport = { run, redraw };
     missing = false;
     hinted = false;
@@ -87,7 +103,7 @@ export const glow = {
         try {
           const { exitCode, stdout } = await t.run(
             glowArgv(job.width, job.style),
-            { ...GLOW_INIT, stdin: job.text },
+            { ...glowInit(), stdin: job.text },
           );
           keep(rendered, job.key, exitCode === 0 ? toLines(stdout) : null);
           if (slot !== job.key) {

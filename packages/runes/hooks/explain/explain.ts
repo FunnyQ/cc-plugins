@@ -2,6 +2,7 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 import type { ExplainEntry, ExplainView } from "../../types";
 import { where } from "../transcript/where";
+import { childEnv, platformCommand, runtime, type PlatformOperation } from "../platform";
 import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
 import { config } from "../config";
@@ -23,7 +24,21 @@ const view = atom(
 const messageOf = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-const basename = (path: string) => path.split("/").filter(Boolean).at(-1) ?? "";
+const basename = (path: string) => path.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
+
+async function platformAction(
+  $: EngineInterface,
+  operation: PlatformOperation,
+): Promise<void> {
+  const result = await $.process.run(platformCommand($.plugin.root), {
+    stdin: JSON.stringify(operation),
+    ...(runtime.info ? { env: childEnv(runtime.info) } : {}),
+  });
+  if (result.exitCode !== 0)
+    throw new Error(
+      result.stderr.trim() || `${operation.op} exited ${result.exitCode}`,
+    );
+}
 
 async function openPane($: EngineInterface, focus = false): Promise<boolean> {
   const { isPlaced } = await $.ui.open({
@@ -89,7 +104,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
         const git = await $.process
           .run(["git", "rev-parse", "--show-toplevel"], {
             cwd: where.cwd || undefined,
-            env: { HOME: home },
+            env: runtime.info ? childEnv(runtime.info) : { HOME: home },
           })
           .catch(() => undefined);
         const project =
@@ -109,8 +124,7 @@ async function run($: EngineInterface, ask: Ask): Promise<void> {
             read: (p) => $.fs.read(p).then(String),
             write: (p, text) => $.fs.write(p, text),
             exists: (p) => $.fs.exists(p),
-            // the engine's $.fs has no mkdir
-            mkdir: (d) => $.process.run(["mkdir", "-p", d]).then(() => {}),
+            mkdir: (directory) => platformAction($, { op: "mkdir", directory }),
           },
           $.plugin.root,
           home,
@@ -219,7 +233,15 @@ export async function explainReopen(
   id: string,
 ): Promise<void> {
   const entry = (await read($, view)).entries.find((e) => e.id === id);
-  if (entry?.kind === "html") await $.process.run(["open", entry.path]);
+  if (entry?.kind !== "html") return;
+  try {
+    await platformAction($, { op: "open", path: entry.path });
+  } catch (err) {
+    await update($, view, (v) => ({
+      ...v,
+      error: `could not open ${basename(entry.path)}: ${messageOf(err)}`,
+    }));
+  }
 }
 
 // trash, not rm: an explainer is the one artifact of a press that outlives the session, so a slip stays recoverable
@@ -229,13 +251,14 @@ async function trashPages(
 ): Promise<string | undefined> {
   const paths = entries.flatMap((e) => (e.kind === "html" ? [e.path] : []));
   if (!paths.length) return undefined;
-  const { exitCode, stderr } = await $.process
-    .run(["trash", ...paths])
-    .catch((err: unknown) => ({ exitCode: 1, stderr: String(err) }));
-  if (exitCode === 0) return undefined;
-  const what =
-    paths.length === 1 ? basename(paths[0]!) : `${paths.length} pages`;
-  return `could not move ${what} to the Trash: ${stderr.trim()}`;
+  try {
+    await platformAction($, { op: "trash", paths });
+    return undefined;
+  } catch (err) {
+    const what =
+      paths.length === 1 ? basename(paths[0]!) : `${paths.length} pages`;
+    return `could not move ${what} to the Trash: ${messageOf(err)}`;
+  }
 }
 
 export async function explainDelete(

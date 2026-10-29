@@ -17,7 +17,7 @@ if (command !== "record" && command !== "label" && command !== "stats") {
   process.exit(2);
 }
 
-const home = process.env.HOME;
+const home = process.env.HOME || process.env.USERPROFILE;
 if (!home) {
   console.error("lessons-cli.ts: HOME is not set");
   process.exit(1);

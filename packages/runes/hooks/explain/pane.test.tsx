@@ -2,6 +2,8 @@ import type { On } from "claude-code";
 import { expect, test, type Engine } from "claude-code/testing";
 
 import type { ExplainEntry, ExplainView } from "../../types";
+import type { PlatformOperation } from "../platform";
+import { HOME } from "../transcript/test-session";
 import { eventually, ran, startSession } from "../transcript/test-session";
 
 const PANE = {
@@ -35,6 +37,8 @@ const seed = (on: On, initial: ExplainView) => {
     version: 1,
     forks: [] as string[],
     opens: [] as string[][],
+    operations: [] as PlatformOperation[],
+    platformFailure: undefined as string | undefined,
   };
   on(
     "state.get",
@@ -60,8 +64,21 @@ const seed = (on: On, initial: ExplainView) => {
 const session = ($: Engine, on: On, view: ExplainView, glow?: string) => {
   const box = seed(on, view);
   return startSession($, on, {
+    probe: () =>
+      ran(JSON.stringify({
+        platform: "darwin",
+        wsl: false,
+        home: HOME,
+        tmp: "/tmp",
+        chrome: null,
+      })),
     run: (e) => {
       box.opens.push(e.argv);
+      if (e.argv[1]?.endsWith("/hooks/platform-cli.ts")) {
+        const op = JSON.parse(e.init?.stdin ?? "") as PlatformOperation;
+        box.operations.push(op);
+        return box.platformFailure ? ran("", 1, box.platformFailure) : ran("");
+      }
       if (e.argv[0] === "glow") {
         if (glow === undefined) throw new Error("glow: not found");
         return ran(glow);
@@ -326,7 +343,7 @@ test("an html entry draws summary, dim path, each check's status line, and open 
   });
   await ui.press({ key: "explain-open:x1" });
   await ui.unmount();
-  expect(box.opens).toContainEqual(["open", "/p/flow.html"]);
+  expect(box.operations).toContainEqual({ op: "open", path: "/p/flow.html" });
 });
 
 test("a long check note wraps inside the answer box and stops at two lines", async ($, on) => {
@@ -438,12 +455,12 @@ test("an html entry has a delete button and the history a clear button, each mov
   const ui = await $.ui.mount(PANE);
   await ui.press({ key: "explain-delete:h2" });
   await ui.unmount();
-  expect(box.opens).toContainEqual(["trash", "/p/h2.html"]);
+  expect(box.operations).toContainEqual({ op: "trash", paths: ["/p/h2.html"] });
   expect(box.view.entries.map((e) => e.id)).toEqual(["h1"]);
   const again = await $.ui.mount(PANE);
   await again.press({ key: "explain-clear" });
   await again.unmount();
-  expect(box.opens).toContainEqual(["trash", "/p/h1.html"]);
+  expect(box.operations).toContainEqual({ op: "trash", paths: ["/p/h1.html"] });
   expect(box.view.entries).toEqual([]);
 });
 
@@ -658,4 +675,34 @@ test("the desktop ask field is a textarea at least 4 rows tall; the terminal's s
   await session($, on, { entries: [text("x1")], isRunning: false });
   expect(byKey(await desktopTree($), "explain-ask")?.props?.rows).toBe(4);
   expect(byKey(await tree($), "explain-ask")?.props?.rows).toBe(1);
+});
+
+test("failed history actions keep the completed entry visible and surface the platform error", async ($, on) => {
+  const page: ExplainEntry & { kind: "html" } = {
+    id: "h1",
+    at: 1,
+    title: "Retained",
+    kind: "html",
+    summary: "Still available",
+    path: "/p/空間 & %#' retained.html",
+    check: "ok",
+  };
+  const box = await session($, on, { entries: [page], isRunning: false });
+  box.platformFailure = "no recoverable trash facility available";
+  const ui = await $.ui.mount(PANE);
+  await ui.press({ key: "explain-delete:h1" });
+  await ui.unmount();
+  expect(box.view.entries).toEqual([page]);
+  expect(box.view.error).toContain("no recoverable trash facility available");
+  expect(texts(await tree($)).join(" ")).toContain("Retained");
+  box.platformFailure = "xdg-open exited 3";
+  const reopen = await $.ui.mount(PANE);
+  await reopen.press({ key: "explain-open:h1" });
+  await reopen.unmount();
+  expect(box.view.entries).toEqual([page]);
+  expect(box.view.error).toContain("xdg-open exited 3");
+  expect(box.operations).toEqual([
+    { op: "trash", paths: [page.path] },
+    { op: "open", path: page.path },
+  ]);
 });

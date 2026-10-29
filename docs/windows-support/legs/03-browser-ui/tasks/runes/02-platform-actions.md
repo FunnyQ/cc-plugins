@@ -8,7 +8,7 @@
 >
 > **Depends on**: runes/01
 > **Blocks**: runes/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -28,6 +28,7 @@ Initialize runes and create, preview, reopen and recoverably delete its artifact
 - `packages/runes/hooks/teacher/lessons-cli.ts` (modify) — fall back from HOME to USERPROFILE in this Bun child.
 - `packages/runes/hooks/explain/explain.ts` (modify) — create directories, reopen pages and request recoverable deletion through the shared contract.
 - `packages/runes/hooks/runes.test.tsx` (modify) — cover initialization and configuration integration with the fake host.
+- `packages/runes/hooks/transcript/test-session.ts` (modify, bounded fixture update) — recognize the closed platform runtime probe in the shared fake host while preserving injected results and rejection of unhandled commands.
 - `packages/runes/hooks/explain/{explain.test.ts,pane.test.tsx}` (modify, bounded mod regression family) — cover first-run generation, history actions and preservation after failed platform operations.
 
 ## Implementation notes
@@ -35,6 +36,8 @@ Initialize runes and create, preview, reopen and recoverably delete its artifact
 ### Keep the mod and runtime boundary explicit
 
 Read platform inputs through a Bun child and cache the result for the session. Do not access `Bun`, `process.platform` or unsupported Node imports from a module loaded by the mod. Keep the hook engine object inside its hook module; share plain values and callbacks instead.
+
+Update the shared fake host to recognize the exact runtime probe introduced by this task. Preserve explicit HOME absence, injected platform snapshots, process failures and rejection of unrelated commands. Keep the existing mod suite assertions intact.
 
 Use this runtime snapshot contract:
 
@@ -78,20 +81,20 @@ Implement `cleanup-check` for the exact `.check.png` and `.check-narrow.png` nam
 
 ## Acceptance criteria
 
-- [ ] Initialization tests cover native Windows with absent and empty `HOME`, valid `USERPROFILE`, the cached runtime snapshot and a failed probe; config and explanation paths retain their established home-relative locations, and the minimap, pasted-image and teacher roots derive from the resolved home.
-- [ ] The actual Bun child rejects malformed JSON, unknown operations and invalid operation payloads, and receives path data intact without constructing shell source; mod-loaded helpers remain free of Bun globals and unsupported runtime imports.
-- [ ] First-run explain generation recursively creates its destination without invoking Unix `mkdir`; tests assert the HTML and history entry are produced when Unix utilities are unavailable.
-- [ ] Scratch-root and child-environment tests cover Windows raw/image/glow paths and unchanged macOS/Linux roots; image lookup accepts native path separators and missing glow or images retain their existing graceful behavior.
-- [ ] Preview and reopen tests preserve macOS Quick Look, select native/WSL openers correctly, and verify received paths containing spaces, CJK and shell metacharacters; an opener failure retains the explanation and reports the error.
-- [ ] Recoverable deletion tests prove failed or unavailable recycling preserves both the persisted page and its history entry, while successful recycling removes the intended entry without a permanent-delete fallback.
-- [ ] Generated-file cleanup tests remove only the two page-derived PNGs, tolerate missing screenshots and leave HTML and unrelated files intact; mocked mod calls and actual child parsing both exercise the shared operation contract.
+- [x] Initialization tests cover native Windows with absent and empty `HOME`, valid `USERPROFILE`, the cached runtime snapshot and a failed probe; config and explanation paths retain their established home-relative locations, and the minimap, pasted-image and teacher roots derive from the resolved home.
+- [x] The actual Bun child rejects malformed JSON, unknown operations and invalid operation payloads, and receives path data intact without constructing shell source; mod-loaded helpers remain free of Bun globals and unsupported runtime imports.
+- [x] First-run explain generation recursively creates its destination without invoking Unix `mkdir`; tests assert the HTML and history entry are produced when Unix utilities are unavailable.
+- [x] Scratch-root and child-environment tests cover Windows raw/image/glow paths and unchanged macOS/Linux roots; image lookup accepts native path separators and missing glow or images retain their existing graceful behavior.
+- [x] Preview and reopen tests preserve macOS Quick Look, select native/WSL openers correctly, and verify received paths containing spaces, CJK and shell metacharacters; an opener failure retains the explanation and reports the error.
+- [x] Recoverable deletion tests prove failed or unavailable recycling preserves both the persisted page and its history entry, while successful recycling removes the intended entry without a permanent-delete fallback.
+- [x] Generated-file cleanup tests remove only the two page-derived PNGs, tolerate missing screenshots and leave HTML and unrelated files intact; mocked mod calls and actual child parsing both exercise the shared operation contract.
 
 ## Verification
 
-- [ ] Run `claude plugin test packages/runes` from the repository root and require exit 0; retain existing mod coverage and add the platform integration regressions.
-- [ ] Run `claude plugin validate packages/runes` from the repository root and require exit 0.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0; keep these Bun contracts free of `claude-code` and `claude-code/testing` imports.
-- [ ] Inspect `git diff -- packages/runes` and confirm root Bun/TypeScript exclusions, themes, checker permissions and unrelated rune behavior remain unchanged.
+- [x] Run `claude plugin test packages/runes` from the repository root and require exit 0; retain existing mod coverage and add the platform integration regressions.
+- [x] Run `claude plugin validate packages/runes` from the repository root and require exit 0.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0; keep these Bun contracts free of `claude-code` and `claude-code/testing` imports.
+- [x] Inspect `git diff -- packages/runes` and confirm root Bun/TypeScript exclusions, themes, checker permissions and unrelated rune behavior remain unchanged.
 
 ## Eval rubric
 
