@@ -31,7 +31,7 @@ describe.skipIf(!installed)("firefox CLI against a real browser", () => {
     const page =
       "data:text/html,<title>T</title><input id=q><button id=b onclick=\"document.title=document.getElementById('q').value\">go</button>";
     const opened = run("open", "--new", page);
-    expect(opened.code).toBe(0);
+    expect(opened).toMatchObject({ code: 0 });
     const id = opened.out.split(" ")[0]!;
 
     try {

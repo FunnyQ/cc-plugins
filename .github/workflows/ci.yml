@@ -37,7 +37,10 @@ jobs:
         run: bun test packages/monitor/skills/cockpit/bin/cockpit.test.ts
       - if: runner.os == 'Windows'
         run: "! grep -q $'\\r' packages/monitor/skills/cockpit/bin/cockpit"
-      - run: bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ ./.github/scripts/browser-smoke.test.ts
+      # The flag replaces bunfig's pathIgnorePatterns, so the mod-test pattern is repeated here.
+      - run: bun test --parallel packages/chronicle packages/dispatch packages/guard packages/relay packages/browsers packages/herdr opencode/ ./.github/scripts/browser-smoke.test.ts --path-ignore-patterns='**/*.live.test.ts' --path-ignore-patterns='**/*.mod.test.ts'
+      # Real browsers, one file at a time: under --parallel a launch timed out on a loaded runner.
+      - run: bun test ./packages/browsers/skills/chrome/scripts/chrome.live.test.ts ./packages/browsers/skills/firefox/scripts/firefox.live.test.ts ./packages/browsers/skills/safari/scripts/safari.live.test.ts
       - run: (cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
       - run: bun .github/scripts/browser-smoke.ts
 
