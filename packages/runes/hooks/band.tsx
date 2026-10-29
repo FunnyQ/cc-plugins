@@ -58,7 +58,11 @@ export const band = (on: On) => {
     );
     const slot = hasButton ? spriteColumns() + 1 + buttons : spriteColumns();
     const slotWidth = isDesktop ? undefined : slot;
-    const reserved = config.enabled.clawd ? slot + config.minimap.gap : 0;
+    const reserved = config.enabled.clawd
+      ? slot + config.minimap.gap
+      : hasButton
+        ? buttons + config.minimap.gap
+        : 0;
     const room = (e.props.bodyColumns ?? 0) - reserved;
     const here = new Set((shown ?? []).map(stem));
     const map =
@@ -210,34 +214,9 @@ export const band = (on: On) => {
             picture
           ),
         )
-      : map
-        ? row()
+      : map || button
+        ? row(button)
         : undefined;
-    if (!button || config.enabled.clawd)
-      return clawdRow ? withNotice(clawdRow) : notice || next(e);
-    return (
-      <Box
-        key={notice ? "teacher-band" : "explain-band"}
-        flexDirection="column"
-      >
-        {notice}
-        {clawdRow}
-        <Box
-          key="explain-row"
-          flexDirection="row"
-          justifyContent="flex-end"
-          width={e.props.bodyColumns}
-        >
-          <Box
-            key="explain-under-clawd"
-            flexDirection="row"
-            justifyContent="center"
-            width={slotWidth}
-          >
-            {button}
-          </Box>
-        </Box>
-      </Box>
-    );
+    return clawdRow ? withNotice(clawdRow) : notice || next(e);
   });
 };

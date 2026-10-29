@@ -71,7 +71,6 @@ const label = async (ui: Awaited<ReturnType<Engine["ui"]["mount"]>>) =>
 test("the buttons stack left of Clawd inside clawd-slot, right-aligned, with no row of their own", async ($, on) => {
   const { ui } = await setup($, on);
   expect(await label(ui)).toContain("[Explain plz!]");
-  expect(await ui.find({ key: "explain-row" })).toBeUndefined();
   type Node =
     | {
         props?: {
@@ -135,15 +134,25 @@ test("explain off draws no button and keeps the Clawd row", async ($, on) => {
   const { ui } = await setup($, on, "explain:\n  enabled: false\n");
   expect(await ui.find({ key: "explain" })).toBeUndefined();
   expect(await ui.find({ key: "clawd-row" })).toBeDefined();
-  expect(await ui.find({ key: "explain-band" })).toBeUndefined();
   await ui.unmount();
 });
 
 test("Clawd off with no map and no lesson draws the button row alone", async ($, on) => {
   const { ui } = await setup($, on, "clawd:\n  enabled: false\n");
-  expect(await ui.find({ key: "explain-row" })).toBeDefined();
-  expect(await ui.find({ key: "clawd-row" })).toBeUndefined();
+  expect(await ui.find({ key: "explain-buttons" })).toBeDefined();
+  expect(await ui.find({ key: "clawd" })).toBeUndefined();
   expect(await ui.find({ text: "engine" })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("Clawd off puts the buttons flush right, not centred in Clawd's empty slot", async ($, on) => {
+  const { ui } = await setup($, on, "clawd:\n  enabled: false\n");
+  type Node =
+    | { props?: { key?: string; justifyContent?: string }; children?: Node[] }
+    | undefined;
+  const row = (await ui.find({ key: "clawd-row" })) as Node;
+  expect(row?.props?.justifyContent).toBe("flex-end");
+  expect(row?.children?.map((c) => c?.props?.key)).toEqual(["explain-buttons"]);
   await ui.unmount();
 });
 
