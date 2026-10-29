@@ -143,7 +143,7 @@ describe("scanRoot", () => {
   // windows.md: `\tmp\x` is drive-relative, so win32 roots under tmpdir().
   test("on win32 it lies under the user's temp dir", () => {
     expect(scanRoot("win32")).toBe(
-      join(`${tmpdir()}\\q-lab\\guard`, "comments-reaper"),
+      `${tmpdir()}\\q-lab\\guard\\comments-reaper`,
     );
   });
 });

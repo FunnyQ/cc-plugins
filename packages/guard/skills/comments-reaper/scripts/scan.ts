@@ -29,7 +29,7 @@ import { defaultStateDir } from "../../../hooks/ledger.ts";
 
 // Measured: one reviewer handed 357 blocks judged them from the comment text alone, reading no code.
 export const scanRoot = (platform: string = process.platform): string =>
-  join(defaultStateDir(platform, tmpdir()), "comments-reaper");
+  `${defaultStateDir(platform, tmpdir())}${platform === "win32" ? "\\" : "/"}comments-reaper`;
 
 export const SHARD_BLOCKS = 60;
 export const WAVE_SHARDS = 8;
