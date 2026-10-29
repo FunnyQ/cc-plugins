@@ -220,7 +220,11 @@ export async function collect(
     }
     const lines = text.split("\n").map((l) => l.trim());
     const added = without(
-      without(resolveAdded(hunks, lines), lines, reported.get(ledgerKey(abs))),
+      without(
+        resolveAdded(hunks, lines),
+        lines,
+        reported.size ? reported.get(ledgerKey(abs)) : undefined,
+      ),
       lines,
       moved,
     );

@@ -17,9 +17,9 @@ import {
 
 export type Baseline = { root: string; tree: string };
 
-function dir(platform = process.platform): string {
+function dir(): string {
   const path =
-    process.env.GUARD_STATE_DIR ?? defaultStateDir(platform, tmpdir());
+    process.env.GUARD_STATE_DIR ?? defaultStateDir(process.platform, tmpdir());
   mkdirSync(path, { recursive: true });
   return path;
 }
@@ -74,13 +74,14 @@ export function recordReported(
   file: string,
   texts: string[],
 ): void {
-  appendFileSync(reportedPath(sessionId), reportedLine(ledgerKey(file), texts));
+  appendFileSync(reportedPath(sessionId), reportedLine(file, texts));
 }
 
 export function readReported(
   sessionId: string,
 ): Map<string, Map<string, number>> {
   const byFile = new Map<string, Map<string, number>>();
+  const keys = new Map<string, string>();
   let raw = "";
   try {
     raw = readFileSync(reportedPath(sessionId), "utf8");
@@ -93,7 +94,8 @@ export function readReported(
       file: string;
       texts: string[];
     };
-    const key = ledgerKey(file);
+    const key = keys.get(file) ?? ledgerKey(file);
+    keys.set(file, key);
     const counts = byFile.get(key) ?? new Map<string, number>();
     for (const text of texts) counts.set(text, (counts.get(text) ?? 0) + 1);
     byFile.set(key, counts);

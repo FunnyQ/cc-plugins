@@ -25,12 +25,11 @@ import {
   syntaxFor,
 } from "../../../hooks/comment-core.ts";
 import { parseHunks } from "../../../hooks/comment-sweep.ts";
+import { defaultStateDir } from "../../../hooks/ledger.ts";
 
 // Measured: one reviewer handed 357 blocks judged them from the comment text alone, reading no code.
 export const scanRoot = (platform: string = process.platform): string =>
-  platform === "win32"
-    ? join(tmpdir(), "q-lab", "guard", "comments-reaper")
-    : "/tmp/q-lab/guard/comments-reaper";
+  join(defaultStateDir(platform, tmpdir()), "comments-reaper");
 
 export const SHARD_BLOCKS = 60;
 export const WAVE_SHARDS = 8;
