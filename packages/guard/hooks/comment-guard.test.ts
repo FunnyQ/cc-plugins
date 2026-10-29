@@ -650,7 +650,10 @@ describe("main", () => {
     const dir = mkdtempSync(join(tmpdir(), "cg-main-"));
     const path = join(dir, "app.ts");
     await Bun.write(path, onDisk);
-    const json = JSON.stringify(payload).replaceAll("<FILE>", path);
+    const json = JSON.stringify(payload).replaceAll(
+      "<FILE>",
+      JSON.stringify(path).slice(1, -1),
+    );
     const proc = Bun.spawn(["bun", HOOK], {
       stdin: new TextEncoder().encode(json),
       stdout: "pipe",

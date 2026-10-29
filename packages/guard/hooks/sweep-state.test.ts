@@ -29,7 +29,8 @@ test("GUARD_STATE_DIR still overrides the state dir", () => {
 });
 
 describe("ledgerKey", () => {
-  const real = realpathSync(mkdtempSync(join(tmpdir(), "ledger-key-")));
+  // windows.md: tmpdir() is an 8.3 short name on the runner; only .native expands it.
+  const real = realpathSync.native(mkdtempSync(join(tmpdir(), "ledger-key-")));
   writeFileSync(join(real, "a.ts"), "");
 
   // windows.md: NTFS paths are case-insensitive, so win32 keys fold case.
@@ -37,7 +38,9 @@ describe("ledgerKey", () => {
     expect(ledgerKey(join(real, "Gone.ts"), "win32")).toBe(
       join(real, "Gone.ts").toLowerCase(),
     );
-    expect(ledgerKey(join(real, "Gone.ts"), "darwin")).toBe(join(real, "Gone.ts"));
+    expect(ledgerKey(join(real, "Gone.ts"), "darwin")).toBe(
+      join(real, "Gone.ts"),
+    );
   });
 
   test("a symlinked or dotted spelling keys like the canonical path", () => {
@@ -51,8 +54,9 @@ describe("ledgerKey", () => {
   test("a missing tail resolves the ancestor and keeps the segments", () => {
     const link = join(mkdtempSync(join(tmpdir(), "ledger-link-")), "l");
     symlinkSync(real, link);
+    const want = join(real, "gone", "b.ts");
     expect(ledgerKey(join(link, "gone", "b.ts"))).toBe(
-      join(real, "gone", "b.ts"),
+      process.platform === "win32" ? want.toLowerCase() : want,
     );
   });
 
