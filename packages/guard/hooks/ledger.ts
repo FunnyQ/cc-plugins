@@ -4,7 +4,8 @@
  * through `$.fs` while the bun hooks write it through `node:fs`.
  */
 
-export const DEFAULT_STATE_DIR = "/tmp/q-lab/guard";
+export const defaultStateDir = (platform: string, tmp: string): string =>
+  platform === "win32" ? `${tmp}\\q-lab\\guard` : "/tmp/q-lab/guard";
 
 export const fileNameSafeSessionId = (sessionId: string) =>
   sessionId.replace(/[^\w.-]/g, "_");

@@ -7,6 +7,8 @@ import { readRecord, writeRecord } from "./daemon-record";
 import {
   canReuse,
   identifyDaemon,
+  openBrowser,
+  openerCommands,
   parseArgs,
   planLine,
   supersede,
@@ -128,6 +130,122 @@ describe("detectSource and validatePlanDir", () => {
 describe("planLine", () => {
   test("names the plan the launcher served, for the dispatch mod to read back", () => {
     expect(planLine("/abs/docs/x")).toBe("flightdeck plan: /abs/docs/x");
+  });
+});
+
+describe("openerCommands", () => {
+  const url = "http://localhost:5757/";
+  const plainLinux = () => "Linux version 6.8.0-45-generic (buildd@lcy02)";
+  const wsl = [
+    ["wslview", url],
+    ["cmd.exe", "/c", "start", "", url],
+  ];
+
+  test("darwin opens with open", () => {
+    expect(openerCommands(url, "darwin", {}, plainLinux)).toEqual([
+      ["open", url],
+    ]);
+  });
+
+  test("win32 opens through cmd's start builtin with an empty title", () => {
+    expect(openerCommands(url, "win32", {}, plainLinux)).toEqual([
+      ["cmd", "/c", "start", "", url],
+    ]);
+  });
+
+  test("WSL_DISTRO_NAME marks WSL without reading /proc/version", () => {
+    const read = () => {
+      throw new Error("must not read /proc/version");
+    };
+    expect(
+      openerCommands(url, "linux", { WSL_DISTRO_NAME: "Ubuntu" }, read),
+    ).toEqual(wsl);
+  });
+
+  test("a Microsoft kernel in /proc/version marks WSL", () => {
+    expect(
+      openerCommands(
+        url,
+        "linux",
+        {},
+        () => "Linux version 5.15.0-microsoft-standard-WSL2",
+      ),
+    ).toEqual(wsl);
+  });
+
+  test("plain linux opens with xdg-open", () => {
+    expect(openerCommands(url, "linux", {}, plainLinux)).toEqual([
+      ["xdg-open", url],
+    ]);
+  });
+
+  test("an unreadable /proc/version means plain linux", () => {
+    const read = () => {
+      throw new Error("ENOENT");
+    };
+    expect(openerCommands(url, "linux", {}, read)).toEqual([["xdg-open", url]]);
+  });
+});
+
+describe("openBrowser", () => {
+  test("falls back from wslview to cmd.exe when the first spawn throws", async () => {
+    const tried: string[][] = [];
+    await openBrowser(
+      [
+        ["wslview", "u"],
+        ["cmd.exe", "/c", "start", "", "u"],
+      ],
+      (command) => {
+        tried.push(command);
+        if (command[0] === "wslview") throw new Error("Executable not found");
+        return Promise.resolve(0);
+      },
+    );
+    expect(tried.map((command) => command[0])).toEqual(["wslview", "cmd.exe"]);
+  });
+
+  test("awaits a nonzero wslview exit before trying cmd.exe and stops after success", async () => {
+    const tried: string[] = [];
+    await openBrowser(
+      [["wslview"], ["cmd.exe"], ["unused"]],
+      async (command) => {
+        await Bun.sleep(1);
+        tried.push(command[0]!);
+        return command[0] === "wslview" ? 1 : 0;
+      },
+    );
+    expect(tried).toEqual(["wslview", "cmd.exe"]);
+  });
+
+  test("logs a notice when every opener exits nonzero", async () => {
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (message: string) => errors.push(message);
+    try {
+      await openBrowser([["wslview"], ["cmd.exe"]], async () => 1);
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toEqual([
+      "flightdeck notice: browser opener unavailable: cmd.exe exited with code 1",
+    ]);
+  });
+
+  test("logs the notice only when every opener threw", async () => {
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (message: string) => errors.push(message);
+    try {
+      await openBrowser([["a"], ["b"]], () => {
+        throw new Error("Executable not found");
+      });
+      await openBrowser([["a"]], () => Promise.resolve(0));
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toEqual([
+      "flightdeck notice: browser opener unavailable: Executable not found",
+    ]);
   });
 });
 

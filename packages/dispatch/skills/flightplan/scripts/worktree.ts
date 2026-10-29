@@ -1,16 +1,19 @@
 #!/usr/bin/env bun
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   rmdirSync,
   statSync,
   symlinkSync,
+  unlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
@@ -20,9 +23,11 @@ import {
   dirname,
   isAbsolute,
   join,
+  posix,
   relative,
   resolve,
   sep,
+  win32,
 } from "node:path";
 
 type Options = { repo: string; slug: string; planDir?: string };
@@ -58,12 +63,16 @@ function gitRaw(
   args: string[],
   options: { env?: Record<string, string>; stdin?: Uint8Array } = {},
 ) {
-  return Bun.spawnSync(["git", "-C", root, ...args], {
-    stdin: options.stdin,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: { ...process.env, ...options.env },
-  });
+  // A system core.autocrlf=true (Git for Windows' default) would write CRLF back into LF files.
+  return Bun.spawnSync(
+    ["git", "-C", root, "-c", "core.autocrlf=false", ...args],
+    {
+      stdin: options.stdin,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: { ...process.env, ...options.env },
+    },
+  );
 }
 
 function git(
@@ -179,6 +188,7 @@ function snapshot(root: string, plan: string): string {
     }
     const env = { GIT_INDEX_FILE: index };
     git(root, ["add", "-A"], env);
+    git(root, ["add", "--renormalize", "-A"], env);
     git(
       root,
       ["rm", "-r", "--cached", "-q", "--ignore-unmatch", "--", plan],
@@ -273,7 +283,26 @@ function isDirectory(path: string): boolean {
   return existsSync(path) && lstatSync(path).isDirectory();
 }
 
-function seedIgnored(repo: string, path: string, excluded: string): void {
+type Spawn = (argv: string[]) => { exitCode: number | null };
+
+function defaultSpawn(argv: string[]): { exitCode: number | null } {
+  try {
+    return Bun.spawnSync(argv, {
+      stdout: "pipe",
+      stderr: "pipe",
+      env: process.env,
+    });
+  } catch {
+    return { exitCode: null };
+  }
+}
+
+export function seedIgnored(
+  repo: string,
+  path: string,
+  excluded: string,
+  spawn: Spawn = defaultSpawn,
+): void {
   function copy(relative: string): void {
     relative = relative.replace(/\/$/, "");
     if (relative === excluded || relative.startsWith(`${excluded}/`)) return;
@@ -285,23 +314,21 @@ function seedIgnored(repo: string, path: string, excluded: string): void {
     }
     const destination = join(path, relative);
     mkdirSync(dirname(destination), { recursive: true });
-    const cloned = Bun.spawnSync(["cp", "-c", "-R", source, destination], {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: process.env,
-    });
-    if (cloned.exitCode !== 0) {
+    if (hasCp) {
+      const cloned = spawn(["cp", "-c", "-R", source, destination]).exitCode;
+      if (cloned === 0) return;
+      hasCp = cloned !== null;
+    }
+    if (hasCp) {
       const fallback =
         isDirectory(source) && isDirectory(destination)
           ? `${source}/.`
           : source;
-      Bun.spawnSync(["cp", "-R", fallback, destination], {
-        stdout: "pipe",
-        stderr: "pipe",
-        env: process.env,
-      });
+      if (spawn(["cp", "-R", fallback, destination]).exitCode === 0) return;
     }
+    cpSync(source, destination, { recursive: true, verbatimSymlinks: true });
   }
+  let hasCp = true;
   let paths: string[];
   try {
     paths = git(repo, [
@@ -326,22 +353,57 @@ function seedIgnored(repo: string, path: string, excluded: string): void {
   }
 }
 
-function registeredPaths(repo: string): Set<string> {
-  return new Set(
+export function linkType(
+  platform: NodeJS.Platform = process.platform,
+): "junction" | undefined {
+  return platform === "win32" ? "junction" : undefined;
+}
+
+export function samePathKey(
+  p: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  const path = platform === "win32" ? win32 : posix;
+  let head = path.resolve(p);
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      head = realpathSync.native(head);
+      break;
+    } catch {
+      const parent = path.dirname(head);
+      if (parent === head) break;
+      rest.unshift(path.basename(head));
+      head = parent;
+    }
+  }
+  const key = path.join(head, ...rest);
+  return platform === "win32" ? key.toLowerCase() : key;
+}
+
+function registeredPaths(repo: string): Map<string, string> {
+  return new Map(
     git(repo, ["worktree", "list", "--porcelain", "-z"])
       .split("\0")
       .filter((field) => field.startsWith("worktree "))
-      .map((field) => field.slice("worktree ".length)),
+      .map((field) => field.slice("worktree ".length))
+      .map((path) => [samePathKey(path), path]),
   );
 }
 
 function removePath(
   repo: string,
   path: string,
-  registered: Set<string>,
+  plan: string,
+  registered: Map<string, string>,
 ): boolean {
-  if (registered.has(path)) {
-    git(repo, ["worktree", "remove", "--force", path]);
+  // Git for Windows' worktree remove keeps a junction, and its parents, yet exits 0.
+  const link = join(path, plan);
+  if (lstatSync(link, { throwIfNoEntry: false })?.isSymbolicLink())
+    (linkType() ? rmdirSync : unlinkSync)(link);
+  const registeredAs = registered.get(samePathKey(path));
+  if (registeredAs !== undefined) {
+    git(repo, ["worktree", "remove", "--force", registeredAs]);
     return true;
   }
   if (existsSync(path)) {
@@ -356,8 +418,12 @@ export function create(options: RefOptions): Location {
   const root = rootOf(options);
   const state = readState(root);
   const registered = registeredPaths(options.repo);
-  if (state[options.ref] || existsSync(path) || registered.has(path)) {
-    removePath(options.repo, path, registered);
+  if (
+    state[options.ref] ||
+    existsSync(path) ||
+    registered.has(samePathKey(path))
+  ) {
+    removePath(options.repo, path, planOf(options), registered);
     git(options.repo, ["worktree", "prune"]);
     delete state[options.ref];
     writeState(root, state);
@@ -372,7 +438,7 @@ export function create(options: RefOptions): Location {
   seedIgnored(options.repo, path, planOf(options));
   const link = join(path, planOf(options));
   mkdirSync(dirname(link), { recursive: true });
-  symlinkSync(join(resolve(options.repo), planOf(options)), link);
+  symlinkSync(join(resolve(options.repo), planOf(options)), link, linkType());
   state[options.ref] = { path, base };
   writeState(root, state);
   return { path, base };
@@ -514,7 +580,13 @@ export function remove(options: RefOptions): { removed: boolean } {
   const path = pathOf(options);
   const root = rootOf(options);
   const state = readState(root);
-  const removed = removePath(options.repo, path, registeredPaths(options.repo));
+  const removed = removePath(
+    options.repo,
+    path,
+    planOf(options),
+    registeredPaths(options.repo),
+  );
+  git(options.repo, ["worktree", "prune"]);
   const hadState = Object.hasOwn(state, options.ref);
   if (hadState) {
     delete state[options.ref];
@@ -560,7 +632,12 @@ export function sweep(
       if (isDirectory(path)) kept.push({ ref, path });
       continue;
     }
-    const didRemove = removePath(options.repo, path, registered);
+    const didRemove = removePath(
+      options.repo,
+      path,
+      planOf(options),
+      registered,
+    );
     if (didRemove || Object.hasOwn(state, ref)) removed.push(ref);
     delete state[ref];
   }

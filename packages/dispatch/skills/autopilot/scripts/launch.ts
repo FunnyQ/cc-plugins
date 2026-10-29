@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { detectSource } from "./graph-source";
 import { decideStartup, type StartupDecision } from "./daemon-decision";
@@ -119,22 +119,56 @@ async function poll(check: () => Promise<boolean>): Promise<boolean> {
   return false;
 }
 
-function openBrowser(url: string): void {
+function isWsl(
+  env: Record<string, string | undefined>,
+  readProcVersion: () => string,
+): boolean {
+  if (env.WSL_DISTRO_NAME) return true;
   try {
-    const command =
-      process.platform === "darwin"
-        ? ["open", url]
-        : process.platform === "win32"
-          ? ["cmd", "/c", "start", "", url]
-          : ["xdg-open", url];
-    Bun.spawn(command, {
-      detached: true,
-      stdio: ["ignore", "ignore", "ignore"],
-    }).unref();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`flightdeck notice: browser opener unavailable: ${message}`);
+    return /microsoft/i.test(readProcVersion());
+  } catch {
+    return false;
   }
+}
+
+export function openerCommands(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  readProcVersion: () => string = () => readFileSync("/proc/version", "utf8"),
+): string[][] {
+  if (platform === "darwin") return [["open", url]];
+  if (platform === "win32") return [["cmd", "/c", "start", "", url]];
+  if (platform === "linux" && isWsl(env, readProcVersion)) {
+    // xdg-open is often absent on WSL; cmd.exe reaches the Windows browser through interop.
+    return [
+      ["wslview", url],
+      ["cmd.exe", "/c", "start", "", url],
+    ];
+  }
+  return [["xdg-open", url]];
+}
+
+export async function openBrowser(
+  commands: string[][],
+  spawn: (command: string[]) => Promise<number> = (command) => {
+    return Bun.spawn(command, {
+      stdio: ["ignore", "ignore", "ignore"],
+    }).exited;
+  },
+): Promise<void> {
+  let failure: unknown;
+  for (const command of commands) {
+    try {
+      const code = await spawn(command);
+      if (code === 0) return;
+      failure = new Error(`${command[0]} exited with code ${code}`);
+    } catch (error) {
+      failure = error;
+    }
+  }
+  const message = failure instanceof Error ? failure.message : String(failure);
+  console.error(`flightdeck notice: browser opener unavailable: ${message}`);
 }
 
 export async function supersede(info: DaemonInfo): Promise<boolean> {
@@ -234,7 +268,7 @@ export async function main(): Promise<void> {
   console.log(planLine(plan));
 
   if (open) {
-    openBrowser(url);
+    await openBrowser(openerCommands(url));
   }
 }
 

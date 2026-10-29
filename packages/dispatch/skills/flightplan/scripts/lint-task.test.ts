@@ -1110,6 +1110,18 @@ describe("inferRefFromPath", () => {
   test("returns null when bucket name has dashes", () => {
     expect(inferRefFromPath("/abs/tasks/my-bucket/01-foo.md")).toBeNull();
   });
+
+  test.each([
+    ["docs/x/tasks/ui/01-a.md"],
+    ["docs\\x\\tasks\\ui\\01-a.md"],
+    ["C:\\repo\\docs/x\\tasks\\ui/01-a.md"],
+  ])("splits %s on either separator", (path) => {
+    expect(inferRefFromPath(path)).toEqual({ bucket: "ui", nn: "01" });
+  });
+
+  test("returns null for a file directly under tasks/, which has no bucket", () => {
+    expect(inferRefFromPath("docs/x/tasks/01-a.md")).toBeNull();
+  });
 });
 
 describe("scope-git-status rule", () => {
@@ -1473,7 +1485,7 @@ describe("plan concurrency", () => {
     );
     const result = await runCli(join(root, "tasks"));
     expect(result.stdout).toContain("[serial-undeclared]");
-    expect(result.stdout).toContain("_context/shared.md");
+    expect(result.stdout).toContain(join("_context", "shared.md"));
     await rm(root, { recursive: true });
   });
 

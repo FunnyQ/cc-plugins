@@ -324,6 +324,7 @@ describe("analyzeFile", () => {
     const dir = await mkdtemp(join(tmpdir(), "chronicle-lock-"));
     process.chdir(dir);
     await $`git init -q .`.quiet();
+    await $`git config core.autocrlf false`.quiet();
     await $`git config user.email t@t`.quiet();
     await $`git config user.name t`.quiet();
 
@@ -356,6 +357,7 @@ describe("analyzeFile", () => {
     const dir = await mkdtemp(join(tmpdir(), "chronicle-newlock-"));
     process.chdir(dir);
     await $`git init -q .`.quiet();
+    await $`git config core.autocrlf false`.quiet();
     await writeFile(join(dir, "bun.lock"), "a\nb\nc\n");
 
     const result = await analyzeFile({
@@ -402,6 +404,7 @@ describe("analyzeFile", () => {
     const dir = await mkdtemp(join(tmpdir(), "chronicle-intent-"));
     process.chdir(dir);
     await $`git init -q .`.quiet();
+    await $`git config core.autocrlf false`.quiet();
     await $`git config user.email t@t`.quiet();
     await $`git config user.name t`.quiet();
     await writeFile(join(dir, "existing.ts"), "export const a = 1;\n");

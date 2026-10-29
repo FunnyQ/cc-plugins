@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: chronicle/02, chronicle/03
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -99,20 +99,20 @@ The unparseable-payload half already passes; leave it.
 
 ## Acceptance criteria
 
-- [ ] `grep -rnE 'split\("/"\)' packages/chronicle --include='*.test.ts'` prints nothing.
-- [ ] `grep -rnE '\$\{shim\}:' packages/chronicle --include='*.test.ts'` prints nothing; the release git-shim test builds PATH with `delimiter`.
-- [ ] Every `git init` in a chronicle test file is followed in the same helper by a `core.autocrlf false` config: `grep -rlE 'git.*init' packages/chronicle --include='*.test.ts'` and `grep -rlE 'autocrlf' packages/chronicle --include='*.test.ts'` list the same files.
-- [ ] The three NTFS file-name tests in `commit.test.ts` are `test.skipIf(process.platform === "win32")` and name the NTFS fact; no other chronicle test gains a `skipIf`, except the release git-shim test under the condition in Implementation notes.
-- [ ] `check-branch.test.ts`'s no-jq half names its links `git.exe` / `cat.exe` on win32.
-- [ ] Every `HOME` override the grep finds in chronicle tests sets `USERPROFILE` too, and every `TMPDIR` override sets `TEMP` and `TMP`; the task report states the grep result.
-- [ ] No product file changes: `git diff --name-only -- packages/chronicle` lists only `*.test.ts` paths.
+- [x] `grep -rnE 'split\("/"\)' packages/chronicle --include='*.test.ts'` prints nothing.
+- [x] `grep -rnE '\$\{shim\}:' packages/chronicle --include='*.test.ts'` prints nothing; the release git-shim test builds PATH with `delimiter`.
+- [x] Every `git init` in a chronicle test file is followed in the same helper by a `core.autocrlf false` config: `grep -rlE 'git.*init' packages/chronicle --include='*.test.ts'` and `grep -rlE 'autocrlf' packages/chronicle --include='*.test.ts'` list the same files.
+- [x] The three NTFS file-name tests in `commit.test.ts` are `test.skipIf(process.platform === "win32")` and name the NTFS fact; no other chronicle test gains a `skipIf`, except the release git-shim test under the condition in Implementation notes.
+- [x] `check-branch.test.ts`'s no-jq half names its links `git.exe` / `cat.exe` on win32.
+- [x] Every `HOME` override the grep finds in chronicle tests sets `USERPROFILE` too, and every `TMPDIR` override sets `TEMP` and `TMP`; the task report states the grep result.
+- [x] No product file changes: `git diff --name-only -- packages/chronicle` lists only `*.test.ts` paths.
 
 ## Verification
 
-- [ ] `bun test packages/chronicle` passes on macOS.
-- [ ] `bunx --bun tsc --noEmit` from the repo root prints nothing.
-- [ ] `git diff --name-only -- packages/chronicle | grep -v '\.test\.ts$'` prints nothing.
-- [ ] `grep -rnE 'split\("/"\)|\$\{shim\}:' packages/chronicle --include='*.test.ts'` prints nothing.
+- [x] `bun test packages/chronicle` passes on macOS.
+- [x] `bunx --bun tsc --noEmit` from the repo root prints nothing.
+- [x] `git diff --name-only -- packages/chronicle | grep -v '\.test\.ts$'` prints nothing.
+- [x] `grep -rnE 'split\("/"\)|\$\{shim\}:' packages/chronicle --include='*.test.ts'` prints nothing.
 
 ## Eval rubric
 

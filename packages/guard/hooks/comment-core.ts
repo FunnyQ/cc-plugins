@@ -4,9 +4,9 @@
  * runs with no Node, so nothing here may import a `node:` module.
  */
 
-// node:path is out of a mod's reach; these copy its posix answers, pinned by a test against it.
+// node:path is out of a mod's reach; accept both path separators here.
 export function baseName(filePath: string): string {
-  return filePath.replace(/\/+$/, "").split("/").pop() ?? "";
+  return filePath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
 }
 
 export function extName(filePath: string): string {
@@ -200,7 +200,8 @@ export const BY_NAME: Record<string, Syntax> = {
 
 export function isGuardedPath(filePath: string): boolean {
   if (/\.min\.(js|css)$/.test(filePath)) return false;
-  if (filePath.split("/").some((part) => SKIP_SEGMENTS.has(part))) return false;
+  if (filePath.split(/[\\/]/).some((part) => SKIP_SEGMENTS.has(part)))
+    return false;
   return !SKIP_EXTS.has(extName(filePath));
 }
 

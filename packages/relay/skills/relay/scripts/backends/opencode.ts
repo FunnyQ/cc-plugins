@@ -46,14 +46,9 @@ export const opencodeBackend: Backend = {
       argv.push("--auto");
     }
 
-    // Append prompt text (opencode has no --prompt-file flag). The `--` stops
-    // yargs from parsing flag-like tokens inside the task (e.g. "add --help
-    // flag") as options — run.ts merges args["--"] back into the message.
-    if (opts.promptText !== undefined) {
-      argv.push("--", opts.promptText);
-    }
-
-    return { argv };
+    // The prompt rides stdin: npm's opencode.cmd shim makes Bun refuse any
+    // argument holding `"`, `%`, `&` or a newline on Windows.
+    return { argv, stdin: opts.promptText };
   },
 
   invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {

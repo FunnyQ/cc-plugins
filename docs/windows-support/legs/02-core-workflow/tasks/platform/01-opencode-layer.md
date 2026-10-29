@@ -9,7 +9,7 @@
 >
 > **Depends on**: dispatch/02
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -74,21 +74,21 @@ Change nothing else in the regex. The extension branch has no separator and stay
 
 ## Acceptance criteria
 
-- [ ] `opencode/plugin.ts` spawns `check-branch.sh` and `flightplan-lint.sh` as `["bash", join(root, …)]`. `grep -n '\[join(root, CHECK_BRANCH)\]\|\[join(root, FLIGHTPLAN_LINT)\]' opencode/plugin.ts` prints nothing.
-- [ ] `COMMENT_GUARDED` accepts `\` and `/` before an extensionless build-file name. The new test for `C:\\repo\\Rakefile` passes, and the existing `BY_EXT`/`BY_NAME` cross-check passes unchanged.
-- [ ] `FLIGHTPLAN_TASK` is byte-identical to its state before this task, and `packages/dispatch/hooks/task-path.test.ts` passes.
-- [ ] Every `skipIf(process.platform === "win32")` added in `opencode/plugin.test.ts` names the missing Windows cockpit build. No skip covers the lint or comment-guard cases.
-- [ ] The lint test asserts that the spawn argv begins with `"bash"`.
-- [ ] `opencode/plugin.ts` still imports nothing from the repo and reads no harness env var.
+- [x] `opencode/plugin.ts` spawns `check-branch.sh` and `flightplan-lint.sh` as `["bash", join(root, …)]`. `grep -n '\[join(root, CHECK_BRANCH)\]\|\[join(root, FLIGHTPLAN_LINT)\]' opencode/plugin.ts` prints nothing.
+- [x] `COMMENT_GUARDED` accepts `\` and `/` before an extensionless build-file name. The new test for `C:\\repo\\Rakefile` passes, and the existing `BY_EXT`/`BY_NAME` cross-check passes unchanged.
+- [x] `FLIGHTPLAN_TASK` is byte-identical to its state before this task, and `packages/dispatch/hooks/task-path.test.ts` passes.
+- [x] Every `skipIf(process.platform === "win32")` added in `opencode/plugin.test.ts` names the missing Windows cockpit build. No skip covers the lint or comment-guard cases.
+- [x] The lint test asserts that the spawn argv begins with `"bash"`.
+- [x] `opencode/plugin.ts` still imports nothing from the repo and reads no harness env var.
 
 ## Verification
 
-- [ ] `bun test opencode/` passes on macOS.
-- [ ] `bun test packages/dispatch/hooks/task-path.test.ts` passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `grep -n 'from "\.\./' opencode/plugin.ts` prints nothing.
-- [ ] `grep -nE 'process\.env\.(CLAUDE|CODEX|PLUGIN_ROOT|OPENCODE)' opencode/plugin.ts` prints nothing.
-- [ ] `git status --short -- opencode/plugin.ts opencode/plugin.test.ts` shows both paths modified.
+- [x] `bun test opencode/` passes on macOS.
+- [x] `bun test packages/dispatch/hooks/task-path.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `grep -n 'from "\.\./' opencode/plugin.ts` prints nothing.
+- [x] `grep -nE 'process\.env\.(CLAUDE|CODEX|PLUGIN_ROOT|OPENCODE)' opencode/plugin.ts` prints nothing.
+- [x] `git status --short -- opencode/plugin.ts opencode/plugin.test.ts` shows both paths modified.
 
 ## Eval rubric
 

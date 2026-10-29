@@ -18,6 +18,7 @@ import {
   type TrustedRoot,
 } from "../../../shared/scripts/cockpit-trail";
 import {
+  ARCHIVE_IGNORE_PATTERN,
   archiveIgnored,
   archiveTrail,
   findTrailRoots,
@@ -63,6 +64,7 @@ function session(
 
 function gitRepository(root: string, gitignore: string): void {
   spawnSync("git", ["init", "-q"], { cwd: root });
+  spawnSync("git", ["config", "core.autocrlf", "false"], { cwd: root });
   writeFileSync(join(root, ".gitignore"), gitignore);
 }
 
@@ -239,4 +241,8 @@ describe("CLI", () => {
       existsSync(join(root, ".cockpit", "archive", "done", "old.jsonl")),
     ).toBe(true);
   });
+});
+
+test("the archive ignore pattern is POSIX on every platform", () => {
+  expect(ARCHIVE_IGNORE_PATTERN).toBe(".cockpit/archive/");
 });

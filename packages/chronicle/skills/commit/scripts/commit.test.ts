@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { realpathSync } from "node:fs";
 import type { PlannedCommit, SimpleProse } from "./commit-plan";
+import { canonicalPath } from "./commit";
 
 const SCRIPT = resolve(import.meta.dir, "commit.ts");
 
@@ -12,6 +14,7 @@ let repo = "";
 async function initRepo(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "chronicle-commit-"));
   await $`git init -q -b main`.cwd(dir).quiet();
+  await $`git config core.autocrlf false`.cwd(dir).quiet();
   await $`git config user.email t@t.t`.cwd(dir).quiet();
   await $`git config user.name t`.cwd(dir).quiet();
   await $`git config commit.gpgsign false`.cwd(dir).quiet();
@@ -352,60 +355,72 @@ describe("apply", () => {
     expect(json.ok).toBe(true);
   });
 
-  test("carries a filename containing git's rename separator", async () => {
-    await baseCommit();
-    await seed("a -> b.txt", "hi\n");
-    const planPath = await writePlan({
-      commits: [
-        { type: "docs", subject: "add the odd name", files: ["a -> b.txt"] },
-      ],
-    });
+  // NTFS forbids `>` in file names.
+  test.skipIf(process.platform === "win32")(
+    "carries a filename containing git's rename separator",
+    async () => {
+      await baseCommit();
+      await seed("a -> b.txt", "hi\n");
+      const planPath = await writePlan({
+        commits: [
+          { type: "docs", subject: "add the odd name", files: ["a -> b.txt"] },
+        ],
+      });
 
-    const { exitCode, json } = await run("apply", planPath);
-    expect(exitCode).toBe(0);
-    expect(json.ok).toBe(true);
-    expect(json.verify.plannedFiles).toBe(1);
-  });
+      const { exitCode, json } = await run("apply", planPath);
+      expect(exitCode).toBe(0);
+      expect(json.ok).toBe(true);
+      expect(json.verify.plannedFiles).toBe(1);
+    },
+  );
 
-  test("carries a filename containing a newline", async () => {
-    await baseCommit();
-    await seed("two\nlines.txt", "hi\n");
-    const planPath = await writePlan({
-      commits: [
-        {
-          type: "docs",
-          subject: "add the odd name",
-          files: ["two\nlines.txt"],
-        },
-      ],
-    });
+  // NTFS forbids control characters, newline included, in file names.
+  test.skipIf(process.platform === "win32")(
+    "carries a filename containing a newline",
+    async () => {
+      await baseCommit();
+      await seed("two\nlines.txt", "hi\n");
+      const planPath = await writePlan({
+        commits: [
+          {
+            type: "docs",
+            subject: "add the odd name",
+            files: ["two\nlines.txt"],
+          },
+        ],
+      });
 
-    const { exitCode, json } = await run("apply", planPath);
-    expect(exitCode).toBe(0);
-    expect(json.ok).toBe(true);
-  });
+      const { exitCode, json } = await run("apply", planPath);
+      expect(exitCode).toBe(0);
+      expect(json.ok).toBe(true);
+    },
+  );
 
-  test("renames a file whose name holds the rename separator", async () => {
-    await baseCommit();
-    await seed("a -> b.txt", "stable content here\n");
-    await $`git add -A`.cwd(repo).quiet();
-    await $`git commit -q -m ${"✨ feat: add it"}`.cwd(repo).quiet();
-    await $`git mv ${"a -> b.txt"} ${"c -> d.txt"}`.cwd(repo).quiet();
+  // NTFS forbids `>` in file names.
+  test.skipIf(process.platform === "win32")(
+    "renames a file whose name holds the rename separator",
+    async () => {
+      await baseCommit();
+      await seed("a -> b.txt", "stable content here\n");
+      await $`git add -A`.cwd(repo).quiet();
+      await $`git commit -q -m ${"✨ feat: add it"}`.cwd(repo).quiet();
+      await $`git mv ${"a -> b.txt"} ${"c -> d.txt"}`.cwd(repo).quiet();
 
-    const planPath = await writePlan({
-      commits: [
-        {
-          type: "refactor",
-          subject: "rename it",
-          files: ["a -> b.txt", "c -> d.txt"],
-        },
-      ],
-    });
+      const planPath = await writePlan({
+        commits: [
+          {
+            type: "refactor",
+            subject: "rename it",
+            files: ["a -> b.txt", "c -> d.txt"],
+          },
+        ],
+      });
 
-    const { exitCode, json } = await run("apply", planPath);
-    expect(exitCode).toBe(0);
-    expect(json.ok).toBe(true);
-  });
+      const { exitCode, json } = await run("apply", planPath);
+      expect(exitCode).toBe(0);
+      expect(json.ok).toBe(true);
+    },
+  );
 
   test("refuses a rename that dropped its old path, before staging anything", async () => {
     await baseCommit();
@@ -678,5 +693,23 @@ describe("apply", () => {
     expect(exitCode).toBe(2);
     expect(json.error).toContain("exclude");
     expect(await subjects()).not.toContain("🐛 fix: resolve conflict");
+  });
+});
+
+describe("canonicalPath", () => {
+  test("appends missing segments to the real existing parent", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-canon-"));
+    expect(canonicalPath(join(dir, "nope", "plan.json"), "darwin")).toBe(
+      join(realpathSync.native(dir), "nope", "plan.json"),
+    );
+  });
+
+  test("lower-cases on win32 only", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-Canon-"));
+    const real = join(realpathSync.native(dir), "Plan.JSON");
+    expect(canonicalPath(join(dir, "Plan.JSON"), "win32")).toBe(
+      real.toLowerCase(),
+    );
+    expect(canonicalPath(join(dir, "Plan.JSON"), "darwin")).toBe(real);
   });
 });

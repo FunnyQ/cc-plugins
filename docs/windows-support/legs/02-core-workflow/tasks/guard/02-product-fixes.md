@@ -9,7 +9,7 @@
 >
 > **Depends on**: guard/01
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -99,21 +99,21 @@ Tests in `comment-core.test.ts`: `isGuardedPath("docs\\gen.py")`, `isGuardedPath
 
 ## Acceptance criteria
 
-- [ ] Each new test fails against the code before the change and passes after it.
-- [ ] `defaultStateDir("darwin", anything)` and `defaultStateDir("linux", anything)` return exactly `/tmp/q-lab/guard`; the win32 value is under the given tmp dir. The scan root returns exactly `/tmp/q-lab/guard/comments-reaper` off win32.
-- [ ] `packages/guard/hooks/ledger.ts` and `packages/guard/hooks/comment-core.ts` import nothing from `node:*`.
-- [ ] `GUARD_STATE_DIR` still overrides the state dir.
-- [ ] `ledgerKey` never throws for a missing path, lower-cases only on win32, and the sweep looks up with it.
-- [ ] `isGuardedPath` skips `docs`, `vendor` and `node_modules` segments separated by `\` and keeps the segment rule (`mydocs\` stays guarded).
-- [ ] No test pins a POSIX literal or `/`-only regex for a guard scratch path, except the darwin/linux assertions on the two root functions themselves (`/tmp/q-lab/guard` and `/tmp/q-lab/guard/comments-reaper`), which must stay exact, and `reap.workflow.test.ts`'s opaque `/tmp/q-lab/...` strings, which a pure function passes through untouched.
+- [x] Each new test fails against the code before the change and passes after it.
+- [x] `defaultStateDir("darwin", anything)` and `defaultStateDir("linux", anything)` return exactly `/tmp/q-lab/guard`; the win32 value is under the given tmp dir. The scan root returns exactly `/tmp/q-lab/guard/comments-reaper` off win32.
+- [x] `packages/guard/hooks/ledger.ts` and `packages/guard/hooks/comment-core.ts` import nothing from `node:*`.
+- [x] `GUARD_STATE_DIR` still overrides the state dir.
+- [x] `ledgerKey` never throws for a missing path, lower-cases only on win32, and the sweep looks up with it.
+- [x] `isGuardedPath` skips `docs`, `vendor` and `node_modules` segments separated by `\` and keeps the segment rule (`mydocs\` stays guarded).
+- [x] No test pins a POSIX literal or `/`-only regex for a guard scratch path, except the darwin/linux assertions on the two root functions themselves (`/tmp/q-lab/guard` and `/tmp/q-lab/guard/comments-reaper`), which must stay exact, and `reap.workflow.test.ts`'s opaque `/tmp/q-lab/...` strings, which a pure function passes through untouched.
 
 ## Verification
 
-- [ ] `bun test packages/guard` passes on macOS.
-- [ ] `bunx --bun tsc --noEmit` from the repo root prints nothing.
-- [ ] `rg -n '^\s*import\b.*["'"'"']node:|require\(["'"'"']node:' packages/guard/hooks/ledger.ts packages/guard/hooks/comment-core.ts` prints nothing (comments that mention `node:fs` do not count).
-- [ ] `grep -rn "DEFAULT_STATE_DIR" packages/guard` prints nothing.
-- [ ] `git diff --stat -- packages/guard` lists only the files named above.
+- [x] `bun test packages/guard` passes on macOS.
+- [x] `bunx --bun tsc --noEmit` from the repo root prints nothing.
+- [x] `rg -n '^\s*import\b.*["'"'"']node:|require\(["'"'"']node:' packages/guard/hooks/ledger.ts packages/guard/hooks/comment-core.ts` prints nothing (comments that mention `node:fs` do not count).
+- [x] `grep -rn "DEFAULT_STATE_DIR" packages/guard` prints nothing.
+- [x] `git diff --stat -- packages/guard` lists only the files named above.
 
 ## Eval rubric
 

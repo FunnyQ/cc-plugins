@@ -9,7 +9,7 @@
 >
 > **Depends on**: dispatch/02
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 > **Models**: dev=opus/high
 
 ## Goal
@@ -129,24 +129,24 @@ Tests in `launch.test.ts`: one per branch — darwin, win32, WSL via `WSL_DISTRO
 
 ## Acceptance criteria
 
-- [ ] `gitRaw` in `worktree.ts` passes `-c core.autocrlf=false` on every git call, and a test with `core.autocrlf true` set in the fixture repo proves an LF file comes back from create and land with no `\r` (the test fails without the pin).
-- [ ] `seedIgnored` copies an ignored directory with `cpSync` when the injected spawn fails for both `cp` attempts, proven by a test with no PATH stub.
-- [ ] The plan-dir link uses type `"junction"` when the injected platform is `win32` and no type otherwise, proven by a unit test of the type choice.
-- [ ] The report records the `opencode run` stdin probe output (or that opencode is absent) and which path (stdin or `-f` file) `opencode-run.ts` now uses.
-- [ ] `opencode-run.ts` spawns opencode with no prompt text in argv, and a test passes a prompt holding `"`, `%`, `&` and a newline that reaches the stub intact.
-- [ ] `openerCommands` returns the exact argv lists above for darwin, win32, WSL (both detection routes) and plain linux, and darwin/win32/plain-linux output equals the pre-change argv.
-- [ ] `openBrowser` falls back from `wslview` to `cmd.exe` when the first spawn throws.
-- [ ] macOS and Linux behaviour is unchanged apart from the autocrlf pin: `/tmp/q-lab` paths, `cp -c` first, `open` / `xdg-open` argv all as before.
+- [x] `gitRaw` in `worktree.ts` passes `-c core.autocrlf=false` on every git call, and a test with `core.autocrlf true` set in the fixture repo proves an LF file comes back from create and land with no `\r` (the test fails without the pin).
+- [x] `seedIgnored` copies an ignored directory with `cpSync` when the injected spawn fails for both `cp` attempts, proven by a test with no PATH stub.
+- [x] The plan-dir link uses type `"junction"` when the injected platform is `win32` and no type otherwise, proven by a unit test of the type choice.
+- [x] The report records the `opencode run` stdin probe output (or that opencode is absent) and which path (stdin or `-f` file) `opencode-run.ts` now uses.
+- [x] `opencode-run.ts` spawns opencode with no prompt text in argv, and a test passes a prompt holding `"`, `%`, `&` and a newline that reaches the stub intact.
+- [x] `openerCommands` returns the exact argv lists above for darwin, win32, WSL (both detection routes) and plain linux, and darwin/win32/plain-linux output equals the pre-change argv.
+- [x] `openBrowser` falls back from `wslview` to `cmd.exe` when the first spawn throws.
+- [x] macOS and Linux behaviour is unchanged apart from the autocrlf pin: `/tmp/q-lab` paths, `cp -c` first, `open` / `xdg-open` argv all as before.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/worktree.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/flightplan/scripts/opencode-run.test.ts` passes.
-- [ ] `bun test packages/dispatch/skills/autopilot/scripts/launch.test.ts` passes.
-- [ ] `bun test packages/dispatch` passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `git status --short -- packages/dispatch/skills/flightplan/scripts/worktree.ts packages/dispatch/skills/flightplan/scripts/opencode-run.ts packages/dispatch/skills/autopilot/scripts/launch.ts` lists all three as modified.
-- [ ] `rg -U -n '"--format",\s*"json",\s*message' packages/dispatch/skills/flightplan/scripts/opencode-run.ts` finds nothing (run it once before the change and confirm it matches the current argv).
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/worktree.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/flightplan/scripts/opencode-run.test.ts` passes.
+- [x] `bun test packages/dispatch/skills/autopilot/scripts/launch.test.ts` passes.
+- [x] `bun test packages/dispatch` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `git status --short -- packages/dispatch/skills/flightplan/scripts/worktree.ts packages/dispatch/skills/flightplan/scripts/opencode-run.ts packages/dispatch/skills/autopilot/scripts/launch.ts` lists all three as modified.
+- [x] `rg -U -n '"--format",\s*"json",\s*message' packages/dispatch/skills/flightplan/scripts/opencode-run.ts` finds nothing (run it once before the change and confirm it matches the current argv).
 
 ## Eval rubric
 

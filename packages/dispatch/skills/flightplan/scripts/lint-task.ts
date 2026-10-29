@@ -29,7 +29,7 @@
  * Exits 0 if all files pass; 1 if any violation is found.
  */
 import { readFile, stat, readdir } from "node:fs/promises";
-import { basename, dirname, resolve, relative, sep } from "node:path";
+import { basename, dirname, resolve, relative } from "node:path";
 import {
   GATE_SECTIONS,
   parseTask,
@@ -546,11 +546,12 @@ export function formatTestNetReport(rows: TestNetReportRow[]): string {
 export function inferRefFromPath(
   filePath: string,
 ): { bucket: string; nn: string } | null {
-  const parts = filePath.split(sep);
+  const parts = filePath.split(/[\\/]/);
   const fileName = parts.at(-1) ?? "";
   const bucket = parts.at(-2) ?? "";
   const match = /^(\d{2})-/.exec(fileName);
-  if (!match || !/^[a-z][a-z0-9]*$/.test(bucket)) return null;
+  if (!match || !/^[a-z][a-z0-9]*$/.test(bucket) || parts.at(-3) !== "tasks")
+    return null;
   return { bucket, nn: match[1] };
 }
 

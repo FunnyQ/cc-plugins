@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdtempSync, realpathSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ASK } from "./comment-core.ts";
@@ -22,6 +22,7 @@ beforeEach(() => {
   git("init", "-q");
   git("config", "user.email", "t@t");
   git("config", "user.name", "t");
+  git("config", "core.autocrlf", "false");
 });
 
 afterEach(async () => {
@@ -122,6 +123,19 @@ describe("sweep", () => {
     expect(await sweep(payload)).toBeNull();
   });
 
+  test("a block reported under a symlinked spelling of the repo is not asked again", async () => {
+    const link = join(mkdtempSync(join(tmpdir(), "sweep-link-")), "repo");
+    symlinkSync(repo, link);
+    await snapshot(payload);
+    await Bun.write(join(repo, "app.ts"), BLOCK);
+    recordReported(SESSION, join(link, "app.ts"), [
+      "// one",
+      "// two",
+      "// three",
+    ]);
+    expect(await sweep(payload)).toBeNull();
+  });
+
   const TRIPLE = "const a = 1;\n// same\n// same\n// same\nconst b = 2;\n";
   const addedLines = (reason: string | undefined) =>
     (reason ?? "").split("\n").filter((l) => /^\s*\+ \d+/.test(l)).length;
@@ -183,7 +197,7 @@ describe("comment-guard records what it reported", () => {
     const file = join(repo, "app.ts");
     await Bun.write(file, BLOCK);
     const proc = Bun.spawn(
-      ["bun", new URL("./comment-guard.ts", import.meta.url).pathname],
+      ["bun", join(import.meta.dir, "comment-guard.ts")],
       {
         stdin: new TextEncoder().encode(
           JSON.stringify({

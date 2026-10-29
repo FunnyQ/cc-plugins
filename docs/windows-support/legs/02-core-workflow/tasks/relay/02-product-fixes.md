@@ -9,7 +9,7 @@
 >
 > **Depends on**: relay/01
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -97,20 +97,20 @@ Add one end-to-end case per backend that spawns a stub through the `.cmd`-shaped
 
 ## Acceptance criteria
 
-- [ ] `tmpRoot("darwin")` and `tmpRoot("linux")` return `"/tmp/q-lab/relay/relay"`; `tmpRoot("win32")` returns `join(tmpdir(), "q-lab", "relay", "relay")`; a test asserts all three.
-- [ ] No relay test pins the string `/tmp/q-lab/relay/relay` except the `tmpRoot("darwin"|"linux")` assertions.
-- [ ] `extractGeneratedPngPath` returns the full drive-letter path for both `C:\…\a.png` and `C:/…/a.png` output, and expands `~\` as well as `~/`; tests cover each shape.
-- [ ] Codex image mode returns `-` as the last argv element and the image prompt on `stdin`.
-- [ ] opencode `invoke` puts no prompt text in argv; the report quotes the PONG probe output and names the path taken (stdin or `-f` file).
-- [ ] The spawn-safety prompt containing `"`, `%`, `&` and a newline reaches the stub intact for codex image mode and opencode.
-- [ ] Each new test fails against the pre-change code (the report names one observed failure per item 1–4).
+- [x] `tmpRoot("darwin")` and `tmpRoot("linux")` return `"/tmp/q-lab/relay/relay"`; `tmpRoot("win32")` returns `join(tmpdir(), "q-lab", "relay", "relay")`; a test asserts all three.
+- [x] No relay test pins the string `/tmp/q-lab/relay/relay` except the `tmpRoot("darwin"|"linux")` assertions.
+- [x] `extractGeneratedPngPath` returns the full drive-letter path for both `C:\…\a.png` and `C:/…/a.png` output, and expands `~\` as well as `~/`; tests cover each shape.
+- [x] Codex image mode returns `-` as the last argv element and the image prompt on `stdin`.
+- [x] opencode `invoke` puts no prompt text in argv; the report quotes the PONG probe output and names the path taken (stdin or `-f` file).
+- [x] The spawn-safety prompt containing `"`, `%`, `&` and a newline reaches the stub intact for codex image mode and opencode.
+- [x] Each new test fails against the pre-change code (the report names one observed failure per item 1–4).
 
 ## Verification
 
-- [ ] `bun test packages/relay` passes.
-- [ ] `bunx --bun tsc --noEmit` from the repo root prints nothing.
-- [ ] `grep -rn '"/tmp/q-lab/relay/relay' packages/relay` lists only `shared.ts` and the `tmpRoot` assertions in `shared.test.ts`.
-- [ ] `git status --short -- packages/relay/skills/relay/scripts/shared.ts packages/relay/skills/relay/scripts/backends/codex.ts packages/relay/skills/relay/scripts/backends/opencode.ts` shows all three modified.
+- [x] `bun test packages/relay` passes.
+- [x] `bunx --bun tsc --noEmit` from the repo root prints nothing.
+- [x] `grep -rn '"/tmp/q-lab/relay/relay' packages/relay` lists only `shared.ts` and the `tmpRoot` assertions in `shared.test.ts`.
+- [x] `git status --short -- packages/relay/skills/relay/scripts/shared.ts packages/relay/skills/relay/scripts/backends/codex.ts packages/relay/skills/relay/scripts/backends/opencode.ts` shows all three modified.
 
 ## Eval rubric
 

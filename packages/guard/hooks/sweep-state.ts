@@ -2,12 +2,14 @@ import {
   appendFileSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import {
-  DEFAULT_STATE_DIR,
+  defaultStateDir,
   reportedFile,
   reportedLine,
   fileNameSafeSessionId,
@@ -16,7 +18,8 @@ import {
 export type Baseline = { root: string; tree: string };
 
 function dir(): string {
-  const path = process.env.GUARD_STATE_DIR ?? DEFAULT_STATE_DIR;
+  const path =
+    process.env.GUARD_STATE_DIR ?? defaultStateDir(process.platform, tmpdir());
   mkdirSync(path, { recursive: true });
   return path;
 }
@@ -45,6 +48,27 @@ export function clearReported(sessionId: string): void {
   rmSync(reportedPath(sessionId), { force: true });
 }
 
+export function ledgerKey(
+  p: string,
+  platform: string = process.platform,
+): string {
+  let head = resolve(p);
+  const tail: string[] = [];
+  let real = head;
+  for (;;) {
+    try {
+      real = join(realpathSync.native(head), ...tail);
+      break;
+    } catch {
+      const up = dirname(head);
+      if (up === head) break;
+      tail.unshift(basename(head));
+      head = up;
+    }
+  }
+  return platform === "win32" ? real.toLowerCase() : real;
+}
+
 export function recordReported(
   sessionId: string,
   file: string,
@@ -57,6 +81,7 @@ export function readReported(
   sessionId: string,
 ): Map<string, Map<string, number>> {
   const byFile = new Map<string, Map<string, number>>();
+  const keys = new Map<string, string>();
   let raw = "";
   try {
     raw = readFileSync(reportedPath(sessionId), "utf8");
@@ -69,9 +94,11 @@ export function readReported(
       file: string;
       texts: string[];
     };
-    const counts = byFile.get(file) ?? new Map<string, number>();
+    const key = keys.get(file) ?? ledgerKey(file);
+    keys.set(file, key);
+    const counts = byFile.get(key) ?? new Map<string, number>();
     for (const text of texts) counts.set(text, (counts.get(text) ?? 0) + 1);
-    byFile.set(file, counts);
+    byFile.set(key, counts);
   }
   return byFile;
 }

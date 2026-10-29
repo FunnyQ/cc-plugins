@@ -9,7 +9,7 @@
 >
 > **Depends on**: chronicle/01
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -125,21 +125,21 @@ Tests in `gate-page.test.ts`: one per branch (darwin, win32, WSL via `WSL_DISTRO
 
 ## Acceptance criteria
 
-- [ ] `tempRoot("darwin")` and `tempRoot("linux")` return `"/tmp/q-lab/chronicle"`; `tempRoot("win32")` returns `join(tmpdir(), "q-lab", "chronicle")`; a test asserts all three.
-- [ ] No chronicle test contains the string `/tmp/q-lab/chronicle` except `pr/scripts/analyze-branch.test.ts` and the darwin/linux assertions on `tempRoot` in `shared/scripts/temp-payload.test.ts`.
-- [ ] `commit.ts`'s guard compares paths through a normaliser that never throws on a missing path and lower-cases on win32; tests cover both.
-- [ ] The archive ignore advice is `.cockpit/archive/` on every platform.
-- [ ] `touchedFiles` adds `.chronicle/release.json` with a forward slash.
-- [ ] `openerCommands` returns the argv lists above for darwin, win32, WSL (env and `/proc/version`) and plain linux, each asserted by a test; `--open` falls back from `wslview` to `cmd.exe`.
-- [ ] Each fix's new test fails against the code at the start of the task (state which in the report).
+- [x] `tempRoot("darwin")` and `tempRoot("linux")` return `"/tmp/q-lab/chronicle"`; `tempRoot("win32")` returns `join(tmpdir(), "q-lab", "chronicle")`; a test asserts all three.
+- [x] No chronicle test contains the string `/tmp/q-lab/chronicle` except `pr/scripts/analyze-branch.test.ts` and the darwin/linux assertions on `tempRoot` in `shared/scripts/temp-payload.test.ts`.
+- [x] `commit.ts`'s guard compares paths through a normaliser that never throws on a missing path and lower-cases on win32; tests cover both.
+- [x] The archive ignore advice is `.cockpit/archive/` on every platform.
+- [x] `touchedFiles` adds `.chronicle/release.json` with a forward slash.
+- [x] `openerCommands` returns the argv lists above for darwin, win32, WSL (env and `/proc/version`) and plain linux, each asserted by a test; `--open` falls back from `wslview` to `cmd.exe`.
+- [x] Each fix's new test fails against the code at the start of the task (state which in the report).
 
 ## Verification
 
-- [ ] `bun test packages/chronicle` passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `rg -n '/tmp/q-lab/chronicle' packages/chronicle --glob '*.test.ts' --glob '!**/analyze-branch.test.ts'` lists only `temp-payload.test.ts` lines, and each asserts a darwin or linux `tempRoot` value.
-- [ ] `rg -n '"start"' packages/chronicle/skills/adr/scripts/gate-page.ts` shows `start` only inside a `cmd` argv.
-- [ ] `git diff --stat -- packages/chronicle` touches only the files listed above.
+- [x] `bun test packages/chronicle` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `rg -n '/tmp/q-lab/chronicle' packages/chronicle --glob '*.test.ts' --glob '!**/analyze-branch.test.ts'` lists only `temp-payload.test.ts` lines, and each asserts a darwin or linux `tempRoot` value.
+- [x] `rg -n '"start"' packages/chronicle/skills/adr/scripts/gate-page.ts` shows `start` only inside a `cmd` argv.
+- [x] `git diff --stat -- packages/chronicle` touches only the files listed above.
 
 ## Eval rubric
 

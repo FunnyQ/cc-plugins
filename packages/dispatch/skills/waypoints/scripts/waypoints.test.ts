@@ -15,7 +15,7 @@ import {
   validateProjectSlug,
 } from "./waypoints";
 
-const SCRIPT_PATH = new URL("./waypoints.ts", import.meta.url).pathname;
+const SCRIPT_PATH = join(import.meta.dir, "waypoints.ts");
 
 const SAMPLE = `# MyApp — Waypoints
 

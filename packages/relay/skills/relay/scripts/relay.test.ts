@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { BACKENDS } from "./backends";
 import {
   executeRelay,
@@ -17,6 +17,8 @@ import {
   type LiveRunResult,
 } from "./live";
 
+const RUN_DIR = "/tmp/relay/test-run";
+
 function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
   const files = new Map<string, string>([
     ["/tmp/prompt.md", "built prompt"],
@@ -25,7 +27,7 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
 
   return {
     registry: BACKENDS,
-    createTmpRunDir: () => "/tmp/relay/test-run",
+    createTmpRunDir: () => RUN_DIR,
     buildPromptFile: () => "/tmp/prompt.md",
     readFile: (path) => files.get(path) ?? "",
     writeFile: (path, text) => {
@@ -268,7 +270,7 @@ describe("executeRelay", () => {
 
     expect(result.code).toBe(0);
     expect(spawned).toBe(false);
-    expect(ensuredDirs).toContain(CONFIG_PATH.replace(/\/config\.json$/, ""));
+    expect(ensuredDirs).toContain(dirname(CONFIG_PATH));
     expect(JSON.parse(files.get(CONFIG_PATH)!)).toEqual({
       keep: true,
       models: {
@@ -403,8 +405,8 @@ describe("executeRelay", () => {
           buildArgs = args;
           return "/tmp/prompt.md";
         },
-        run: (argv) => {
-          promptArg = argv.at(-1) ?? "";
+        run: (_argv, opts) => {
+          promptArg = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -431,8 +433,8 @@ describe("executeRelay", () => {
           built = true;
           return "/tmp/prompt.md";
         },
-        run: (argv) => {
-          promptArg = argv.at(-1) ?? "";
+        run: (_argv, opts) => {
+          promptArg = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -484,8 +486,8 @@ describe("executeRelay", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(result.lastMd).toBe("/tmp/relay/test-run/last.md");
-    expect(writes.get("/tmp/relay/test-run/last.md")).toBe("final review");
+    expect(result.lastMd).toBe(join(RUN_DIR, "last.md"));
+    expect(writes.get(join(RUN_DIR, "last.md"))).toBe("final review");
     expect(printed.join("")).toBe("final review");
   });
 
@@ -547,12 +549,12 @@ describe("executeRelay", () => {
   });
 
   it("gives opencode the uncommitted review prompt when task is absent", async () => {
-    let invocation: string[] = [];
+    let prompt = "";
     const result = await executeRelay(
       ["opencode", "review"],
       deps({
-        run: (argv) => {
-          invocation = argv;
+        run: (_argv, opts) => {
+          prompt = opts?.stdin ?? "";
           return {
             ok: true,
             stdout: '{"type":"text","part":{"text":"done"}}',
@@ -564,8 +566,8 @@ describe("executeRelay", () => {
     );
 
     expect(result.code).toBe(0);
-    expect(invocation.at(-1)).toContain("Review only the uncommitted changes");
-    expect(invocation.at(-1)).toContain("git diff --cached");
+    expect(prompt).toContain("Review only the uncommitted changes");
+    expect(prompt).toContain("git diff --cached");
   });
 
   it("passes a provided review task without adding uncommitted scope", async () => {
@@ -951,19 +953,19 @@ describe("executeRelay live routing", () => {
       }),
     );
 
-    const livePrompt = writes.get("/tmp/relay/test-run/live-prompt.md")!;
+    const livePrompt = writes.get(join(RUN_DIR, "live-prompt.md"))!;
     expect(livePrompt).toContain("Review changes since main");
     expect(livePrompt).not.toContain("uncommitted changes");
-    expect(livePrompt).toContain("/tmp/relay/test-run/result.md");
+    expect(livePrompt).toContain(join(RUN_DIR, "result.md"));
     expect(livePrompt.trimEnd().split("\n")).toContain(
       "- The file's last line must be exactly: ==== RELAY RESULT END ====",
     );
 
     expect(liveOpts!.bootstrapText).toContain(
-      "/tmp/relay/test-run/live-prompt.md",
+      join(RUN_DIR, "live-prompt.md"),
     );
     expect(liveOpts!.bootstrapText).not.toContain("built prompt");
-    expect(liveOpts!.resultPath).toBe("/tmp/relay/test-run/result.md");
+    expect(liveOpts!.resultPath).toBe(join(RUN_DIR, "result.md"));
   });
 
   // A live pane's TUI hands the agent an ask tool the headless form never gets,
@@ -979,7 +981,7 @@ describe("executeRelay live routing", () => {
           runLive: () => Promise.resolve(liveOk),
         }),
       );
-      return writes.get("/tmp/relay/test-run/live-prompt.md")!;
+      return writes.get(join(RUN_DIR, "live-prompt.md"))!;
     };
 
     const guarded = await promptFor([
@@ -993,7 +995,7 @@ describe("executeRelay live routing", () => {
     expect(guarded).toContain("Nobody is watching this run");
     expect(guarded).toContain("never wait on a reply");
     expect(guarded.indexOf("Nobody is watching this run")).toBeLessThan(
-      guarded.indexOf("/tmp/relay/test-run/result.md"),
+      guarded.indexOf(join(RUN_DIR, "result.md")),
     );
 
     const plain = await promptFor(["codex", "delegate", "Do", "the", "thing"]);
@@ -1024,7 +1026,7 @@ describe("executeRelay live routing", () => {
     expect(result.code).toBe(0);
     expect(result.agentName).toBe("relay-opencode-delegate-9f1c");
     expect(printed.join("")).toBe(markdown);
-    expect(writes.get("/tmp/relay/test-run/last.md")).toBe(markdown);
+    expect(writes.get(join(RUN_DIR, "last.md"))).toBe(markdown);
     expect(metadata.join("")).toContain("relay-opencode-delegate-9f1c");
     expect(metadata.join("")).toContain("pane closed");
     expect(printed.join("")).not.toContain("pane left open");

@@ -13,16 +13,15 @@ import {
   writeFile,
   readFile,
   readdir,
-  chmod,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isolateHome, writeFakeBin } from "./lib/fake-bin.ts";
 
 const SCRIPT = join(import.meta.dir, "codex-run.ts");
 
 let dir: string;
-let originalHome: string | undefined;
-let fakeCodex: string;
+let restoreHome: () => void;
 let argsLog: string;
 
 const FAKE = `#!/usr/bin/env bun
@@ -34,30 +33,17 @@ const oi = argv.indexOf("-o");
 if (oi !== -1) writeFileSync(argv[oi + 1], "CODEX SAYS: did the thing");
 `;
 
-function isolateHomeFromDeveloperRelayConfig() {
-  originalHome = process.env.HOME;
-  process.env.HOME = dir;
-}
-
+let codexBin: string;
 beforeAll(async () => {
   dir = await mkdtemp(join(tmpdir(), "codex-run-test-"));
-  isolateHomeFromDeveloperRelayConfig();
-  fakeCodex = join(dir, "fake-codex.ts");
+  restoreHome = isolateHome(dir);
   argsLog = join(dir, "args.json");
-  await writeFile(fakeCodex, FAKE);
-  await chmod(fakeCodex, 0o755);
+  codexBin = await writeFakeBin(dir, "codex", FAKE);
 });
 
 afterAll(async () => {
-  process.env.HOME = originalHome;
+  restoreHome();
   await rm(dir, { recursive: true, force: true });
-});
-
-let codexBin: string;
-beforeAll(async () => {
-  codexBin = join(dir, "codex");
-  await writeFile(codexBin, `#!/bin/sh\nexec bun ${fakeCodex} "$@"\n`);
-  await chmod(codexBin, 0o755);
 });
 
 describe("codex-run delegate", () => {
@@ -265,6 +251,8 @@ describe("codex-run errors", () => {
       env: {
         ...process.env,
         TMPDIR: tmp,
+        TEMP: tmp,
+        TMP: tmp,
         CODEX_BIN: codexBin,
         ARGS_LOG: argsLog,
       },

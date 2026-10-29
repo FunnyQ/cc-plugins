@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: dispatch/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -115,22 +115,22 @@ Each skip names its platform fact in the test title or a one-line comment.
 
 ## Acceptance criteria
 
-- [ ] Every `HOME` override in the four profile-isolation files is paired with `USERPROFILE` to the same value: `grep -n "HOME" <file>` shows a `USERPROFILE` set beside each `HOME` set in `relay-model.test.ts`, `codex-run.test.ts`, `opencode-run.test.ts`, and the opencode-unreachable test in `review-plan.test.ts`.
-- [ ] `codex-run.test.ts`'s scratch-dir test sets `TEMP` and `TMP` beside `TMPDIR`.
-- [ ] `codex-run.test.ts` and `opencode-run.test.ts` write a `.cmd` shim of the form `@"<process.execPath>" "<fake>.ts" %*\r\n` on win32 and keep the `#!/bin/sh` stub elsewhere.
-- [ ] `worktree.test.ts` `fixture()` sets `core.autocrlf false` and `core.eol lf`.
-- [ ] `worktree.test.ts` and `scaffold.test.ts` compare paths through a `samePath` helper that tolerates a missing path, uses `realpathSync.native`, and lower-cases on win32.
-- [ ] No `new URL(...).pathname` remains as a spawn path: `grep -rn "\.pathname" packages/dispatch --include=*.test.ts` finds none used to spawn.
-- [ ] Exactly three new `skipIf(process.platform === "win32")`-class skips or win32 branches exist (chmod, newline file name, `cp` stub), each naming its fact.
-- [ ] `git diff --name-only -- packages/dispatch` lists only `*.test.ts` files, all from the Files list above.
+- [x] Every `HOME` override in the four profile-isolation files is paired with `USERPROFILE` to the same value: `grep -n "HOME" <file>` shows a `USERPROFILE` set beside each `HOME` set in `relay-model.test.ts`, `codex-run.test.ts`, `opencode-run.test.ts`, and the opencode-unreachable test in `review-plan.test.ts`.
+- [x] `codex-run.test.ts`'s scratch-dir test sets `TEMP` and `TMP` beside `TMPDIR`.
+- [x] `codex-run.test.ts` and `opencode-run.test.ts` write a `.cmd` shim of the form `@"<process.execPath>" "<fake>.ts" %*\r\n` on win32 and keep the `#!/bin/sh` stub elsewhere.
+- [x] `worktree.test.ts` `fixture()` sets `core.autocrlf false` and `core.eol lf`.
+- [x] `worktree.test.ts` and `scaffold.test.ts` compare paths through a `samePath` helper that tolerates a missing path, uses `realpathSync.native`, and lower-cases on win32.
+- [x] No `new URL(...).pathname` remains as a spawn path: `grep -rn "\.pathname" packages/dispatch --include=*.test.ts` finds none used to spawn.
+- [x] Exactly three new `skipIf(process.platform === "win32")`-class skips or win32 branches exist (chmod, newline file name, `cp` stub), each naming its fact.
+- [x] `git diff --name-only -- packages/dispatch` lists only `*.test.ts` files, all from the Files list above.
 
 ## Verification
 
-- [ ] `bun test packages/dispatch` passes on macOS with no new skips firing there.
-- [ ] `bunx --bun tsc --noEmit` from the repo root prints nothing.
-- [ ] `git diff --name-only -- packages/dispatch | grep -v '\.test\.ts$'` prints nothing.
-- [ ] `grep -rn "USERPROFILE" packages/dispatch/skills/flightplan/scripts/lib/relay-model.test.ts packages/dispatch/skills/flightplan/scripts/codex-run.test.ts packages/dispatch/skills/flightplan/scripts/opencode-run.test.ts packages/dispatch/skills/flightplan/scripts/review-plan.test.ts` hits each of the four files.
-- [ ] `grep -n "core.autocrlf" packages/dispatch/skills/flightplan/scripts/worktree.test.ts` hits `fixture()`.
+- [x] `bun test packages/dispatch` passes on macOS with no new skips firing there.
+- [x] `bunx --bun tsc --noEmit` from the repo root prints nothing.
+- [x] `git diff --name-only -- packages/dispatch | grep -v '\.test\.ts$'` prints nothing.
+- [x] `grep -rn "USERPROFILE" packages/dispatch/skills/flightplan/scripts/lib/relay-model.test.ts packages/dispatch/skills/flightplan/scripts/codex-run.test.ts packages/dispatch/skills/flightplan/scripts/opencode-run.test.ts packages/dispatch/skills/flightplan/scripts/review-plan.test.ts` hits each of the four files.
+- [x] `grep -n "core.autocrlf" packages/dispatch/skills/flightplan/scripts/worktree.test.ts` hits `fixture()`.
 
 ## Eval rubric
 

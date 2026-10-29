@@ -27,7 +27,7 @@
 import { $ } from "bun";
 import { existsSync, realpathSync } from "node:fs";
 import { mkdir, unlink } from "node:fs/promises";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   committedPathsSince,
   parseStatus,
@@ -83,16 +83,24 @@ async function gitOrEmpty(...args: string[]): Promise<string> {
  * external and let it through the guard below.
  */
 function insideRepo(absolute: string): boolean {
-  const real = (path: string): string => {
-    try {
-      return realpathSync(path);
-    } catch {
-      return path;
-    }
-  };
-  const root = real(process.cwd());
-  const holder = real(dirname(absolute));
+  const root = canonicalPath(process.cwd());
+  const holder = canonicalPath(dirname(absolute));
   return holder === root || holder.startsWith(`${root}${sep}`);
+}
+
+export function canonicalPath(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  let existing = resolve(path);
+  const missing: string[] = [];
+  while (!existsSync(existing) && dirname(existing) !== existing) {
+    missing.unshift(basename(existing));
+    existing = dirname(existing);
+  }
+  const full = join(realpathSync.native(existing), ...missing);
+  // windows.md: Windows paths are case-insensitive and may differ in case between sources.
+  return platform === "win32" ? full.toLowerCase() : full;
 }
 
 async function readPlanFile(path: string): Promise<PlanDraft> {

@@ -3,9 +3,9 @@
  * Thin wrapper around the `opencode` CLI for autopilot's opencode paths.
  *
  * Mirrors `codex-run.ts`: autopilot's opencode dev engine and its closing
- * cross-vendor review lens both reduce to `opencode run -m <model> --format json
- * "<prompt>"`, so this wraps both and keeps only the `opencode` CLI as a
- * dependency (autopilot version-checks it). opencode prints a JSONL event stream
+ * cross-vendor review lens both reduce to `opencode run -m <model> --format json`
+ * with the prompt on stdin, so this wraps both and keeps only the `opencode` CLI
+ * as a dependency (autopilot version-checks it). opencode prints a JSONL event stream
  * on stdout; we extract the answer with `parseJsonl` (the `text` parts) rather
  * than scraping `--format default`, whose stream interleaves the answer with TUI
  * progress noise.
@@ -26,8 +26,7 @@
  * `cli-default` omits `-m`, as relay itself does.
  *
  * The prompt comes from `--prompt-file <path>` or, if omitted, stdin — the same
- * caller interface as `codex-run.ts`, even though opencode takes the prompt as an
- * argv positional (not stdin).
+ * caller interface as `codex-run.ts` — and reaches opencode on its stdin.
  *
  * Usage:
  *   bun opencode-run.ts delegate [--prompt-file <path>] [--model <m>]
@@ -104,15 +103,16 @@ function run(mode: Mode, prompt: string, model: string | null): number {
         ...(model ? ["-m", model] : []),
         "--format",
         "json",
-        message,
       ],
-      // stdin "ignore": opencode inherits stdin and hangs if it stays open with no
-      // EOF; closing it makes `run` return normally (see relay's backends note).
+      // The message rides stdin, not argv: Bun refuses to spawn a .cmd shim
+      // (npm's opencode on Windows) when an argument holds a newline, `"`, `%`
+      // or `&`. A finished buffer also reaches EOF, which `run` needs: opencode
+      // hangs on an open stdin with no EOF.
       // RELAY_DELEGATED marks this an unattended delegate, so monitor's
       // decision-log hooks stay quiet — opencode runs them inside this process,
       // so the var is all they need.
       {
-        stdin: "ignore",
+        stdin: new TextEncoder().encode(message),
         stdout: "pipe",
         stderr: "pipe",
         env: { ...process.env, RELAY_DELEGATED: "1" },

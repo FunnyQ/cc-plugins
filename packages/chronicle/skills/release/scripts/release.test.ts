@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, delimiter, join } from "node:path";
 
 import { $ } from "bun";
 
@@ -158,6 +158,7 @@ async function commitAll(dir: string, message: string): Promise<void> {
 async function initRepo(files: Record<string, string>): Promise<string> {
   const dir = repo(files);
   await $`git init -q -b main`.cwd(dir).quiet();
+  await $`git config core.autocrlf false`.cwd(dir).quiet();
   await $`git config user.name t && git config user.email t@t && git config commit.gpgsign false && git config tag.gpgsign false`
     .cwd(dir)
     .quiet();
@@ -196,19 +197,26 @@ describe("plan", () => {
 
   test("asks git for the origin remote at most once, though run re-plans after every stage", async () => {
     const dir = await initRepo({ VERSION: "0.1.0\n" });
-    const realGit = (await $`which git`.quiet()).stdout.toString().trim();
-    const log = join(dir, "..", `${dir.split("/").pop()}.git-calls`);
+    const log = join(dir, "..", `${basename(dir)}.git-calls`);
     scratch.push(log);
-    const shim = join(dir, "..", `${dir.split("/").pop()}-bin`);
+    const shim = join(dir, "..", `${basename(dir)}-bin`);
     scratch.push(shim);
     mkdirSync(shim);
-    writeFileSync(
-      join(shim, "git"),
-      `#!/bin/sh\necho "$*" >> "${log}"\nexec "${realGit}" "$@"\n`,
-    );
-    chmodSync(join(shim, "git"), 0o755);
+    const realGit = Bun.which("git");
+    if (process.platform === "win32") {
+      writeFileSync(
+        join(shim, "git.cmd"),
+        `@echo %*>> "${log}"\r\n@"${realGit}" %*\r\n`,
+      );
+    } else {
+      writeFileSync(
+        join(shim, "git"),
+        `#!/bin/sh\necho "$*" >> "${log}"\nexec "${realGit}" "$@"\n`,
+      );
+      chmodSync(join(shim, "git"), 0o755);
+    }
     const path = process.env.PATH;
-    process.env.PATH = `${shim}:${path}`;
+    process.env.PATH = `${shim}${delimiter}${path}`;
     try {
       await planRelease(githubFlow, choices, noPersist);
       await planRelease(githubFlow, choices, noPersist);

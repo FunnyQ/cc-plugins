@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { basename, extname } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, extname, join } from "node:path";
 import {
   addedCommentLines,
   ASK,
@@ -642,13 +644,16 @@ describe("blanks inside a block comment", () => {
 });
 
 describe("main", () => {
-  const HOOK = new URL("./comment-guard.ts", import.meta.url).pathname;
+  const HOOK = join(import.meta.dir, "comment-guard.ts");
 
   const run = async (payload: unknown, onDisk: string) => {
-    const dir = `/tmp/cg-main-${Math.random().toString(36).slice(2)}`;
-    const path = `${dir}/app.ts`;
+    const dir = mkdtempSync(join(tmpdir(), "cg-main-"));
+    const path = join(dir, "app.ts");
     await Bun.write(path, onDisk);
-    const json = JSON.stringify(payload).replaceAll("<FILE>", path);
+    const json = JSON.stringify(payload).replaceAll(
+      "<FILE>",
+      JSON.stringify(path).slice(1, -1),
+    );
     const proc = Bun.spawn(["bun", HOOK], {
       stdin: new TextEncoder().encode(json),
       stdout: "pipe",

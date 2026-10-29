@@ -209,24 +209,28 @@ describe("createCodexSource", () => {
     expect(source.read()).toHaveLength(1);
   });
 
-  test("an unreadable pass keeps the last-known counts rather than zeroing them", () => {
-    const root = mkdtempSync(join(tmpdir(), "codex-"));
-    const file = writeRollout(root, "rollout-a.jsonl", [
-      meta("/repo"),
-      tokenCount({ input_tokens: 500, total_tokens: 500 }),
-    ]);
-    const source = createCodexSource(root);
-    source.read();
+  // Windows ignores chmod 0o000, so the file stays readable there.
+  test.skipIf(process.platform === "win32")(
+    "an unreadable pass keeps the last-known counts rather than zeroing them",
+    () => {
+      const root = mkdtempSync(join(tmpdir(), "codex-"));
+      const file = writeRollout(root, "rollout-a.jsonl", [
+        meta("/repo"),
+        tokenCount({ input_tokens: 500, total_tokens: 500 }),
+      ]);
+      const source = createCodexSource(root);
+      source.read();
 
-    writeFileSync(file, "{}\n");
-    chmodSync(file, 0o000);
-    try {
-      const [run] = source.read();
-      expect(run!.counts.cacheWrite).toBe(500);
-    } finally {
-      chmodSync(file, 0o644);
-    }
-  });
+      writeFileSync(file, "{}\n");
+      chmodSync(file, 0o000);
+      try {
+        const [run] = source.read();
+        expect(run!.counts.cacheWrite).toBe(500);
+      } finally {
+        chmodSync(file, 0o644);
+      }
+    },
+  );
 });
 
 describe("attachCodexUsage", () => {

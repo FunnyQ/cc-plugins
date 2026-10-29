@@ -18,10 +18,41 @@
  * means the one-shot server timed out.
  */
 
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { TEMP_ROOT } from "../../../shared/scripts/temp-payload";
 import { formatAdrId } from "./adr-index";
+
+export function openerCommands(
+  url: string,
+  platform: NodeJS.Platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+  procVersion: () => string = () => readFileSync("/proc/version", "utf8"),
+): string[][] {
+  if (platform === "darwin") return [["open", url]];
+  // windows.md: `start` is a cmd builtin, not an executable; "" is its window title.
+  if (platform === "win32") return [["cmd", "/c", "start", "", url]];
+  if (platform === "linux" && isWsl(env, procVersion)) {
+    return [
+      ["wslview", url],
+      ["cmd.exe", "/c", "start", "", url],
+    ];
+  }
+  return [["xdg-open", url]];
+}
+
+function isWsl(
+  env: Record<string, string | undefined>,
+  procVersion: () => string,
+): boolean {
+  if (env.WSL_DISTRO_NAME) return true;
+  try {
+    return /microsoft/i.test(procVersion());
+  } catch {
+    return false;
+  }
+}
 
 export type Disposition = "promote" | "watch" | "skip";
 export type Lang = "en" | "zh-TW";
@@ -942,20 +973,21 @@ if (import.meta.main) {
   if (gateServer) console.error(`gate-page: serving ${gateServer.url}`);
 
   if (argv.includes("--open")) {
-    const opener =
-      process.platform === "darwin"
-        ? "open"
-        : process.platform === "win32"
-          ? "start"
-          : "xdg-open";
-    const proc = Bun.spawn([opener, pageUrl], {
-      stdout: "ignore",
-      stderr: "ignore",
-    });
-    if ((await proc.exited) !== 0) {
+    const commands = openerCommands(pageUrl);
+    let opened = false;
+    for (const command of commands) {
+      try {
+        const proc = Bun.spawn(command, { stdout: "ignore", stderr: "ignore" });
+        if ((await proc.exited) === 0) {
+          opened = true;
+          break;
+        }
+      } catch {}
+    }
+    if (!opened) {
       gateServer?.stop();
       console.error(
-        `gate-page: could not open a browser with "${opener}" — open ${pageUrl} by hand`,
+        `gate-page: could not open a browser with "${commands[0]![0]}" — open ${pageUrl} by hand`,
       );
       process.exit(3);
     }

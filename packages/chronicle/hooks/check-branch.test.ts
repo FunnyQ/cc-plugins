@@ -3,7 +3,6 @@ import {
   mkdirSync,
   mkdtempSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +14,7 @@ let repo: string;
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), "chronicle-branch-guard-"));
   Bun.spawnSync(["git", "init", "-b", "main"], { cwd: repo });
+  Bun.spawnSync(["git", "config", "core.autocrlf", "false"], { cwd: repo });
 });
 
 afterEach(() => {
@@ -114,12 +114,19 @@ describe("check-branch", () => {
   test("fails open when jq is missing or the payload is unparseable, so the guard never breaks every Bash command", () => {
     writePrConfig({ workflow: "github-flow", base: "main" });
     const bin = mkdtempSync(join(tmpdir(), "chronicle-no-jq-"));
+    // A symlinked MSYS cat.exe cannot load msys-2.0.dll from its own directory, so wrap the real binary instead.
     for (const tool of ["git", "cat"]) {
-      symlinkSync(Bun.which(tool)!, join(bin, tool));
+      const real = Bun.which(tool)!.replaceAll("\\", "/");
+      writeFileSync(join(bin, tool), `#!/bin/sh\nexec '${real}' "$@"\n`, {
+        mode: 0o755,
+      });
     }
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([k]) => k.toUpperCase() !== "PATH"),
+    );
     const noJq = Bun.spawnSync([Bun.which("bash")!, hook], {
       cwd: repo,
-      env: { PATH: bin },
+      env: { ...env, PATH: bin },
       stdin: new TextEncoder().encode(
         JSON.stringify({ tool_input: { command: "git commit -m test" } }),
       ),

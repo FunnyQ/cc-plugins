@@ -1,17 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import {
-  mkdtemp,
-  mkdir,
-  access,
-  realpath,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, access, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkCollision, scaffold, validateInput } from "./scaffold";
 import { parseTask } from "./lib/parse-task";
+import { samePathKey } from "./worktree";
 
 async function newRoot(): Promise<string> {
   return await mkdtemp(join(tmpdir(), "flightplan-scaffold-"));
@@ -261,8 +254,13 @@ describe("scaffold CLI", () => {
       { cwd: root, stdout: "pipe", stderr: "pipe" },
     );
     expect(res.exitCode).toBe(0);
-    expect(res.stdout.toString()).toContain(
-      `Scaffolded ${join(await realpath(root), "docs", "course-player")}`,
+    const printed = res.stdout
+      .toString()
+      .split("\n")
+      .find((line) => line.startsWith("Scaffolded "));
+    expect(printed).toBeDefined();
+    expect(samePathKey(printed!.slice("Scaffolded ".length).trim())).toBe(
+      samePathKey(join(root, "docs", "course-player")),
     );
     await rm(root, { recursive: true });
   });

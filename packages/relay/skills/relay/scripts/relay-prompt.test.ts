@@ -7,6 +7,7 @@ import {
   RESULT_END_MARKER,
 } from "./relay-prompt";
 import { rmSync, existsSync, readFileSync } from "fs";
+import { sep } from "path";
 import { TMP_ROOT } from "./shared";
 import type { FormatOptions, PromptKind } from "./relay-prompt";
 
@@ -335,6 +336,6 @@ describe("buildPromptFile", () => {
       noProject: true,
     });
 
-    expect(promptPath).toContain("/tmp/q-lab/relay/relay/");
+    expect(promptPath.startsWith(TMP_ROOT + sep)).toBe(true);
   });
 });

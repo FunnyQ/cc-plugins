@@ -6,21 +6,26 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import {
   create,
   fingerprint,
   land,
+  linkType,
   rebase,
   remove,
   reset,
+  samePathKey,
+  seedIgnored,
   show,
   sweep,
   unland,
@@ -57,6 +62,8 @@ function fixture() {
   const repo = join(temp, "parent", "repo");
   mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q");
+  git(repo, "config", "core.autocrlf", "false");
+  git(repo, "config", "core.eol", "lf");
   git(repo, "config", "user.name", "Worktree Test");
   git(repo, "config", "user.email", "worktree@example.invalid");
   git(repo, "config", "commit.gpgsign", "false");
@@ -67,6 +74,20 @@ function fixture() {
   git(repo, "add", ".");
   git(repo, "commit", "-qm", "fixture");
   return { repo, slug: "test-plan", ref: "work-tree/01" };
+}
+
+function aliasedFixture() {
+  const options = fixture();
+  const alias = join(dirname(dirname(options.repo)), "alias");
+  symlinkSync(dirname(options.repo), alias, "junction");
+  return { ...options, repo: join(alias, "repo") };
+}
+
+function registered(repo: string): string[] {
+  return git(repo, "worktree", "list", "--porcelain")
+    .split("\n")
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => samePathKey(line.slice("worktree ".length)));
 }
 
 function rootOf(options: { repo: string; slug: string }) {
@@ -105,6 +126,31 @@ describe("worktree lifecycle", () => {
     expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe("main\n");
     expect(readFileSync(index)).toEqual(before);
     expect(statSync(index).mtimeMs).toBe(timestamp.getTime());
+  });
+
+  test("CRLF checkouts with trusted index stats round-trip through create, land and unland", () => {
+    const options = fixture();
+    git(options.repo, "config", "core.autocrlf", "true");
+    put(options.repo, "a.txt", "base\r\n");
+    const timestamp = new Date(Date.now() - 10_000);
+    utimesSync(join(options.repo, "a.txt"), timestamp, timestamp);
+    git(options.repo, "add", "a.txt");
+    const index = join(options.repo, ".git/index");
+    const before = readFileSync(index);
+    const baseline = fingerprint(options).fingerprint;
+    const wt = create(options);
+    expect(readFileSync(join(wt.path, "a.txt"), "utf8")).toBe("base\r\n");
+    expect(readFileSync(index)).toEqual(before);
+    put(wt.path, "a.txt", "base\r\nedited\r\n");
+    expect(land({ ...options, expect: baseline, op: "crlf-land" }).status).toBe(
+      "clean",
+    );
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe(
+      "base\r\nedited\r\n",
+    );
+    unland({ ...options, op: "crlf-unland" });
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe("base\r\n");
+    expect(readFileSync(index)).toEqual(before);
   });
 
   test("create snapshots tracked and untracked files, seeds ignored paths, and excludes the plan", () => {
@@ -465,6 +511,32 @@ describe("worktree lifecycle", () => {
     expect(readFileSync(join(path, "a.txt"), "utf8")).toBe("base\n");
   });
 
+  test("first create through a repo alias, before its worktree root exists, registers the path under the same key", () => {
+    const options = aliasedFixture();
+    expect(existsSync(dirname(rootOf(options)))).toBe(false);
+    const { path } = create(options);
+    expect(registered(options.repo)).toContain(samePathKey(path));
+  });
+
+  test("remove prunes a worktree deleted by hand, reached through a repo alias so git's spelling differs from pathOf's", () => {
+    const options = aliasedFixture();
+    const { path } = create(options);
+    expect(registered(options.repo)).toContain(samePathKey(path));
+    rmSync(path, { recursive: true, force: true });
+    expect(remove(options)).toEqual({ removed: true });
+    expect(registered(options.repo)).not.toContain(samePathKey(path));
+  });
+
+  test("remove deletes the whole worktree directory, plan link included, and keeps the main-tree plan", () => {
+    const options = fixture();
+    const { path } = create(options);
+    expect(remove(options)).toEqual({ removed: true });
+    expect(existsSync(path)).toBe(false);
+    expect(
+      readFileSync(join(options.repo, "docs/test-plan/PLAN.md"), "utf8"),
+    ).toBe("plan\n");
+  });
+
   test("sweep keep-all leaves state and registrations untouched; keep scopes removals to this slug", () => {
     const options = fixture();
     const first = create(options);
@@ -493,10 +565,10 @@ describe("worktree lifecycle", () => {
     });
     expect(existsSync(other.path)).toBe(true);
     expect(existsSync(userPath)).toBe(true);
-    const remaining = git(options.repo, "worktree", "list", "--porcelain");
-    expect(remaining).toContain(second.path);
-    expect(remaining).not.toContain(first.path);
-    expect(remaining.split("worktree ").length - 1).toBe(4);
+    const listed = registered(options.repo);
+    expect(listed).toContain(samePathKey(second.path));
+    expect(listed).not.toContain(samePathKey(first.path));
+    expect(listed).toHaveLength(4);
     for (const removed of [true, false]) {
       const response = cli([
         "remove",
@@ -533,7 +605,11 @@ describe("worktree lifecycle", () => {
   test("binary, added, deleted and oddly named paths land and restore", () => {
     const options = fixture();
     const wt = create(options);
-    const oddName = "space and\nnewline.txt";
+    // NTFS forbids a newline in a file name.
+    const oddName =
+      process.platform === "win32"
+        ? "space and name.txt"
+        : "space and\nnewline.txt";
     put(wt.path, oddName, "odd\n");
     put(wt.path, "binary.dat", new Uint8Array([0, 255, 1, 128, 2]));
     put(wt.path, "bytes.txt", new Uint8Array([255, 254, 10]));
@@ -601,32 +677,119 @@ describe("worktree lifecycle", () => {
     expect(git(options.repo, "show", ":a.txt")).toBe("staged");
   });
 
-  test("ignored seeds fall back from clone copies and tolerate complete copy failure", () => {
+  // Windows cannot run a #!/bin/sh stub, and its PATH separator is ";", not ":".
+  test.skipIf(process.platform === "win32")(
+    "ignored seeds fall back from a failed clone copy to cp -R",
+    () => {
+      const options = fixture();
+      put(options.repo, "node_modules/x/index.js", "dependency\n");
+      const bin = join(dirname(options.repo), "bin");
+      put(
+        bin,
+        "cp",
+        '#!/bin/sh\nif [ "$1" = "-c" ]; then exit 1; fi\nexec /bin/cp "$@"\n',
+      );
+      chmodSync(join(bin, "cp"), 0o755);
+      const originalPath = process.env.PATH;
+      process.env.PATH = `${bin}:${originalPath}`;
+      try {
+        const first = create(options);
+        expect(
+          readFileSync(join(first.path, "node_modules/x/index.js"), "utf8"),
+        ).toBe("dependency\n");
+      } finally {
+        process.env.PATH = originalPath;
+      }
+    },
+  );
+
+  test("ignored seeds copy with cpSync when both cp attempts fail, with no PATH stub", () => {
+    const options = fixture();
+    const bytes = new Uint8Array([0, 13, 10, 255, 128, 10]);
+    put(options.repo, "node_modules/x/index.js", "dependency\n");
+    put(options.repo, "node_modules/x/lib/deep/blob.bin", bytes);
+    const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+    scratch.push(destination);
+    const tried: string[][] = [];
+    seedIgnored(options.repo, destination, "docs/test-plan", (argv) => {
+      tried.push(argv);
+      return { exitCode: 1 };
+    });
+    expect(tried.map((argv) => argv.slice(0, 2))).toEqual([
+      ["cp", "-c"],
+      ["cp", "-R"],
+    ]);
+    expect(
+      readFileSync(join(destination, "node_modules/x/index.js"), "utf8"),
+    ).toBe("dependency\n");
+    expect(
+      new Uint8Array(
+        readFileSync(join(destination, "node_modules/x/lib/deep/blob.bin")),
+      ),
+    ).toEqual(bytes);
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "cpSync seeds preserve relative symlinks (Windows symlink creation requires privilege)",
+    () => {
+      const options = fixture();
+      put(options.repo, "node_modules/x/index.js", "dependency\n");
+      symlinkSync("x", join(options.repo, "node_modules/linked"));
+      const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+      scratch.push(destination);
+      seedIgnored(options.repo, destination, "docs/test-plan", () => ({
+        exitCode: null,
+      }));
+      expect(readlinkSync(join(destination, "node_modules/linked"))).toBe("x");
+      put(destination, "node_modules/x/index.js", "copied dependency\n");
+      expect(
+        readFileSync(join(destination, "node_modules/linked/index.js"), "utf8"),
+      ).toBe("copied dependency\n");
+      expect(
+        readFileSync(join(options.repo, "node_modules/x/index.js"), "utf8"),
+      ).toBe("dependency\n");
+    },
+  );
+
+  test("ignored seeds stop spawning cp once it is missing from PATH", () => {
     const options = fixture();
     put(options.repo, "node_modules/x/index.js", "dependency\n");
-    const bin = join(dirname(options.repo), "bin");
-    put(
-      bin,
-      "cp",
-      '#!/bin/sh\nif [ "$1" = "-c" ]; then exit 1; fi\nexec /bin/cp "$@"\n',
+    put(options.repo, ".flightlog/run.jsonl", "{}\n");
+    const destination = mkdtempSync(join(tmpdir(), "dispatch-seed-test-"));
+    scratch.push(destination);
+    const tried: string[][] = [];
+    seedIgnored(options.repo, destination, "docs/test-plan", (argv) => {
+      tried.push(argv);
+      return { exitCode: null };
+    });
+    expect(tried).toHaveLength(1);
+    expect(
+      readFileSync(join(destination, ".flightlog/run.jsonl"), "utf8"),
+    ).toBe("{}\n");
+    expect(
+      readFileSync(join(destination, "node_modules/x/index.js"), "utf8"),
+    ).toBe("dependency\n");
+  });
+
+  test("create and land round-trip LF bytes when git's core.autocrlf is true, as on Windows", () => {
+    const options = fixture();
+    git(options.repo, "config", "core.autocrlf", "true");
+    put(options.repo, "lf.txt", "one\ntwo\n");
+    const baseline = fingerprint(options).fingerprint;
+    const wt = create(options);
+    put(wt.path, "landed.txt", "three\nfour\n");
+    put(wt.path, "a.txt", "base\nedited\n");
+    expect(land({ ...options, expect: baseline, op: "a1-land" }).status).toBe(
+      "clean",
     );
-    chmodSync(join(bin, "cp"), 0o755);
-    const originalPath = process.env.PATH;
-    process.env.PATH = `${bin}:${originalPath}`;
-    try {
-      const first = create(options);
-      expect(
-        readFileSync(join(first.path, "node_modules/x/index.js"), "utf8"),
-      ).toBe("dependency\n");
-      put(bin, "cp", "#!/bin/sh\nexit 1\n");
-      const second = create(options);
-      expect(show(options)).toEqual({ ...second, exists: true });
-      expect(existsSync(join(second.path, "node_modules/x/index.js"))).toBe(
-        false,
-      );
-    } finally {
-      process.env.PATH = originalPath;
+    for (const root of [options.repo, wt.path]) {
+      for (const file of ["lf.txt", "landed.txt", "a.txt", "b.txt"]) {
+        expect(readFileSync(join(root, file), "utf8")).not.toContain("\r");
+      }
     }
+    expect(readFileSync(join(options.repo, "a.txt"), "utf8")).toBe(
+      "base\nedited\n",
+    );
   });
 
   test("ignored ancestor directories never seed the excluded plan", () => {
@@ -672,6 +835,49 @@ describe("worktree lifecycle", () => {
     expect(unland({ ...options, op: "a1-unland" })).toEqual({
       restored: ["a.txt"],
     });
+  });
+});
+
+describe("linkType", () => {
+  test("links the plan dir as a junction on win32 only, which needs no Developer Mode", () => {
+    expect(linkType("win32")).toBe("junction");
+    expect(linkType("darwin")).toBeUndefined();
+    expect(linkType("linux")).toBeUndefined();
+  });
+});
+
+describe("samePathKey", () => {
+  test("re-joins missing trailing segments onto the realpath of the nearest existing ancestor", () => {
+    const options = fixture();
+    const expected = join(realpathSync.native(options.repo), "gone", "too");
+    expect(samePathKey(join(options.repo, "gone", "too"))).toBe(
+      process.platform === "win32" ? expected.toLowerCase() : expected,
+    );
+  });
+
+  test("lower-cases on win32 only, so two case spellings of an existing directory share a key there", () => {
+    const options = fixture();
+    const mixed = join(options.repo, "Mixed", "Case");
+    mkdirSync(mixed, { recursive: true });
+    expect(samePathKey(mixed, "win32")).toBe(
+      samePathKey(mixed, "win32").toLowerCase(),
+    );
+    expect(samePathKey(mixed, "win32")).toBe(
+      samePathKey(join(options.repo, "MIXED", "case"), "win32"),
+    );
+    expect(samePathKey(mixed, "darwin")).toEndWith(`${sep}Mixed${sep}Case`);
+  });
+
+  test("win32 keys match git's C:/ spelling and resolve()'s C:\\ spelling, driven through path.win32 on any OS", () => {
+    expect(
+      samePathKey("C:/Users/runneradmin/.repo-autopilot/plan/ui-01", "win32"),
+    ).toBe("c:\\users\\runneradmin\\.repo-autopilot\\plan\\ui-01");
+    expect(
+      samePathKey(
+        "c:\\Users\\RunnerAdmin\\.repo-autopilot\\plan\\ui-01",
+        "win32",
+      ),
+    ).toBe("c:\\users\\runneradmin\\.repo-autopilot\\plan\\ui-01");
   });
 });
 

@@ -1,10 +1,16 @@
 import { randomUUID } from "crypto";
 import { mkdirSync } from "fs";
 import { join, parse } from "path";
-import { homedir } from "os";
+import { homedir, tmpdir } from "os";
 import type { Mode, RunResult } from "./types";
 
-export const TMP_ROOT = "/tmp/q-lab/relay/relay";
+export function tmpRoot(platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32"
+    ? join(tmpdir(), "q-lab", "relay", "relay")
+    : "/tmp/q-lab/relay/relay";
+}
+
+export const TMP_ROOT = tmpRoot();
 
 export const CONFIG_PATH = join(
   homedir(),

@@ -8,7 +8,7 @@
 > - `../_context/rubric.md`
 >
 > **Depends on**: platform/02, platform/03
-> **Status**: todo
+> **Status**: done
 > **Final review**: true
 
 ## Goal
@@ -46,36 +46,36 @@ Fix an integration defect in place when the fix is small and local; record it. W
 
 ## Acceptance criteria
 
-- [ ] `docs/windows-support/legs/02-core-workflow/review-notes.md` exists and has a PASS/FAIL line with evidence for each of: suites green, smoke job, profile isolation, macOS/Linux unchanged, inventory (a) items, win32 skips, scratch-root copies, task-path regex copies, plugin boundaries, no prompt in argv, path identity, docs.
-- [ ] `docs/windows-support/legs/02-core-workflow/review-notes.md` lists every inventory (a) row with its product change and its test name.
-- [ ] `.github/workflows/ci.yml` `required` job runs the five suites on all three OS, and a `smoke` job runs `bun .github/scripts/smoke.ts` on all three OS, neither with `continue-on-error`.
-- [ ] `git diff <baseRef> -- .github/workflows/ci.yml` changes no line in the `report` job.
-- [ ] Every `skipIf(process.platform === "win32")` in the five suites carries its Windows fact in the test title or a one-line comment.
-- [ ] (human) The leg's PR CI run is green on `windows-latest` for both `required` and `smoke`.
-- [ ] (human) On a real Windows PC, in a fresh `git init` repo with one new file `hello.ts` holding `export const hi = 1;` plus a 3-line `//` comment block: `/chronicle:commit` lands one commit containing `hello.ts`; the guard turn-end reviewer reports that comment block; `/chronicle:release local` on a one-component `.chronicle/release.json` bumps the version file and creates a local tag (`git tag` lists it); `/dispatch:flightplan` for "add a `bye` export to hello.ts" writes a `docs/<slug>/tasks/` tree that `lint-task.ts` passes, and `/autopilot` on it lands a commit adding `bye`. Record each result in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
-- [ ] (human) On a real Windows PC, ask Claude Code to Write `/tmp/q-lab/probe/write.txt` with the content `probe`, then run `Get-ChildItem -Recurse -Filter write.txt C:\tmp, $env:TEMP` in PowerShell and record the full path that holds it (or that none does) in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
-- [ ] (human) On WSL, from the repo root, run `bun -e 'import { openerCommands } from "./packages/dispatch/skills/autopilot/scripts/launch.ts"; for (const c of openerCommands("https://example.com")) { try { const r = Bun.spawnSync(c); if (r.exitCode === 0) { console.log("opened via", c[0]); break; } } catch {} }'` (the import is safe: `launch.ts` runs its CLI only under `import.meta.main`). This exercises the opener argv list; `openBrowser`'s own fallback loop is covered by its unit test. With `wslu` installed it prints `opened via wslview` and the Windows browser shows example.com; after `sudo apt remove wslu`, it prints `opened via cmd.exe` and the browser shows it again. Record both outputs in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
+- [x] `docs/windows-support/legs/02-core-workflow/review-notes.md` exists and has a PASS/FAIL line with evidence for each of: suites green, smoke job, profile isolation, macOS/Linux unchanged, inventory (a) items, win32 skips, scratch-root copies, task-path regex copies, plugin boundaries, no prompt in argv, path identity, docs.
+- [x] `docs/windows-support/legs/02-core-workflow/review-notes.md` lists every inventory (a) row with its product change and its test name.
+- [x] `.github/workflows/ci.yml` `required` job runs the five suites on all three OS, and a `smoke` job runs `bun .github/scripts/smoke.ts` on all three OS, neither with `continue-on-error`.
+- [x] `git diff <baseRef> -- .github/workflows/ci.yml` changes no line in the `report` job.
+- [x] Every `skipIf(process.platform === "win32")` in the five suites carries its Windows fact in the test title or a one-line comment.
+- [x] (human) The leg's PR CI run is green on `windows-latest` for both `required` and `smoke`.
+- [x] (human) On a real Windows PC, in a fresh `git init` repo with one new file `hello.ts` holding `export const hi = 1;` plus a 3-line `//` comment block: `/chronicle:commit` lands one commit containing `hello.ts`; the guard turn-end reviewer reports that comment block; `/chronicle:release local` on a one-component `.chronicle/release.json` bumps the version file and creates a local tag (`git tag` lists it); `/dispatch:flightplan` for "add a `bye` export to hello.ts" writes a `docs/<slug>/tasks/` tree that `lint-task.ts` passes, and `/autopilot` on it lands a commit adding `bye`. Record each result in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
+- [x] (human) On a real Windows PC, ask Claude Code to Write `/tmp/q-lab/probe/write.txt` with the content `probe`, then run `Get-ChildItem -Recurse -Filter write.txt C:\tmp, $env:TEMP` in PowerShell and record the full path that holds it (or that none does) in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
+- [x] (human) On WSL, from the repo root, run `bun -e 'import { openerCommands } from "./packages/dispatch/skills/autopilot/scripts/launch.ts"; for (const c of openerCommands("https://example.com")) { try { const r = Bun.spawnSync(c); if (r.exitCode === 0) { console.log("opened via", c[0]); break; } } catch {} }'` (the import is safe: `launch.ts` runs its CLI only under `import.meta.main`). This exercises the opener argv list; `openBrowser`'s own fallback loop is covered by its unit test. With `wslu` installed it prints `opened via wslview` and the Windows browser shows example.com; after `sudo apt remove wslu`, it prints `opened via cmd.exe` and the browser shows it again. Record both outputs in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
 
 ## Verification
 
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `bun test packages/chronicle packages/dispatch packages/guard packages/relay opencode/` passes.
-- [ ] `bun .github/scripts/smoke.ts` exits 0.
-- [ ] `git diff --name-only <baseRef> -- packages/chronicle packages/dispatch packages/guard packages/relay opencode .github CLAUDE.md README.md` lists changes in every one of those paths.
-- [ ] `grep -rn 'skipIf(process.platform === "win32")' packages/chronicle packages/dispatch packages/guard packages/relay opencode` — each hit is a class (c) case per `inventory.md`, or the chronicle release git-shim exception citing the `.cmd` argument fact from `windows.md`, noted in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
-- [ ] `grep -rn '"/tmp/q-lab' packages/chronicle packages/guard packages/relay --include=*.ts` — every non-test hit sits in the non-win32 branch of a platform-parameterised scratch root.
-- [ ] `grep -rnE "from \"\.\./\.\./\.\./(chronicle|dispatch|guard|relay|monitor|herdr|browsers|runes)/" packages` prints nothing, and `grep -nE '^import .* from "\.' opencode/plugin.ts` prints nothing.
-- [ ] `bun test packages/dispatch/hooks/task-path.test.ts` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `bun test packages/chronicle packages/dispatch packages/guard packages/relay opencode/` passes.
+- [x] `bun .github/scripts/smoke.ts` exits 0.
+- [x] `git diff --name-only <baseRef> -- packages/chronicle packages/dispatch packages/guard packages/relay opencode .github CLAUDE.md README.md` lists changes in every one of those paths.
+- [x] `grep -rn 'skipIf(process.platform === "win32")' packages/chronicle packages/dispatch packages/guard packages/relay opencode` — each hit is a class (c) case per `inventory.md`, or the chronicle release git-shim exception citing the `.cmd` argument fact from `windows.md`, noted in `docs/windows-support/legs/02-core-workflow/review-notes.md`.
+- [x] `grep -rn '"/tmp/q-lab' packages/chronicle packages/guard packages/relay --include=*.ts` — every non-test hit sits in the non-win32 branch of a platform-parameterised scratch root.
+- [x] `grep -rnE "from \"\.\./\.\./\.\./(chronicle|dispatch|guard|relay|monitor|herdr|browsers|runes)/" packages` prints nothing, and `grep -nE '^import .* from "\.' opencode/plugin.ts` prints nothing.
+- [x] `bun test packages/dispatch/hooks/task-path.test.ts` passes.
 
 ## Eval rubric
 
 > Integration dimensions replace the shared four (see `../_context/rubric.md` for the scale). Each dimension 0–5; weighted average > 4.0 to pass; Meets the leg goal < 4 is an automatic veto.
 
-| Dimension                 | Weight | 0–1 (fail)                                                                                         | 2–3 (below bar)                                                                                       | 4–5 (pass)                                                                                                            |
-| ------------------------- | ------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Meets the leg goal        | ×3     | A suite is not in `required`, the smoke job is missing, or an inventory (a) item has no fix        | Suites and smoke are wired but an (a) item lacks a test, or the smoke script skips a named flow       | All five suites block on three OS, smoke covers all five flows, every (a) item has a fix and a test                   |
-| No regressions            | ×2     | macOS/Linux scratch root or opener changed, or the local suite fails                               | Local suite passes but a test still writes the real profile or an unnamed behaviour changed off win32 | macOS/Linux behaviour unchanged beyond the WSL opener and autocrlf pin; no test touches the real profile              |
-| Integration & consistency | ×2     | Regex copies disagree, a cross-plugin import exists, or `opencode/plugin.ts` imports from the repo | Scratch-root copies differ in shape, or a skip names no fact                                          | Scratch roots, regex copies, normalisers and openers agree in shape; boundaries hold; every skip is (c) with its fact |
+| Dimension                 | Weight | 0–1 (fail)                                                                                                                                                                                                                                                                          | 2–3 (below bar)                                                                                       | 4–5 (pass)                                                                                                            |
+| ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Meets the leg goal        | ×3     | A suite is not in `required`, the smoke job is missing, or an inventory (a) item has no fix                                                                                                                                                                                         | Suites and smoke are wired but an (a) item lacks a test, or the smoke script skips a named flow       | All five suites block on three OS, smoke covers all five flows, every (a) item has a fix and a test                   |
+| No regressions            | ×2     | macOS/Linux scratch root or opener changed, or the local suite fails                                                                                                                                                                                                                | Local suite passes but a test still writes the real profile or an unnamed behaviour changed off win32 | macOS/Linux behaviour unchanged beyond the WSL opener and autocrlf pin; no test touches the real profile              |
+| Integration & consistency | ×2     | Regex copies disagree, a cross-plugin import exists, or `opencode/plugin.ts` imports from the repo                                                                                                                                                                                  | Scratch-root copies differ in shape, or a skip names no fact                                          | Scratch roots, regex copies, normalisers and openers agree in shape; boundaries hold; every skip is (c) with its fact |
 | Leanness                  | ×1     | A cross-plugin shared helper, a config switch nobody sets, or an abstraction with no current caller or test need was added (the pure platform-injection seams the tasks specify — `tempRoot`, `codexHome`, `linkType`, `openerCommands` and the like — are expected, not penalised) | Some per-plugin copies carry options nobody passes                                                    | Each plugin carries the smallest copy it needs; stdlib (`path`, `fs.cpSync`, `os.tmpdir`) used over hand-rolled code  |
 
 ## Out of scope

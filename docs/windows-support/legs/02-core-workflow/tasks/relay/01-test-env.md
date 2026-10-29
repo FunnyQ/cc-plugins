@@ -9,7 +9,7 @@
 >
 > **Depends on**: none — foundation task
 > **Blocks**: relay/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -67,20 +67,20 @@ These relay failures remain on Windows by design, because they are product bugs 
 
 ## Acceptance criteria
 
-- [ ] `grep -n 'CONFIG_PATH.replace' packages/relay/skills/relay/scripts/relay.test.ts` prints nothing, and the file uses `dirname(CONFIG_PATH)`.
-- [ ] `grep -n '"/tmp/relay/test-run/' packages/relay/skills/relay/scripts/relay.test.ts` prints at most the one line defining the run-dir constant.
-- [ ] `grep -nF -e 'dir\/subdir' -e '\/tmp\/relay\/report' packages/relay/skills/relay/scripts/shared.test.ts` prints nothing (no `/`-only regexes for `addTimestampSuffix`).
-- [ ] `grep -n '/dev/null' packages/relay/skills/relay/scripts/delegation-marker.test.ts` prints nothing.
-- [ ] `grep -n '"/repo/packages/herdr' packages/relay/skills/relay/scripts/live.test.ts` prints nothing.
-- [ ] `bun test packages/relay` passes on macOS.
-- [ ] `git diff --name-only -- packages/relay` lists only `*.test.ts` files.
+- [x] `grep -n 'CONFIG_PATH.replace' packages/relay/skills/relay/scripts/relay.test.ts` prints nothing, and the file uses `dirname(CONFIG_PATH)`.
+- [x] `grep -n '"/tmp/relay/test-run/' packages/relay/skills/relay/scripts/relay.test.ts` prints at most the one line defining the run-dir constant.
+- [x] `grep -nF -e 'dir\/subdir' -e '\/tmp\/relay\/report' packages/relay/skills/relay/scripts/shared.test.ts` prints nothing (no `/`-only regexes for `addTimestampSuffix`).
+- [x] `grep -n '/dev/null' packages/relay/skills/relay/scripts/delegation-marker.test.ts` prints nothing.
+- [x] `grep -n '"/repo/packages/herdr' packages/relay/skills/relay/scripts/live.test.ts` prints nothing.
+- [x] `bun test packages/relay` passes on macOS.
+- [x] `git diff --name-only -- packages/relay` lists only `*.test.ts` files.
 
 ## Verification
 
-- [ ] `bun test packages/relay` exits 0.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
-- [ ] `git diff --name-only -- packages/relay | grep -v '\.test\.ts$'` prints nothing.
-- [ ] `grep -rnE 'HOME|TMPDIR|#!/bin/sh' packages/relay --include='*.test.ts'` shows no `HOME` / `TMPDIR` override without its `USERPROFILE` / `TEMP` partner, and no shebang stub.
+- [x] `bun test packages/relay` exits 0.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `git diff --name-only -- packages/relay | grep -v '\.test\.ts$'` prints nothing.
+- [x] `grep -rnE 'HOME|TMPDIR|#!/bin/sh' packages/relay --include='*.test.ts'` shows no `HOME` / `TMPDIR` override without its `USERPROFILE` / `TEMP` partner, and no shebang stub.
 
 ## Eval rubric
 

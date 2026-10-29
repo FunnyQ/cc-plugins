@@ -8,7 +8,7 @@
 >
 > **Depends on**: chronicle/01
 > **Blocks**: platform/02
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -55,17 +55,17 @@ Test first, in `setup-codex-agents.test.ts`:
 
 ## Acceptance criteria
 
-- [ ] `setup-codex-agents.ts` contains no `process.env.HOME`.
-- [ ] `codexHome({ HOME: "/wrong" }, "/h")` returns `join("/h", ".codex")`, and with `CODEX_HOME` unset the dry run prints a path under the isolated profile's `.codex`.
-- [ ] `CODEX_HOME`, when set, still wins.
-- [ ] The new test sets `HOME` and `USERPROFILE` together and never touches the real profile.
+- [x] `setup-codex-agents.ts` contains no `process.env.HOME`.
+- [x] `codexHome({ HOME: "/wrong" }, "/h")` returns `join("/h", ".codex")`, and with `CODEX_HOME` unset the dry run prints a path under the isolated profile's `.codex`.
+- [x] `CODEX_HOME`, when set, still wins.
+- [x] The new test sets `HOME` and `USERPROFILE` together and never touches the real profile.
 
 ## Verification
 
-- [ ] `rg -n 'process\.env\.HOME' packages/chronicle/skills/install/scripts/setup-codex-agents.ts` prints nothing.
-- [ ] `bun test packages/chronicle/skills/install/scripts/setup-codex-agents.test.ts` passes.
-- [ ] `bun test packages/chronicle` passes.
-- [ ] `bunx --bun tsc --noEmit` prints nothing.
+- [x] `rg -n 'process\.env\.HOME' packages/chronicle/skills/install/scripts/setup-codex-agents.ts` prints nothing.
+- [x] `bun test packages/chronicle/skills/install/scripts/setup-codex-agents.test.ts` passes.
+- [x] `bun test packages/chronicle` passes.
+- [x] `bunx --bun tsc --noEmit` prints nothing.
 
 ## Eval rubric
 

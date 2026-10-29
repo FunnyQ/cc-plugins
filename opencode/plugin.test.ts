@@ -265,6 +265,10 @@ describe("tool.execute.after handler", () => {
       const { output, thrown } = await lintHook(filePath);
       expect(thrown).toBeUndefined();
       expect(output).toContain("flightplan lint violations");
+      const lintCall = spawnWithBinary.mock.calls.find(([argv]) =>
+        String((argv as string[])[1]).endsWith("flightplan-lint.sh"),
+      );
+      expect((lintCall?.[0] as string[])[0]).toBe("bash");
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -401,6 +405,12 @@ describe("COMMENT_GUARDED", () => {
     (name) => expect(COMMENT_GUARDED.test(name)).toBe(true),
   );
 
+  test("guards Windows paths to an extensionless build file", () => {
+    expect(COMMENT_GUARDED.test("C:\\repo\\Rakefile")).toBe(true);
+    expect(COMMENT_GUARDED.test("C:\\repo\\sub\\Dockerfile.dev")).toBe(true);
+    expect(COMMENT_GUARDED.test("C:\\repo\\notes.txt")).toBe(false);
+  });
+
   test.each(["a.md", "a.cfg", "LICENSE"])("leaves %s alone", (name) =>
     expect(COMMENT_GUARDED.test(name)).toBe(false),
   );
@@ -453,6 +463,8 @@ describe("withOpenCodeNote", () => {
 // first request is the throwaway title generator, so consume-once would lose
 // it), and session.idle retires the entry.
 describe("experimental.chat.system.transform", () => {
+  // No Windows cockpit build, and the shim is a POSIX sh script.
+  const cockpitTest = test.skipIf(process.platform === "win32");
   const root = dirname(import.meta.dir);
 
   async function createdAndTransform(
@@ -467,158 +479,182 @@ describe("experimental.chat.system.transform", () => {
     return output;
   }
 
-  test("injects the decision-log guidance into the system prompt", async () => {
-    const { system } = await createdAndTransform();
+  cockpitTest(
+    "injects the decision-log guidance into the system prompt",
+    async () => {
+      const { system } = await createdAndTransform();
 
-    expect(system[0]).toBe("base system prompt");
-    expect(system[1]).toContain("DECISION LOG ACTIVE");
-    expect(system[1]).toContain("task tool");
-  });
+      expect(system[0]).toBe("base system prompt");
+      expect(system[1]).toContain("DECISION LOG ACTIVE");
+      expect(system[1]).toContain("task tool");
+    },
+  );
 
-  test("the created seed survives a fire-and-forget dispatch (S20)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_race";
-    const output = { system: ["base"] };
+  cockpitTest(
+    "the created seed survives a fire-and-forget dispatch (S20)",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_race";
+      const output = { system: ["base"] };
 
-    // The runtime calls hook["event"] without awaiting it. The handler's
-    // synchronous seeding must land before the transform — the async spawn
-    // that used to live in the handler lost this race and the model never
-    // saw the guidance.
-    void hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+      // The runtime calls hook["event"] without awaiting it. The handler's
+      // synchronous seeding must land before the transform — the async spawn
+      // that used to live in the handler lost this race and the model never
+      // saw the guidance.
+      void hooks.event({
+        event: { type: "session.created", properties: { sessionID } },
+      });
+      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
 
-    expect(output.system[1]).toContain("DECISION LOG ACTIVE");
-  });
+      expect(output.system[1]).toContain("DECISION LOG ACTIVE");
+    },
+  );
 
-  test("rides the title request AND the real request (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_title_first";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+  cockpitTest(
+    "rides the title request AND the real request (S21)",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_title_first";
+      await hooks.event({
+        event: { type: "session.created", properties: { sessionID } },
+      });
 
-    // The runtime triggers the transform once per LLM request: the first is
-    // the throwaway title generator, the second is the request the user
-    // actually sees. Both must carry the guidance.
-    const title = { system: ["title prompt"] };
-    const main = { system: ["full system prompt"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, title);
-    await hooks["experimental.chat.system.transform"]({ sessionID }, main);
+      // The runtime triggers the transform once per LLM request: the first is
+      // the throwaway title generator, the second is the request the user
+      // actually sees. Both must carry the guidance.
+      const title = { system: ["title prompt"] };
+      const main = { system: ["full system prompt"] };
+      await hooks["experimental.chat.system.transform"]({ sessionID }, title);
+      await hooks["experimental.chat.system.transform"]({ sessionID }, main);
 
-    expect(title.system[1]).toContain("DECISION LOG ACTIVE");
-    expect(main.system[1]).toContain("DECISION LOG ACTIVE");
-  });
+      expect(title.system[1]).toContain("DECISION LOG ACTIVE");
+      expect(main.system[1]).toContain("DECISION LOG ACTIVE");
+    },
+  );
 
-  test("materializes the seed once and replays the cache (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_cache";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+  cockpitTest(
+    "materializes the seed once and replays the cache (S21)",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_cache";
+      await hooks.event({
+        event: { type: "session.created", properties: { sessionID } },
+      });
 
-    const spawn = spyOn(Bun, "spawn");
-    try {
-      const outputs = [];
-      for (let i = 0; i < PUSH_CAP; i++) {
-        const output = { system: ["base"] };
+      const spawn = spyOn(Bun, "spawn");
+      try {
+        const outputs = [];
+        for (let i = 0; i < PUSH_CAP; i++) {
+          const output = { system: ["base"] };
+          await hooks["experimental.chat.system.transform"](
+            { sessionID },
+            output,
+          );
+          outputs.push(output);
+        }
+
+        // Re-running the script per push assumes it is a pure function of its
+        // input. scribe-nudge is not: it writes a marker and throttles, so a
+        // re-run inside the same turn returns nothing and the later requests
+        // push an empty message. Materialize once, then replay the strings.
+        expect(spawn).toHaveBeenCalledTimes(1);
+        expect(spawn.mock.calls[0]?.[0]).toEqual([
+          join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
+          "hook",
+          "session-start",
+        ]);
+        const stdin = spawn.mock.calls[0]?.[1]?.stdin as Blob;
+        expect(JSON.parse(await stdin.text())).toEqual({
+          session_id: sessionID,
+          cwd: root,
+          provider: "opencode",
+        });
+        for (const output of outputs) {
+          expect(output.system[1]).toContain("DECISION LOG ACTIVE");
+        }
+      } finally {
+        spawn.mockRestore();
+      }
+    },
+  );
+
+  cockpitTest(
+    "stops pushing after PUSH_CAP requests (S21)",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_cap";
+      await hooks.event({
+        event: { type: "session.created", properties: { sessionID } },
+      });
+
+      const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
+        system: ["base"],
+      }));
+      for (const output of outputs) {
         await hooks["experimental.chat.system.transform"](
           { sessionID },
           output,
         );
-        outputs.push(output);
       }
 
-      // Re-running the script per push assumes it is a pure function of its
-      // input. scribe-nudge is not: it writes a marker and throttles, so a
-      // re-run inside the same turn returns nothing and the later requests
-      // push an empty message. Materialize once, then replay the strings.
-      expect(spawn).toHaveBeenCalledTimes(1);
-      expect(spawn.mock.calls[0]?.[0]).toEqual([
+      for (const output of outputs.slice(0, PUSH_CAP)) {
+        expect(output.system).toHaveLength(2);
+      }
+      for (const output of outputs.slice(PUSH_CAP)) {
+        expect(output.system).toHaveLength(1);
+      }
+    },
+  );
+
+  cockpitTest(
+    "session.idle retires the turn's entry and seeds the nudge (S21)",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_turn";
+      await hooks.event({
+        event: { type: "session.created", properties: { sessionID } },
+      });
+      const first = { system: ["base"] };
+      await hooks["experimental.chat.system.transform"]({ sessionID }, first);
+      expect(first.system[1]).toContain("DECISION LOG ACTIVE");
+
+      // Turn over: the created guidance must not ride the next turn's requests.
+      // The nudge script may or may not push in this environment (it gates on
+      // the repo's change signature), but whatever it does, the created
+      // guidance — identified by its unique "DECISION LOG ACTIVE" line — is gone.
+      await hooks.event({
+        event: { type: "session.idle", properties: { sessionID } },
+      });
+      const second = { system: ["base"] };
+      await hooks["experimental.chat.system.transform"]({ sessionID }, second);
+      expect(second.system.join("\n")).not.toContain("DECISION LOG ACTIVE");
+    },
+  );
+
+  cockpitTest(
+    "runs the stop hook through the shim with the OpenCode payload",
+    async () => {
+      const hooks = await QLabPlugin({ directory: root });
+      const sessionID = "ses_stop_argv";
+      await hooks.event({
+        event: { type: "session.idle", properties: { sessionID } },
+      });
+      const output = { system: ["base"] };
+      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+      expect(spawnWithBinary.mock.calls[0]?.[0]).toEqual([
         join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
         "hook",
-        "session-start",
+        "stop",
       ]);
-      const stdin = spawn.mock.calls[0]?.[1]?.stdin as Blob;
+      const stdin = spawnWithBinary.mock.calls[0]?.[1]?.stdin as Blob;
       expect(JSON.parse(await stdin.text())).toEqual({
         session_id: sessionID,
         cwd: root,
         provider: "opencode",
       });
-      for (const output of outputs) {
-        expect(output.system[1]).toContain("DECISION LOG ACTIVE");
-      }
-    } finally {
-      spawn.mockRestore();
-    }
-  });
-
-  test("stops pushing after PUSH_CAP requests (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_cap";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-
-    const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
-      system: ["base"],
-    }));
-    for (const output of outputs) {
-      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
-    }
-
-    for (const output of outputs.slice(0, PUSH_CAP)) {
-      expect(output.system).toHaveLength(2);
-    }
-    for (const output of outputs.slice(PUSH_CAP)) {
-      expect(output.system).toHaveLength(1);
-    }
-  });
-
-  test("session.idle retires the turn's entry and seeds the nudge (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_turn";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    const first = { system: ["base"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, first);
-    expect(first.system[1]).toContain("DECISION LOG ACTIVE");
-
-    // Turn over: the created guidance must not ride the next turn's requests.
-    // The nudge script may or may not push in this environment (it gates on
-    // the repo's change signature), but whatever it does, the created
-    // guidance — identified by its unique "DECISION LOG ACTIVE" line — is gone.
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID } },
-    });
-    const second = { system: ["base"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, second);
-    expect(second.system.join("\n")).not.toContain("DECISION LOG ACTIVE");
-  });
-
-  test("runs the stop hook through the shim with the OpenCode payload", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_stop_argv";
-    await hooks.event({
-      event: { type: "session.idle", properties: { sessionID } },
-    });
-    const output = { system: ["base"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
-    expect(spawnWithBinary.mock.calls[0]?.[0]).toEqual([
-      join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
-      "hook",
-      "stop",
-    ]);
-    const stdin = spawnWithBinary.mock.calls[0]?.[1]?.stdin as Blob;
-    expect(JSON.parse(await stdin.text())).toEqual({
-      session_id: sessionID,
-      cwd: root,
-      provider: "opencode",
-    });
-    expect(output.system[1]).toContain("Log the decision.");
-  });
+      expect(output.system[1]).toContain("Log the decision.");
+    },
+  );
 
   test("no-ops without a session id or without pending guidance", async () => {
     const hooks = await QLabPlugin({ directory: root });
