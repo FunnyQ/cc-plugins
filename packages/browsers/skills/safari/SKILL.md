@@ -23,6 +23,19 @@ bun "$S" open http://localhost:3000
 
 Written `S <command>` below — expand it to `bun "$S" <command>` every time.
 
+## Platform boundary
+
+Run Safari only on macOS with `bun`, Safari and its installed `safaridriver`.
+Outside macOS, executable invocations refuse with `macOS only` before parsing,
+state creation or driver spawn. Keep parser/protocol imports portable.
+Opt into the visible live test explicitly from the repository root:
+
+```sh
+SAFARI_LIVE=1 bun test packages/browsers/skills/safari/scripts/safari.live.test.ts
+```
+
+Expect the default live test to skip; a skip supplies no live Safari evidence.
+
 ## Before the first run
 
 Ask the user to run `safaridriver --enable` once. It asks for their password, so

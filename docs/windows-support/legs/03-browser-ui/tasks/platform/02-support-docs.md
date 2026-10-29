@@ -9,7 +9,7 @@
 >
 > **Depends on**: platform/01
 > **Blocks**: review/01
-> **Status**: todo
+> **Status**: done
 
 ## Goal
 
@@ -71,19 +71,19 @@ Use additional rows when distinct environments need separate evidence. Mark a ch
 
 ## Acceptance criteria
 
-- [ ] The declared documentation describes implemented browser search, Safari refusal, file openers and Herdr prerequisites without claiming host-binary ports or automatic dependency installation.
-- [ ] Documentation states the support matrix, WSL's Linux-browser-only rule with its install hint, the Windows Firefox/Zen refusal and Linux-only runes checker behavior on WSL.
-- [ ] Documented verification commands match existing implemented entrypoints and distinguish three-OS Bun contracts, required native smoke, the full local mod suite and owed real Windows/WSL evidence.
-- [ ] `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` contains the five specified columns and all seven owed-check groups, initialized without fabricated evidence or completion claims.
-- [ ] Existing leg-2 debts and the active leg-3 roadmap state remain intact, and no release/version/push/merge operation is introduced by this documentation change.
+- [x] The declared documentation describes implemented browser search, Safari refusal, file openers and Herdr prerequisites without claiming host-binary ports or automatic dependency installation.
+- [x] Documentation states the support matrix, WSL's Linux-browser-only rule with its install hint, the Windows Firefox/Zen refusal and Linux-only runes checker behavior on WSL.
+- [x] Documented verification commands match existing implemented entrypoints and distinguish three-OS Bun contracts, required native smoke, the full local mod suite and owed real Windows/WSL evidence.
+- [x] `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` contains the five specified columns and all seven owed-check groups, initialized without fabricated evidence or completion claims.
+- [x] Existing leg-2 debts and the active leg-3 roadmap state remain intact, and no release/version/push/merge operation is introduced by this documentation change.
 
 ## Verification
 
-- [ ] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites` from the repository root; require measured paths and versions for every browser the host requires, and preserve a nonzero diagnostic when a prerequisite is missing.
-- [ ] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0, confirming the isolated command is runnable as documented.
-- [ ] Inspect each declared file and verify that referenced source paths and command entrypoints exist and support claims match actual implementation and CI coverage.
-- [ ] Inspect `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` and confirm every required environment/check group remains `owed` unless a recorded actual run justifies a changed status.
-- [ ] Run `git diff --check -- README.md CLAUDE.md packages/browsers/skills packages/herdr/skills/herdr-browser docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` and require no whitespace errors.
+- [x] Run `bun .github/scripts/browser-smoke.ts --check-prerequisites` from the repository root; require measured paths and versions for every browser the host requires, and preserve a nonzero diagnostic when a prerequisite is missing.
+- [x] Run `(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)` and require exit 0, confirming the isolated command is runnable as documented.
+- [x] Inspect each declared file and verify that referenced source paths and command entrypoints exist and support claims match actual implementation and CI coverage.
+- [x] Inspect `docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` and confirm every required environment/check group remains `owed` unless a recorded actual run justifies a changed status.
+- [x] Run `git diff --check -- README.md CLAUDE.md packages/browsers/skills packages/herdr/skills/herdr-browser docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md` and require no whitespace errors.
 
 ## Eval rubric
 

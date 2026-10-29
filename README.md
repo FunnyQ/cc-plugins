@@ -141,7 +141,7 @@ Windows support is a work in progress. Plugins load without hook errors. The roa
 
 **Works on native Windows:** chronicle, dispatch, guard and relay. Their test suites, and the OpenCode layer's (`opencode/`), pass in CI's blocking `required` job on windows-latest. A `smoke` CI job runs commit, release (local mode), flightplan scaffold and lint, worktree create and land, and the comment sweep on Linux, macOS and Windows. The agent-driven flows (such as `/chronicle:commit`, `/autopilot` and the guard reviewer) are not yet verified on a real Windows machine.
 
-**Not yet supported:** monitor (the cockpit and the usage dashboard), herdr, browsers and runes. They are later roadmap legs. monitor skips its cockpit hooks on native Windows.
+**Still pending:** monitor (the cockpit and the usage dashboard); monitor skips its cockpit hooks on native Windows. See the browser/UI boundaries below for the implemented leg-3 behavior and its remaining verification.
 
 **Supported runtimes:**
 
@@ -161,6 +161,40 @@ Scratch files go under `%TEMP%\q-lab\<plugin>\` on native Windows (the `join(tmp
 Inside WSL, URL openers use `wslview` when it is installed, and fall back to `cmd.exe /c start "" <url>`.
 
 The OpenCode layer's tests pass on Windows in CI, and relay's opencode backend no longer passes prompts in argv. The OpenCode layer's flightplan lint and comment guard hooks run on Windows. Its cockpit hooks do not, because no Windows cockpit binary ships. Codex and OpenCode on Windows are otherwise not verified on a real Windows machine.
+
+## Browser and UI platform boundaries
+
+Use Bun on `PATH` for browser and Herdr scripts and runes runtime children. Use Claude Code for runes; it is a function-hooks mod, with no Codex manifest.
+
+| Browser | macOS | Linux, including WSL | Native Windows |
+| --- | --- | --- | --- |
+| Chrome | supported | supported | supported |
+| Firefox / Zen | supported | supported | refused: `not supported on Windows` |
+| Safari | supported | refused: `macOS only` | refused: `macOS only` |
+
+Read [Chrome discovery](./packages/browsers/skills/chrome/SKILL.md), [Firefox/Zen discovery](./packages/browsers/skills/firefox/SKILL.md) and [Safari requirements](./packages/browsers/skills/safari/SKILL.md) before launching. Use installed executables in the documented search locations; arbitrary portable installations are not promised. On WSL, use Linux-installed browsers only, never Windows browsers. When discovery fails there, follow the diagnostic `Install a Linux build of <browser> inside WSL.` Report missing prerequisites without automatically installing them. Preserve Safari's visible live-test opt-in, `SAFARI_LIVE=1`.
+
+For explain completion and history reopen, use the system file opener: `open` on macOS, `xdg-open` on Linux, and `cmd.exe /d /c start` on Windows, with a fixed PowerShell opener for paths containing shell metacharacters. On WSL, try `wslview`, then convert the file path with `wslpath -w` before the Windows fallback. Preserve URL-aware decoding of file URLs. For raw Markdown and image previews, preserve macOS Quick Look (`qlmanage -p`, raised through `osascript`); use the same system opener elsewhere. Retain completed HTML and report opening failures.
+
+For the runes checker on WSL, use Linux Chrome discovered on `PATH` (`google-chrome`, `google-chrome-stable`, `chromium`, `chromium-browser`). When absent, skip checking and still attempt to open the explanation. Resolve runes home from `HOME`, falling back to `USERPROFILE` on native Windows. Keep config at `<home>/.config/q-lab/cc-plugins/runes/config.yaml` and HTML at `<home>/.local/share/q-lab/runes/explain`. For recoverable deletion, require `trash` on macOS, `trash-put` or `gio trash` on Linux/WSL, and `powershell.exe` with the native recycle operation on Windows. If recycling is unavailable, retain the page and report the failure.
+
+For Herdr panes, require compatible installed `herdr` and `terminal-browser` binaries. Read [Herdr browser requirements](./packages/herdr/skills/herdr-browser/SKILL.md) for `HERDR_BIN_PATH`, workspace targeting and view selection. This repository wraps their CLIs; it does not port the host binaries or supply a verified Windows installer. Keep Windows/WSL pane operations owed until measured on those hosts.
+
+Run these commands from the repository root:
+
+```sh
+bun test packages/browsers packages/herdr
+bunx --bun tsc --noEmit
+claude plugin test packages/runes
+claude plugin validate packages/runes
+(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
+bun .github/scripts/browser-smoke.ts
+bun .github/scripts/browser-smoke.ts --check-prerequisites
+```
+
+Distinguish the evidence layers in [`.github/workflows/ci.yml`](./.github/workflows/ci.yml): the three-OS `required` job runs Bun contracts for browsers/Herdr and the isolated runes platform/theme contracts, plus native browser smoke. The separate `smoke` job exercises core workflow operations. Run the complete runes mod suite through Claude Code locally; the root TypeScript configuration excludes runes, so a passing root typecheck does not validate the mod. Injected platform fixtures do not establish real Windows/WSL behavior.
+
+Require installed Chrome on every native smoke host and Firefox on macOS/Linux. Preserve nonzero diagnostics for missing prerequisites. Record selected paths and measured versions with actual results; `--check-prerequisites` measures availability and versions without running browser interactions. Optional local live-test skips are not equivalent evidence. Keep Windows/WSL rendering, pane operations, Zen live runs and the remote implementation PR results in [OWED-CHECKS.md](./docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md). Preserve the leg-2 debts and the active leg-3 state in [the roadmap](./docs/windows-support/WAYPOINTS.md).
 
 ## usage-dashboard
 

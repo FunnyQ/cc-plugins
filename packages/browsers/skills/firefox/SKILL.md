@@ -44,8 +44,23 @@ a headed window takes focus on the user's screen.
 `open` prints the instance id first. With several instances open, every command
 refuses to guess — pass `--id`, and the error lists the candidates.
 
-The browser comes from the first installed of Firefox Developer Edition, Firefox,
-and Firefox Nightly. Pass `--zen` to use Zen.
+## Installed browser discovery
+
+Require `bun` and an installed browser. On macOS, search `/Applications` app
+bundles in order: Firefox Developer Edition, Firefox, Firefox Nightly.
+With `--zen`, use `/Applications/Zen.app/Contents/MacOS/zen`.
+On Linux, search `PATH` for `firefox`, then `firefox-esr`, then
+`/usr/bin/firefox`, `/usr/bin/firefox-esr`, `/opt/firefox/firefox`,
+`/snap/bin/firefox`. For Zen, search `PATH` for `zen`, then `zen-browser`,
+then `/usr/bin/zen`, `/usr/bin/zen-browser`, `/opt/zen/zen`.
+Do not promise arbitrary portable installations.
+
+On native Windows, refuse Firefox and Zen executable invocations before parsing,
+state creation or launch with `not supported on Windows`; use the chrome skill.
+On WSL, use Linux-installed browsers only, never Windows browsers.
+If discovery fails, report attempted candidates and
+`Install a Linux build of firefox inside WSL.` (or `zen` for `--zen`).
+Report missing prerequisites without automatically installing them.
 
 ## Read and drive the page
 

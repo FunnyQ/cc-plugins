@@ -26,10 +26,28 @@ Written `B <command>` below — expand it to `bun "$B" <command>` every time.
 
 ## Requirements
 
-The browser is [terminal-browser](https://terminal-browser.sh). Every operation
-below runs over CDP; only `open`, `new-tab`, `activate`, and `raw` go through its
-CLI. When the binary is missing the error names the install command. Never
-install it for the user without asking.
+Require `bun` and compatible installed `herdr` and
+[terminal-browser](https://terminal-browser.sh) executables for Herdr panes.
+Resolve Herdr through `HERDR_BIN_PATH` when nonempty, otherwise `herdr` on
+`PATH`; resolve `terminal-browser` on `PATH`. Pass `HERDR_BIN_PATH` as one
+executable path, without shell flags. Every operation below runs over CDP;
+`open`, `new-tab`, `activate`, and `raw` also use the terminal-browser CLI.
+
+On native Windows, missing dependencies report `<dependency> is not installed`
+and suggest a native installation on `PATH` or an available WSL installation.
+On macOS/Linux, the terminal-browser diagnostic names its upstream shell install
+command; Herdr's diagnostic names `PATH` and `HERDR_BIN_PATH`. Report these
+prerequisites without automatically installing anything. This repository wraps
+the CLIs; it does not port either host binary or supply a verified Windows
+installer. Keep native Windows and WSL pane behavior owed until an actual run
+records command outputs, pane/view ids and screenshots.
+
+When `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID` are both present, create the default
+new browser tab in that workspace with the current working directory and pass
+its root pane through `HERDR_PANE_ID` to terminal-browser. Without both values,
+let terminal-browser choose placement. Preserve `--split` placement in the
+focused pane. With multiple views, select `--view ID` explicitly; never infer a
+workspace from a view id or bypass the Herdr CLI with a Unix socket assumption.
 
 ## Open a page
 

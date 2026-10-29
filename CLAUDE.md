@@ -336,9 +336,14 @@ d=$(mktemp -d) && mkdir "$d/hooks" && cp -R packages/guard/.claude-plugin packag
 # dispatch's mod: copy only the mod's files, since its bun tests share hooks/
 (d=$(mktemp -d) && mkdir "$d/hooks" && cp -R packages/dispatch/.claude-plugin "$d" && (cd packages/dispatch/hooks && cp -R hooks.json register.ts task-path.ts flightdeck flightdeck.mod.test.ts flightplan-lint.mod.test.ts "$d/hooks") && rm -f "$d"/hooks/flightdeck/*.test.ts && claude plugin test "$d"; s=$?; rm -rf "$d"; exit $s)
 
-# runes: the mod suite, then the explain theme contract, which reads files the kit refuses
+# Browser/UI gates from the repository root; keep the full mod suite separate
+bun test packages/browsers packages/herdr
+bunx --bun tsc --noEmit
 claude plugin test packages/runes
-(cd packages/runes && bun test ./hooks/explain/themes.spec.ts)
+claude plugin validate packages/runes
+(cd packages/runes && bun test ./hooks/platform.spec.ts ./hooks/explain/themes.spec.ts)
+bun .github/scripts/browser-smoke.ts
+bun .github/scripts/browser-smoke.ts --check-prerequisites
 
 # Whole-repo test run — --parallel runs test files across worker processes (Bun 1.4)
 bun test --parallel .
@@ -354,6 +359,43 @@ files on the command line drops the config, so `strict` runs without
 name. Real errors then hide among a dozen fake ones — this is how a `Target`
 literal missing a required field once shipped and failed at runtime on every
 command.
+
+## Browser/UI platform conventions
+
+Follow `packages/browsers/skills/shared/platform.ts` for installed browser search:
+Chrome on macOS/Linux/Windows, Firefox and Zen on macOS/Linux only. On WSL,
+launch Linux-installed browsers only; preserve the Linux-build install hint.
+Refuse native Windows Firefox/Zen with `not supported on Windows` and Safari
+outside macOS with `macOS only` at the executable boundary. Preserve Safari's
+visible live-test opt-in through `SAFARI_LIVE=1`.
+
+Keep runes platform planning in `hooks/platform.ts` and runtime work in
+`hooks/platform-cli.ts` under `packages/runes/`. Resolve `HOME`, then
+`USERPROFILE` on native Windows. For explain completion/history, preserve `open`
+on macOS, `xdg-open` on Linux, Windows `cmd.exe`/PowerShell opening, and WSL
+`wslview` followed by `wslpath -w` and the Windows fallback. For raw/image
+previews, preserve macOS Quick Look and use the system opener elsewhere.
+Keep the WSL checker on Linux Chrome; when absent, skip checking and still
+attempt opening. Preserve recoverable deletion; retain pages if trash fails.
+
+Require installed compatible Herdr and terminal-browser binaries. Preserve
+`HERDR_BIN_PATH || "herdr"`, `HERDR_PANE_ID`/`HERDR_WORKSPACE_ID` placement and
+explicit `--view` selection. Do not claim host-binary ports or a verified
+Windows installer. Read the plugin skills for exact discovery and dependency
+boundaries.
+
+Distinguish `.github/workflows/ci.yml` evidence: three-OS Bun helper contracts
+and isolated runes platform/theme contracts run in `required`, alongside native
+browser smoke. The separate `smoke` job covers core workflows. Run the full
+runes suite through Claude Code; root `tsconfig.json` excludes the mod.
+Do not treat injected platform fixtures or optional live-test skips as actual
+Windows/WSL verification. Require Chrome on every native smoke host and Firefox
+on macOS/Linux; fail missing prerequisites and record measured paths/versions.
+Use `--check-prerequisites` for availability/version diagnostics, not interaction
+proof. Record actual local outcomes separately from owed rows in
+`docs/windows-support/legs/03-browser-ui/OWED-CHECKS.md`; keep Windows/WSL UI,
+Zen and authorized remote PR evidence owed until actual runs. Preserve leg-2
+debts and the active leg-3 roadmap state.
 
 ## Code Conventions
 
