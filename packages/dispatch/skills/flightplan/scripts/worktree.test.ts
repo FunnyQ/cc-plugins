@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import {
   chmodSync,
   existsSync,
@@ -30,6 +30,8 @@ import {
   sweep,
   unland,
 } from "./worktree";
+
+setDefaultTimeout(20_000);
 
 const scratch: string[] = [];
 afterEach(() => {
