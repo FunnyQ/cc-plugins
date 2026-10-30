@@ -12,7 +12,7 @@ when_to_use: >-
   are open and where. Do NOT use to run a shell command in another pane, or
   for work you can do yourself in this session.
 argument-hint: <project-or-fragment> <what to do>
-version: 3
+version: 4
 ---
 
 # Tell another project's agent
@@ -33,6 +33,16 @@ bun "$HERD" tell --agent codex api-service "rebase onto main and run the suite"
 
 Put `--agent` BEFORE the fragment. Pass the harness the user named; otherwise leave it out.
 
+```bash
+# A project neither the registry nor zoxide knows: pass its absolute folder
+bun "$HERD" tell /Users/dev/Projects/herdr-q-saddle "read the brief in /tmp/…/brief.md"
+
+# A slash command reaches the agent as a command, not as a message
+bun "$HERD" tell herdr-q-saddle "/rc"
+```
+
+Under herdr-app, `hc send` wraps text in an `<hc from=…>` tag, so a slash command sent as text arrives as a message the agent tries to interpret. `tell` types a one-line text starting with `/` as keys instead. Send the command and the task as two `tell` calls, command first.
+
 Need a verb's flags? Run `bun "$HERD" <verb> --help`. Never read `herd.ts` to answer that.
 
 Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** banner. `${CLAUDE_PLUGIN_ROOT}` is not reliable inside a Bash call. On OpenCode there is no banner. Use `~/.config/opencode/skills/herdr/scripts/herd.ts` directly.
@@ -45,7 +55,7 @@ The readable address is the agent's `name` when it has one, otherwise `workspace
 
 ## No live agent? `tell` looks further before giving up
 
-Zero live matches does not mean stop. `tell` next checks the herdr-workbench project registry (`~/.local/state/herdr-projects/registry.json` — projects it or another herdr client has seen, open or not), then zoxide's frecency index. Same unique/ambiguous/zero rule as live agents, candidates listed by path instead of pane id.
+Zero live matches does not mean stop. An absolute path to an existing folder resolves to that folder. Otherwise `tell` next checks the herdr-workbench project registry (`~/.local/state/herdr-projects/registry.json` — projects it or another herdr client has seen, open or not), then zoxide's frecency index. Same unique/ambiguous/zero rule as live agents, candidates listed by path instead of pane id.
 
 A registry/zoxide hit is a **path**, not a running agent. `tell` checks that path against every live agent's cwd first — a tab renamed away from its project's label can still be reachable there — and only when nothing answers does it spawn a fresh workspace (a new space under herdr-app) at that path, starting the harness with the text as its first prompt. The result's `spawned` field is set exactly when this happened; **report it** alongside `matched`.
 
