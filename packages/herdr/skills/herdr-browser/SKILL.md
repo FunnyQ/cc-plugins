@@ -51,7 +51,9 @@ workspace from a view id or bypass the Herdr CLI with a Unix socket assumption.
 
 Under herdr-app (`HC_TERMINAL_ID` set, no `HERDR_PANE_ID`), require `herdr-app`
 instead of `herdr`. `open --new` runs `herdr-app do tab.new` in the space that
-shows this terminal, and names the tab after the URL's host. `--split right|down`
+shows this terminal, and names the tab after the URL's host. `tab.new` always
+shows the new tab, so the script then selects the tab that was shown before,
+and the person's screen does not move. `--split right|down`
 splits this terminal's pane with `pane.split`. herdr-app refuses `left` and `up`,
 and refuses `--ratio`. The tab belongs to the person, not to this agent, so it
 outlives the session. Closing the browser leaves an idle shell in that tab,

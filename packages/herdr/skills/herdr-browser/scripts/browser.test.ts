@@ -831,6 +831,7 @@ describe("openTerminal", () => {
       return async (command) => {
         calls.push(command);
         if (command[0] === "herdr-app" && command[1] === "ls") return screen;
+        if (command[1] === "status") return JSON.stringify({ tab: "tb0" });
         if (command[2] === "tab.new")
           return JSON.stringify({ space: "sp1", tab: "tb9", terminal: "t4f" });
         if (command[2] === "pane.split")
@@ -839,7 +840,7 @@ describe("openTerminal", () => {
       };
     }
 
-    test("opens the browser in a new tab of this space, named after the host", async () => {
+    test("opens the browser in a new tab of this space, named after the host, and shows the person's tab again", async () => {
       const calls: string[][] = [];
       let reads = 0;
       const found = await openTerminal(
@@ -855,6 +856,7 @@ describe("openTerminal", () => {
       expect(found.id).toBe("new-view");
       expect(calls).toEqual([
         ["herdr-app", "ls"],
+        ["herdr-app", "status"],
         [
           "herdr-app",
           "do",
@@ -866,6 +868,7 @@ describe("openTerminal", () => {
             argv: argv("https://example.com/a"),
           }),
         ],
+        ["herdr-app", "do", "tab.select", JSON.stringify({ id: "tb0" })],
       ]);
     });
 
@@ -875,7 +878,7 @@ describe("openTerminal", () => {
         run: fake(calls),
         terminalTargets: async () => [own],
       });
-      expect(JSON.parse(calls[1][3]).name).toBe("browser");
+      expect(JSON.parse(calls[2][3]).name).toBe("browser");
     });
 
     test("--split splits this terminal's pane", async () => {

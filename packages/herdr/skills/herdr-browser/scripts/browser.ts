@@ -317,7 +317,9 @@ export async function run(
   const dependency =
     command[0] === "terminal-browser"
       ? "terminal-browser"
-      : command[0] === HERDR_BIN ? "herdr" : null;
+      : command[0] === HERDR_BIN
+        ? "herdr"
+        : null;
   if (dependency) requireExecutable(command[0], dependency);
   const child = Bun.spawn(command, {
     stdout: "pipe",
@@ -556,6 +558,10 @@ async function openInHerdrApp(
     );
   }
   const argv = appBrowserArgv(url);
+  const shown =
+    split === null
+      ? JSON.parse(await deps.run(["herdr-app", "status"])).tab
+      : null;
   const created = JSON.parse(
     await deps.run(
       split === null
@@ -578,6 +584,11 @@ async function openInHerdrApp(
           ],
     ),
   );
+  if (shown) {
+    await deps
+      .run(["herdr-app", "do", "tab.select", JSON.stringify({ id: shown })])
+      .catch(() => {});
+  }
   try {
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const found = newcomer(before, await deps.terminalTargets());
