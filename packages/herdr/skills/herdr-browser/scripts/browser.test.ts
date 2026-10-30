@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import {
   cdp,
@@ -781,6 +781,108 @@ describe("openTerminal", () => {
       }
     }
     expect(calls.at(-1)?.slice(1)).toEqual(["tab", "close", "T9"]);
+  });
+
+  describe("under herdr-app", () => {
+    const keys = ["HC_TERMINAL_ID", "HERDR_PANE_ID"] as const;
+    let saved: (string | undefined)[] = [];
+    beforeEach(() => {
+      saved = keys.map((key) => process.env[key]);
+      process.env.HC_TERMINAL_ID = "t46";
+      delete process.env.HERDR_PANE_ID;
+    });
+    afterEach(() => {
+      keys.forEach((key, index) => {
+        if (saved[index] === undefined) delete process.env[key];
+        else process.env[key] = saved[index];
+      });
+    });
+
+    const own: Target = {
+      id: "new-view",
+      cdpHttp: "http://127.0.0.1:1",
+      activeTargetId: "target",
+      pane: null,
+      hostTab: null,
+      url: "about:blank",
+      title: "",
+      tabs: [],
+    };
+    const self = JSON.stringify({
+      labels: { "herdr.space": "sp1", "herdr.tab": "tb1" },
+    });
+    const layout = JSON.stringify({
+      spaces: [{ tabs: [{ id: "tb2", terminals: [{ terminal: "t4f" }] }] }],
+    });
+
+    function fake(calls: string[][]): Deps["run"] {
+      return async (command) => {
+        calls.push(command);
+        if (command[0] === "hc" && command[1] === "get") return self;
+        if (command[0] === "hc" && command[1] === "run")
+          return JSON.stringify({ address: "t4f" });
+        if (command[0] === "herdr-app" && command[1] === "ls") return layout;
+        return "{}";
+      };
+    }
+
+    test("runs the browser as its own hc terminal in a new tab of this space, named browser", async () => {
+      const calls: string[][] = [];
+      let reads = 0;
+      const found = await openTerminal("https://example.com/", null, null, [], {
+        run: fake(calls),
+        terminalTargets: async () => (reads++ === 0 ? [] : [own]),
+      });
+      expect(found.id).toBe("new-view");
+      expect(calls).toEqual([
+        ["hc", "get", "--json", "t46"],
+        [
+          "hc",
+          "run",
+          "--bg",
+          "--json",
+          "--outlive-parent",
+          "--no-notify",
+          "--rm",
+          "--label",
+          "herdr.space=sp1",
+          "terminal-browser",
+          "open",
+          "https://example.com/",
+        ],
+        ["herdr-app", "ls"],
+        [
+          "herdr-app",
+          "do",
+          "tab.rename",
+          JSON.stringify({ id: "tb2", name: "browser" }),
+        ],
+      ]);
+    });
+
+    test("--split lands it in this tab instead", async () => {
+      const calls: string[][] = [];
+      await openTerminal("about:blank", "right", null, [], {
+        run: fake(calls),
+        terminalTargets: async () => [own],
+      });
+      expect(calls[1]).toContain("herdr.tab=tb1");
+      expect(calls.some((c) => c[1] === "do")).toBe(false);
+    });
+
+    test("a browser that never reports is killed, so no stray tab is left", async () => {
+      const calls: string[][] = [];
+      const failure = new Error("gone");
+      await expect(
+        openTerminal("about:blank", null, null, [], {
+          run: fake(calls),
+          terminalTargets: async () => {
+            throw failure;
+          },
+        }),
+      ).rejects.toBe(failure);
+      expect(calls.at(-1)).toEqual(["hc", "kill", "t4f"]);
+    });
   });
 });
 

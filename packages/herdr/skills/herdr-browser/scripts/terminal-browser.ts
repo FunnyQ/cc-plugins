@@ -176,6 +176,38 @@ export function newcomer(
   return after.find((target) => !known.has(target.id));
 }
 
+// herdr-app shows an hc terminal labelled `herdr.space` as a new tab of that
+// space, or as a pane of the tab `herdr.tab` names. `--rm` drops the terminal
+// when the browser exits, which takes its tab with it.
+export function hcBrowserRunArgs(url: string, labels: string[]): string[] {
+  return [
+    "hc",
+    "run",
+    "--bg",
+    "--json",
+    "--outlive-parent",
+    "--no-notify",
+    "--rm",
+    ...labels.flatMap((label) => ["--label", label]),
+    "terminal-browser",
+    "open",
+    url,
+  ];
+}
+
+export function appTabOf(raw: string, terminal: string): string | null {
+  try {
+    for (const space of JSON.parse(raw)?.spaces ?? []) {
+      for (const tab of space.tabs ?? []) {
+        if ((tab.terminals ?? []).some((t: any) => t.terminal === terminal)) {
+          return tab.id;
+        }
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export function herdrTabLabel(raw: string): string | null {
   try {
     const label = JSON.parse(raw)?.result?.tab?.label;
