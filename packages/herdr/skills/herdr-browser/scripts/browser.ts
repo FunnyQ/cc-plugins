@@ -9,6 +9,8 @@ import {
   herdrTabCreateArgs,
   parseHerdrTab,
   herdrTabLabel,
+  hcBrowserRunArgs,
+  appTabOf,
   type HerdrTab,
   type Tab,
   type Target,
@@ -319,7 +321,12 @@ export async function run(
   const child = Bun.spawn(command, {
     stdout: "pipe",
     stderr: "pipe",
-    env: env ? { ...process.env, ...env } : process.env,
+    env:
+      command[0] === "terminal-browser" && inHerdrApp()
+        ? withoutGhostty({ ...process.env, ...env })
+        : env
+          ? { ...process.env, ...env }
+          : process.env,
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline =
@@ -352,6 +359,21 @@ export async function run(
     );
   }
   return stdout;
+}
+
+// herdr-app hands its terminals Ghostty's TERM_PROGRAM and resources dir, so
+// terminal-browser picks its Ghostty adapter and fails: "Ghostty is not
+// running, so there is no window to script". Without the two it finds its
+// browsers.
+function withoutGhostty(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  const { TERM_PROGRAM: _t, GHOSTTY_RESOURCES_DIR: _g, ...rest } = env;
+  return rest;
+}
+
+function inHerdrApp(): boolean {
+  return !!process.env.HC_TERMINAL_ID && !process.env.HERDR_PANE_ID;
 }
 
 export function resolveMetrics(
@@ -473,6 +495,9 @@ export async function openTerminal(
   before: Target[],
   deps: Deps = LIVE,
 ): Promise<Target> {
+  if (inHerdrApp()) {
+    return openInHerdrApp(url, split, ratio, before, deps);
+  }
   const tab = split === null ? await herdrTab(deps.run) : null;
   try {
     await deps.run(
@@ -503,6 +528,54 @@ export async function openTerminal(
     if (tab) {
       await deps.run([HERDR_BIN, "tab", "close", tab.tab]).catch(() => {});
     }
+    throw error;
+  }
+}
+
+async function openInHerdrApp(
+  url: string,
+  split: string | null,
+  ratio: string | null,
+  before: Target[],
+  deps: Deps,
+): Promise<Target> {
+  if (ratio !== null) {
+    throw new Error(
+      "--ratio is not supported under herdr-app, which sizes the pane itself",
+    );
+  }
+  const self = JSON.parse(
+    await deps.run(["hc", "get", "--json", process.env.HC_TERMINAL_ID!]),
+  );
+  const labels = [`herdr.space=${self.labels?.["herdr.space"]}`];
+  if (split !== null) labels.push(`herdr.tab=${self.labels?.["herdr.tab"]}`);
+  const { address } = JSON.parse(
+    await deps.run(hcBrowserRunArgs(url, labels)),
+  );
+  try {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const found = newcomer(before, await deps.terminalTargets());
+      if (found) {
+        if (split === null) {
+          const tab = appTabOf(await deps.run(["herdr-app", "ls"]), address);
+          if (tab) {
+            await deps
+              .run([
+                "herdr-app",
+                "do",
+                "tab.rename",
+                JSON.stringify({ id: tab, name: "browser" }),
+              ])
+              .catch(() => {});
+          }
+        }
+        return found;
+      }
+      await Bun.sleep(250);
+    }
+    throw new Error("opened the browser but it never reported the page");
+  } catch (error) {
+    await deps.run(["hc", "kill", address]).catch(() => {});
     throw error;
   }
 }

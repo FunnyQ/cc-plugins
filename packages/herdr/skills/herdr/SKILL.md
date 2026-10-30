@@ -1,24 +1,39 @@
 ---
 name: herdr
 description: >-
-  Help with Herdr configuration, CLI, popup and tiled panes, plugins, and
-  coordinating agents across panes.
+  Help with Herdr (the `herdr` multiplexer, or herdr-app with herdr-core's
+  `hc`) configuration, CLI, panes, plugins, and coordinating agents across
+  panes.
 when_to_use: >-
   For herdr config.toml, keybindings, themes, popup commands, CLI commands, or
-  plugin development; or — inside a herdr pane (HERDR_ENV=1) — spawning,
-  driving, or coordinating agents in other panes or tabs. Handing work to an
-  agent already running in another project belongs to the `tell` skill, and
-  getting an ANSWER back from one belongs to the `ask` skill — not this one.
-version: 3
+  plugin development; or — inside a herdr pane (HERDR_ENV=1) or a herdr-app
+  terminal (HC_TERMINAL_ID set) — spawning, driving, or coordinating agents in
+  other panes or tabs. Handing work to an agent already running in another
+  project belongs to the `tell` skill, and getting an ANSWER back from one
+  belongs to the `ask` skill — not this one.
+version: 4
 ---
 
 # Herdr
+
+Two products carry the name. Check which one you are in before anything else:
+
+- **`HERDR_ENV=1`**: the `herdr` terminal multiplexer. Everything below this section applies.
+- **`HC_TERMINAL_ID` set, no `HERDR_ENV`**: herdr-app, whose terminals herdr-core (`hc`) runs. Read the next section and skip the rest.
+
+## Under herdr-app
+
+Run `hc --skill` and `herdr-app --skill` and follow them. They are the current manuals, shipped with the installed release. `hc` starts, messages, waits on, reads and cleans up agents and programs; `herdr-app` changes only what the person sees: spaces, tabs, panes, mods. Your address is `$HC_TERMINAL_ID`, not a pane id.
+
+`herd.ts` keeps only `list`, `tell`, `ask` and `collect` there, because those resolve a project fragment through the registry and zoxide, which `hc` cannot do. Every other verb refuses and points at `hc`. Settings and mods live in `~/.config/herdr-app/`; read its `AGENTS.md` first. `references/` below describes the `herdr` multiplexer only.
+
+## The `herdr` multiplexer
 
 Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file. If you need customization, add `~/.config/herdr/config.toml`.
 
 Docs: <https://herdr.dev/docs/>. For an agent-readable index pinned to the installed release, fetch <https://herdr.dev/llms.txt> and open only the page the task needs. This skill is the source of truth for driving Herdr. Do not load `herdr --skill`; it is a generic guide this skill already covers.
 
-## Orchestrating agents — use the `herd` wrapper first
+### Orchestrating agents — use the `herd` wrapper first
 
 Inside a herdr pane (`HERDR_ENV=1`), use the bundled `scripts/herd.ts` wrapper instead of hand-rolled raw `herdr` CLI chains. It collapses create-pane → start → prompt → wait → read into ten typed verbs, and addresses agents by a generated name that survives a cross-workspace pane-id change.
 
@@ -80,7 +95,7 @@ All verbs print JSON except `read`, which prints the agent's terminal text. It d
 
 If the wrapper doesn't cover something, for example worktrees, layout, notifications, waiting on arbitrary pane output, or plugin panes, drop to the raw CLI. See `references/agent-orchestration.md` for live recipes. See `references/cli.md` for the full command surface.
 
-## Reference files
+### Reference files
 
 This skill's detail lives in `references/`. Read only the file(s) relevant to the question, not all of them.
 

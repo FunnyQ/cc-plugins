@@ -20,6 +20,7 @@ import {
 import {
   collectLive,
   DEFAULT_WAIT_TIMEOUT_MS,
+  HC_CLIENT,
   liveGate,
   resolveHerdScript,
   runLive,
@@ -462,7 +463,10 @@ async function executeCollectCommand(
     return { code: 1 };
   }
 
-  const herdScriptPath = deps.resolveHerdScript();
+  const herdScriptPath =
+    deps.env.HERDR_ENV !== "1" && deps.env.HC_TERMINAL_ID
+      ? HC_CLIENT
+      : deps.resolveHerdScript();
   if (!herdScriptPath) {
     deps.stderr(
       "collect needs herd.ts (herdr plugin missing?) — nothing to reattach to\n",
@@ -641,7 +645,11 @@ export async function executeRelay(
   };
 
   const herdScriptPath =
-    deps.env.HERDR_ENV === "1" ? deps.resolveHerdScript() : null;
+    deps.env.HERDR_ENV === "1"
+      ? deps.resolveHerdScript()
+      : deps.env.HC_TERMINAL_ID
+        ? HC_CLIENT
+        : null;
   const gate = liveGate({
     env: deps.env,
     headless: parsed.flags.headless,
@@ -725,7 +733,7 @@ export async function executeRelay(
       deps.stderr(
         `\n[relay live] agent ${liveResult.agentName} — ${
           parsed.flags.keepPane
-            ? `pane left open (\`herd close ${liveResult.agentName}\` to close)`
+            ? `pane left open (\`${herdScriptPath === HC_CLIENT ? "hc kill" : "herd close"} ${liveResult.agentName}\` to close)`
             : "pane closed after verified result"
         }\n`,
       );

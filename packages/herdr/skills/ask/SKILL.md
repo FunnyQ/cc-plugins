@@ -2,7 +2,7 @@
 name: ask
 description: >-
   Ask another project's agent a question and get its answer back — an agent
-  already running in its Herdr workspace when one is open, otherwise a known
+  already running in its Herdr workspace or herdr-app space when one is open, otherwise a known
   project resolved from the herdr-workbench registry or zoxide, spun up on
   demand.
 when_to_use: >-
@@ -11,7 +11,7 @@ when_to_use: >-
   what port it runs on", "check with <project> whether Y is done". If you just
   want to hand off work and move on with no answer needed, use `tell` instead.
 argument-hint: <project-or-fragment> <question>
-version: 1
+version: 2
 ---
 
 # Ask another project's agent
@@ -42,7 +42,7 @@ Need a flag's exact spelling, default, or accepted values? Run `bun "$HERD" ask 
 
 Identical to the `tell` skill — read it first. Every rule in its `## Rules` applies unchanged, including the destructive-action bar when the question itself would make the target act.
 
-The one difference in fallback behavior: a pane `ask` spawns itself gets **closed** once the answer is collected, unless the caller passed `--keep-pane`. An agent that was already running before you asked it anything is never closed, no matter what.
+The one difference in fallback behavior: a pane `ask` spawns itself (a whole space under herdr-app) gets **closed** once the answer is collected, unless the caller passed `--keep-pane`. An agent that was already running before you asked it anything is never closed, no matter what.
 
 ## How the answer comes back
 

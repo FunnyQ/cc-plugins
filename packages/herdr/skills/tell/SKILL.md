@@ -2,7 +2,7 @@
 name: tell
 description: >-
   Hand a job to another project — an agent already running in its Herdr
-  workspace when one is open, otherwise a known project resolved from the
+  workspace or herdr-app space when one is open, otherwise a known project resolved from the
   herdr-workbench registry or zoxide, spun up on demand — fire-and-forget.
 when_to_use: >-
   Use when work belongs to a different project — "叫 api-service 去 rebase",
@@ -12,21 +12,36 @@ when_to_use: >-
   are open and where. Do NOT use to run a shell command in another pane, or
   for work you can do yourself in this session.
 argument-hint: <project-or-fragment> <what to do>
-version: 2
+version: 4
 ---
 
 # Tell another project's agent
 
 ## Do it
 
-Run `tell` directly. Check nothing first. Do not test `HERDR_ENV`, do not run `list`, do not verify the address. `tell` resolves the fragment itself and fails with a message that tells you exactly what to do next.
+Run `tell` directly. Check nothing first. Do not test `HERDR_ENV` or `HC_TERMINAL_ID`, do not run `list`, do not verify the address. `tell` resolves the fragment itself and fails with a message that tells you exactly what to do next.
 
 ```bash
 HERD="$SKILL_DIR/../herdr/scripts/herd.ts"
 
 bun "$HERD" tell api-service "rebase onto main and run the suite"
 bun "$HERD" tell web-app/dashboard "restart the dev server"
+
+# --agent picks the harness started when the project has no live agent (default claude)
+bun "$HERD" tell --agent codex api-service "rebase onto main and run the suite"
 ```
+
+Put `--agent` BEFORE the fragment. Pass the harness the user named; otherwise leave it out.
+
+```bash
+# A project neither the registry nor zoxide knows: pass its absolute folder
+bun "$HERD" tell /Users/dev/Projects/herdr-q-saddle "read the brief in /tmp/…/brief.md"
+
+# A slash command reaches the agent as a command, not as a message
+bun "$HERD" tell herdr-q-saddle "/rc"
+```
+
+Under herdr-app, `hc send` wraps text in an `<hc from=…>` tag, so a slash command sent as text arrives as a message the agent tries to interpret. `tell` types a one-line text starting with `/` as keys instead. Send the command and the task as two `tell` calls, command first.
 
 Need a verb's flags? Run `bun "$HERD" <verb> --help`. Never read `herd.ts` to answer that.
 
@@ -34,19 +49,19 @@ Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** bann
 
 ## Addressing
 
-Herdr runs one workspace per project, and its label *is* the project name — the fragment is matched case-insensitively against that workspace label, the tab label, the agent name, the pane id, and the cwd. Split it on `/` to narrow. Every part must match, though different parts may match different fields. `web-app/dashboard` resolves on workspace plus tab; `clients/acme` resolves on path plus label.
+Herdr runs one workspace per project, and its label *is* the project name; herdr-app does the same with a space per project — the fragment is matched case-insensitively against that workspace label, the tab label, the agent name, the pane id, and the cwd. Split it on `/` to narrow. Every part must match, though different parts may match different fields. `web-app/dashboard` resolves on workspace plus tab; `clients/acme` resolves on path plus label.
 
-The readable address is the agent's `name` when it has one, otherwise `workspaceLabel/tabLabel`. `paneId` is the exact one. It is the only handle guaranteed unique, because two tabs in one workspace may share a label. Every failure message already prints both, so pass the fullest fragment you have and let the error correct you. Run `list` only when the user asks who is open.
+The readable address is the agent's `name` when it has one, otherwise `workspaceLabel/tabLabel`. `paneId` is the exact one; under herdr-app it holds the terminal address, such as `t3m`. It is the only handle guaranteed unique, because two tabs in one workspace may share a label. Every failure message already prints both, so pass the fullest fragment you have and let the error correct you. Run `list` only when the user asks who is open.
 
 ## No live agent? `tell` looks further before giving up
 
-Zero live matches does not mean stop. `tell` next checks the herdr-workbench project registry (`~/.local/state/herdr-projects/registry.json` — projects it or another herdr client has seen, open or not), then zoxide's frecency index. Same unique/ambiguous/zero rule as live agents, candidates listed by path instead of pane id.
+Zero live matches does not mean stop. An absolute path to an existing folder resolves to that folder. Otherwise `tell` next checks the herdr-workbench project registry (`~/.local/state/herdr-projects/registry.json` — projects it or another herdr client has seen, open or not), then zoxide's frecency index. Same unique/ambiguous/zero rule as live agents, candidates listed by path instead of pane id.
 
-A registry/zoxide hit is a **path**, not a running agent. `tell` checks that path against every live agent's cwd first — a tab renamed away from its project's label can still be reachable there — and only when nothing answers does it spawn a fresh workspace at that path and hand it the text. The result's `spawned` field is set exactly when this happened; **report it** alongside `matched`.
+A registry/zoxide hit is a **path**, not a running agent. `tell` checks that path against every live agent's cwd first — a tab renamed away from its project's label can still be reachable there — and only when nothing answers does it spawn a fresh workspace (a new space under herdr-app) at that path, starting the harness with the text as its first prompt. The result's `spawned` field is set exactly when this happened; **report it** alongside `matched`.
 
 ## Rules
 
-**No Herdr means stop.** When the script exits with `not inside a herdr-managed pane`, there are no sibling agents to reach. Say so and stop. Do not look for another way to deliver the message.
+**No Herdr means stop.** When the script exits with `not inside herdr`, there are no sibling agents to reach. Say so and stop. Do not look for another way to deliver the message.
 
 **Report which agent you reached.** The user cannot see the other pane. The result carries `matched`. Name the project and tab back to them.
 
@@ -69,6 +84,6 @@ Put those candidates to the user through the harness's own question tool. On Cla
 
 **Your own pane is excluded.** Telling your own project label finds a sibling, or nothing. Never yourself.
 
-**A blocked agent takes nothing.** On `agent_blocked`, report it; do not retry, and do not answer another project's dialog on their behalf.
+**A blocked agent takes nothing.** On `agent_blocked`, or under herdr-app `has not reported a status yet` (a startup dialog such as folder trust), report it; do not retry, and do not answer another project's dialog on their behalf.
 
 For the rest of the wrapper (`spawn`, `send`, `keys`, `wait`, `read`, `close`), see the `herdr` skill.

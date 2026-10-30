@@ -2,13 +2,13 @@
 
 > Verified locally (2026-06-15). Each backend section translates a `relay` mode into the canonical CLI invocation.
 
-## Live-pane mode (herdr)
+## Live-pane mode (herdr or herdr-app)
 
-Inside herdr (`HERDR_ENV=1`), delegate and review launch the backend's **interactive TUI**. The TUI opens in **its own new tab**, not a split of the caller's pane, so your working pane keeps its full size. This launch replaces the headless invocations below (`--headless` opts out of it).
+Inside herdr (`HERDR_ENV=1`) or a herdr-app terminal (`HC_TERMINAL_ID` set), delegate and review launch the backend's **interactive TUI**. The TUI opens in **its own new tab**, not a split of the caller's pane, so your working pane keeps its full size. This launch replaces the headless invocations below (`--headless` opts out of it).
 
 The prompt rides a file (`live-prompt.md`). The pane only receives a one-line bootstrap. The answer is captured from `result.md` via an end-marker contract.
 
-relay asks herdr to confirm the bootstrap landed, accepting the whole lifecycle enum — `unknown` included, which herdr leaves out of its own defaults — so the check returns as soon as the agent reacts. Failing to confirm never fails the run: relay logs `agent_prompt_stalled` or `timeout` and continues, because a cold start can exceed herdr's five-second window and the nudge loop heals a genuine miss. A rejected send still fails, since `agent_blocked` means nothing was delivered and the pane needs a human. This needs herdr 0.8.2 and herd.ts 0.4.0; an older pair silently skips the check and relies on the nudge loop alone.
+relay asks herdr to confirm the bootstrap landed, accepting the whole lifecycle enum — `unknown` included, which herdr leaves out of its own defaults — so the check returns as soon as the agent reacts. Failing to confirm never fails the run: relay logs `agent_prompt_stalled` or `timeout` and continues, because a cold start can exceed herdr's five-second window and the nudge loop heals a genuine miss. A rejected send still fails, since `agent_blocked` means nothing was delivered and the pane needs a human. This needs herdr 0.8.2 and herd.ts 0.4.0; an older pair silently skips the check and relies on the nudge loop alone. Under herdr-app, `hc send` has no such check, so the nudge loop alone heals a missed bootstrap.
 
 This design makes the work visible and take-over-able. It also sidesteps headless flakiness: opencode's `run` in particular can hang around the #26855 family.
 

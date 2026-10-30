@@ -5,10 +5,10 @@ description: >-
   Playwright or other CDP clients.
 when_to_use: >-
   Use whenever a page needs opening, reading, or driving — screenshots, clicks,
-  form input, console or network debugging, viewport emulation — and Herdr is
-  running. Drives terminal-browser. Also use to hand a CDP endpoint to
+  form input, console or network debugging, viewport emulation — and Herdr or
+  herdr-app is running. Drives terminal-browser. Also use to hand a CDP endpoint to
   Playwright, Chrome DevTools MCP, or Browser Use.
-version: 2
+version: 3
 ---
 
 # Herdr Browser
@@ -48,6 +48,15 @@ its root pane through `HERDR_PANE_ID` to terminal-browser. Without both values,
 let terminal-browser choose placement. Preserve `--split` placement in the
 focused pane. With multiple views, select `--view ID` explicitly; never infer a
 workspace from a view id or bypass the Herdr CLI with a Unix socket assumption.
+
+Under herdr-app (`HC_TERMINAL_ID` set, no `HERDR_PANE_ID`), require `hc` and
+`herdr-app` instead of `herdr`. `open --new` runs terminal-browser as its own
+`hc` terminal in a new tab of this space, named `browser`; `--split` puts it in
+this tab, where herdr-app picks the side, and `--ratio` is refused. The terminal
+ends with the browser, and herdr-app closes its tab with it. herdr-app gives its
+terminals Ghostty's `TERM_PROGRAM` and `GHOSTTY_RESOURCES_DIR`, which send
+terminal-browser to its Ghostty adapter, so the script drops both before every
+terminal-browser call.
 
 ## Open a page
 

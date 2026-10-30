@@ -9,7 +9,8 @@ when_to_use: >-
   "expected N, received M" — or when Herdr updated and a plugin stopped working,
   or when someone is about to change a MINIMUM_PROTOCOL / EXPECTED_PROTOCOL
   constant. Do not read the API schema by hand to answer this; run the script.
-version: 1
+  Applies to `herdr` multiplexer plugins only, not herdr-app mods.
+version: 2
 ---
 
 # Herdr protocol upgrade
