@@ -808,69 +808,115 @@ describe("openTerminal", () => {
       title: "",
       tabs: [],
     };
-    const self = JSON.stringify({
-      labels: { "herdr.space": "sp1", "herdr.tab": "tb1" },
-    });
     const layout = JSON.stringify({
-      spaces: [{ tabs: [{ id: "tb2", terminals: [{ terminal: "t4f" }] }] }],
+      spaces: [
+        {
+          id: "sp1",
+          tabs: [{ id: "tb1", terminals: [{ terminal: "t46", pane: "p1" }] }],
+        },
+      ],
     });
+    const argv = (url: string) => [
+      "env",
+      "-u",
+      "TERM_PROGRAM",
+      "-u",
+      "GHOSTTY_RESOURCES_DIR",
+      "terminal-browser",
+      "open",
+      url,
+    ];
 
-    function fake(calls: string[][]): Deps["run"] {
+    function fake(calls: string[][], screen = layout): Deps["run"] {
       return async (command) => {
         calls.push(command);
-        if (command[0] === "hc" && command[1] === "get") return self;
-        if (command[0] === "hc" && command[1] === "run")
-          return JSON.stringify({ address: "t4f" });
-        if (command[0] === "herdr-app" && command[1] === "ls") return layout;
+        if (command[0] === "herdr-app" && command[1] === "ls") return screen;
+        if (command[2] === "tab.new")
+          return JSON.stringify({ space: "sp1", tab: "tb9", terminal: "t4f" });
+        if (command[2] === "pane.split")
+          return JSON.stringify({ pane: "p9", terminal: "t4f" });
         return "{}";
       };
     }
 
-    test("runs the browser as its own hc terminal in a new tab of this space, named browser", async () => {
+    test("opens the browser in a new tab of this space, named after the host", async () => {
       const calls: string[][] = [];
       let reads = 0;
-      const found = await openTerminal("https://example.com/", null, null, [], {
-        run: fake(calls),
-        terminalTargets: async () => (reads++ === 0 ? [] : [own]),
-      });
+      const found = await openTerminal(
+        "https://example.com/a",
+        null,
+        null,
+        [],
+        {
+          run: fake(calls),
+          terminalTargets: async () => (reads++ === 0 ? [] : [own]),
+        },
+      );
       expect(found.id).toBe("new-view");
       expect(calls).toEqual([
-        ["hc", "get", "--json", "t46"],
-        [
-          "hc",
-          "run",
-          "--bg",
-          "--json",
-          "--outlive-parent",
-          "--no-notify",
-          "--rm",
-          "--label",
-          "herdr.space=sp1",
-          "terminal-browser",
-          "open",
-          "https://example.com/",
-        ],
         ["herdr-app", "ls"],
         [
           "herdr-app",
           "do",
-          "tab.rename",
-          JSON.stringify({ id: "tb2", name: "browser" }),
+          "tab.new",
+          JSON.stringify({
+            name: "example.com",
+            space: "sp1",
+            folder: process.cwd(),
+            argv: argv("https://example.com/a"),
+          }),
         ],
       ]);
     });
 
-    test("--split lands it in this tab instead", async () => {
+    test("a URL with no host names the tab browser", async () => {
       const calls: string[][] = [];
-      await openTerminal("about:blank", "right", null, [], {
+      await openTerminal("about:blank", null, null, [], {
         run: fake(calls),
         terminalTargets: async () => [own],
       });
-      expect(calls[1]).toContain("herdr.tab=tb1");
+      expect(JSON.parse(calls[1][3]).name).toBe("browser");
+    });
+
+    test("--split splits this terminal's pane", async () => {
+      const calls: string[][] = [];
+      await openTerminal("about:blank", "down", null, [], {
+        run: fake(calls),
+        terminalTargets: async () => [own],
+      });
+      expect(calls[1]).toEqual([
+        "herdr-app",
+        "do",
+        "pane.split",
+        JSON.stringify({
+          direction: "down",
+          pane: "p1",
+          argv: argv("about:blank"),
+        }),
+      ]);
+    });
+
+    test("--split left is refused, since herdr-app splits only right or down", async () => {
+      const calls: string[][] = [];
+      await expect(
+        openTerminal("about:blank", "left", null, [], {
+          run: fake(calls),
+          terminalTargets: async () => [own],
+        }),
+      ).rejects.toThrow(/right or down/);
       expect(calls.some((c) => c[1] === "do")).toBe(false);
     });
 
-    test("a browser that never reports is killed, so no stray tab is left", async () => {
+    test("a terminal herdr-app does not show is refused", async () => {
+      await expect(
+        openTerminal("about:blank", null, null, [], {
+          run: fake([], JSON.stringify({ spaces: [] })),
+          terminalTargets: async () => [own],
+        }),
+      ).rejects.toThrow(/t46 is not shown in herdr-app/);
+    });
+
+    test("a browser that never reports has its tab closed", async () => {
       const calls: string[][] = [];
       const failure = new Error("gone");
       await expect(
@@ -881,7 +927,30 @@ describe("openTerminal", () => {
           },
         }),
       ).rejects.toBe(failure);
-      expect(calls.at(-1)).toEqual(["hc", "kill", "t4f"]);
+      expect(calls.at(-1)).toEqual([
+        "herdr-app",
+        "do",
+        "tab.close",
+        JSON.stringify({ id: "tb9", confirmed: true }),
+      ]);
+    });
+
+    test("a split browser that never reports has its pane closed", async () => {
+      const calls: string[][] = [];
+      await expect(
+        openTerminal("about:blank", "right", null, [], {
+          run: fake(calls),
+          terminalTargets: async () => {
+            throw new Error("gone");
+          },
+        }),
+      ).rejects.toThrow("gone");
+      expect(calls.at(-1)).toEqual([
+        "herdr-app",
+        "do",
+        "pane.close",
+        JSON.stringify({ pane: "p9" }),
+      ]);
     });
   });
 });

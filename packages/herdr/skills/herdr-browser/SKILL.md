@@ -49,14 +49,16 @@ let terminal-browser choose placement. Preserve `--split` placement in the
 focused pane. With multiple views, select `--view ID` explicitly; never infer a
 workspace from a view id or bypass the Herdr CLI with a Unix socket assumption.
 
-Under herdr-app (`HC_TERMINAL_ID` set, no `HERDR_PANE_ID`), require `hc` and
-`herdr-app` instead of `herdr`. `open --new` runs terminal-browser as its own
-`hc` terminal in a new tab of this space, named `browser`; `--split` puts it in
-this tab, where herdr-app picks the side, and `--ratio` is refused. The terminal
-ends with the browser, and herdr-app closes its tab with it. herdr-app gives its
+Under herdr-app (`HC_TERMINAL_ID` set, no `HERDR_PANE_ID`), require `herdr-app`
+instead of `herdr`. `open --new` runs `herdr-app do tab.new` in the space that
+shows this terminal, and names the tab after the URL's host. `--split right|down`
+splits this terminal's pane with `pane.split`. herdr-app refuses `left` and `up`,
+and refuses `--ratio`. The tab belongs to the person, not to this agent, so it
+outlives the session. Closing the browser leaves an idle shell in that tab,
+because herdr-app keeps a shell after its program exits. herdr-app gives its
 terminals Ghostty's `TERM_PROGRAM` and `GHOSTTY_RESOURCES_DIR`, which send
-terminal-browser to its Ghostty adapter, so the script drops both before every
-terminal-browser call.
+terminal-browser to its Ghostty adapter. The script drops both before every
+terminal-browser call, and the launched argv drops them through `env -u`.
 
 ## Open a page
 

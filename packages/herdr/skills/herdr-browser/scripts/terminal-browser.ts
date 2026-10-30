@@ -176,32 +176,40 @@ export function newcomer(
   return after.find((target) => !known.has(target.id));
 }
 
-// herdr-app shows an hc terminal labelled `herdr.space` as a new tab of that
-// space, or as a pane of the tab `herdr.tab` names. `--rm` drops the terminal
-// when the browser exits, which takes its tab with it.
-export function hcBrowserRunArgs(url: string, labels: string[]): string[] {
+// herdr-app launches argv in its own core, with the window's environment, so
+// the Ghostty variables have to be dropped inside the argv itself.
+// POSIX `env` only; native Windows herdr-app needs another way if it is ever used.
+export function appBrowserArgv(url: string): string[] {
   return [
-    "hc",
-    "run",
-    "--bg",
-    "--json",
-    "--outlive-parent",
-    "--no-notify",
-    "--rm",
-    ...labels.flatMap((label) => ["--label", label]),
+    "env",
+    "-u",
+    "TERM_PROGRAM",
+    "-u",
+    "GHOSTTY_RESOURCES_DIR",
     "terminal-browser",
     "open",
     url,
   ];
 }
 
-export function appTabOf(raw: string, terminal: string): string | null {
+export function appTabName(url: string): string {
+  try {
+    return new URL(url).hostname || "browser";
+  } catch {
+    return "browser";
+  }
+}
+
+export type AppPlace = { space: string; tab: string; pane: string };
+
+export function appPlaceOf(raw: string, terminal: string): AppPlace | null {
   try {
     for (const space of JSON.parse(raw)?.spaces ?? []) {
       for (const tab of space.tabs ?? []) {
-        if ((tab.terminals ?? []).some((t: any) => t.terminal === terminal)) {
-          return tab.id;
-        }
+        const found = (tab.terminals ?? []).find(
+          (t: any) => t.terminal === terminal,
+        );
+        if (found) return { space: space.id, tab: tab.id, pane: found.pane };
       }
     }
   } catch {}
