@@ -1,5 +1,15 @@
 # Changelog
 
+## [herdr 0.9.0] - 2026-10-31
+
+_tracks tag `herdr-v0.9.0`_
+
+### Added
+- New herdr-app skill teaches agents to manage agents and programs with `hc`, control herdr-app windows, and customize layout, keys, and mods under `~/.config/herdr-app`.
+
+### Changed
+- The herdr skill now covers only the multiplexer, with herdr-app guidance moved into its own skill so the two no longer compete for the same triggers.
+
 ## [herdr 0.8.1] - 2026-10-31
 
 _tracks tag `herdr-v0.8.1`_
