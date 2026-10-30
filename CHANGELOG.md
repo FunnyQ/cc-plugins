@@ -1,5 +1,18 @@
 # Changelog
 
+## [herdr 0.8.1] - 2026-10-31
+
+_tracks tag `herdr-v0.8.1`_
+
+### Added
+- herdr-browser now opens the browser as a tab (or split pane) under herdr-app, so the tab belongs to you rather than the agent; `--split left|up` is no longer supported.
+
+### Changed
+- The herdr skill now tells agents to run long jobs with `hc run --bg`, so progress shows in the herdr-app panel, and documents the exit note and cleanup behaviour.
+
+### Fixed
+- Opening herdr-browser no longer steals focus: your current tab is restored right after the new one is created.
+
 ## [herdr 0.8.0] - 2026-10-30
 
 _tracks tag `herdr-v0.8.0`_
