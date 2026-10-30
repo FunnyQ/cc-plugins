@@ -112,6 +112,10 @@ export function resolveHerdScript(
   return null;
 }
 
+/** Stands in for a herd.ts path under herdr-app, where the pane is driven
+ *  through hc-client.ts instead of a herdr plugin's herd.ts. */
+export const HC_CLIENT = "hc";
+
 export type LiveGateInput = {
   env: Record<string, string | undefined>;
   headless: boolean; // --headless escape hatch
@@ -123,7 +127,9 @@ export type LiveGateInput = {
 export type LiveGateResult = { live: boolean; reason?: string };
 
 export function liveGate(input: LiveGateInput): LiveGateResult {
-  if (input.env.HERDR_ENV !== "1") return { live: false };
+  if (input.env.HERDR_ENV !== "1" && !input.env.HC_TERMINAL_ID) {
+    return { live: false };
+  }
   if (input.headless) return { live: false };
   if (input.mode !== "delegate" && input.mode !== "review") {
     return { live: false };
@@ -167,6 +173,7 @@ export type HerdClient = {
   read(target: string, opts?: { source?: string }): Promise<string>;
   list(): Promise<HerdAgent[]>;
   close(target: string): Promise<unknown>;
+  callerLocation?(): Promise<CallerLocation | null>;
 };
 
 export type HerdAgent = {
@@ -350,6 +357,9 @@ export type RunLiveDeps = {
 export function defaultRunLiveDeps(): RunLiveDeps {
   return {
     loadHerd: async (herdScriptPath) => {
+      if (herdScriptPath === HC_CLIENT) {
+        return (await import("./hc-client")).createHcClient(process.env);
+      }
       const mod = await import(herdScriptPath);
       return mod.createHerd() as HerdClient;
     },
@@ -368,8 +378,14 @@ export function extractFinalText(content: string): string | null {
   return lines.slice(0, -1).join("\n").trimEnd();
 }
 
+function driver(herdScriptPath: string) {
+  return herdScriptPath === HC_CLIENT
+    ? { herd: "hc", close: "kill" }
+    : { herd: `bun ${shellArg(herdScriptPath)}`, close: "close" };
+}
+
 function pendingReport(ctx: PollContext, elapsedMs: number): string {
-  const herd = `bun ${shellArg(ctx.herdScriptPath)}`;
+  const { herd, close } = driver(ctx.herdScriptPath);
   const agent = shellArg(ctx.agentName);
   const result = shellArg(ctx.resultPath);
   const keep = ctx.keepPane ? " --keep-pane" : "";
@@ -386,8 +402,10 @@ function pendingReport(ctx: PollContext, elapsedMs: number): string {
     `Or drive the pane by hand:`,
     `  cat ${result}   # collect the answer once written`,
     `  ${herd} read ${agent}                  # read the pane (holds the answer if result.md was never written)`,
-    `  ${herd} close ${agent}                 # close the pane when done`,
-    `  ${herd} wait ${agent} --timeout ${ctx.waitTimeoutMs}   # blocks until \`idle\` ONLY — codex parks at \`done\`, so prefer collect`,
+    `  ${herd} ${close} ${agent}                 # close the pane when done`,
+    herd === "hc"
+      ? `  hc wait ${agent}   # until it stops working; prefer collect`
+      : `  ${herd} wait ${agent} --timeout ${ctx.waitTimeoutMs}   # blocks until \`idle\` ONLY — codex parks at \`done\`, so prefer collect`,
     ``,
   ].join("\n");
 }
@@ -420,10 +438,12 @@ export async function runLive(
     namesBefore = new Set(
       agents.map((a) => a.name).filter((n): n is string => n !== null),
     );
-    callerLocation = resolveCallerLocation(agents, {
-      env: opts.callerEnv,
-      cwd: opts.cwd,
-    });
+    callerLocation = herd.callerLocation
+      ? await herd.callerLocation()
+      : resolveCallerLocation(agents, {
+          env: opts.callerEnv,
+          cwd: opts.cwd,
+        });
   } catch {}
   if (!callerLocation) {
     return {
@@ -520,7 +540,7 @@ export async function runLive(
   deps.stderr(
     `[relay live] ${agentName} running — recover if this call is interrupted:\n` +
       `  cat ${opts.resultPath}   # the answer, once written\n` +
-      `  bun ${opts.herdScriptPath} read ${agentName}   # read the pane if result.md is missing\n`,
+      `  ${driver(opts.herdScriptPath).herd} read ${agentName}   # read the pane if result.md is missing\n`,
   );
 
   return pollForResult(

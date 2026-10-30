@@ -1,10 +1,12 @@
 # Live-Pane Mode Reference
 
-## Live-pane mode (inside herdr)
+## Live-pane mode (inside herdr or herdr-app)
 
 When the session runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` open automatically in a **visible, take-over-able TUI in its own new herdr tab**. This replaces a blocking headless spawn. Your current pane keeps its full size. It does not split. `image` always stays headless/native. Nothing changes in how you invoke `relay.ts`. The routing is automatic.
 
-The live tab stays in the caller's Herdr workspace, even when Relay runs against a different project or a sibling repository. Relay accepts that cross-project caller only under one condition. The inherited `HERDR_WORKSPACE_ID` / `HERDR_TAB_ID` / `HERDR_PANE_ID` triple must uniquely match an active caller in current Herdr state. The caller's agent type must also match. If identity is stale or ambiguous, Relay falls back to the cwd-based runtime check. If no unique caller can be proven, Relay safely declines live mode.
+Under herdr-app (`HC_TERMINAL_ID` set, no `HERDR_ENV`), relay drives the pane through herdr-core's `hc` directly and needs no herdr plugin. The pane is an `hc` terminal named `relay-<backend>-<mode>-<hex>`, in a new tab of the caller's own space: relay reads that space from the `herdr.space` label on `$HC_TERMINAL_ID`, never from focus. A caller with no such label runs headless. The pane ends with the caller's terminal, as every `hc` child does, and `hc` types no notes about it into the caller. Codex runs with `--no-daemon`, as `hc --skill` requires. A pane that has not reported a status yet takes no bootstrap, because `hc send` presses Enter and would answer a startup dialog (folder trust, login); relay fails the run and leaves the pane for a human. Drive a kept pane with `hc send/wait/read/kill`.
+
+Under herdr, the live tab stays in the caller's Herdr workspace, even when Relay runs against a different project or a sibling repository. Relay accepts that cross-project caller only under one condition. The inherited `HERDR_WORKSPACE_ID` / `HERDR_TAB_ID` / `HERDR_PANE_ID` triple must uniquely match an active caller in current Herdr state. The caller's agent type must also match. If identity is stale or ambiguous, Relay falls back to the cwd-based runtime check. If no unique caller can be proven, Relay safely declines live mode.
 
 ### Choosing live vs headless
 
@@ -14,7 +16,7 @@ Live and headless share the same CLI, model, and write access. Editing capabilit
 
 Flags:
 
-- `--headless` — force the headless flow even inside herdr. **Use this for nested delegation.** An agent that was itself live-delegated inherits `HERDR_ENV=1`. A second layer of panes is rarely what anyone wants.
+- `--headless` — force the headless flow even inside herdr. **Use this for nested delegation.** An agent that was itself live-delegated inherits `HERDR_ENV=1`, or under herdr-app its own `HC_TERMINAL_ID`. A second layer of panes is rarely what anyone wants.
 - `--keep-pane` — after a verified success, keep the live pane open for follow-up conversation. Without this flag, relay closes the pane after it has collected a settled, marker-terminated result.
 - `--wait-timeout <ms>` — how long relay polls for the result (default 600000 = 10 min).
 - `--dangerous` — **YOLO / unattended** live run. The delegate proceeds without stopping on approval prompts (codex `--dangerously-bypass-approvals-and-sandbox`, claude `--dangerously-skip-permissions`, opencode `--auto`). Without it, approval prompts surface **in the pane** for a human to answer. When nobody is watching the pane to press "allow", pass `--dangerous`. Leave it off for supervised runs. opencode nuance: `--auto` auto-approves only what is **not explicitly denied** — config `deny` rules still block, unlike codex's full bypass.

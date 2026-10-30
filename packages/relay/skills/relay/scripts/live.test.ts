@@ -11,11 +11,13 @@ import {
   resolveHerdScript,
   runLive,
   shellArg,
+  type CallerLocation,
   type CollectLiveOpts,
   type HerdClient,
   type LocatorDeps,
   type RunLiveDeps,
   type RunLiveOpts,
+  HC_CLIENT,
 } from "./live";
 import { RESULT_END_MARKER } from "./relay-prompt";
 import { BACKENDS } from "./backends";
@@ -127,6 +129,12 @@ describe("liveGate", () => {
 
   it("goes live when everything lines up", () => {
     expect(liveGate(base)).toEqual({ live: true });
+  });
+
+  it("goes live in a herdr-app terminal through hc", () => {
+    expect(
+      liveGate({ ...base, env: { HC_TERMINAL_ID: "t46" }, herdScriptPath: HC_CLIENT }),
+    ).toEqual({ live: true });
   });
 
   it("stays headless outside herdr, silently", () => {
@@ -462,6 +470,8 @@ function runLiveHarness(options: {
   keepPane?: boolean;
   callerAgents?: Parameters<typeof fakeHerd>[0]["callerAgents"];
   callerEnv?: Record<string, string | undefined>;
+  clientLocation?: CallerLocation | null;
+  herdScriptPath?: string;
 }) {
   const callerAgents = options.callerAgents ?? [
     {
@@ -485,7 +495,7 @@ function runLiveHarness(options: {
     backend: "codex",
     mode: "delegate",
     spec: { agentBin: "codex", argv: ["-m", "gpt-6"] },
-    herdScriptPath: "/x/herd.ts",
+    herdScriptPath: options.herdScriptPath ?? "/x/herd.ts",
     bootstrapText: "Read the file /tmp/relay/run/live-prompt.md …",
     resultPath: "/tmp/relay/run/result.md",
     cwd: "/repo",
@@ -522,6 +532,9 @@ function runLiveHarness(options: {
     },
   };
 
+  if (options.clientLocation !== undefined) {
+    (herd as HerdClient).callerLocation = async () => options.clientLocation!;
+  }
   const originalGet = herd.get.bind(herd);
   herd.get = async (target) => {
     gets++;
@@ -595,6 +608,36 @@ describe("runLive", () => {
       unknown
     >;
     expect(spawn.workspace).toBe("wT");
+  });
+
+  it("takes the caller's space from the client when it knows it, without matching agents", async () => {
+    const { run, calls } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: `# Result\n${RESULT_END_MARKER}\n`,
+      callerAgents: [],
+      clientLocation: { workspaceId: "sp1", tabId: "tb1", paneId: "t46", source: "env" },
+    });
+
+    expect((await run()).ok).toBe(true);
+    const spawn = calls.find((c) => c.verb === "spawn")!.args[0] as Record<string, unknown>;
+    expect(spawn.workspace).toBe("sp1");
+  });
+
+  it("points a pending report at hc when the pane runs under herdr-app", async () => {
+    const { run } = runLiveHarness({
+      statuses: ["working"],
+      waitTimeoutMs: 20_000,
+      herdScriptPath: HC_CLIENT,
+      clientLocation: { workspaceId: "sp1", tabId: "tb1", paneId: "t46", source: "env" },
+    });
+
+    const result = await run();
+
+    if (result.ok || !result.pending) throw new Error("expected pending");
+    expect(result.report).toContain("hc read relay-codex-delegate-ab12");
+    expect(result.report).toContain("hc kill relay-codex-delegate-ab12");
+    expect(result.report).not.toContain("herd.ts");
   });
 
   it("fails before spawning when the caller workspace is ambiguous", async () => {

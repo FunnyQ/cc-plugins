@@ -9,7 +9,7 @@ when_to_use: >-
   fire on a passing mention of another CLI ("codex said…"). `image` is
   codex-only.
 argument-hint: "<codex|opencode|claude> <delegate|review> [task] · codex image [--out]"
-version: 0.5.5
+version: 0.6.0
 ---
 
 # Relay Skill
@@ -58,9 +58,9 @@ For brevity, the examples below write `relay.ts <backend> <mode> …` as shortha
 
 ---
 
-## Live-pane mode (inside herdr)
+## Live-pane mode (inside herdr or herdr-app)
 
-Inside herdr (`HERDR_ENV=1`), `delegate` and `review` auto-route to a live TUI pane in a new tab.
+Inside herdr (`HERDR_ENV=1`) or a herdr-app terminal (`HC_TERMINAL_ID` set), `delegate` and `review` auto-route to a live TUI pane in a new tab.
 Before running in that environment, read `references/live.md`.
 It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous` / `--no-ask`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
 `image` stays headless/native.
@@ -290,4 +290,4 @@ If `relay.ts` cannot run, report that and stop.
 ## Additional Resources
 
 - **`references/backends.md`** — read this only when installing under OpenCode or debugging a backend CLI failure. `relay.ts` already encodes all CLI invocations. Normal runs never need it.
-- **`references/live.md`** — read this only when `HERDR_ENV=1`. It covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.
+- **`references/live.md`** — read this only when `HERDR_ENV=1` or `HC_TERMINAL_ID` is set. It covers live-pane flags, output contract, pane lifecycle, and pending-report semantics.

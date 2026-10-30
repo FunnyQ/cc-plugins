@@ -780,6 +780,45 @@ describe("writeFileCreatingDir", () => {
 });
 
 describe("executeRelay live routing", () => {
+  it("goes live through hc in a herdr-app terminal, never scanning for herd.ts", async () => {
+    let herdScriptPath: string | undefined;
+    let resolved = false;
+
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x"],
+      deps({
+        env: { HC_TERMINAL_ID: "t46" },
+        resolveHerdScript: () => {
+          resolved = true;
+          return "/x/herd.ts";
+        },
+        runLive: (opts) => {
+          herdScriptPath = opts.herdScriptPath;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+
+    expect(result.code).toBe(0);
+    expect(herdScriptPath).toBe("hc");
+    expect(resolved).toBe(false);
+  });
+
+  it("reattaches a herdr-app pane through hc on collect", async () => {
+    let herdScriptPath: string | undefined;
+    await executeRelay(
+      ["collect", "--agent", "relay-claude-delegate-ab12", "--result", "/tmp/r.md"],
+      deps({
+        env: { HC_TERMINAL_ID: "t46" },
+        collectLive: (opts) => {
+          herdScriptPath = opts.herdScriptPath;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+    expect(herdScriptPath).toBe("hc");
+  });
+
   it("stays headless when HERDR_ENV is unset, never scanning for herd.ts", async () => {
     let liveCalled = false;
     let ranHeadless = false;
