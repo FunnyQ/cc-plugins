@@ -313,355 +313,6 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     }));
   }
 
-  /** Either an already-reachable live agent, or a project known only from the
-   *  registry/zoxide that has nothing live at its cwd — the caller decides
-   *  what to do about a `project` (spawn with a task, spawn plain and drive
-   *  it separately, etc). Shared by `tell` and `ask` so the fragment/registry/
-   *  zoxide matching — and its two ambiguity messages — exist exactly once. */
-  type Resolved =
-    | { kind: "agent"; agent: AgentLocation }
-    | { kind: "project"; path: string; name: string };
-
-  /**
-   * Resolve a human-typed fragment to exactly one live agent, or — when none
-   * matches — to exactly one known-but-closed project.
-   *
-   * Ambiguity is a hard failure rather than a broadcast or a best guess: an
-   * unwanted prompt cannot be recalled, and the agent that receives it will
-   * act on it. Each listed candidate carries its pane id beside the readable
-   * address, so the retry needs no second lookup even when two addresses
-   * read alike.
-   *
-   * When no LIVE agent matches, fall through to known-but-closed projects
-   * before giving up: the project registry (`~/.local/state/herdr-projects/
-   * registry.json`, written by herdr-workbench), then zoxide's frecency
-   * index. A resolved path is checked against every live agent's cwd first —
-   * a renamed tab can still be reachable — so `kind: "project"` only comes
-   * back once nothing already answers there. Ambiguity at the registry layer
-   * is the same hard failure as at the agent layer: spawning into the wrong
-   * repo is worse than telling the wrong agent, never picked automatically.
-   */
-  async function resolveProjectOrAgent(
-    fragment: string,
-    opts: {
-      selfPaneId?: string;
-      registryPath?: string;
-    } = {},
-  ): Promise<Resolved> {
-    const agents = await directory();
-    const selfPaneId = opts.selfPaneId ?? process.env.HERDR_PANE_ID;
-    const matches = matchAgents(agents, fragment, { selfPaneId });
-
-    const listed = (found: AgentLocation[]) =>
-      found
-        .map((a) => `  ${addressOf(a)}  [${a.paneId}]  ${a.status}  ${a.cwd}`)
-        .join("\n");
-
-    if (matches.length > 1) {
-      throw new HerdrError(
-        `"${fragment}" matches ${matches.length} agents — ask which one, then retry using its pane id:\n${listed(matches)}`,
-      );
-    }
-
-    if (matches.length === 1) {
-      return { kind: "agent", agent: matches[0]! };
-    }
-
-    const registry = await readRegistry(opts.registryPath);
-    const projectMatches = matchProjects(registry, fragment).sort(
-      compareProjects,
-    );
-
-    if (projectMatches.length > 1) {
-      const listedProjects = projectMatches
-        .map((p) => `  ${p.name}  ${p.path}`)
-        .join("\n");
-      throw new HerdrError(
-        `"${fragment}" matches ${projectMatches.length} known projects — ask which one, then retry with a narrower fragment:\n${listedProjects}`,
-      );
-    }
-
-    let resolved: ProjectCandidate | null = projectMatches[0] ?? null;
-    if (!resolved) {
-      const zpath = await queryZoxide(fragment);
-      if (zpath) {
-        resolved = {
-          path: zpath,
-          name: zpath.split("/").pop() || zpath,
-          aliases: [],
-        };
-      }
-    }
-
-    if (!resolved) {
-      const known = listed(agents.filter((a) => a.paneId !== selfPaneId));
-      throw new HerdrError(
-        `no agent matches "${fragment}"; checked the project registry and zoxide too${known ? `\navailable:\n${known}` : ""}`,
-      );
-    }
-
-    const liveAtPath = agents.filter(
-      (a) =>
-        a.paneId !== selfPaneId &&
-        (a.cwd === resolved!.path || a.foregroundCwd === resolved!.path),
-    );
-    if (liveAtPath.length > 1) {
-      throw new HerdrError(
-        `"${fragment}" resolved to ${resolved.path}, which ${liveAtPath.length} agents already have open — ask which one, then retry using its pane id:\n${listed(liveAtPath)}`,
-      );
-    }
-    if (liveAtPath.length === 1) {
-      return { kind: "agent", agent: liveAtPath[0]! };
-    }
-
-    return { kind: "project", path: resolved.path, name: resolved.name };
-  }
-
-  function locateSpawned(
-    started: SpawnResult,
-    projectName: string,
-  ): { agent: AgentLocation; spawned: SpawnedAgent } {
-    return {
-      agent: {
-        ...started,
-        workspaceLabel: projectName,
-        tabLabel: projectName,
-      },
-      spawned: {
-        workspaceId: started.workspaceId,
-        paneId: started.paneId,
-        name: started.name,
-        cwd: started.cwd,
-      },
-    };
-  }
-
-  async function tell(
-    fragment: string,
-    text: string,
-    opts: {
-      selfPaneId?: string;
-      spawnAgent?: string;
-      registryPath?: string;
-    } = {},
-  ): Promise<TellResult> {
-    const resolved = await resolveProjectOrAgent(fragment, {
-      selfPaneId: opts.selfPaneId,
-      registryPath: opts.registryPath,
-    });
-
-    if (resolved.kind === "agent") {
-      const matched = resolved.agent;
-      const res = await send(matched.name ?? matched.paneId, text);
-      return { ...res, matched };
-    }
-
-    const started = await spawn({
-      role: resolved.name,
-      agent: opts.spawnAgent ?? "claude",
-      cwd: resolved.path,
-      newWorkspace: true,
-      tabLabel: resolved.name,
-      task: text,
-    });
-    const { agent: matchedAgent, spawned } = locateSpawned(
-      started,
-      resolved.name,
-    );
-    return {
-      target: started.name,
-      paneId: started.paneId,
-      submitted: started.task?.sent ?? false,
-      waited: true,
-      status: started.status,
-      matched: matchedAgent,
-      spawned,
-    };
-  }
-
-  const ASK_POLL_INTERVAL_MS = 5_000;
-  const ASK_DEFAULT_TIMEOUT_MS = 10 * 60_000;
-  const ASK_SPAWN_IDLE_WAIT_MS = 20_000;
-
-  /**
-   * Poll `target` until it settles (idle/done) AND `resultPath`'s last line
-   * is the sentinel — both, not either: a marker alone could be a stale file
-   * from a previous run, and settled alone could be a mid-write snapshot.
-   *
-   * Settled with no verified file, even briefly, is NOT treated as done —
-   * only the timeout distinguishes "ran out of patience while still working"
-   * (pending, worth another `collect`) from "finished without ever producing
-   * a file" (a hard failure — the target didn't follow the contract, and
-   * waiting longer will not fix that).
-   */
-  type AskOutcome = { answer: string } | { pending: true };
-
-  async function pollAskResult(
-    target: string,
-    resultPath: string,
-    timeoutMs: number,
-  ): Promise<AskOutcome> {
-    const deadline = now() + timeoutMs;
-    let settledWithoutFile = false;
-    while (now() < deadline) {
-      await sleep(ASK_POLL_INTERVAL_MS);
-      let status: string;
-      try {
-        status = (await get(target)).status;
-      } catch {
-        continue; // transient herdr hiccup — keep polling
-      }
-      const settled = status === "idle" || status === "done";
-      settledWithoutFile = settled;
-      if (!settled) continue;
-
-      let content: string;
-      try {
-        content = await Bun.file(resultPath).text();
-      } catch {
-        continue; // not written yet
-      }
-      const answer = extractFinalText(content);
-      if (answer === null) continue; // exists but mid-write
-      return { answer };
-    }
-    if (settledWithoutFile) {
-      throw new HerdrError(
-        `${target} settled without ever writing a valid result to ${resultPath}`,
-      );
-    }
-    return { pending: true };
-  }
-
-  function shellQuote(value: string): string {
-    return `'${value.replace(/'/g, `'\\''`)}'`;
-  }
-
-  function pendingReport(target: string, resultPath: string): string {
-    const script = shellQuote(import.meta.path);
-    return (
-      `ask timed out waiting for an answer from "${target}" — it may still be working.\n` +
-      `Result file: ${resultPath}\n` +
-      `Re-check without re-asking: bun ${script} collect ${shellQuote(target)} --result ${shellQuote(resultPath)}`
-    );
-  }
-
-  function buildAskResult(
-    target: string,
-    agent: AgentLocation,
-    outcome: AskOutcome,
-    resultPath: string,
-    spawned?: SpawnedAgent,
-  ): AskResult {
-    if ("pending" in outcome) {
-      return {
-        agentName: target,
-        paneId: agent.paneId,
-        matched: agent,
-        spawned,
-        pending: true,
-        resultPath,
-        report: pendingReport(target, resultPath),
-      };
-    }
-    return {
-      agentName: target,
-      paneId: agent.paneId,
-      matched: agent,
-      spawned,
-      pending: false,
-      answer: outcome.answer,
-    };
-  }
-
-  /**
-   * Ask another project's agent a question and wait for its answer, via the
-   * file contract in ask-contract.ts. Resolution is identical to `tell`'s
-   * (see `resolveProjectOrAgent`); the difference is entirely in what happens
-   * after the target is found.
-   *
-   * A `project` result is spawned WITHOUT a `task` — `ask` drives the
-   * question itself (file contract, then a one-line pointer, never the raw
-   * question text: a multi-line prompt can submit prematurely in a TUI input,
-   * and a long one risks ARG_MAX) — and only closes the pane it spawned
-   * itself, and only on a verified success with `keepPane` unset. An agent
-   * that was already running is never touched.
-   */
-  async function ask(
-    fragment: string,
-    question: string,
-    opts: {
-      selfPaneId?: string;
-      spawnAgent?: string;
-      registryPath?: string;
-      timeoutMs?: number;
-      keepPane?: boolean;
-      resultDir?: string;
-    } = {},
-  ): Promise<AskResult> {
-    const resolved = await resolveProjectOrAgent(fragment, {
-      selfPaneId: opts.selfPaneId,
-      registryPath: opts.registryPath,
-    });
-
-    let agent: AgentLocation;
-    let spawned: SpawnedAgent | undefined;
-    if (resolved.kind === "agent") {
-      agent = resolved.agent;
-    } else {
-      const started = await spawn({
-        role: resolved.name,
-        agent: opts.spawnAgent ?? "claude",
-        cwd: resolved.path,
-        newWorkspace: true,
-        tabLabel: resolved.name,
-      });
-      try {
-        await wait(started.name, {
-          status: "idle",
-          timeoutMs: ASK_SPAWN_IDLE_WAIT_MS,
-        });
-      } catch {}
-      ({ agent, spawned } = locateSpawned(started, resolved.name));
-    }
-
-    const target = agent.name ?? agent.paneId;
-    const dir = createAskRunDir(opts.resultDir);
-    const resultPath = join(dir, "result.md");
-    const questionPath = join(dir, "question.md");
-    await Bun.write(questionPath, appendFileContract(question, resultPath));
-    await send(
-      target,
-      `Read the file ${questionPath} and answer the question in it, following the result-file instructions at the end.`,
-    );
-
-    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
-    const outcome = await pollAskResult(target, resultPath, timeoutMs);
-
-    if (!("pending" in outcome) && spawned && !opts.keepPane) {
-      try {
-        await close(target);
-      } catch {}
-    }
-    return buildAskResult(target, agent, outcome, resultPath, spawned);
-  }
-
-  async function collect(
-    target: string,
-    resultPath: string,
-    opts: { timeoutMs?: number } = {},
-  ): Promise<AskResult> {
-    const agent = await get(target);
-    const located: AgentLocation = {
-      ...agent,
-      workspaceLabel: null,
-      tabLabel: null,
-    };
-    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
-    const outcome = await pollAskResult(target, resultPath, timeoutMs);
-    return buildAskResult(target, located, outcome, resultPath);
-  }
-
   async function get(target: string): Promise<AgentInfo> {
     const r = await callJson(["agent", "get", target]);
     return normAgent(r.agent ?? r);
@@ -1037,6 +688,7 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     return { target, paneId, closed: true };
   }
 
+  const primitives = { directory, get, spawn, send, wait, close };
   return {
     list,
     directory,
@@ -1045,9 +697,10 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
     genName,
     spawn,
     send,
-    tell,
-    ask,
-    collect,
+    ...createBroker(primitives, {
+      ...deps,
+      selfPaneId: process.env.HERDR_PANE_ID,
+    }),
     keys,
     wait,
     read,
@@ -1055,13 +708,397 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   };
 }
 
-function assertHerdrEnv(): void {
-  if (process.env.HERDR_ENV !== "1") {
-    console.error(
-      "herd: not inside a herdr-managed pane (HERDR_ENV != 1). These verbs only work when running inside herdr.",
+export type BrokerPrimitives = {
+  directory(): Promise<AgentLocation[]>;
+  get(target: string): Promise<AgentInfo>;
+  spawn(opts: SpawnOpts): Promise<SpawnResult>;
+  send(target: string, text: string): Promise<SendResult>;
+  wait(
+    target: string,
+    opts: { status?: AgentStatus | AgentStatus[]; timeoutMs?: number },
+  ): Promise<unknown>;
+  close(target: string): Promise<unknown>;
+};
+
+export function createBroker(
+  p: BrokerPrimitives,
+  deps: HerdDeps & { selfPaneId?: string } = {},
+) {
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? ((ms: number) => Bun.sleep(ms));
+  const { directory, get, spawn, send, wait, close } = p;
+
+  /** Either an already-reachable live agent, or a project known only from the
+   *  registry/zoxide that has nothing live at its cwd — the caller decides
+   *  what to do about a `project` (spawn with a task, spawn plain and drive
+   *  it separately, etc). Shared by `tell` and `ask` so the fragment/registry/
+   *  zoxide matching — and its two ambiguity messages — exist exactly once. */
+  type Resolved =
+    | { kind: "agent"; agent: AgentLocation }
+    | { kind: "project"; path: string; name: string };
+
+  /**
+   * Resolve a human-typed fragment to exactly one live agent, or — when none
+   * matches — to exactly one known-but-closed project.
+   *
+   * Ambiguity is a hard failure rather than a broadcast or a best guess: an
+   * unwanted prompt cannot be recalled, and the agent that receives it will
+   * act on it. Each listed candidate carries its pane id beside the readable
+   * address, so the retry needs no second lookup even when two addresses
+   * read alike.
+   *
+   * When no LIVE agent matches, fall through to known-but-closed projects
+   * before giving up: the project registry (`~/.local/state/herdr-projects/
+   * registry.json`, written by herdr-workbench), then zoxide's frecency
+   * index. A resolved path is checked against every live agent's cwd first —
+   * a renamed tab can still be reachable — so `kind: "project"` only comes
+   * back once nothing already answers there. Ambiguity at the registry layer
+   * is the same hard failure as at the agent layer: spawning into the wrong
+   * repo is worse than telling the wrong agent, never picked automatically.
+   */
+  async function resolveProjectOrAgent(
+    fragment: string,
+    opts: {
+      selfPaneId?: string;
+      registryPath?: string;
+    } = {},
+  ): Promise<Resolved> {
+    const agents = await directory();
+    const selfPaneId = opts.selfPaneId ?? deps.selfPaneId;
+    const matches = matchAgents(agents, fragment, { selfPaneId });
+
+    const listed = (found: AgentLocation[]) =>
+      found
+        .map((a) => `  ${addressOf(a)}  [${a.paneId}]  ${a.status}  ${a.cwd}`)
+        .join("\n");
+
+    if (matches.length > 1) {
+      throw new HerdrError(
+        `"${fragment}" matches ${matches.length} agents — ask which one, then retry using its pane id:\n${listed(matches)}`,
+      );
+    }
+
+    if (matches.length === 1) {
+      return { kind: "agent", agent: matches[0]! };
+    }
+
+    const registry = await readRegistry(opts.registryPath);
+    const projectMatches = matchProjects(registry, fragment).sort(
+      compareProjects,
     );
-    process.exit(1);
+
+    if (projectMatches.length > 1) {
+      const listedProjects = projectMatches
+        .map((p) => `  ${p.name}  ${p.path}`)
+        .join("\n");
+      throw new HerdrError(
+        `"${fragment}" matches ${projectMatches.length} known projects — ask which one, then retry with a narrower fragment:\n${listedProjects}`,
+      );
+    }
+
+    let resolved: ProjectCandidate | null = projectMatches[0] ?? null;
+    if (!resolved) {
+      const zpath = await queryZoxide(fragment);
+      if (zpath) {
+        resolved = {
+          path: zpath,
+          name: zpath.split("/").pop() || zpath,
+          aliases: [],
+        };
+      }
+    }
+
+    if (!resolved) {
+      const known = listed(agents.filter((a) => a.paneId !== selfPaneId));
+      throw new HerdrError(
+        `no agent matches "${fragment}"; checked the project registry and zoxide too${known ? `\navailable:\n${known}` : ""}`,
+      );
+    }
+
+    const liveAtPath = agents.filter(
+      (a) =>
+        a.paneId !== selfPaneId &&
+        (a.cwd === resolved!.path || a.foregroundCwd === resolved!.path),
+    );
+    if (liveAtPath.length > 1) {
+      throw new HerdrError(
+        `"${fragment}" resolved to ${resolved.path}, which ${liveAtPath.length} agents already have open — ask which one, then retry using its pane id:\n${listed(liveAtPath)}`,
+      );
+    }
+    if (liveAtPath.length === 1) {
+      return { kind: "agent", agent: liveAtPath[0]! };
+    }
+
+    return { kind: "project", path: resolved.path, name: resolved.name };
   }
+
+  function locateSpawned(
+    started: SpawnResult,
+    projectName: string,
+  ): { agent: AgentLocation; spawned: SpawnedAgent } {
+    return {
+      agent: {
+        ...started,
+        workspaceLabel: projectName,
+        tabLabel: projectName,
+      },
+      spawned: {
+        workspaceId: started.workspaceId,
+        paneId: started.paneId,
+        name: started.name,
+        cwd: started.cwd,
+      },
+    };
+  }
+
+  async function tell(
+    fragment: string,
+    text: string,
+    opts: {
+      selfPaneId?: string;
+      spawnAgent?: string;
+      registryPath?: string;
+    } = {},
+  ): Promise<TellResult> {
+    const resolved = await resolveProjectOrAgent(fragment, {
+      selfPaneId: opts.selfPaneId,
+      registryPath: opts.registryPath,
+    });
+
+    if (resolved.kind === "agent") {
+      const matched = resolved.agent;
+      const res = await send(matched.name ?? matched.paneId, text);
+      return { ...res, matched };
+    }
+
+    const started = await spawn({
+      role: resolved.name,
+      agent: opts.spawnAgent ?? "claude",
+      cwd: resolved.path,
+      newWorkspace: true,
+      tabLabel: resolved.name,
+      task: text,
+    });
+    const { agent: matchedAgent, spawned } = locateSpawned(
+      started,
+      resolved.name,
+    );
+    return {
+      target: started.name,
+      paneId: started.paneId,
+      submitted: started.task?.sent ?? false,
+      waited: true,
+      status: started.status,
+      matched: matchedAgent,
+      spawned,
+    };
+  }
+
+  const ASK_POLL_INTERVAL_MS = 5_000;
+  const ASK_DEFAULT_TIMEOUT_MS = 10 * 60_000;
+  const ASK_SPAWN_IDLE_WAIT_MS = 20_000;
+
+  /**
+   * Poll `target` until it settles (idle/done) AND `resultPath`'s last line
+   * is the sentinel — both, not either: a marker alone could be a stale file
+   * from a previous run, and settled alone could be a mid-write snapshot.
+   *
+   * Settled with no verified file, even briefly, is NOT treated as done —
+   * only the timeout distinguishes "ran out of patience while still working"
+   * (pending, worth another `collect`) from "finished without ever producing
+   * a file" (a hard failure — the target didn't follow the contract, and
+   * waiting longer will not fix that).
+   */
+  type AskOutcome = { answer: string } | { pending: true };
+
+  async function pollAskResult(
+    target: string,
+    resultPath: string,
+    timeoutMs: number,
+  ): Promise<AskOutcome> {
+    const deadline = now() + timeoutMs;
+    let settledWithoutFile = false;
+    while (now() < deadline) {
+      await sleep(ASK_POLL_INTERVAL_MS);
+      let status: string;
+      try {
+        status = (await get(target)).status;
+      } catch {
+        continue; // transient herdr hiccup — keep polling
+      }
+      const settled = status === "idle" || status === "done";
+      settledWithoutFile = settled;
+      if (!settled) continue;
+
+      let content: string;
+      try {
+        content = await Bun.file(resultPath).text();
+      } catch {
+        continue; // not written yet
+      }
+      const answer = extractFinalText(content);
+      if (answer === null) continue; // exists but mid-write
+      return { answer };
+    }
+    if (settledWithoutFile) {
+      throw new HerdrError(
+        `${target} settled without ever writing a valid result to ${resultPath}`,
+      );
+    }
+    return { pending: true };
+  }
+
+  function shellQuote(value: string): string {
+    return `'${value.replace(/'/g, `'\\''`)}'`;
+  }
+
+  function pendingReport(target: string, resultPath: string): string {
+    const script = shellQuote(import.meta.path);
+    return (
+      `ask timed out waiting for an answer from "${target}" — it may still be working.\n` +
+      `Result file: ${resultPath}\n` +
+      `Re-check without re-asking: bun ${script} collect ${shellQuote(target)} --result ${shellQuote(resultPath)}`
+    );
+  }
+
+  function buildAskResult(
+    target: string,
+    agent: AgentLocation,
+    outcome: AskOutcome,
+    resultPath: string,
+    spawned?: SpawnedAgent,
+  ): AskResult {
+    if ("pending" in outcome) {
+      return {
+        agentName: target,
+        paneId: agent.paneId,
+        matched: agent,
+        spawned,
+        pending: true,
+        resultPath,
+        report: pendingReport(target, resultPath),
+      };
+    }
+    return {
+      agentName: target,
+      paneId: agent.paneId,
+      matched: agent,
+      spawned,
+      pending: false,
+      answer: outcome.answer,
+    };
+  }
+
+  /**
+   * Ask another project's agent a question and wait for its answer, via the
+   * file contract in ask-contract.ts. Resolution is identical to `tell`'s
+   * (see `resolveProjectOrAgent`); the difference is entirely in what happens
+   * after the target is found.
+   *
+   * A `project` result is spawned WITHOUT a `task` — `ask` drives the
+   * question itself (file contract, then a one-line pointer, never the raw
+   * question text: a multi-line prompt can submit prematurely in a TUI input,
+   * and a long one risks ARG_MAX) — and only closes the pane it spawned
+   * itself, and only on a verified success with `keepPane` unset. An agent
+   * that was already running is never touched.
+   */
+  async function ask(
+    fragment: string,
+    question: string,
+    opts: {
+      selfPaneId?: string;
+      spawnAgent?: string;
+      registryPath?: string;
+      timeoutMs?: number;
+      keepPane?: boolean;
+      resultDir?: string;
+    } = {},
+  ): Promise<AskResult> {
+    const resolved = await resolveProjectOrAgent(fragment, {
+      selfPaneId: opts.selfPaneId,
+      registryPath: opts.registryPath,
+    });
+
+    let agent: AgentLocation;
+    let spawned: SpawnedAgent | undefined;
+    if (resolved.kind === "agent") {
+      agent = resolved.agent;
+    } else {
+      const started = await spawn({
+        role: resolved.name,
+        agent: opts.spawnAgent ?? "claude",
+        cwd: resolved.path,
+        newWorkspace: true,
+        tabLabel: resolved.name,
+      });
+      try {
+        await wait(started.name, {
+          status: "idle",
+          timeoutMs: ASK_SPAWN_IDLE_WAIT_MS,
+        });
+      } catch {}
+      ({ agent, spawned } = locateSpawned(started, resolved.name));
+    }
+
+    const target = agent.name ?? agent.paneId;
+    const dir = createAskRunDir(opts.resultDir);
+    const resultPath = join(dir, "result.md");
+    const questionPath = join(dir, "question.md");
+    await Bun.write(questionPath, appendFileContract(question, resultPath));
+    await send(
+      target,
+      `Read the file ${questionPath} and answer the question in it, following the result-file instructions at the end.`,
+    );
+
+    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
+    const outcome = await pollAskResult(target, resultPath, timeoutMs);
+
+    if (!("pending" in outcome) && spawned && !opts.keepPane) {
+      try {
+        await close(target);
+      } catch {}
+    }
+    return buildAskResult(target, agent, outcome, resultPath, spawned);
+  }
+
+  async function collect(
+    target: string,
+    resultPath: string,
+    opts: { timeoutMs?: number } = {},
+  ): Promise<AskResult> {
+    const agent = await get(target);
+    const located: AgentLocation = {
+      ...agent,
+      workspaceLabel: null,
+      tabLabel: null,
+    };
+    const timeoutMs = opts.timeoutMs ?? ASK_DEFAULT_TIMEOUT_MS;
+    const outcome = await pollAskResult(target, resultPath, timeoutMs);
+    return buildAskResult(target, located, outcome, resultPath);
+  }
+
+  return { tell, ask, collect };
+}
+
+const APP_VERBS = new Set(["list", "tell", "ask", "collect"]);
+
+export function runtimeFor(
+  env: Record<string, string | undefined>,
+  verb: string,
+): { kind: "herdr" } | { kind: "app"; self: string } | { error: string } {
+  if (env.HERDR_ENV === "1") return { kind: "herdr" };
+  if (!env.HC_TERMINAL_ID) {
+    return {
+      error:
+        "herd: not inside herdr (HERDR_ENV != 1) or herdr-app (no HC_TERMINAL_ID). These verbs only work inside one of them.",
+    };
+  }
+  if (!APP_VERBS.has(verb)) {
+    return {
+      error: `herd ${verb}: under herdr-app use hc directly (read \`hc --skill\`); herd keeps only list, tell, ask and collect there.`,
+    };
+  }
+  return { kind: "app", self: env.HC_TERMINAL_ID };
 }
 
 const BOOLEAN_FLAGS = new Set(["new-tab", "new-workspace"]);
@@ -1119,17 +1156,18 @@ export const VERB_USAGE: Record<string, string> = {
               [--workspace ID] [--tab ID] [--task "prompt"] [--wait-timeout MS] [--env K=V ...] [-- <extra argv>]
               # <kind> is a herdr agent kind: ${AGENT_KINDS} (no default — required)
               # --new-workspace opens a FRESH workspace instead of the caller's (wins over --new-tab)`,
-  tell: `  herd tell <fragment> <text>          # hand work to an existing agent, fire-and-forget
+  tell: `  herd tell [--agent KIND] <fragment> <text>   # hand work to an agent, fire-and-forget
               # <fragment> matches a workspace label (the project name), a tab label,
               # an agent name, a pane id, or a cwd. Slash-separate to narrow: web-app/dashboard
               # No live agent? Falls back to the herdr-workbench project registry, then zoxide;
-              # a resolved project with no live agent gets one spawned into a fresh workspace.`,
+              # a resolved project with no live agent gets one spawned into a fresh workspace.
+              # --agent KIND   harness to start there (default claude); goes BEFORE <fragment>`,
   send: `  herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives`,
   ask: `  herd ask [--agent KIND] [--timeout MS] [--keep-pane] <fragment> <question>
               # like tell, but waits for and returns the answer via a result-file contract.
               # <fragment> addresses the target exactly as \`tell\` does.
-              # --agent KIND   agent kind to start if none is running: ${AGENT_KINDS} (default claude)
+              # --agent KIND   harness to start if none is running, e.g. ${AGENT_KINDS} (default claude)
               # --timeout MS   how long to wait for the answer (default 600000, 10 min)
               # --keep-pane    keep a pane ask itself spawned; an already-running agent
               #                is never closed either way
@@ -1213,8 +1251,19 @@ async function main() {
     console.log(`${VERB_USAGE[verb]}\n\n${FOOTER}`);
     process.exit(0);
   }
-  assertHerdrEnv();
-  const herd = createHerd();
+  const runtime = runtimeFor(process.env, verb);
+  if ("error" in runtime) {
+    console.error(runtime.error);
+    process.exit(1);
+  }
+  // runtimeFor admits only list/tell/ask/collect under herdr-app, and the app
+  // herd implements exactly those.
+  const herd =
+    runtime.kind === "app"
+      ? ((await import("./herd-app.ts")).createHerdApp(undefined, {
+          selfPaneId: runtime.self,
+        }) as unknown as ReturnType<typeof createHerd>)
+      : createHerd();
   const { positionals, flags, env, rest: restArgv } = parseArgs(rest);
 
   try {
@@ -1224,11 +1273,17 @@ async function main() {
         break;
       }
       case "tell": {
-        const [fragment, ...textParts] = rest;
-        const text = textParts.join(" ");
+        const {
+          flags: f,
+          head: fragment,
+          text,
+        } = parseLeadingFlags("tell", rest, ["agent"]);
         if (!fragment || !text)
           throw new HerdrError("tell requires <fragment> and <text>");
-        console.log(JSON.stringify(await herd.tell(fragment, text), null, 2));
+        const spawnAgent = Array.isArray(f.agent) ? f.agent.at(-1) : undefined;
+        console.log(
+          JSON.stringify(await herd.tell(fragment, text, { spawnAgent }), null, 2),
+        );
         break;
       }
       case "spawn": {
