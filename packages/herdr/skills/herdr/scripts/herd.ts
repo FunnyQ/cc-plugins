@@ -12,7 +12,8 @@ import {
   createAskRunDir,
   extractFinalText,
 } from "./ask-contract.ts";
-import { join } from "node:path";
+import { statSync } from "node:fs";
+import { basename, isAbsolute, join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; code: number };
 export type Runner = (args: string[]) => Promise<RunResult>;
@@ -708,6 +709,14 @@ export function createHerd(run: Runner = herdrRunner, deps: HerdDeps = {}) {
   };
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export type BrokerPrimitives = {
   directory(): Promise<AgentLocation[]>;
   get(target: string): Promise<AgentInfo>;
@@ -797,6 +806,9 @@ export function createBroker(
     }
 
     let resolved: ProjectCandidate | null = projectMatches[0] ?? null;
+    if (!resolved && isAbsolute(fragment) && isDirectory(fragment)) {
+      resolved = { path: fragment, name: basename(fragment), aliases: [] };
+    }
     if (!resolved) {
       const zpath = await queryZoxide(fragment);
       if (zpath) {
@@ -1161,6 +1173,8 @@ export const VERB_USAGE: Record<string, string> = {
               # an agent name, a pane id, or a cwd. Slash-separate to narrow: web-app/dashboard
               # No live agent? Falls back to the herdr-workbench project registry, then zoxide;
               # a resolved project with no live agent gets one spawned into a fresh workspace.
+              # An absolute folder path works when neither the registry nor zoxide knows it.
+              # Under herdr-app a one-line text starting with / is typed as a slash command.
               # --agent KIND   harness to start there (default claude); goes BEFORE <fragment>`,
   send: `  herd send [--wait] [--status idle|working|blocked|done|unknown]... [--timeout MS] <target> <text>
               # flags go BEFORE <target> so prompt text containing \`--\` survives`,

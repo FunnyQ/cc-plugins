@@ -239,3 +239,29 @@ describe("send", () => {
     expect(calls.some((c) => c[1] === "send")).toBe(false);
   });
 });
+
+describe("slash commands and paths", () => {
+  test("types a one-line slash command as keys, since hc send wraps text in an <hc> tag", async () => {
+    const { run, calls } = fakeRunner((cmd) =>
+      cmd[1] === "get" ? { address: "t9", status: { state: "idle" } } : {},
+    );
+    await createHerdApp(run, { selfPaneId: "t46" }).send("t9", "/rc on");
+    expect(calls.at(-1)).toEqual([
+      "hc", "keys", "--json", "t9", "/", "r", "c", "space", "o", "n", "enter",
+    ]);
+  });
+
+  test("tell opens an absolute folder no registry knows", async () => {
+    const folder = mkdtempSync(join(tmpdir(), "herd-app-path-"));
+    const { run, calls } = fakeRunner((cmd) => {
+      if (cmd[1] === "ls") return LS;
+      if (cmd[0] === "herdr-app") return { space: "sp1", tab: "tb1", terminal: "t9" };
+      return {};
+    });
+    const res = await createHerdApp(run, { selfPaneId: "t46" }).tell(folder, "go", {
+      registryPath: noRegistry,
+    });
+    expect(res.spawned?.cwd).toBe(folder);
+    expect(JSON.parse(calls.find((c) => c[0] === "herdr-app")![3]!).folder).toBe(folder);
+  });
+});

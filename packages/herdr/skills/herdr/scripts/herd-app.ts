@@ -141,14 +141,20 @@ export function createHerdApp(
 
   /** A harness reports no status until it is past its startup dialogs, and
    *  `hc send` presses Enter: on Claude's folder-trust dialog that answers
-   *  "No, exit". */
+   *  "No, exit". `hc send` also wraps text in an `<hc from=…>` tag, which turns
+   *  a slash command into a message, so a one-line command is typed as keys. */
   async function send(target: string, text: string): Promise<SendResult> {
     if ((await get(target)).status === "unknown") {
       throw new HerdrError(
         `${target} has not reported a status yet — it may be waiting on a startup dialog (folder trust, login). Read it with \`hc read ${target}\` and ask the person.`,
       );
     }
-    await call(["hc", "send", "--json", "--", target, text]);
+    if (/^\/\S/.test(text) && !text.includes("\n")) {
+      const keys = [...text].map((ch) => (ch === " " ? "space" : ch));
+      await call(["hc", "keys", "--json", target, ...keys, "enter"]);
+    } else {
+      await call(["hc", "send", "--json", "--", target, text]);
+    }
     return { target, paneId: target, submitted: true, waited: false };
   }
 
