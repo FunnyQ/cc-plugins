@@ -265,3 +265,53 @@ describe("slash commands and paths", () => {
     expect(JSON.parse(calls.find((c) => c[0] === "herdr-app")![3]!).folder).toBe(folder);
   });
 });
+
+describe("spawn through the q-saddle layout CLI", () => {
+  test("opens the project with the default tab layout, the harness in its agent pane", async () => {
+    const { run, calls } = fakeRunner((cmd) =>
+      cmd[0] === "node"
+        ? { space: "sp1", tab: "tb1", agent_terminal: "t9", panes: { agent: "p1" } }
+        : {},
+    );
+    const herd = createHerdApp(run, { selfPaneId: "t46", layoutCli: "/m/cli.js" });
+    const res = await herd.spawn({
+      role: "acme",
+      agent: "codex",
+      cwd: "/p/acme",
+      newWorkspace: true,
+      tabLabel: "acme",
+      task: "do it",
+    });
+    expect(calls).toEqual([
+      [
+        "node", "/m/cli.js", "open",
+        "--folder", "/p/acme",
+        "--name", "acme",
+        "--agent-argv", JSON.stringify(["codex", "--no-daemon", "do it"]),
+      ],
+    ]);
+    expect(res).toMatchObject({ name: "t9", workspaceId: "sp1", tabId: "tb1" });
+  });
+
+  test("falls back to a single-pane space when the CLI finds no config or layout", async () => {
+    const calls: string[][] = [];
+    const run: AppRunner = async (cmd) => {
+      calls.push(cmd);
+      if (cmd[0] === "node")
+        return { stdout: JSON.stringify({ error: "no config" }), stderr: "", code: 2 };
+      return {
+        stdout: JSON.stringify({ space: "sp2", tab: "tb2", terminal: "t8" }),
+        stderr: "",
+        code: 0,
+      };
+    };
+    const res = await createHerdApp(run, { selfPaneId: "t46", layoutCli: "/m/cli.js" }).spawn({
+      role: "acme",
+      agent: "claude",
+      cwd: "/p/acme",
+      newWorkspace: true,
+    });
+    expect(calls.map((c) => c[0])).toEqual(["node", "herdr-app"]);
+    expect(res.name).toBe("t8");
+  });
+});

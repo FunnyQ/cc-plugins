@@ -53,7 +53,7 @@ function statusOf(raw: unknown): string {
 
 export function createHerdApp(
   run: AppRunner = appRunner,
-  deps: HerdDeps & { selfPaneId?: string } = {},
+  deps: HerdDeps & { selfPaneId?: string; layoutCli?: string | null } = {},
 ) {
   async function call(cmd: string[]): Promise<any> {
     const result = await run(cmd);
@@ -110,9 +110,40 @@ export function createHerdApp(
     };
   }
 
+  /** Exit 2 means q-saddle has no config or no such layout: fall back to a
+   *  single-pane space. */
+  async function openWithLayout(
+    name: string,
+    opts: SpawnOpts,
+  ): Promise<{ space: string; tab: string; terminal: string } | null> {
+    if (!deps.layoutCli || !opts.cwd) return null;
+    const result = await run([
+      "node",
+      deps.layoutCli,
+      "open",
+      "--folder",
+      opts.cwd,
+      "--name",
+      name,
+      "--agent-argv",
+      JSON.stringify(harnessArgv(opts.agent, opts.argv, opts.task)),
+    ]);
+    if (result.code === 2) return null;
+    let out: any = null;
+    try {
+      out = JSON.parse(result.stdout.trim());
+    } catch {}
+    if (result.code !== 0 || !out?.agent_terminal) {
+      throw new HerdrError(
+        `q-saddle layout CLI failed: ${out?.error ?? (result.stderr.trim() || `exit ${result.code}`)}`,
+      );
+    }
+    return { space: out.space, tab: out.tab, terminal: out.agent_terminal };
+  }
+
   async function spawn(opts: SpawnOpts): Promise<SpawnResult> {
     const name = opts.tabLabel ?? opts.role;
-    const created = await call([
+    const created = (await openWithLayout(name, opts)) ?? await call([
       "herdr-app",
       "do",
       "space.new",
@@ -185,6 +216,7 @@ export function createHerdApp(
     directory,
     get,
     send,
+    spawn,
     ...createBroker({ directory, get, spawn, send, wait, close }, deps),
   };
 }

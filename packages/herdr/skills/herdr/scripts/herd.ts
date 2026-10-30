@@ -12,7 +12,8 @@ import {
   createAskRunDir,
   extractFinalText,
 } from "./ask-contract.ts";
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 
 export type RunResult = { stdout: string; stderr: string; code: number };
@@ -1092,6 +1093,15 @@ export function createBroker(
   return { tell, ask, collect };
 }
 
+// q-saddle (herdr-q-saddle) opens a project with Q's default tab layout; without
+// it, tell and ask open a single-pane space.
+function qSaddleLayoutCli(): string | null {
+  const home =
+    process.env.HERDR_APP_HOME || join(homedir(), ".config", "herdr-app");
+  const cli = join(home, "mods", "q-saddle-tab", "cli.js");
+  return existsSync(cli) ? cli : null;
+}
+
 const APP_VERBS = new Set(["list", "tell", "ask", "collect"]);
 
 export function runtimeFor(
@@ -1276,6 +1286,7 @@ async function main() {
     runtime.kind === "app"
       ? ((await import("./herd-app.ts")).createHerdApp(undefined, {
           selfPaneId: runtime.self,
+          layoutCli: qSaddleLayoutCli(),
         }) as unknown as ReturnType<typeof createHerd>)
       : createHerd();
   const { positionals, flags, env, rest: restArgv } = parseArgs(rest);
