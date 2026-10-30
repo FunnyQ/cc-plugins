@@ -12,7 +12,7 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 | **dispatch**  | Interview-driven planning and execution                                 | `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan` |
 | **relay**     | Delegate a task to another harness CLI                                  | `relay`                                                                |
 | **chronicle** | ADR curation, commit, PR/MR, and release automation                     | `adr`, `commit`, `pr`, `release`, `install`                            |
-| **herdr**     | Reference + agent orchestration for the Herdr terminal                  | `herdr`, `tell`, `ask`, `herdr-browser`, `herdr-protocol-upgrade`      |
+| **herdr**     | Reference + agent orchestration for the Herdr terminal                  | `herdr`, `herdr-app`, `tell`, `ask`, `herdr-browser`, `herdr-protocol-upgrade` |
 | **guard**     | Coding rules the harness enforces, as hooks; an on-demand comment sweep | `comments-reaper`                                                      |
 | **browsers**  | Drive Firefox, Zen, Chrome, and Safari from the terminal                | `firefox`, `chrome`, `safari`                                          |
 | **runes**     | Switchable UI mods, Claude Code only; first rune is the Clawd mascot    | _(none — a function-hooks mod, toggled by `/runes`)_                   |
@@ -239,7 +239,7 @@ Do not infer intent from visibility. `document.hidden` stays false when another 
 
 **No chronicle agent spawns a child.** Claude Code 2.1.217 disabled nested subagent spawning by default, and chronicle once carried a `SessionStart` hook that raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` to `2` for its `pr` and `adr` orchestrators. Both orchestrators were folded away, so the hook and its scripts are gone; keep every chronicle agent a leaf, or the requirement comes back with a silent `Agent exists but is not enabled in this context` failure. OpenCode's equivalent, `subagent_depth` in `~/.config/opencode/opencode.json`, ships defaulting to `1`, which blocks nesting outright; dispatch's `autopilot` still needs it at `2`, so `opencode/install.ts --apply` still raises it — raise-only, no session hook, and a silent stop if it is skipped.
 
-**opencode runtime layer.** All OpenCode-facing code lives in `opencode/` at the repo root, deliberately outside `packages/`, so the two-manifests-per-package invariant and the release config stay untouched — `opencode/` versions nothing and ships in no plugin. Install is symlinks, not copies: `opencode/install.ts --apply` links the 24 skills, the plugin module, the 6 chronicle agents, and the 2 monitor commands into `~/.config/opencode/`, with the checkout as the single source of truth — an edit lands live, no reinstall — plus the one `subagent_depth` config edit above.
+**opencode runtime layer.** All OpenCode-facing code lives in `opencode/` at the repo root, deliberately outside `packages/`, so the two-manifests-per-package invariant and the release config stay untouched — `opencode/` versions nothing and ships in no plugin. Install is symlinks, not copies: `opencode/install.ts --apply` links the 25 skills, the plugin module, the 6 chronicle agents, and the 2 monitor commands into `~/.config/opencode/`, with the checkout as the single source of truth — an edit lands live, no reinstall — plus the one `subagent_depth` config edit above.
 
 Hook parity — which Claude hooks port to which OpenCode events:
 

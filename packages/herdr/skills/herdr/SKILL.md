@@ -1,14 +1,13 @@
 ---
 name: herdr
 description: >-
-  Help with Herdr (the `herdr` multiplexer, or herdr-app with herdr-core's
-  `hc`) configuration, CLI, panes, plugins, and coordinating agents across
-  panes.
+  Help with the `herdr` terminal multiplexer: configuration, CLI, panes,
+  plugins, and coordinating agents across panes.
 when_to_use: >-
   For herdr config.toml, keybindings, themes, popup commands, CLI commands, or
-  plugin development; or — inside a herdr pane (HERDR_ENV=1) or a herdr-app
-  terminal (HC_TERMINAL_ID set) — spawning, driving, or coordinating agents in
-  other panes or tabs. Handing work to an agent already running in another
+  plugin development; or — inside a herdr pane (HERDR_ENV=1) — spawning,
+  driving, or coordinating agents in other panes. herdr-app and `hc` belong to
+  the `herdr-app` skill. Handing work to an agent already running in another
   project belongs to the `tell` skill, and getting an ANSWER back from one
   belongs to the `ask` skill — not this one.
 version: 4
@@ -19,15 +18,7 @@ version: 4
 Two products carry the name. Check which one you are in before anything else:
 
 - **`HERDR_ENV=1`**: the `herdr` terminal multiplexer. Everything below this section applies.
-- **`HC_TERMINAL_ID` set, no `HERDR_ENV`**: herdr-app, whose terminals herdr-core (`hc`) runs. Read the next section and skip the rest.
-
-## Under herdr-app
-
-Run `hc --skill` and `herdr-app --skill` and follow them. They are the current manuals, shipped with the installed release. `hc` starts, messages, waits on, reads and cleans up agents and programs; `herdr-app` changes only what the person sees: spaces, tabs, panes, mods. Your address is `$HC_TERMINAL_ID`, not a pane id.
-
-`herd.ts` keeps only `list`, `tell`, `ask` and `collect` there, because those resolve a project fragment through the registry and zoxide, which `hc` cannot do. Every other verb refuses and points at `hc`. Settings and mods live in `~/.config/herdr-app/`; read its `AGENTS.md` first. `references/` below describes the `herdr` multiplexer only.
-
-Run a long job (a build, a test suite, a server) with `hc run --bg --name <job> <cmd>` instead of the harness's own background task, so the person can watch its progress in the herdr-app panel. When it exits, hc types `<hc>t65 <job> exited (exit 3). Last lines: … Read: hc read t65</hc>` into your terminal. On Claude Code that note starts a new turn when you are idle, and arrives with the next tool result when you are busy — both measured. The job ends with your program unless you add `--outlive-parent`. Remove it with `hc rm <t>` once you have read it.
+- **`HC_TERMINAL_ID` set, no `HERDR_ENV`**: herdr-app, whose terminals herdr-core (`hc`) runs. Use the `herdr-app` skill instead; nothing below applies.
 
 ## The `herdr` multiplexer
 
@@ -58,8 +49,6 @@ bun "$HERD" spawn reviewer --agent codex --cwd "$PWD"
 
 # Spawn AND hand it a task in one shot (waits for idle, then sends + submits)
 bun "$HERD" spawn reviewer --agent codex --task "review the diff in src/api/"
-
-# Another project: `tell` (fire-and-forget) / `ask` (answer back) — read those skills first.
 
 # Atomically send and submit a prompt to a running agent
 bun "$HERD" send reviewer-a3f9 "now check error handling"

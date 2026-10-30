@@ -36,6 +36,7 @@ const EXPECTED_SKILL_NAMES = [
   "firefox",
   "flightplan",
   "herdr",
+  "herdr-app",
   "herdr-browser",
   "herdr-protocol-upgrade",
   "hop",
