@@ -1,5 +1,25 @@
 # Changelog
 
+## [herdr 0.8.0] - 2026-10-30
+
+_tracks tag `herdr-v0.8.0`_
+
+### Added
+- herd tell, ask and collect now run inside herdr-app as well as the original Herdr multiplexer, so agent hand-offs work in either runtime.
+- herdr-browser opens in herdr-app, as its own terminal tab that closes when the browser exits.
+- tell and ask open a new project with your q-saddle tab layout under herdr-app, falling back to a single pane when q-saddle is missing.
+- tell accepts an absolute path to an existing folder, and under herdr-app a one-line message starting with / is typed as a slash command instead of arriving as plain text.
+
+### Fixed
+- tell now picks an exact project path or name first, so a project nested in a same-named parent folder can be selected instead of matching several projects.
+
+## [relay 0.10.0] - 2026-10-30
+
+_tracks tag `relay-v0.10.0`_
+
+### Added
+- relay delegate and review now open a live pane under herdr-app, as a new tab in the caller's own space, instead of silently running headless.
+
 ## [runes 0.13.3] - 2026-10-30
 
 _tracks tag `runes-v0.13.3`_
