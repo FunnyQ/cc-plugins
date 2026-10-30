@@ -90,9 +90,20 @@ export function matchProjects(
   const query = fragment.trim().replaceAll("\\", "/").toLowerCase();
   if (!query) return [];
 
+  const pool = candidates.filter((c) => !isTempPath(c.path, tempRoot));
+  const trimmed = query.replace(/\/+$/, "");
+  const ending = pool.filter((c) => {
+    const path = c.path.replaceAll("\\", "/").toLowerCase();
+    return (
+      path === trimmed ||
+      path.endsWith(`/${trimmed}`) ||
+      c.name.toLowerCase() === trimmed
+    );
+  });
+  if (ending.length) return ending;
+
   const parts = query.split("/").filter(Boolean);
-  return candidates.filter((c) => {
-    if (isTempPath(c.path, tempRoot)) return false;
+  return pool.filter((c) => {
     const haystack = [c.name, ...c.aliases, c.path].map((v) =>
       v.replaceAll("\\", "/").toLowerCase(),
     );

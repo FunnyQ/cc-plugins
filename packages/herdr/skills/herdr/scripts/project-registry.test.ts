@@ -105,6 +105,24 @@ describe("isTempPath", () => {
 });
 
 describe("matchProjects", () => {
+  test("an exact path or name wins over a parent folder that repeats it", () => {
+    const nested: ProjectCandidate[] = [
+      { path: "/p/archive/skid", name: "skid", aliases: [] },
+      { path: "/p/clients/_Skid-V1/skid", name: "skid", aliases: [] },
+      { path: "/p/clients/_Skid-V1/kolnet", name: "kolnet", aliases: [] },
+    ];
+    expect(
+      matchProjects(nested, "/p/clients/_Skid-V1/skid").map((c) => c.path),
+    ).toEqual(["/p/clients/_Skid-V1/skid"]);
+    expect(matchProjects(nested, "_Skid-V1/skid").map((c) => c.path)).toEqual([
+      "/p/clients/_Skid-V1/skid",
+    ]);
+    expect(matchProjects(nested, "skid").map((c) => c.path)).toEqual([
+      "/p/archive/skid",
+      "/p/clients/_Skid-V1/skid",
+    ]);
+  });
+
   const candidates: ProjectCandidate[] = [
     {
       path: "/Users/dev/Projects/api-service",
