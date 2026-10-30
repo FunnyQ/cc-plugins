@@ -9,8 +9,9 @@ import {
   herdrTabCreateArgs,
   parseHerdrTab,
   herdrTabLabel,
-  hcBrowserRunArgs,
-  appTabOf,
+  appBrowserArgv,
+  appPlaceOf,
+  appTabName,
   type HerdrTab,
   type Tab,
   type Target,
@@ -316,7 +317,9 @@ export async function run(
   const dependency =
     command[0] === "terminal-browser"
       ? "terminal-browser"
-      : command[0] === HERDR_BIN ? "herdr" : null;
+      : command[0] === HERDR_BIN
+        ? "herdr"
+        : null;
   if (dependency) requireExecutable(command[0], dependency);
   const child = Bun.spawn(command, {
     stdout: "pipe",
@@ -544,38 +547,73 @@ async function openInHerdrApp(
       "--ratio is not supported under herdr-app, which sizes the pane itself",
     );
   }
-  const self = JSON.parse(
-    await deps.run(["hc", "get", "--json", process.env.HC_TERMINAL_ID!]),
+  if (split !== null && split !== "right" && split !== "down") {
+    throw new Error(`herdr-app splits only right or down, not ${split}`);
+  }
+  const terminal = process.env.HC_TERMINAL_ID!;
+  const place = appPlaceOf(await deps.run(["herdr-app", "ls"]), terminal);
+  if (!place) {
+    throw new Error(
+      `${terminal} is not shown in herdr-app, so it has no space to open a tab in`,
+    );
+  }
+  const argv = appBrowserArgv(url);
+  const shown =
+    split === null
+      ? JSON.parse(await deps.run(["herdr-app", "status"])).tab
+      : null;
+  const created = JSON.parse(
+    await deps.run(
+      split === null
+        ? [
+            "herdr-app",
+            "do",
+            "tab.new",
+            JSON.stringify({
+              name: appTabName(url),
+              space: place.space,
+              folder: process.cwd(),
+              argv,
+            }),
+          ]
+        : [
+            "herdr-app",
+            "do",
+            "pane.split",
+            JSON.stringify({ direction: split, pane: place.pane, argv }),
+          ],
+    ),
   );
-  const labels = [`herdr.space=${self.labels?.["herdr.space"]}`];
-  if (split !== null) labels.push(`herdr.tab=${self.labels?.["herdr.tab"]}`);
-  const { address } = JSON.parse(
-    await deps.run(hcBrowserRunArgs(url, labels)),
-  );
+  if (shown) {
+    await deps
+      .run(["herdr-app", "do", "tab.select", JSON.stringify({ id: shown })])
+      .catch(() => {});
+  }
   try {
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const found = newcomer(before, await deps.terminalTargets());
-      if (found) {
-        if (split === null) {
-          const tab = appTabOf(await deps.run(["herdr-app", "ls"]), address);
-          if (tab) {
-            await deps
-              .run([
-                "herdr-app",
-                "do",
-                "tab.rename",
-                JSON.stringify({ id: tab, name: "browser" }),
-              ])
-              .catch(() => {});
-          }
-        }
-        return found;
-      }
+      if (found) return found;
       await Bun.sleep(250);
     }
     throw new Error("opened the browser but it never reported the page");
   } catch (error) {
-    await deps.run(["hc", "kill", address]).catch(() => {});
+    await deps
+      .run(
+        split === null
+          ? [
+              "herdr-app",
+              "do",
+              "tab.close",
+              JSON.stringify({ id: created.tab, confirmed: true }),
+            ]
+          : [
+              "herdr-app",
+              "do",
+              "pane.close",
+              JSON.stringify({ pane: created.pane }),
+            ],
+      )
+      .catch(() => {});
     throw error;
   }
 }
