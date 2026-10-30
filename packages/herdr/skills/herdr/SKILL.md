@@ -27,6 +27,8 @@ Run `hc --skill` and `herdr-app --skill` and follow them. They are the current m
 
 `herd.ts` keeps only `list`, `tell`, `ask` and `collect` there, because those resolve a project fragment through the registry and zoxide, which `hc` cannot do. Every other verb refuses and points at `hc`. Settings and mods live in `~/.config/herdr-app/`; read its `AGENTS.md` first. `references/` below describes the `herdr` multiplexer only.
 
+Run a long job (a build, a test suite, a server) with `hc run --bg --name <job> <cmd>` instead of the harness's own background task, so the person can watch its progress in the herdr-app panel. When it exits, hc types `<hc>t65 <job> exited (exit 3). Last lines: … Read: hc read t65</hc>` into your terminal. On Claude Code that note starts a new turn when you are idle, and arrives with the next tool result when you are busy — both measured. The job ends with your program unless you add `--outlive-parent`. Remove it with `hc rm <t>` once you have read it.
+
 ## The `herdr` multiplexer
 
 Herdr is a terminal workspace manager with workspaces, tabs, split panes, agent detection, and a plugin system. It works without a config file. If you need customization, add `~/.config/herdr/config.toml`.
@@ -99,13 +101,13 @@ If the wrapper doesn't cover something, for example worktrees, layout, notificat
 
 This skill's detail lives in `references/`. Read only the file(s) relevant to the question, not all of them.
 
-| File | Read when the user asks about... |
-|---|---|
-| `references/config.md` | `config.toml` sections, keybindings and popup commands, themes, toast/sound notifications, environment variables, `herdr server reload-config` |
-| `references/cli.md` | Any `herdr <subcommand>` usage — session/workspace/tab/pane/agent management, waits, integrations, plugin CLI commands |
-| `references/plugin-development.md` | Writing or debugging a Herdr plugin — `herdr-plugin.toml` manifest, runtime env vars, dev workflow (`plugin link`), distribution, pitfalls |
-| `references/agent-orchestration.md` | Claude is running *inside* a herdr pane (`HERDR_ENV=1`) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents |
-| `references/socket-api.md` | Talking to herdr over `HERDR_SOCKET_PATH` instead of the CLI — envelope, framing rules, CLI↔method map, enum spelling traps, `events.subscribe` (the one thing the CLI cannot do) |
+| File                                | Read when the user asks about...                                                                                                                                                  |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `references/config.md`              | `config.toml` sections, keybindings and popup commands, themes, toast/sound notifications, environment variables, `herdr server reload-config`                                    |
+| `references/cli.md`                 | Any `herdr <subcommand>` usage — session/workspace/tab/pane/agent management, waits, integrations, plugin CLI commands                                                            |
+| `references/plugin-development.md`  | Writing or debugging a Herdr plugin — `herdr-plugin.toml` manifest, runtime env vars, dev workflow (`plugin link`), distribution, pitfalls                                        |
+| `references/agent-orchestration.md` | Claude is running _inside_ a herdr pane (`HERDR_ENV=1`) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents                     |
+| `references/socket-api.md`          | Talking to herdr over `HERDR_SOCKET_PATH` instead of the CLI — envelope, framing rules, CLI↔method map, enum spelling traps, `events.subscribe` (the one thing the CLI cannot do) |
 
 Most CLI commands output JSON for scripting. `herdr --default-config` prints the full default config as a starting point.
 
