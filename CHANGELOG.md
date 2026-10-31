@@ -1,5 +1,12 @@
 # Changelog
 
+## [monitor 8.4.2] - 2026-10-31
+
+_tracks tag `monitor-v8.4.2`_
+
+### Fixed
+- The headless scribe no longer takes over its parent session's work: it is limited to Bash and Read, denied anything not allowed, and capped at a $2 budget, after one runaway run cost $14.08.
+
 ## [herdr 0.9.0] - 2026-10-31
 
 _tracks tag `herdr-v0.9.0`_

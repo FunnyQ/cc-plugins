@@ -1,6 +1,6 @@
 [package]
 name = "cockpit"
-version = "8.4.1"
+version = "8.4.2"
 edition = "2024"
 
 [[bin]]
