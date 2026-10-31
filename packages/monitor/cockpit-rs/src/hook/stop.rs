@@ -88,7 +88,7 @@ pub fn build_headless_scribe(
     let cli = format!("{skill_dir}/bin/cockpit");
     let refs = format!("{skill_dir}/references");
     let prompt = format!(
-        "Scribe this session's decision log. In one turn, read {refs}/scribe.md and run `{cli} scribe --prep --session {scribe_session}`. Then follow scribe.md: the CLI is {cli}, and every call passes --session {scribe_session}. Spell each call as `{cli} scribe …`, never through a shell variable. When done, reply with one line."
+        "Scribe this session's decision log. In one turn, read {refs}/scribe.md and run `{cli} scribe --prep --session {scribe_session}`. Then follow scribe.md: the CLI is {cli}, and every call passes --session {scribe_session}. Spell each call as `{cli} scribe …`, never through a shell variable. You are not this session's author: do not continue its work, answer its pending notifications, or touch any file. When done, reply with one line."
     );
     // allowedTools is variadic and would swallow any following options.
     vec![
@@ -103,6 +103,13 @@ pub fn build_headless_scribe(
         "low".into(),
         "--output-format".into(),
         "json".into(),
+        "--tools".into(),
+        "Bash,Read".into(),
+        "--permission-mode".into(),
+        "dontAsk".into(),
+        // normal scribes cost $0.20-0.70; one that took over its parent's work cost $14
+        "--max-budget-usd".into(),
+        "2".into(),
         "--allowedTools".into(),
         format!("Bash({cli} scribe:*)"),
         format!("Read(/{refs}/**)"),
@@ -441,6 +448,12 @@ mod tests {
                 "low",
                 "--output-format",
                 "json",
+                "--tools",
+                "Bash,Read",
+                "--permission-mode",
+                "dontAsk",
+                "--max-budget-usd",
+                "2",
                 "--allowedTools",
                 "Bash(/skill/bin/cockpit scribe:*)",
                 "Read(//skill/references/**)"
@@ -450,7 +463,7 @@ mod tests {
         assert_eq!(argv[1], "-p");
         assert_eq!(
             argv[2],
-            "Scribe this session's decision log. In one turn, read /skill/references/scribe.md and run `/skill/bin/cockpit scribe --prep --session parent`. Then follow scribe.md: the CLI is /skill/bin/cockpit, and every call passes --session parent. Spell each call as `/skill/bin/cockpit scribe …`, never through a shell variable. When done, reply with one line."
+            "Scribe this session's decision log. In one turn, read /skill/references/scribe.md and run `/skill/bin/cockpit scribe --prep --session parent`. Then follow scribe.md: the CLI is /skill/bin/cockpit, and every call passes --session parent. Spell each call as `/skill/bin/cockpit scribe …`, never through a shell variable. You are not this session's author: do not continue its work, answer its pending notifications, or touch any file. When done, reply with one line."
         );
     }
 
