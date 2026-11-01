@@ -95,13 +95,16 @@ When effort is already at the maximum, keep it there.
 Keep the same retry cap when translating the Claude escalation ladder to Codex models.
 State that native Codex agents cannot supply the Claude-Opus fallback from the external-engine Claude ladder.
 
-For the external bug/correctness lens, offer the existing `codex-run.ts review` and `opencode-run.ts review` wrappers.
-When cross-vendor review is required, select an installed OpenCode provider from another vendor.
+For the external bug/correctness lens, offer Claude through relay first, then the `codex-run.ts review` and `opencode-run.ts review` wrappers.
+Resolve `relay.ts` as Step 1 item 9 of `SKILL.md` describes, and capture its absolute path as `$RELAY`.
+When `$RELAY` does not resolve, drop the Claude option and say why.
+When cross-vendor review is required, pick Claude through relay, or an installed OpenCode provider from another vendor.
 When choosing Codex review, disclose that it supplies an independent context but no cross-vendor signal in this flight.
-Check the chosen external CLI with `--version` before flying.
+Check the chosen external CLI with `--version` before flying; for Claude, run `claude --version`.
 State which service receives the branch diff.
-Keep headless wrappers as this path's external execution mode.
-State that this path does not implement Workflow's relay live-pane driver or its external-dev fallback ladder.
+When `HERDR_ENV=1` or `HC_TERMINAL_ID` is set and `$RELAY` resolved, ask whether the closing review runs in a visible relay live pane, defaulting to headless.
+Run every non-relay external review through the headless wrappers.
+State that this path does not implement Workflow's external-dev fallback ladder, because native Codex agents write every task.
 Keep commits between waves and after Final review unless the user explicitly disables them for this flight.
 Honor an existing no-commit instruction from the conversation.
 Obtain an explicit go-ahead unless the conversation already authorizes the concrete flight choices.
@@ -347,7 +350,7 @@ Write raw findings into `$PLAN/.flightlog/review/attempt-N/<lens>.md`.
 
 | Lens            | Brief                                                                                                  |
 | --------------- | ------------------------------------------------------------------------------------------------------ |
-| External engine | Run the selected `codex-run.ts review` or `opencode-run.ts review` wrapper for bugs and correctness.   |
+| External engine | Run `relay.ts claude review`, or the selected `codex-run.ts` / `opencode-run.ts review` wrapper.       |
 | reuse           | Find duplicated logic, missed existing helpers, and missing abstractions justified by repeated code.   |
 | leanness        | Find deletions and over-engineering using `delete`, `stdlib`, `native`, `yagni`, or `shrink` findings. |
 | efficiency      | Find redundant passes, N+1 calls, recomputation, and avoidable allocation or I/O.                      |
@@ -362,9 +365,19 @@ bun "$SCRIPTS/codex-run.ts" review --prompt-file "$PROMPT_FILE" --model "$REVIEW
 ```
 
 When choosing OpenCode, substitute `opencode-run.ts` and the agreed provider model.
+When choosing Claude, run relay instead:
+
+```bash
+bun "$RELAY" claude review --git-scope none --dangerous --no-ask --wait-timeout 480000 --prompt-file "$PROMPT_FILE"
+```
+
+When the flight agreed on headless, add `--headless`; otherwise relay routes to a live pane inside herdr or herdr-app.
+Run it as one foreground call within the 600s tool cap, and never poll it from a shell loop.
+When relay prints a pending report, run the `relay.ts collect --agent <name> --result <path>` command it prints, at most 3 times.
+When the last collect is still pending, treat the review as unreachable.
 When using relay configuration or wrapper defaults, omit `--model` instead of passing an empty value.
 Preserve the wrapper's sandbox or record-only contract.
-When the external engine is unreachable, preserve its `CODEX UNREACHABLE` or `OPENCODE UNREACHABLE` error in the findings artifact.
+When the external engine is unreachable, preserve its `CODEX UNREACHABLE` or `OPENCODE UNREACHABLE` error in the findings artifact, or write `CLAUDE UNREACHABLE` for a failed or still-pending relay run.
 Never interpret a missing artifact, failed wrapper, or missing result as “no findings.”
 When a wrapper exits successfully with empty review output, fail the review result as missing evidence.
 After the lenses finish, spawn one fixer to read all findings and apply justified fixes in `$REPO`.
@@ -391,4 +404,4 @@ Claim tree completion only after a valid nonempty scout confirms all tasks done,
 Describe this path as an agent-driven parallel flight rather than a detached Workflow process.
 After a session interruption, recover from task files, worktree state, and `flightlog.ts progress` before continuing.
 Do not promise execution while the primary session is stopped.
-Disclose the remaining differences from Claude Code: native Codex role models, no automatic Claude fallback, no relay live panes in this path, no Claude pane mod, and no cross-vendor signal when the selected reviewer also uses OpenAI.
+Disclose the remaining differences from Claude Code: native Codex role models, no automatic Claude fallback for dev, relay live panes for the closing review only, no Claude pane mod, and no cross-vendor signal when the selected reviewer also uses OpenAI.
