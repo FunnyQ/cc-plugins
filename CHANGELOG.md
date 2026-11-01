@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 5.8.5] - 2026-11-01
+
+_tracks tag `dispatch-v5.8.5`_
+
+### Added
+- A flightplan rubric can now declare several vetoes, so a task scoring too low on any named dimension (not just one) fails regardless of its weighted total.
+- Flightdeck and the Claude Code pane now show which dimensions triggered a veto, with a shortened label on narrow cards.
+- Autopilot can fly a task tree under Codex, which has no Workflow tool: the primary agent schedules each wave and runs its roles as parallel native subagents, and stays silent during the flight.
+
+### Fixed
+- Multi-word rubric dimensions now fire their veto, and flightplan lint rejects a veto that names no rubric row.
+
 ## [monitor 8.4.2] - 2026-10-31
 
 _tracks tag `monitor-v8.4.2`_
