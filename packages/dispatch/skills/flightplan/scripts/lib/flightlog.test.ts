@@ -101,7 +101,18 @@ describe("renderRunlog", () => {
     };
     const md = renderRunlog([failed], { slug: "demo" });
     expect(md).toMatch(/FAIL/i);
-    expect(md).toMatch(/veto/i);
+    expect(md).toContain("→ FAIL ❌ · hard-fail veto _(agent:");
+  });
+
+  test("names every dimension that vetoed", () => {
+    const failed: ScoreEntry = {
+      ...SCORE,
+      passed: false,
+      hardFailed: true,
+      vetoedBy: ["Correctness", "Security"],
+    };
+    const md = renderRunlog([failed], { slug: "demo" });
+    expect(md).toContain("· hard-fail veto: Correctness, Security _(agent:");
   });
 
   test("folds a judge rationale under the verdict line", () => {

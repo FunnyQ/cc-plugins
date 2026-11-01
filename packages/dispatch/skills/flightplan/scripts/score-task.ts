@@ -43,6 +43,7 @@ export type ScoreResult = {
   passOp: ">" | ">=";
   passed: boolean;
   hardFailed: boolean;
+  vetoedBy: string[];
   breakdown: DimensionScore[];
   missing: string[];
 };
@@ -86,16 +87,14 @@ export function scoreTask(
 
   const weighted = weightSum > 0 ? acc / weightSum : 0;
 
-  let hardFailed = false;
-  if (rubric.hardFail) {
-    const hv = scores[rubric.hardFail.dimension];
-    if (typeof hv === "number") {
-      hardFailed =
-        rubric.hardFail.op === "<"
-          ? hv < rubric.hardFail.value
-          : hv <= rubric.hardFail.value;
-    }
-  }
+  const vetoedBy = rubric.hardFails
+    .filter((h) => {
+      const hv = scores[h.dimension];
+      if (typeof hv !== "number") return false;
+      return h.op === "<" ? hv < h.value : hv <= h.value;
+    })
+    .map((h) => h.dimension);
+  const hardFailed = vetoedBy.length > 0;
 
   const meetsThreshold =
     rubric.passOp === ">"
@@ -110,6 +109,7 @@ export function scoreTask(
     passOp: rubric.passOp,
     passed,
     hardFailed,
+    vetoedBy,
     breakdown,
     missing,
   };
@@ -135,6 +135,7 @@ export function buildScoreEntry(
     weighted: result.weighted,
     passed: result.passed,
     hardFailed: result.hardFailed,
+    ...(result.vetoedBy.length > 0 ? { vetoedBy: result.vetoedBy } : {}),
     missing: result.missing,
     threshold: result.passThreshold,
     passOp: result.passOp,

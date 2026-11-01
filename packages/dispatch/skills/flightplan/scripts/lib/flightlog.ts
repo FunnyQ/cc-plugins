@@ -35,6 +35,7 @@ export type ScoreEntry = {
   weighted: number;
   passed: boolean;
   hardFailed: boolean;
+  vetoedBy?: string[];
   missing: string[];
   threshold: number;
   passOp: ">" | ">=";
@@ -146,7 +147,8 @@ function renderLine(e: FlightlogEntry): string {
     return `- ${attempt}${e.role} — ${e.message}${agent}`;
   }
   const verdict = e.passed ? "PASS ✅" : "FAIL ❌";
-  const veto = e.hardFailed ? " · hard-fail veto" : "";
+  const vetoNames = e.vetoedBy?.length ? `: ${e.vetoedBy.join(", ")}` : "";
+  const veto = e.hardFailed ? ` · hard-fail veto${vetoNames}` : "";
   const miss = e.missing.length ? ` · missing: ${e.missing.join(", ")}` : "";
   const line = `- ${attempt}judge — score ${e.weighted.toFixed(2)} ${e.passOp} ${e.threshold} → ${verdict}${veto}${miss}${agent}`;
   const rationale = e.rationale?.trim();

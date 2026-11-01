@@ -45,7 +45,8 @@ export type Rubric = {
   passThreshold: number;
   passOp: ">" | ">=";
   scaleMax: number;
-  hardFail: RubricHardFail | null;
+  hardFails: RubricHardFail[];
+  unknownVetoes: string[]; // "<word> < N" on the threshold line that ends with no row name
   dimensions: RubricDimension[];
 };
 
@@ -207,20 +208,46 @@ export function parseRubric(body: string): Rubric | null {
   const scaleMatch = /\b0\s*[–-]\s*([0-9]+)\b/.exec(quote);
   const scaleMax = scaleMatch ? parseInt(scaleMatch[1], 10) : 5;
 
-  const hardMatch =
-    /([\p{L}\p{N}_-]+)\s*(<=|≤|<)\s*([0-9]+(?:\.[0-9]+)?)/u.exec(quote);
-  const hardFail: RubricHardFail | null = hardMatch
-    ? {
-        dimension: hardMatch[1],
-        op: hardMatch[2] === "<" ? "<" : "<=",
-        value: parseFloat(hardMatch[3]),
-      }
-    : null;
-
   const dimensions = parseRubricTable(section);
   if (dimensions.length === 0) return null;
 
-  return { passThreshold, passOp, scaleMax, hardFail, dimensions };
+  const hardFails: RubricHardFail[] = [];
+  const unknownVetoes: string[] = [];
+  const squash = (text: string) => text.replace(/\s+/g, " ");
+  const line = squash(quote.replace(/[`*]/g, ""));
+  for (const m of line.matchAll(/(<=|≤|<)\s*([0-9]+(?:\.[0-9]+)?)/g)) {
+    const before = line.slice(0, m.index).trimEnd();
+    const lower = before.toLowerCase();
+    const row = dimensions
+      .filter((d) => {
+        const name = squash(d.name).toLowerCase();
+        const start = lower.length - name.length;
+        return (
+          lower.endsWith(name) &&
+          (start === 0 || !/[\p{L}\p{N}_]/u.test(lower[start - 1]))
+        );
+      })
+      .sort((a, b) => squash(b.name).length - squash(a.name).length)[0];
+    if (row) {
+      hardFails.push({
+        dimension: row.name,
+        op: m[1] === "<" ? "<" : "<=",
+        value: parseFloat(m[2]),
+      });
+      continue;
+    }
+    const word = /\S+$/.exec(before)?.[0];
+    unknownVetoes.push(`${word ? `${word} ` : ""}${m[1]} ${m[2]}`);
+  }
+
+  return {
+    passThreshold,
+    passOp,
+    scaleMax,
+    hardFails,
+    unknownVetoes,
+    dimensions,
+  };
 }
 
 function parseRubricTable(section: string): RubricDimension[] {

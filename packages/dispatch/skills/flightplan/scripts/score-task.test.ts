@@ -15,7 +15,8 @@ const RUBRIC: Rubric = {
   passThreshold: 4.0,
   passOp: ">",
   scaleMax: 5,
-  hardFail: { dimension: "Correctness", op: "<", value: 4 },
+  hardFails: [{ dimension: "Correctness", op: "<", value: 4 }],
+  unknownVetoes: [],
   dimensions: [
     { name: "Correctness", weight: 3 },
     { name: "Test coverage", weight: 2 },
@@ -57,7 +58,45 @@ describe("scoreTask", () => {
     });
     expect(r.weighted).toBeCloseTo(29 / 7, 5);
     expect(r.hardFailed).toBe(true);
+    expect(r.vetoedBy).toEqual(["Correctness"]);
     expect(r.passed).toBe(false);
+  });
+
+  const SECURE: Rubric = {
+    ...RUBRIC,
+    hardFails: [
+      { dimension: "Correctness", op: "<", value: 4 },
+      { dimension: "Security", op: "<", value: 4 },
+    ],
+    dimensions: [
+      { name: "Correctness", weight: 3 },
+      { name: "Security", weight: 2 },
+      { name: "Test coverage", weight: 2 },
+      { name: "Assumptions & docs", weight: 1 },
+    ],
+  };
+
+  test("a second veto fails a task the first one passes", () => {
+    const r = scoreTask(SECURE, {
+      Correctness: 5,
+      Security: 3,
+      "Test coverage": 5,
+      "Assumptions & docs": 5,
+    });
+    expect(r.weighted).toBeGreaterThan(4);
+    expect(r.vetoedBy).toEqual(["Security"]);
+    expect(r.hardFailed).toBe(true);
+    expect(r.passed).toBe(false);
+  });
+
+  test("every fired veto is named, in rubric order", () => {
+    const r = scoreTask(SECURE, {
+      Correctness: 2,
+      Security: 1,
+      "Test coverage": 5,
+      "Assumptions & docs": 5,
+    });
+    expect(r.vetoedBy).toEqual(["Correctness", "Security"]);
   });
 
   test("pass line is strict ('>'): exactly on the line fails", () => {
@@ -147,6 +186,25 @@ describe("buildScoreEntry", () => {
       ts: "2026-06-01T10:00:00.000Z",
     });
     expect(entry.attempt).toBe(1);
+  });
+
+  test("records the vetoing dimensions, and omits the key when none fired", () => {
+    const meta = { task: "ui/03", ts: "2026-06-01T10:00:00.000Z" };
+    const vetoed = scoreTask(RUBRIC, {
+      Correctness: 3,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
+    });
+    expect(buildScoreEntry(vetoed, meta).vetoedBy).toEqual(["Correctness"]);
+
+    const clean = scoreTask(RUBRIC, {
+      Correctness: 5,
+      "Test coverage": 5,
+      "Interface & readability": 5,
+      "Assumptions & docs": 5,
+    });
+    expect(buildScoreEntry(clean, meta)).not.toHaveProperty("vetoedBy");
   });
 
   test("records a trimmed rationale, and omits the key when absent or whitespace-only alike", () => {

@@ -516,6 +516,24 @@ describe("lintFile", () => {
     await rm(root, { recursive: true });
   });
 
+  test("a veto naming no table row → violation", async () => {
+    const bad = VALID_TASK.replace(
+      "Correctness < 4 is an automatic veto",
+      "Correctness < 4 and Securty < 4 are automatic vetoes",
+    );
+    const root = await writeTree({
+      "tasks/_context/shared.md": "# Shared\n",
+      "tasks/ui/01-foo.md": bad,
+    });
+    const violations = await lintFile(join(root, "tasks/ui/01-foo.md"));
+    expect(
+      violations.filter((v) => v.rule === "rubric").map((v) => v.detail),
+    ).toEqual([
+      "veto `Securty < 4` names no row of the rubric table, so it can never fire — name a dimension as its table row spells it",
+    ]);
+    await rm(root, { recursive: true });
+  });
+
   test("pass threshold out of scale → violation", async () => {
     const bad = VALID_TASK.replace(
       "weighted average > 4.0 to pass",

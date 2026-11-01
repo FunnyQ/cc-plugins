@@ -283,11 +283,9 @@ describe("parseRubric", () => {
     expect(rubric.passThreshold).toBe(4.0);
     expect(rubric.passOp).toBe(">");
     expect(rubric.scaleMax).toBe(5);
-    expect(rubric.hardFail).toEqual({
-      dimension: "Correctness",
-      op: "<",
-      value: 4,
-    });
+    expect(rubric.hardFails).toEqual([
+      { dimension: "Correctness", op: "<", value: 4 },
+    ]);
     expect(rubric.dimensions).toEqual([
       { name: "Correctness", weight: 3 },
       { name: "Test coverage", weight: 2 },
@@ -304,17 +302,94 @@ describe("parseRubric", () => {
     expect(b?.passOp).toBe(">=");
   });
 
-  test("veto dimension name is read verbatim from the threshold line", () => {
+  test("a veto takes the table row's spelling, matched case-insensitively", () => {
     const src = REAL_RUBRIC.replace(
       "Correctness < 4 is an automatic veto",
       "correctness < 4 veto",
     );
     const rubric = parseRubric(src);
-    expect(rubric?.hardFail).toEqual({
-      dimension: "correctness",
-      op: "<",
-      value: 4,
-    });
+    expect(rubric?.hardFails).toEqual([
+      { dimension: "Correctness", op: "<", value: 4 },
+    ]);
+  });
+
+  test("every veto on the threshold line is read, in order", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "Correctness < 4 and Assumptions & docs ≤ 3 are automatic vetoes",
+    );
+    const rubric = parseRubric(src);
+    expect(rubric?.hardFails).toEqual([
+      { dimension: "Correctness", op: "<", value: 4 },
+      { dimension: "Assumptions & docs", op: "<=", value: 3 },
+    ]);
+  });
+
+  test("a multi-word dimension is a veto under its whole name, even across a quote line break", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto.",
+      "Interface &\n> readability < 4 is an automatic veto.",
+    );
+    expect(parseRubric(src)?.hardFails).toEqual([
+      { dimension: "Interface & readability", op: "<", value: 4 },
+    ]);
+  });
+
+  test("the longest row name the text ends with wins, at a word boundary", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "Test coverage < 3 and Incorrectness < 2 are vetoes",
+    ).replace(
+      "| Correctness | ×3 |",
+      "| Coverage | ×1 | a | b | c |\n| Correctness | ×3 |",
+    );
+    const rubric = parseRubric(src);
+    expect(rubric?.hardFails).toEqual([
+      { dimension: "Test coverage", op: "<", value: 3 },
+    ]);
+    expect(rubric?.unknownVetoes).toEqual(["Incorrectness < 2"]);
+  });
+
+  test("markdown emphasis around a veto name does not hide it", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "`Correctness` < 4 and **Securty** < 3 are automatic vetoes",
+    );
+    const rubric = parseRubric(src);
+    expect(rubric?.hardFails).toEqual([
+      { dimension: "Correctness", op: "<", value: 4 },
+    ]);
+    expect(rubric?.unknownVetoes).toEqual(["Securty < 3"]);
+  });
+
+  test("a veto with no word before it still reaches lint", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "(score) < 4 is an automatic veto",
+    );
+    expect(parseRubric(src)?.unknownVetoes).toEqual(["(score) < 4"]);
+  });
+
+  test("a row name with doubled spaces matches its veto", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "Test  coverage < 4 is an automatic veto",
+    ).replace("| Test coverage |", "| Test  coverage |");
+    expect(parseRubric(src)?.hardFails).toEqual([
+      { dimension: "Test  coverage", op: "<", value: 4 },
+    ]);
+  });
+
+  test("a veto naming no row is kept for lint, not scored", () => {
+    const src = REAL_RUBRIC.replace(
+      "Correctness < 4 is an automatic veto",
+      "Correctness < 4 and Securty ≤ 3 are automatic vetoes",
+    );
+    const rubric = parseRubric(src);
+    expect(rubric?.hardFails).toEqual([
+      { dimension: "Correctness", op: "<", value: 4 },
+    ]);
+    expect(rubric?.unknownVetoes).toEqual(["Securty ≤ 3"]);
   });
 
   test("hard fail is optional", () => {
@@ -324,7 +399,8 @@ describe("parseRubric", () => {
     );
     const rubric = parseRubric(src);
     expect(rubric).not.toBeNull();
-    expect(rubric?.hardFail).toBeNull();
+    expect(rubric?.hardFails).toEqual([]);
+    expect(rubric?.unknownVetoes).toEqual([]);
   });
 
   test("returns null when there is no Eval rubric section", () => {

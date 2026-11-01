@@ -391,6 +391,12 @@ export async function lintFile(
       `pass threshold ${task.rubric.passThreshold} is out of the 0–${task.rubric.scaleMax} scale`,
     );
   }
+  for (const veto of task.rubric?.unknownVetoes ?? []) {
+    push(
+      "rubric",
+      `veto \`${veto}\` names no row of the rubric table, so it can never fire — name a dimension as its table row spells it`,
+    );
+  }
 
   return violations;
 }
