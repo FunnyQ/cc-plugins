@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.8.6] - 2026-11-01
+
+_tracks tag `dispatch-v5.8.6`_
+
+### Changed
+- The Codex autopilot guide now correctly says relay is available, so final review's external lens can run Claude through relay as the cross-vendor option, with an optional visible live pane, up to 3 collect rounds, and a clear `CLAUDE UNREACHABLE` result on failure.
+
 ## [dispatch 5.8.5] - 2026-11-01
 
 _tracks tag `dispatch-v5.8.5`_
