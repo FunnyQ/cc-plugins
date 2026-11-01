@@ -79,7 +79,7 @@ whole deliverable end to end:
 
 ## Eval rubric
 
-> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration < 4 is an automatic veto. This gate scores the whole deliverable, not individual tasks.
+> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. This gate scores the whole deliverable, not individual tasks.
 
 | Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|

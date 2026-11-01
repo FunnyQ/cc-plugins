@@ -51,7 +51,7 @@ This is the holistic gate — per-task rubrics already scored each piece; this c
 
 ## Eval rubric
 
-> Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration < 4 is an automatic veto. These axes are holistic (not a re-score of individual tasks).
+> Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. These axes are holistic (not a re-score of individual tasks).
 
 | Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|

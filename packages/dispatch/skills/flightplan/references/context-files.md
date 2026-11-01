@@ -113,7 +113,7 @@ Contents:
 
 - **Scoring scale** — what 0–1 / 2–3 / 4–5 mean in general (the bands every task reuses).
 - **Generic dimensions** — what `Correctness` / `Test coverage` / `Interface & readability` / `Assumptions & docs` look at. Per-task tables then only need the task-specific anchors.
-- **Scoring & pass line** — the weighted-average formula, the default pass threshold (`> 4.0`), and the hard-fail convention (`Correctness < 4 is an automatic veto`).
+- **Scoring & pass line** — the weighted-average formula, the default pass threshold (`> 4.0`), and the hard-fail convention (`Correctness < 4 is an automatic veto`; add more `<dimension> < N` on the line for more vetoes).
 
 Per-task rubrics still carry their own threshold line and weighted table. This keeps them self-contained for the linter. This file just saves them from redefining the scale. See `task-template.md` → "`Eval rubric`" for the parseable contract.
 

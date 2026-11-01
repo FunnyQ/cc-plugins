@@ -62,7 +62,7 @@ Check the seams, not individual task internals (those passed their own rubrics):
 
 ## Eval rubric
 
-> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. This rubric scores **integration**, not individual tasks.
+> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration / composes < 4 is an automatic veto. This rubric scores **integration**, not individual tasks.
 
 | Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|

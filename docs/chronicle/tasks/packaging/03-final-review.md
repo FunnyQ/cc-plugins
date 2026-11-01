@@ -63,7 +63,7 @@ This task transitively depends on every other task in the plan (the dependency c
 
 ## Eval rubric
 
-> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto. This gate scores integration-level axes, not a re-score of individual tasks.
+> Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Integration / does it compose < 4 is an automatic veto. This gate scores integration-level axes, not a re-score of individual tasks.
 
 | Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|

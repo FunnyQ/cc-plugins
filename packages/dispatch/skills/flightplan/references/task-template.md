@@ -160,7 +160,7 @@ Every task must carry an `## Eval rubric`. Acceptance criteria is the **binary g
 `lint-task.ts` enforces a parseable shape. `score-task.ts` consumes that shape. The contract is **operator-anchored**, so it works in any language:
 
 - **Threshold line**: a `>`-quoted line that carries the pass operator and a number. `> 4.0`, `≥ 4`, and `>= 4` all parse. State the scale (`0–5`) on the same line. This lets the linter range-check the threshold.
-- **Hard-fail veto** (optional): write `<dimension> < N`, using `<` or `≤`, anywhere on the threshold line. For example: `Correctness < 4 is an automatic veto`. The named dimension must match a row in the table.
+- **Hard-fail veto** (optional): write `<dimension> < N`, using `<` or `≤`, anywhere on the threshold line. For example: `Correctness < 4 is an automatic veto`. Each `<dimension> < N` on the line is its own veto, so `Correctness < 4 and Security < 4 are automatic vetoes` declares two. Write each dimension's whole name as its table row spells it, case aside, or `lint-task.ts` rejects the task. When a veto fires, the run log names the dimension.
 - **Dimension table**: the header must include a `Weight` column. Each row's weight is written `×N`. Rows without a positive weight, or the `|---|` separator row, are ignored.
 
 Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–scaleMax scale. A task passes when the average meets the threshold **and** no veto fires. Customize the anchors for each task. Keep the threshold line and the weighted table shape.

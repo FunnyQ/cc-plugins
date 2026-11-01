@@ -80,7 +80,7 @@ Exercise the full loop against a throwaway `docs/demo/` roadmap — do not rely 
 
 ## Eval rubric
 
-> Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration < 4 is an automatic veto. This is the holistic gate — it scores whole-deliverable axes, not a re-score of individual tasks.
+> Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. This is the holistic gate — it scores whole-deliverable axes, not a re-score of individual tasks.
 
 | Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
 |---|---|---|---|---|
