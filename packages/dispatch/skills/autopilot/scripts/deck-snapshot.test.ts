@@ -272,7 +272,7 @@ describe("buildDeckSnapshot", () => {
       title: "Task a/01",
       state: "done",
       attempts: 2,
-      score: { weighted: 4.4, threshold: 4, passed: true },
+      score: { weighted: 4.4, threshold: 4, passed: true, vetoed: null },
       time: null,
       tokens: null,
     });
@@ -285,6 +285,25 @@ describe("buildDeckSnapshot", () => {
       time: null,
       tokens: null,
     });
+  });
+
+  test("a hard fail maps to the vetoing dimensions, and an unnamed old one to []", () => {
+    const base = {
+      weighted: 4.6,
+      threshold: 4,
+      passOp: ">" as const,
+      passed: false,
+      hardFailed: true,
+      breakdown: [],
+    };
+    const deck = snapshot([
+      view("a/01", "blocked", [], {
+        latestScore: { ...base, vetoedBy: ["Security"] },
+      }),
+      view("a/02", "blocked", [], { latestScore: base }),
+    ]);
+    expect(deck.tasks["a/01"].score?.vetoed).toEqual(["Security"]);
+    expect(deck.tasks["a/02"].score?.vetoed).toEqual([]);
   });
 
   test("agents keep in-flight rows only, oldest first, unstarted last, absent fields null", () => {

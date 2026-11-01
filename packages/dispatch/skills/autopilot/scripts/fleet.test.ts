@@ -242,6 +242,22 @@ describe("deriveTaskViews", () => {
     expect(older.latestScore).not.toHaveProperty("rationale");
   });
 
+  test("carries the vetoing dimensions onto latestScore, and omits them when absent", () => {
+    const vetoed = {
+      ...score("ui/03", 1, "2026-01-01T00:03:00Z"),
+      passed: false,
+      hardFailed: true,
+      vetoedBy: ["Security"],
+    };
+    const [view] = deriveTaskViews({ "ui/03": task("ui/03") }, [vetoed]);
+    expect(view.latestScore?.vetoedBy).toEqual(["Security"]);
+
+    const [older] = deriveTaskViews({ "ui/03": task("ui/03") }, [
+      score("ui/03", 1, "2026-01-01T00:03:00Z"),
+    ]);
+    expect(older.latestScore).not.toHaveProperty("vetoedBy");
+  });
+
   test("keeps a task in progress until every parallel lens has ended", () => {
     const lenses = ["leanness", "reuse", "codex", "efficiency"];
     const entries = [

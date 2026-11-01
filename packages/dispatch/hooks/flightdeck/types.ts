@@ -6,7 +6,12 @@ export type DeckTask = {
   title: string;
   state: DeckState;
   attempts: number;
-  score: { weighted: number; threshold: number; passed: boolean } | null;
+  score: {
+    weighted: number;
+    threshold: number;
+    passed: boolean;
+    vetoed: string[] | null; // null: no veto fired; []: a veto from a log too old to name it
+  } | null;
   time: { startedAt: string; endedAt: string | null } | null; // first agent start to last finish; endedAt null while one runs
   tokens: DeckTokens | null; // done tasks only, and only from a --usage run
 };

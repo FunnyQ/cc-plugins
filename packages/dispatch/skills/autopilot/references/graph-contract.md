@@ -110,6 +110,8 @@ export type ScoreEntry = {
   weighted: number;
   passed: boolean;
   hardFailed: boolean;
+  /** Dimensions whose veto fired, in rubric order. Absent when none fired, and on entries written before the field existed. */
+  vetoedBy?: string[];
   /** Dimensions the rubric declared but the scores omitted. */
   missing: string[];
   threshold: number;

@@ -487,6 +487,28 @@ describe("gate outcome colouring", () => {
 
     expect(html).toContain("-failed");
     expect(html).not.toContain("-rejected");
+    expect(html).toContain('<span class="failure">hard fail</span>');
+  });
+
+  test("names the dimensions that vetoed in the hard-fail label", () => {
+    const html = rowHtml({
+      key: "judge:ui/01#1",
+      role: "judge",
+      ref: "ui/01",
+      status: "finished",
+      outcome: "failed",
+      score: {
+        weighted: 4.6,
+        passed: false,
+        hardFailed: true,
+        vetoedBy: ["Correctness", "Security"],
+        breakdown: [],
+      },
+    });
+
+    expect(html).toContain(
+      '<span class="failure">hard fail: Correctness, Security</span>',
+    );
   });
 });
 

@@ -86,6 +86,7 @@ export function buildDeckSnapshot(input: {
         weighted: score.weighted,
         threshold: score.threshold,
         passed: score.passed,
+        vetoed: score.hardFailed ? (score.vetoedBy ?? []) : null,
       },
       time: timeOf(rowsByRef.get(view.ref) ?? []),
       tokens:

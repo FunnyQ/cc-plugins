@@ -56,6 +56,7 @@ export type TaskView = {
     passOp: ">" | ">=";
     passed: boolean;
     hardFailed: boolean;
+    vetoedBy?: string[];
     breakdown: { name: string; weight: number; score: number }[];
     rationale?: string;
   } | null;
@@ -245,6 +246,9 @@ export function deriveTaskViews(
             passOp: latestScore.passOp,
             passed: latestScore.passed,
             hardFailed: latestScore.hardFailed,
+            ...(latestScore.vetoedBy
+              ? { vetoedBy: latestScore.vetoedBy }
+              : {}),
             breakdown: latestScore.breakdown,
             ...(latestScore.rationale
               ? { rationale: latestScore.rationale }

@@ -179,7 +179,7 @@ describe("waveCards", () => {
       tasks: tasksOf([
         {
           ...task("a", "done"),
-          score: { weighted: 4.56, threshold: 4, passed: true },
+          score: { weighted: 4.56, threshold: 4, passed: true, vetoed: null },
         },
         task("b", "in-progress", 2),
       ]),
@@ -192,6 +192,66 @@ describe("waveCards", () => {
     ]);
     expect(g.cards[0].color).toBe(COLOR.done);
     expect(g.cards[1].color).toBe(COLOR["in-progress"]);
+  });
+
+  test("a vetoed card names its first veto, counts the rest, and marks an unnamed one", () => {
+    const vetoed = (ref: string, names: string[]): DeckTask => ({
+      ...task(ref, "blocked", 2),
+      score: { weighted: 4.6, threshold: 4, passed: false, vetoed: names },
+    });
+    const s = snap({
+      waves: [["a", "b", "c"]],
+      tasks: tasksOf([
+        vetoed("a", ["Security"]),
+        vetoed("b", ["Correctness", "Security"]),
+        vetoed("c", []),
+      ]),
+    });
+    const subs = waveCards(s, 80, 0, "fresh").groups[0].cards.map((c) => c.sub);
+    expect(subs).toEqual([
+      "✗Security a2     ",
+      "✗Correctness+1 a2",
+      "✗veto a2         ",
+    ]);
+  });
+
+  test("a veto name too long for the card clips itself, never the count or attempts", () => {
+    const s = snap({
+      waves: [["a"]],
+      tasks: tasksOf([
+        {
+          ...task("a", "blocked", 3),
+          score: {
+            weighted: 4.6,
+            threshold: 4,
+            passed: false,
+            vetoed: ["Interface-readability", "Security"],
+          },
+        },
+      ]),
+    });
+    expect(waveCards(s, 80, 0, "fresh").groups[0].cards[0].sub).toBe(
+      "✗Interface-…+1 a3",
+    );
+  });
+
+  test("a vetoed card never outgrows a pane narrower than its tail", () => {
+    const s = snap({
+      waves: [["a"]],
+      tasks: tasksOf([
+        {
+          ...task("a", "blocked", 2),
+          score: {
+            weighted: 4.6,
+            threshold: 4,
+            passed: false,
+            vetoed: ["Correctness", "Security"],
+          },
+        },
+      ]),
+    });
+    const { inner, groups } = waveCards(s, 10, 0, "fresh");
+    expect(groups[0].cards[0].sub.length).toBe(inner);
   });
 
   test("every card in a snapshot shares one inner width, 4 columns past its longest ref", () => {
@@ -218,7 +278,7 @@ describe("waveCards", () => {
         {
           ...task("x/01", "done"),
           title: "Final review",
-          score: { weighted: 4.56, threshold: 4, passed: true },
+          score: { weighted: 4.56, threshold: 4, passed: true, vetoed: null },
         },
       ]),
     });

@@ -210,12 +210,14 @@ export function waveCards(
   );
 
   const model = (t: DeckTask): CardModel => {
-    const meta = [
-      t.score ? t.score.weighted.toFixed(1) : "",
-      t.attempts > 1 ? `a${t.attempts}` : "",
-    ]
+    const attempts = t.attempts > 1 ? `a${t.attempts}` : "";
+    const meta = [t.score ? t.score.weighted.toFixed(1) : "", attempts]
       .filter(Boolean)
       .join(" ");
+    const vetoed = t.score?.vetoed;
+    const vetoTail = vetoed
+      ? `${vetoed.length > 1 ? `+${vetoed.length - 1}` : ""}${attempts ? ` ${attempts}` : ""}`
+      : "";
     const { color, dim } = styled(t.state, "");
     const time = timeOf(t, now);
     return {
@@ -229,9 +231,13 @@ export function waveCards(
         t.tokens === null
           ? null
           : `${formatTokens(t.tokens[mode])} tok`.padStart(inner),
-      sub: meta
-        ? spread(t.title, meta, inner)
-        : fit(t.title, inner).padEnd(inner),
+      sub: vetoed
+        ? `${fit(`✗${vetoed[0] ?? "veto"}`, inner - vetoTail.length)}${vetoTail}`
+            .padEnd(inner)
+            .slice(0, inner)
+        : meta
+          ? spread(t.title, meta, inner)
+          : fit(t.title, inner).padEnd(inner),
       agents: s.agents
         .filter((a) => a.ref === t.ref)
         .map((a) =>

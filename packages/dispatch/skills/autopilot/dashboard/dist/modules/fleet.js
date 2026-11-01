@@ -42,8 +42,11 @@ export function rememberRationales(payload) {
 function renderScore(score) {
   if (!score) return "";
 
+  const vetoedBy = score.vetoedBy?.length
+    ? `: ${score.vetoedBy.map(escapeHtml).join(", ")}`
+    : "";
   const failure = score.hardFailed
-    ? '<span class="failure">hard fail</span>'
+    ? `<span class="failure">hard fail${vetoedBy}</span>`
     : "";
   return `
     <span class="c-fleet-score ${scoreClass(score)}">
