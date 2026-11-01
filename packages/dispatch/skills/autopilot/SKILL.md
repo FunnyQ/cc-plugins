@@ -35,6 +35,8 @@ Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent 
 
 > **OpenCode only**: there is no Workflow tool. Skip the rest of this section and follow `~/.config/opencode/skills/autopilot/references/opencode.md` instead — a hand-driven wave loop over the task tool. The path is absolute because OpenCode prints no skill base-directory banner.
 
+> **Codex only**: skip the Workflow runtime instructions and follow [references/codex.md](references/codex.md) instead. Use its native parallel subagent wave loop, shared script gates, and task worktrees.
+
 Use the **hybrid shape**. Scout inline first to discover the work-list. Then hand the fan-out to a Workflow script.
 
 Three hard constraints shape the design:
