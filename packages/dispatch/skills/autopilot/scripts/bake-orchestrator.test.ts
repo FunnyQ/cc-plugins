@@ -36,8 +36,8 @@ describe("bakeOrchestrator", () => {
     expect(script).toMatch(/^\s*repoRoot:\s*"\/r",\s*\/\/ ABSOLUTE/m);
     expect(script).toMatch(/^\s*devEngine:\s*"codex",/m);
     expect(script).toMatch(/^\s*maxAttempts:\s*5,/m);
-    expect(script).toContain(
-      `planGoal:              "Ship it — costs $5, says \\"done\\"",`,
+    expect(script).toMatch(
+      /^\s*planGoal:\s*"Ship it — costs \$5, says \\"done\\"",/m,
     );
     expect(script.startsWith("export const meta")).toBe(true);
   });
@@ -113,8 +113,11 @@ test("CLI writes the script beside a self-ignore, so no inter-wave commit sweeps
     const out = join(root, "docs", "my-plan", ".flightlog", "orchestrator.js");
     expect(code).toBe(0);
     expect(stdout.trim()).toBe(out);
-    expect(await readFile(out, "utf-8")).toContain(
-      `repoRoot:              ${JSON.stringify(root)},`,
+    expect(await readFile(out, "utf-8")).toMatch(
+      new RegExp(
+        `^\\s*repoRoot:\\s*${RegExp.escape(JSON.stringify(root))},`,
+        "m",
+      ),
     );
     expect(
       await readFile(

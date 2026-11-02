@@ -40,7 +40,6 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 // Inline real signatures rather than referring to a file
 export function foo(bar: Bar): Baz;
 ```
-````
 
 ## Acceptance criteria
 
@@ -72,7 +71,6 @@ Write Verification commands relative to the repo root. Autopilot runs them from 
 
 - <Tempting thing> — Deferred. Reason: <one-line summary the executor needs to know>.
 - <Tempting thing> — Deferred to a follow-up task in the same bucket.
-
 ````
 
 ## Header rules
@@ -114,14 +112,14 @@ Every plan ends with **one terminal task that reviews the whole deliverable**. M
 
 **Put it at `review/01`, in its own bucket.** Do not append it to a feature bucket as that bucket's next number. `ui/05` reads as the fifth UI task and hides the fact that it is the gate every other task feeds; `review/01` says what it is at a glance, in the task index, in `Depends on` lines, and in autopilot's run log. The `review` bucket is reserved for this one task — nothing else belongs in it. A single-task plan is exempt and needs no `review` bucket at all.
 
-This is the holistic gate. Per-task rubrics catch per-task quality. The final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score *those* axes, for example **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, and **No regressions**. It does not re-score individual tasks.
+This is the holistic gate. Per-task rubrics catch per-task quality. The final review catches integration, consistency, regressions, and whether the plan's overall goal was actually met. Its `## Eval rubric` should score _those_ axes, for example **Integration / does it compose**, **Meets the PLAN goal**, **Consistency**, and **No regressions**. It does not re-score individual tasks.
 
 **Check what the leg changed with `git diff`, never `git status`.** Autopilot commits between waves, so by the time the Final review runs, every earlier task's edits are committed and `git status` no longer lists them. Write `git diff --name-only <baseRef> -- <paths>` instead. Autopilot substitutes `<baseRef>` with the commit the run started from, and the diff covers committed and uncommitted edits alike. `lint-task.ts` rejects any `git status` in a Final review gate as the `final-review-git-status` rule.
 
 - ❌ `` `git status --short -- DESIGN.md docs/deploy.md` shows both as changed. ``
 - ✅ `` `git diff --name-only <baseRef> -- DESIGN.md docs/deploy.md` lists both paths. ``
 
-Consider one more axis at a low weight: **Leanness** — did the tree ship abstractions with one caller, config nobody sets, or hand-rolled versions of what the stdlib and the platform already provide? Per-task rubrics may miss the accumulated effect, because each task looks proportionate on its own and only the whole diff shows the pile-up. Score the *judgement*, never a line count: a plan that legitimately adds a lot of code should still score well here. Autopilot's closing round runs a `leanness` review lens against exactly this question, so the axis gives the judge a reason to care whether the fixer acted on what that lens found.
+Consider one more axis at a low weight: **Leanness** — did the tree ship abstractions with one caller, config nobody sets, or hand-rolled versions of what the stdlib and the platform already provide? Per-task rubrics may miss the accumulated effect, because each task looks proportionate on its own and only the whole diff shows the pile-up. Score the _judgement_, never a line count: a plan that legitimately adds a lot of code should still score well here. Autopilot's closing round runs a `leanness` review lens against exactly this question, so the axis gives the judge a reason to care whether the fixer acted on what that lens found.
 
 A plan with a single task is exempt. That task is its own terminal. Don't mark more than one task. Keep one unambiguous closing gate.
 
@@ -137,7 +135,7 @@ Treat the Models header as optional. Pick it by where the task would fail, not b
 
 ```markdown
 > **Models**: dev=opus/high, judge=opus/high
-````
+```
 
 Write comma-separated entries as `role=model` or `role=model/effort`. Use lowercase tokens. Allow whitespace around `=`, `/`, and each entry. Allow a trailing comma. Keep explanations outside the example line: a trailing note becomes part of the last entry and fails parsing.
 

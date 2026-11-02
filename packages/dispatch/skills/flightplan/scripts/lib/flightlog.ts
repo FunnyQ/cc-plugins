@@ -139,12 +139,12 @@ export function renderRunlog(
 function renderLine(e: FlightlogEntry): string {
   const agent = e.agentLabel ? ` _(agent: ${e.agentLabel})_` : "";
   if (e.kind === "state") {
-    const message = e.message ? `: ${e.message}` : "";
+    const message = e.message ? `: ${singleSpaced(e.message)}` : "";
     return `- state — ${e.state}${message}${agent}`;
   }
   const attempt = e.attempt ? `attempt ${e.attempt} · ` : "";
   if (e.kind === "note") {
-    return `- ${attempt}${e.role} — ${e.message}${agent}`;
+    return `- ${attempt}${e.role} — ${singleSpaced(e.message)}${agent}`;
   }
   const verdict = e.passed ? "PASS ✅" : "FAIL ❌";
   const vetoNames = e.vetoedBy?.length ? `: ${e.vetoedBy.join(", ")}` : "";
@@ -157,6 +157,12 @@ function renderLine(e: FlightlogEntry): string {
   // and would bury the verdict lines; nesting the block inside the list item
   // would need every line re-indented, which rewrites the judge's own markdown.
   return `${line}\n\n<details><summary>judge rationale</summary>\n\n${rationale}\n\n</details>\n`;
+}
+
+// bun fmt collapses runs of spaces in a list item, so a committed RUNLOG.md only
+// re-renders byte for byte if the renderer does too.
+function singleSpaced(text: string): string {
+  return text.replace(/ {2,}/g, " ");
 }
 
 export async function appendEntry(

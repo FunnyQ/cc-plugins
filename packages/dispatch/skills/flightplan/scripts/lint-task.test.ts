@@ -120,7 +120,7 @@ describe("lintFile Models", () => {
       "utf8",
     );
     const templateBlock = template.match(
-      /^## Template\n\n```markdown\n([\s\S]*?)\n```\n\n## Header rules/m,
+      /^## Template\n\n````markdown\n([\s\S]*?)\n````\n\n## Header rules/m,
     );
     expect(templateBlock).not.toBeNull();
     expect(templateBlock![1].match(/^> \*\*Models\*\*:.*$/m)).toBeNull();
