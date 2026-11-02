@@ -49,8 +49,8 @@ already runs two close analogues of what permission relay needs:
 - **`inbox.ts`** — `/api/inbox` (channel long-poll) + `/api/send-message` (UI POST):
   the channel pulls UI text. This is the shape of the **channel-side verdict pull**.
 
-Permission relay is largely *assembling these existing patterns in the reverse
-direction* (session→UI for the request, UI→session for the verdict) plus one new
+Permission relay is largely _assembling these existing patterns in the reverse
+direction_ (session→UI for the request, UI→session for the verdict) plus one new
 capability declaration and one new notification handler on the channel.
 
 **Two protocol details are undocumented** (confirmed against the Channels
@@ -152,13 +152,13 @@ IF one exists; the UI also TTL-dismisses as a guaranteed fallback.
 
 ## Task index
 
-| Bucket | NN | Title | Status | Depends on |
-|---|---|---|---|---|
-| backend | 01 | permission-broker | done | — |
-| backend | 02 | wire-routes | done | backend/01 |
-| channel | 01 | permission-relay | done | backend/01 |
-| ui | 01 | permission-modal | done | backend/01 |
-| ui | 02 | attention | done | ui/01 |
+| Bucket  | NN  | Title             | Status | Depends on |
+| ------- | --- | ----------------- | ------ | ---------- |
+| backend | 01  | permission-broker | done   | —          |
+| backend | 02  | wire-routes       | done   | backend/01 |
+| channel | 01  | permission-relay  | done   | backend/01 |
+| ui      | 01  | permission-modal  | done   | backend/01 |
+| ui      | 02  | attention         | done   | ui/01      |
 
 ## Cross-bucket dependencies
 
@@ -194,6 +194,7 @@ serialized, so a TUI/hook-resolved request's pull hung forever and blocked every
 subsequent request from reaching the daemon (new modals stopped showing); and (2)
 the **ghost modal** lingered to the 90s TTL because no cancel signal exists. Fixed
 with three coordinated mechanisms (TTL kept at 90s as the final backstop):
+
 - **Channel abort** — a new `permission_request` aborts the previous in-flight
   pull (Claude serializes prompts, so a new one proves the prior resolved);
   `pullVerdict` gained an overall budget + an `{abandoned:true}` daemon response.

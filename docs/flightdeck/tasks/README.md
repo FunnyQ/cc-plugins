@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,23 +48,23 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | flightlog phase events | todo | > 4 | — |
-| contract | 02 | fleet and task state derivation | todo | > 4 | contract/01 |
-| server | 01 | static file serving | todo | > 4 | — |
-| server | 02 | the server process | todo | > 4 | server/01, ui/01 |
-| server | 03 | the launcher | todo | > 4 | server/02 |
-| server | 04 | the tree endpoint | todo | > 4 | server/03, contract/02 |
-| server | 05 | the fleet event stream | todo | > 4 | server/04 |
-| ui | 01 | Hangar design system and page shell | todo | > 4 | — |
-| ui | 02 | task lanes | todo | > 4 | ui/01, server/04 |
-| ui | 03 | agent fleet and score meters | todo | > 4 | ui/01, server/05 |
-| ui | 04 | SVG dependency graph | todo | > 4 | ui/02, ui/03 |
-| wiring | 01 | orchestrator start events | todo | > 4 | contract/01 |
-| wiring | 02 | skill auto-start and the retired invariant | todo | > 4 | server/03 |
-| wiring | 03 | fixture flight verification | todo | > 4 | wiring/01, wiring/02, ui/03, ui/04 |
-| wiring | 04 | final review | todo | > 4 | wiring/03, contract/02, server/05, ui/04 |
+| Bucket   | NN  | Title                                      | Status | Pass line | Depends on                               |
+| -------- | --- | ------------------------------------------ | ------ | --------- | ---------------------------------------- |
+| contract | 01  | flightlog phase events                     | todo   | > 4       | —                                        |
+| contract | 02  | fleet and task state derivation            | todo   | > 4       | contract/01                              |
+| server   | 01  | static file serving                        | todo   | > 4       | —                                        |
+| server   | 02  | the server process                         | todo   | > 4       | server/01, ui/01                         |
+| server   | 03  | the launcher                               | todo   | > 4       | server/02                                |
+| server   | 04  | the tree endpoint                          | todo   | > 4       | server/03, contract/02                   |
+| server   | 05  | the fleet event stream                     | todo   | > 4       | server/04                                |
+| ui       | 01  | Hangar design system and page shell        | todo   | > 4       | —                                        |
+| ui       | 02  | task lanes                                 | todo   | > 4       | ui/01, server/04                         |
+| ui       | 03  | agent fleet and score meters               | todo   | > 4       | ui/01, server/05                         |
+| ui       | 04  | SVG dependency graph                       | todo   | > 4       | ui/02, ui/03                             |
+| wiring   | 01  | orchestrator start events                  | todo   | > 4       | contract/01                              |
+| wiring   | 02  | skill auto-start and the retired invariant | todo   | > 4       | server/03                                |
+| wiring   | 03  | fixture flight verification                | todo   | > 4       | wiring/01, wiring/02, ui/03, ui/04       |
+| wiring   | 04  | final review                               | todo   | > 4       | wiring/03, contract/02, server/05, ui/04 |
 
 ## Dependency graph
 
@@ -91,16 +92,17 @@ ui/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| ui/02 | server/04 |
-| ui/03 | server/05 |
-| server/04 | contract/02 |
-| server/02 | ui/01 |
-| wiring/01 | contract/01 |
-| wiring/03 | ui/03, ui/04 |
+| Task      | Depends on                    |
+| --------- | ----------------------------- |
+| ui/02     | server/04                     |
+| ui/03     | server/05                     |
+| server/04 | contract/02                   |
+| server/02 | ui/01                         |
+| wiring/01 | contract/01                   |
+| wiring/03 | ui/03, ui/04                  |
 | wiring/04 | contract/02, server/05, ui/04 |
-| wiring/02 | server/03 |
+| wiring/02 | server/03                     |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

@@ -1,6 +1,7 @@
 # REVIEW-01: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -194,13 +195,13 @@ one outcome this gate must never produce.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Meets the goal < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration | ×3 | the documented path does not reach a rendering dashboard | it reaches one, but a step needed knowledge the documentation never gave | a stranger following the documentation literally gets a rendering dashboard |
-| Meets the goal | ×3 | a declared graph plus a trail does not render | it renders, but a panel or a count is wrong or absent | every panel renders correctly from a declared graph and a hand-written trail |
-| No regressions | ×2 | the existing suite fails, or an assertion was deleted | the suite passes but an assertion was loosened to fit the new path | the suite passes and every pre-existing assertion is intact or stronger |
-| Consistency | ×2 | the three descriptions of the format contradict each other | they agree on the required fields but drift on defaults or error behaviour | all three agree field by field, rule by rule |
-| Leanness | ×1 | abstractions with one caller, options nobody sets | one or two speculative seams left in | every abstraction has a named current requirement that fails without it |
+| Dimension      | Weight | 0–1 (fail)                                                 | 2–3 (below bar)                                                            | 4–5 (pass)                                                                   |
+| -------------- | ------ | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Integration    | ×3     | the documented path does not reach a rendering dashboard   | it reaches one, but a step needed knowledge the documentation never gave   | a stranger following the documentation literally gets a rendering dashboard  |
+| Meets the goal | ×3     | a declared graph plus a trail does not render              | it renders, but a panel or a count is wrong or absent                      | every panel renders correctly from a declared graph and a hand-written trail |
+| No regressions | ×2     | the existing suite fails, or an assertion was deleted      | the suite passes but an assertion was loosened to fit the new path         | the suite passes and every pre-existing assertion is intact or stronger      |
+| Consistency    | ×2     | the three descriptions of the format contradict each other | they agree on the required fields but drift on defaults or error behaviour | all three agree field by field, rule by rule                                 |
+| Leanness       | ×1     | abstractions with one caller, options nobody sets          | one or two speculative seams left in                                       | every abstraction has a named current requirement that fails without it      |
 
 ## Out of scope
 

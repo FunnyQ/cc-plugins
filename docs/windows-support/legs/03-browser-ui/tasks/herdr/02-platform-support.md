@@ -1,6 +1,7 @@
 # HERDR-02: Support Windows ask and browser CLI boundaries.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -86,12 +87,12 @@ Use a controlled data/local HTML page with title "Pane check", a button #increme
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Ask paths remain non-portable or browser changes target unrelated panes. | Common paths work but overrides, target selection or failed-open cleanup drift. | Platform roots, exact overrides, result-file collection, CLI executable selection and owned cleanup preserve their contracts. |
-| Test coverage | ×2 | Windows branches are untested or broad skips hide failures. | Happy paths pass but path containment, CLI errors or cleanup ownership lack regressions. | Injected-platform and CLI tests cover roots, path queries, missing dependencies, explicit overrides and failed-open ownership. |
-| Interface & readability | ×1 | A registry rewrite or new transport framework obscures the platform fixes. | Helpers work but duplicate executable selection or mix matching with persisted data changes. | Small plugin-local changes preserve public entrypoints, CLI transport and stored registry data. |
-| Assumptions & docs | ×1 | Mocked calls are claimed as real Windows/WSL pane proof or diagnostics invent an installer. | Platform limits are mentioned without distinguishing actual and owed evidence. | Diagnostics match verified prerequisites and execution notes distinguish automated coverage from owed real pane operations. |
+| Dimension               | Weight | 0–1 (fail)                                                                                  | 2–3 (below bar)                                                                              | 4–5 (pass)                                                                                                                     |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Ask paths remain non-portable or browser changes target unrelated panes.                    | Common paths work but overrides, target selection or failed-open cleanup drift.              | Platform roots, exact overrides, result-file collection, CLI executable selection and owned cleanup preserve their contracts.  |
+| Test coverage           | ×2     | Windows branches are untested or broad skips hide failures.                                 | Happy paths pass but path containment, CLI errors or cleanup ownership lack regressions.     | Injected-platform and CLI tests cover roots, path queries, missing dependencies, explicit overrides and failed-open ownership. |
+| Interface & readability | ×1     | A registry rewrite or new transport framework obscures the platform fixes.                  | Helpers work but duplicate executable selection or mix matching with persisted data changes. | Small plugin-local changes preserve public entrypoints, CLI transport and stored registry data.                                |
+| Assumptions & docs      | ×1     | Mocked calls are claimed as real Windows/WSL pane proof or diagnostics invent an installer. | Platform limits are mentioned without distinguishing actual and owed evidence.               | Diagnostics match verified prerequisites and execution notes distinguish automated coverage from owed real pane operations.    |
 
 ## Out of scope
 

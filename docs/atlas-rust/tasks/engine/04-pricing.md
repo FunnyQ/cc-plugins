@@ -1,6 +1,7 @@
 # ENGINE-04: Pricing load, resolution, and override refresh
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -114,12 +115,12 @@ Port every pricing case from `packages/monitor/skills/usage-dashboard/scripts/ap
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | `source pricing` golden fails, or resolution order / override precedence is wrong | golden passes but an edge drifts: `:free` shadowing, alias order, missing `cacheRead` handling, or refresh drops existing override entries | golden passes; alias, normalized-fallback, cost-branch, and refresh-merge behavior all match TS |
-| Test coverage | ×2 | no cargo tests | only happy-path lookup and cost | every `api.test.ts` pricing case ported, plus refresh merge, corrupt override, and live-fetch failure cases |
-| Interface & readability | ×1 | engine-api signatures changed without updating `engine-api.md`, or `unwrap` on fetched/parsed data | signatures kept but helpers duplicated or types loose (`Value` where a struct fits) | signatures as frozen, structs mirror TS types, one resolver shared by `price_for`, meta, and refresh |
-| Assumptions & docs | ×1 | silent differences from TS | differences present but uncommented | one-line comments on JSON error-text drift, JS error-name mapping, and any cache-sharing corner-cut with its ceiling |
+| Dimension               | Weight | 0–1 (fail)                                                                                         | 2–3 (below bar)                                                                                                                            | 4–5 (pass)                                                                                                           |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | `source pricing` golden fails, or resolution order / override precedence is wrong                  | golden passes but an edge drifts: `:free` shadowing, alias order, missing `cacheRead` handling, or refresh drops existing override entries | golden passes; alias, normalized-fallback, cost-branch, and refresh-merge behavior all match TS                      |
+| Test coverage           | ×2     | no cargo tests                                                                                     | only happy-path lookup and cost                                                                                                            | every `api.test.ts` pricing case ported, plus refresh merge, corrupt override, and live-fetch failure cases          |
+| Interface & readability | ×1     | engine-api signatures changed without updating `engine-api.md`, or `unwrap` on fetched/parsed data | signatures kept but helpers duplicated or types loose (`Value` where a struct fits)                                                        | signatures as frozen, structs mirror TS types, one resolver shared by `price_for`, meta, and refresh                 |
+| Assumptions & docs      | ×1     | silent differences from TS                                                                         | differences present but uncommented                                                                                                        | one-line comments on JSON error-text drift, JS error-name mapping, and any cache-sharing corner-cut with its ceiling |
 
 ## Out of scope
 

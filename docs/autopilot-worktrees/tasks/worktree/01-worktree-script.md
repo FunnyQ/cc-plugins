@@ -1,6 +1,7 @@
 # WORKTREE-01: worktree.ts — create, land, rebase, sweep
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/rubric.md`
@@ -37,6 +38,7 @@ A standalone `worktree.ts` CLI creates a per-task git worktree from a snapshot o
 ### Repeat calls
 
 Follow "Repeat calls are safe" in `../_context/worktree.md`. An agent can finish a call and then lose its structured result, so the orchestrator may run the same call twice.
+
 - `land`, `unland`, and `rebase` take a required `--op <id>`. The orchestrator builds it from the attempt and step, for example `a2-land`.
 - Each of them first looks up `ops[<id>]` for the ref. On a hit, print the recorded result and exit 0, touching nothing. This check runs **before** the leak check. Without it, a repeated `land` would see its own first write as a leak.
 - A new id always acts, even when every other argument matches a recorded call. Comparing inputs is not enough: after a conflict the worktree changes while `--expect` stays the same, and an input-keyed cache would replay the old conflict forever.
@@ -48,6 +50,7 @@ Follow "Repeat calls are safe" in `../_context/worktree.md`. An agent can finish
 ### Snapshot (shared by create, land, rebase, fingerprint)
 
 Follow the numbered steps in "Snapshot technique" of `../_context/worktree.md`.
+
 - Copy `worktreeTree` from `comment-sweep.ts:51-64`: seed a throwaway index from the real one in a `mkdtempSync` scratch dir, then run `git add -A` under `GIT_INDEX_FILE`.
 - Then run `git rm -r --cached -q --ignore-unmatch -- docs/<slug>` under the same env, and `git write-tree`.
 - `commit-tree <tree> -p HEAD` produces the snapshot commit.
@@ -97,6 +100,7 @@ export type LandResult = {
 ### rebase
 
 Follow "Rebase" in `../_context/worktree.md`.
+
 - Run the same merge-tree. Take the first stdout line as the tree, even on exit 1, because it carries the conflict markers.
 - Move the worktree's detached HEAD to the new `ours` commit with `git -C <wt> reset --soft <ours>`, then check the tree out with `git -C <wt> read-tree -u --reset <tree>`. A worktree's HEAD keeps its commit reachable, so `git gc` cannot drop the new base while the worktree exists. (`create` gets the same protection, because `worktree add --detach` sets HEAD to the snapshot.)
 - Set `base` to the new `ours` commit.
@@ -155,12 +159,12 @@ Follow "Rebase" in `../_context/worktree.md`.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | land writes the real index, a conflict mutates main, or a subcommand's JSON keys differ from the contract | happy paths work but drift, leak, the `docs/<slug>/` exclusion, `unland`, or a repeat call is wrong | every subcommand matches the contract table; a repeat call with identical inputs changes nothing; main and the real index are touched only by a clean land or unland; sweep never leaves the slug root |
-| Test coverage | ×2 | no real-git tests | clean land and create only | every acceptance criterion has a real-git test, exit codes included |
-| Interface & readability | ×1 | git calls scattered with ad-hoc error handling, I/O mixed into logic | one helper, but functions return inconsistent shapes | one copied `git()` helper, one exported function per subcommand, thin `main`, `type` over `interface` |
-| Assumptions & docs | ×1 | the copied snapshot code carries no source note | assumptions implicit | a one-line note cites `comment-sweep.ts` as the copy source; the `cp -c` fallback and the merge-tree exit-1 tree read are each explained in one line |
+| Dimension               | Weight | 0–1 (fail)                                                                                                | 2–3 (below bar)                                                                                     | 4–5 (pass)                                                                                                                                                                                             |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | land writes the real index, a conflict mutates main, or a subcommand's JSON keys differ from the contract | happy paths work but drift, leak, the `docs/<slug>/` exclusion, `unland`, or a repeat call is wrong | every subcommand matches the contract table; a repeat call with identical inputs changes nothing; main and the real index are touched only by a clean land or unland; sweep never leaves the slug root |
+| Test coverage           | ×2     | no real-git tests                                                                                         | clean land and create only                                                                          | every acceptance criterion has a real-git test, exit codes included                                                                                                                                    |
+| Interface & readability | ×1     | git calls scattered with ad-hoc error handling, I/O mixed into logic                                      | one helper, but functions return inconsistent shapes                                                | one copied `git()` helper, one exported function per subcommand, thin `main`, `type` over `interface`                                                                                                  |
+| Assumptions & docs      | ×1     | the copied snapshot code carries no source note                                                           | assumptions implicit                                                                                | a one-line note cites `comment-sweep.ts` as the copy source; the `cp -c` fallback and the merge-tree exit-1 tree read are each explained in one line                                                   |
 
 ## Out of scope
 

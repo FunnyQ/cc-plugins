@@ -52,7 +52,7 @@ visual language stays off limits either way.
 - Take **no external npm dependencies at runtime**. `devDependencies` may carry
   types-only packages.
 - Prefer a longer function over an indirection used once.
-- Comment *why*, never *what*. One line. When an approach broke, that belongs in
+- Comment _why_, never _what_. One line. When an approach broke, that belongs in
   the commit body, not the source.
 - Match the surrounding file. These scripts are comment-heavy by convention: a
   short prose comment above anything non-obvious explaining the reason it is
@@ -105,6 +105,7 @@ Authoritative source for the repo-wide rules (for verification only):
   ```
 
   Real directories, not mocks.
+
 - Assert with `toEqual` on whole returned objects where practical, rather than
   field-by-field, so a new field cannot slip through unasserted.
 - Comment non-obvious fixtures with one line saying what makes them non-obvious.

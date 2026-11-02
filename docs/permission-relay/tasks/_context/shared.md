@@ -45,9 +45,13 @@ function cockpitHome(): string {
 }
 function daemonToken(): string | null {
   try {
-    const raw = JSON.parse(readFileSync(join(cockpitHome(), "daemon.json"), "utf8"));
+    const raw = JSON.parse(
+      readFileSync(join(cockpitHome(), "daemon.json"), "utf8"),
+    );
     return typeof raw?.token === "string" ? raw.token : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 ```
 
@@ -95,7 +99,7 @@ warm under `idleTimeout`. Reuse this shape for the permission stream.
   `ListToolsRequestSchema` handler returning `{ tools: [] }`. Permission relay adds
   to this (see `channel/01`).
 - It SENDS notifications via `mcp.notification({ method, params })` (see
-  `channelNotification()`); it currently registers no notification *handlers*.
+  `channelNotification()`); it currently registers no notification _handlers_.
 - Reconnect/backoff helpers exist: `nextReconnectDelayMs(failureCount)`,
   `ensureCockpitDaemon()`, `readDaemonCoords()`.
 

@@ -1,6 +1,7 @@
 # SERVER-03: Transcript stream and history
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -82,12 +83,12 @@ An entry is displayed when `type` ∈ `{user, assistant, system, tool, tool_use,
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong provider files streamed, confinement bypassable, or entries malformed | Claude works; Codex/OpenCode mapping, history cursor, or filter drifts | All three providers, the filter, cursor math, and confinement match TS |
-| Test coverage | ×2 | Contract group not run on Rust | Group passes; cursor and OpenCode mapping untested in Rust | Group passes on both; `cargo test` covers `read_lines_ending_at` edges (mid-file start, no newline, multibyte), OpenCode part mapping, bounded reads |
-| Interface & readability | ×1 | Tailer or path helpers duplicated | Reused but OpenCode logic tangled with file tailing | Tail source and OpenCode poller are separate, both reuse the shared helpers |
-| Assumptions & docs | ×1 | Magic numbers without source | Constants present, JS coercions unexplained | Constants named; `Number()` coercion and ordering choices commented |
+| Dimension               | Weight | 0–1 (fail)                                                                  | 2–3 (below bar)                                                        | 4–5 (pass)                                                                                                                                           |
+| ----------------------- | ------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong provider files streamed, confinement bypassable, or entries malformed | Claude works; Codex/OpenCode mapping, history cursor, or filter drifts | All three providers, the filter, cursor math, and confinement match TS                                                                               |
+| Test coverage           | ×2     | Contract group not run on Rust                                              | Group passes; cursor and OpenCode mapping untested in Rust             | Group passes on both; `cargo test` covers `read_lines_ending_at` edges (mid-file start, no newline, multibyte), OpenCode part mapping, bounded reads |
+| Interface & readability | ×1     | Tailer or path helpers duplicated                                           | Reused but OpenCode logic tangled with file tailing                    | Tail source and OpenCode poller are separate, both reuse the shared helpers                                                                          |
+| Assumptions & docs      | ×1     | Magic numbers without source                                                | Constants present, JS coercions unexplained                            | Constants named; `Number()` coercion and ordering choices commented                                                                                  |
 
 ## Out of scope
 

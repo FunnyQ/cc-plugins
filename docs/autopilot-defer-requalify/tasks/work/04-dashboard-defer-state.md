@@ -1,6 +1,7 @@
 # WORK-04: Requalify rows in the fleet dashboard
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -148,12 +149,12 @@ Reuse the existing seams — neither `gateOutcome` nor the render path is export
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The regex gained the role but the cast did not, so the file fails to typecheck; or the outcome guard stayed narrow and requalify rows go unjudged | All four sites edited, but the progress map was appended rather than inserted, so the second gate check ranks after scoring | All four sites edited coherently: role admitted, label parsed, ranked between the first check and scoring, and its verdict read |
-| Test coverage | ×2 | No test for the new label or the new outcome path | The happy path is asserted, so a narrow outcome guard would still pass | Label, both verdicts, the leading-verdict-versus-prose case, and two gate rows at one attempt all covered |
-| Interface & readability | ×1 | A parallel role list or a second regex introduced beside the existing ones | Edits land in the right places but the renumbering is skipped, leaving a gap or a tie | Every edit extends the existing closed set in its own idiom; the map stays contiguous |
-| Assumptions & docs | ×1 | The renumbering reads as unexplained churn | A comment restates the new ordinal | A comment says why the second gate check sits between the first and scoring |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                        | 2–3 (below bar)                                                                                                             | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The regex gained the role but the cast did not, so the file fails to typecheck; or the outcome guard stayed narrow and requalify rows go unjudged | All four sites edited, but the progress map was appended rather than inserted, so the second gate check ranks after scoring | All four sites edited coherently: role admitted, label parsed, ranked between the first check and scoring, and its verdict read |
+| Test coverage           | ×2     | No test for the new label or the new outcome path                                                                                                 | The happy path is asserted, so a narrow outcome guard would still pass                                                      | Label, both verdicts, the leading-verdict-versus-prose case, and two gate rows at one attempt all covered                       |
+| Interface & readability | ×1     | A parallel role list or a second regex introduced beside the existing ones                                                                        | Edits land in the right places but the renumbering is skipped, leaving a gap or a tie                                       | Every edit extends the existing closed set in its own idiom; the map stays contiguous                                           |
+| Assumptions & docs      | ×1     | The renumbering reads as unexplained churn                                                                                                        | A comment restates the new ordinal                                                                                          | A comment says why the second gate check sits between the first and scoring                                                     |
 
 ## Out of scope
 

@@ -55,14 +55,14 @@ type DecisionRecord = {
   type: "decision";
   kind: DecisionKind;
   source: "agent" | "scribe";
-  decision: string;     // headline / title
-  reason: string;       // body (markdown)
+  decision: string; // headline / title
+  reason: string; // body (markdown)
   tradeoff: string;
-  facets: string[];     // "LABEL: text" rows
+  facets: string[]; // "LABEL: text" rows
   needs_your_call: boolean;
   options: string[];
   files: string[];
-  timestamp: string;    // ISO-8601
+  timestamp: string; // ISO-8601
 };
 ```
 

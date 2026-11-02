@@ -41,10 +41,22 @@ touch `band.tsx`, `config.ts`, `types/index.d.ts`, `state.ts`, `protocol.ts`, `h
 ```ts
 export const PANE = "runes-explain";
 export async function explainPress($: EngineInterface): Promise<void>;
-export async function explainAsk($: EngineInterface, text: string): Promise<void>;
-export async function explainPick($: EngineInterface, topic: string): Promise<void>;
-export async function explainSelect($: EngineInterface, id: string): Promise<void>;
-export async function explainReopen($: EngineInterface, id: string): Promise<void>;
+export async function explainAsk(
+  $: EngineInterface,
+  text: string,
+): Promise<void>;
+export async function explainPick(
+  $: EngineInterface,
+  topic: string,
+): Promise<void>;
+export async function explainSelect(
+  $: EngineInterface,
+  id: string,
+): Promise<void>;
+export async function explainReopen(
+  $: EngineInterface,
+  id: string,
+): Promise<void>;
 export function explainHooks(on: On): void; // checker(on), nothing else
 ```
 
@@ -53,6 +65,7 @@ method or an exported arrow fails `claude plugin validate` (`protocol.md` → "P
 three that fork share one same-file helper (an arrow is fine there).
 
 ```ts
+
 ```
 
 Every handler gets the `$` of the Button `onPress` / Input `onSubmit` that calls it. `$` never leaves the call.

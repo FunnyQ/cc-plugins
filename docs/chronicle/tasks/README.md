@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,17 +48,17 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| commit | 01 | Port analyze-changes script | todo | > 4.2 | — |
-| commit | 02 | Commit message template | todo | > 4.2 | — |
-| commit | 03 | Commit skill (unified decision tree) | todo | > 4.2 | commit/01, commit/02 |
-| packaging | 01 | Manifests and marketplace registries | todo | > 4.2 | commit/03, pr/03 |
-| packaging | 02 | Changelog and repo docs | todo | > 4.2 | packaging/01 |
-| packaging | 03 | Final review | todo | > 4.2 | commit/01, commit/02, commit/03, pr/01, pr/02, pr/03, packaging/01, packaging/02 |
-| pr | 01 | analyze-branch script | todo | > 4.2 | — |
-| pr | 02 | request-creator script | todo | > 4.2 | — |
-| pr | 03 | PR skill (history + cockpit → reviewer-legible PR/MR) | todo | > 4.2 | pr/01, pr/02 |
+| Bucket    | NN  | Title                                                 | Status | Pass line | Depends on                                                                       |
+| --------- | --- | ----------------------------------------------------- | ------ | --------- | -------------------------------------------------------------------------------- |
+| commit    | 01  | Port analyze-changes script                           | todo   | > 4.2     | —                                                                                |
+| commit    | 02  | Commit message template                               | todo   | > 4.2     | —                                                                                |
+| commit    | 03  | Commit skill (unified decision tree)                  | todo   | > 4.2     | commit/01, commit/02                                                             |
+| packaging | 01  | Manifests and marketplace registries                  | todo   | > 4.2     | commit/03, pr/03                                                                 |
+| packaging | 02  | Changelog and repo docs                               | todo   | > 4.2     | packaging/01                                                                     |
+| packaging | 03  | Final review                                          | todo   | > 4.2     | commit/01, commit/02, commit/03, pr/01, pr/02, pr/03, packaging/01, packaging/02 |
+| pr        | 01  | analyze-branch script                                 | todo   | > 4.2     | —                                                                                |
+| pr        | 02  | request-creator script                                | todo   | > 4.2     | —                                                                                |
+| pr        | 03  | PR skill (history + cockpit → reviewer-legible PR/MR) | todo   | > 4.2     | pr/01, pr/02                                                                     |
 
 ## Dependency graph
 
@@ -79,10 +80,11 @@ pr/02
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| packaging/01 | commit/03, pr/03 |
+| Task         | Depends on                                           |
+| ------------ | ---------------------------------------------------- |
+| packaging/01 | commit/03, pr/03                                     |
 | packaging/03 | commit/01, commit/02, commit/03, pr/01, pr/02, pr/03 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

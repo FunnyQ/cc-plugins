@@ -1,6 +1,7 @@
 # WORKTREE-04: Drift re-verify and its flightdeck and resume-point support
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/models.md`
@@ -28,6 +29,7 @@ When a task lands onto a main tree that moved after its snapshot, the orchestrat
 ### Starting state
 
 The orchestrator already runs the clean path in per-task worktrees:
+
 - Every `wt-*` call runs under the one main-tree lock, and the `live` map tracks each worktree the run created and has not removed.
 - dev, verify, and judge run in the worktree.
 - `wt-land --expect` runs under the lock. A conflict runs `wt-rebase` and counts as a failed attempt.
@@ -35,6 +37,7 @@ The orchestrator already runs the clean path in per-task worktrees:
 - A parked task keeps its worktree.
 
 Two land results still have interim behaviour:
+
 - `drift: true` on a clean land is treated exactly like a clean land. **This task replaces that.**
 - `status: "leak"` fails only the task that saw it, as a per-task infrastructure failure. **Leave that alone.** A later change turns it into a run-wide abort.
 
@@ -70,6 +73,7 @@ This applies when `wt-land` returns `status: "clean"` with `drift: true`. The ma
 ### Resume point: `reverify` supersedes the judge
 
 `resumePoint(entries, task)` in `resume-point.ts` decides `from` latest-evidence-first. Today a passing `verdict` in the last attempt returns `from: "verify"`. A drift re-verify runs after the judge in the same attempt. When it fails, the passing score is stale, and the right restart is a new dev attempt.
+
 - Add `"reverify"` as its own concept. Keep it out of `GATE_ROLES`, so the existing gate logic is unchanged.
 - In `decide()`, check first: if the last attempt has a completed `reverify` step whose message matches `/^FAIL\b/`, return `{ from: "dev", gateRejected: true, reason: … }`. The reason names the drift re-verify on that attempt and quotes its message.
 - A completed `reverify` whose message starts `PASS` changes nothing; the existing verdict logic applies.
@@ -80,6 +84,7 @@ This applies when `wt-land` returns `status: "clean"` with `drift: true`. The ma
 ### flightdeck: `reverify` is a gate role
 
 In `fleet.ts`:
+
 - Add `"reverify"` to `KNOWN_ROLES`.
 - Extend `REF_ATTEMPT` to `/^(verify|requalify|reverify|judge|fix):(.+)#(\d+)$/`, and the cast on its match.
 - Add `reverify: 6` to `ROLE_PROGRESS`. It runs after `judge` (5) and before the attempt ends.
@@ -89,10 +94,11 @@ In `fleet.ts`:
 ### Tests (`orchestrator-script.test.ts`)
 
 Extend the label-routed stub with a `reverify:` route and a per-ref scenario queue. Its default returns a passing gate. Add these cases:
+
 1. **Drift pass.** `wt-land` returns clean with `drift: true`, and `reverify` passes. The label order holds `wt-land:<ref>` → `reverify:<ref>#1` → `done:<ref>` → `wt-remove:<ref>`. The task completes, and the `reverify` prompt carries no `WORKTREE` line.
 2. **Drift fail.** The same, but `reverify` fails on attempt 1. The label order holds `reverify:<ref>#1` → `wt-unland:<ref>` → `wt-rebase:<ref>` → `dev:<ref>#2`. Attempt 2's dev prompt contains `REVERIFY FAIL`. `done:<ref>` never runs for attempt 1.
 3. **Drift null twice.** `reverify` returns `null` on both tries. The stub records two `reverify:<ref>#1` calls, the second on the structuredRetry model, then `wt-unland:<ref>` → `block:<ref>`. No `wt-rebase:<ref>`, `dev:<ref>#2`, `done:<ref>`, or `wt-remove:<ref>` runs. The result is an infrastructure failure, and its reason mentions the drift re-verify and the undone land. The run result's kept worktrees include the ref.
-3b. **Drift null then pass.** `reverify` returns `null` once and a passing gate on the retry. The stub records two `reverify:<ref>#1` calls, then `done:<ref>` → `wt-remove:<ref>`. No `wt-unland:<ref>` runs, and the task completes.
+   3b. **Drift null then pass.** `reverify` returns `null` once and a passing gate on the retry. The stub records two `reverify:<ref>#1` calls, then `done:<ref>` → `wt-remove:<ref>`. No `wt-unland:<ref>` runs, and the task completes.
 4. **Drift model.** A task with `modelsRaw: "verify=sonnet/high"` runs `reverify` with model `sonnet` and effort `high`. A task without the header runs opus / low.
 
 ### Tests (`resume-point.test.ts` and `fleet.test.ts`)
@@ -123,12 +129,12 @@ Extend the label-routed stub with a `reverify:` route and a per-ref scenario que
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A failed or silent re-verify leaves the merged main tree in place, or the re-verify runs in the worktree | Pass and fail work, but a `null` result is not retried once, the null path rebases or starts another attempt, or the lock is released before unland | Pass, fail, and null each behave exactly as specified, under the lock, with the verify role's model and effort |
-| Test coverage | ×2 | No new cases | Drift pass and fail are covered, but either null case or the model case is not | All five orchestrator cases, plus the resume-point and fleet cases |
-| Interface & readability | ×1 | The reverify prompt duplicates the verify prompt wholesale | Works, but the labels or roles drift from `worktree.md` | The reverify prompt reuses the verify prompt with the stated differences, and labels match exactly |
-| Assumptions & docs | ×1 | Design notes still describe drift as treated like clean | Notes updated but vague | Design notes state the drift rule, why it unlands, and the resume-point supersession |
+| Dimension               | Weight | 0–1 (fail)                                                                                               | 2–3 (below bar)                                                                                                                                     | 4–5 (pass)                                                                                                     |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A failed or silent re-verify leaves the merged main tree in place, or the re-verify runs in the worktree | Pass and fail work, but a `null` result is not retried once, the null path rebases or starts another attempt, or the lock is released before unland | Pass, fail, and null each behave exactly as specified, under the lock, with the verify role's model and effort |
+| Test coverage           | ×2     | No new cases                                                                                             | Drift pass and fail are covered, but either null case or the model case is not                                                                      | All five orchestrator cases, plus the resume-point and fleet cases                                             |
+| Interface & readability | ×1     | The reverify prompt duplicates the verify prompt wholesale                                               | Works, but the labels or roles drift from `worktree.md`                                                                                             | The reverify prompt reuses the verify prompt with the stated differences, and labels match exactly             |
+| Assumptions & docs      | ×1     | Design notes still describe drift as treated like clean                                                  | Notes updated but vague                                                                                                                             | Design notes state the drift rule, why it unlands, and the resume-point supersession                           |
 
 ## Out of scope
 

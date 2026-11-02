@@ -1,6 +1,7 @@
 # INTEGRATION-03: final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -27,7 +28,7 @@ Exercise the full loop against a throwaway `docs/demo/` roadmap — do not rely 
 1. Produce a minimal `docs/demo/WAYPOINTS.md` (two legs, leg 1 `[~]`, leg 2 `[ ]`, both with `→ legs/NN-slug/`
    pointers) **by following the `waypoints` SKILL.md process and its `references/waypoints-template.md`** — do
    not free-hand a format the skill wouldn't produce. Then confirm the produced file parses: `waypoints.ts
-   active demo` exits 0. Also paste the template's own example roadmap into a temp file and confirm it parses
+active demo` exits 0. Also paste the template's own example roadmap into a temp file and confirm it parses
    (guards against a template that the CLI can't read).
 2. `waypoints.ts active demo` → prints the active leg + (empty) prior digest, exits 0.
 3. **Drive `flightplan` waypoint mode for real** — follow the updated `flightplan/SKILL.md` "Waypoint mode"
@@ -82,12 +83,12 @@ Exercise the full loop against a throwaway `docs/demo/` roadmap — do not rely 
 
 > Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. This is the holistic gate — it scores whole-deliverable axes, not a re-score of individual tasks.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration / does it compose | ×3 | the end-to-end loop breaks | loop works but a seam is fragile (e.g. active output flightplan can't consume) | active → leg-scaffold → lint → advance composes cleanly end-to-end |
-| Meets the PLAN goal | ×2 | rolling-wave loop not achievable | achievable but awkward or missing a step | full plan-a-leg-at-a-time loop works as designed |
-| Consistency | ×1 | docs and CLI disagree | minor doc/code drift | SKILL.mds, references, and CLI all agree |
-| No regressions | ×1 | flightplan flow or tests broken | tests pass but a behavior shifted | non-waypoint flow intact, all suites green, marketplaces untouched |
+| Dimension                     | Weight | 0–1 (fail)                       | 2–3 (below bar)                                                                | 4–5 (pass)                                                         |
+| ----------------------------- | ------ | -------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Integration / does it compose | ×3     | the end-to-end loop breaks       | loop works but a seam is fragile (e.g. active output flightplan can't consume) | active → leg-scaffold → lint → advance composes cleanly end-to-end |
+| Meets the PLAN goal           | ×2     | rolling-wave loop not achievable | achievable but awkward or missing a step                                       | full plan-a-leg-at-a-time loop works as designed                   |
+| Consistency                   | ×1     | docs and CLI disagree            | minor doc/code drift                                                           | SKILL.mds, references, and CLI all agree                           |
+| No regressions                | ×1     | flightplan flow or tests broken  | tests pass but a behavior shifted                                              | non-waypoint flow intact, all suites green, marketplaces untouched |
 
 ## Out of scope
 

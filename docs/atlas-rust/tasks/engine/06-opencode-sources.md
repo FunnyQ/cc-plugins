@@ -1,6 +1,7 @@
 # ENGINE-06: OpenCode usage source
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -71,7 +72,7 @@ Field order in each struct follows the TS return object, so JSON key order match
 - Sessions: DB rows fill `sessions_by_id` as `{id, directory, time: {created: time_created, updated: time_updated}}`. **Only when the DB produced 0 session rows**, read each session file; a parsed session with an `id` is inserted.
 - Messages from the DB: parse `data` as JSON (skip on parse failure). Override `id` = row id, `sessionID` = `session_id`, `time.created` = `info.time.created ?? row.time_created`, `time.completed` = `info.time.completed ?? row.time_updated`; `fallbackTimestampMs` = `row.time_updated || row.time_created`; `toolCalls` = the per-message count from the `part` query, else 0.
 - **Only when the DB produced 0 message rows**, read each message file: `info = stored.info ?? stored`; `sessionId = info.sessionID ?? stored.sessionID ?? <parent dir name of the file> ?? <file path>`; `fallbackTimestampMs = 0`; `toolCalls = count of stored.parts entries with type == "tool"` (0 when `parts` is not an array).
-- Note the ordering in TS: DB messages are ingested inside the DB block, *before* the legacy session files are read. A DB message whose session is only in a legacy file therefore sees no session. Port that order exactly.
+- Note the ordering in TS: DB messages are ingested inside the DB block, _before_ the legacy session files are read. A DB message whose session is only in a legacy file therefore sees no session. Port that order exactly.
 
 ### Timestamps (`openCodeTimestampMs`)
 
@@ -128,12 +129,12 @@ Token counts are `i64`. `costUSD` is `f64`. `timestampMs` values from JSON may b
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | `source opencode` golden fails, or model keys / timestamps differ from TS | golden passes, but a merge rule (DB-vs-legacy gating, message ordering before legacy sessions, seconds-vs-ms detection) drifts from TS on an input the fixture lacks | golden passes and every rule under Implementation notes matches TS, including the skip conditions and the ledger post-pass |
-| Test coverage | ×2 | no cargo tests | token mapping only | unit tests for token mapping, timestamp detection, missing DB, DB-vs-legacy gating, zero-token skip, and user-message dedup |
-| Interface & readability | ×1 | signatures differ from `engine-api.md`, or `unwrap` on DB/JSON data | matches the API but mixes I/O into helpers that could be pure | matches `engine-api.md`; ingest logic is one private function like TS; no one-caller abstractions |
-| Assumptions & docs | ×1 | silent deviations from TS | deviations present but uncommented | every deliberate difference (e.g. helpers kept local until hoisted) has a one-line why comment |
+| Dimension               | Weight | 0–1 (fail)                                                                | 2–3 (below bar)                                                                                                                                                      | 4–5 (pass)                                                                                                                  |
+| ----------------------- | ------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | `source opencode` golden fails, or model keys / timestamps differ from TS | golden passes, but a merge rule (DB-vs-legacy gating, message ordering before legacy sessions, seconds-vs-ms detection) drifts from TS on an input the fixture lacks | golden passes and every rule under Implementation notes matches TS, including the skip conditions and the ledger post-pass  |
+| Test coverage           | ×2     | no cargo tests                                                            | token mapping only                                                                                                                                                   | unit tests for token mapping, timestamp detection, missing DB, DB-vs-legacy gating, zero-token skip, and user-message dedup |
+| Interface & readability | ×1     | signatures differ from `engine-api.md`, or `unwrap` on DB/JSON data       | matches the API but mixes I/O into helpers that could be pure                                                                                                        | matches `engine-api.md`; ingest logic is one private function like TS; no one-caller abstractions                           |
+| Assumptions & docs      | ×1     | silent deviations from TS                                                 | deviations present but uncommented                                                                                                                                   | every deliberate difference (e.g. helpers kept local until hoisted) has a one-line why comment                              |
 
 ## Out of scope
 

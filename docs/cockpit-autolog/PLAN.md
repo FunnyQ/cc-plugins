@@ -33,7 +33,7 @@ thing a human ever sets once is the log language.
 1. One skill `cockpit` whose `SKILL.md` is a **thin router** dispatching to
    `references/pilot.md` (interactive front) or `references/scribe.md` (auto-distill,
    invoked as `/cockpit scribe` by a context-inheriting fork). Keep `references/claude.md`
-   + `references/codex.md` for provider specifics.
+   - `references/codex.md` for provider specifics.
 2. One command `commands/thoughtful.md` injecting the standing auto-log instruction.
 3. One new `SessionStart` hook entry in `packages/monitor/.claude-plugin/plugin.json`
    echoing the thoughtful instruction so auto-logging is the default on Claude Code.
@@ -106,19 +106,19 @@ so its removal is fully covered server-side in the backend bucket).
 
 ## Task index
 
-| Task | Depends on | Summary |
-|---|---|---|
-| backend/01-config-module | none | `config.ts` + `config.test.ts` (XDG-aware global config) |
-| backend/02-config-cli | backend/01 | `cockpit config` subcommand in `cockpit.ts` |
-| backend/03-retire-start-strip-goals-kernel | backend/02 | remove start + goal machinery from `cockpit.ts`; rewrite tests |
-| backend/04-strip-goals-server | backend/03 | remove goal readers from `registry.ts` + `project-info.ts`; fix tests (rewrites start-based fixtures → needs the no-start path) |
-| frontend/01-remove-goal-ui | backend/03 | strip goal rendering from dashboard `dist/` (incl. hero subtitle binding) |
-| skills/01-skill-router-and-pilot | backend/02, backend/03, skills/02 | thin `SKILL.md` router + `references/pilot.md` |
-| skills/02-scribe-reference | backend/02 | `references/scribe.md`; delete `skills/cockpit-scribe/` |
-| skills/03-thoughtful-command | skills/01, skills/02 | `commands/thoughtful.md`; delete `skills/thoughtful/` |
-| skills/04-sessionstart-hook | skills/03 | 2nd `SessionStart` entry echoing the instruction |
-| docs/01-docs-claude-md-changelog | backend/03, backend/04, frontend/01, skills/01–04 | CLAUDE.md + CHANGELOG |
-| docs/02-final-review | backend/01–04, frontend/01, skills/01–04, docs/01 | **Final review** — holistic gate (transitive closure over all tasks) |
+| Task                                       | Depends on                                        | Summary                                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| backend/01-config-module                   | none                                              | `config.ts` + `config.test.ts` (XDG-aware global config)                                                                        |
+| backend/02-config-cli                      | backend/01                                        | `cockpit config` subcommand in `cockpit.ts`                                                                                     |
+| backend/03-retire-start-strip-goals-kernel | backend/02                                        | remove start + goal machinery from `cockpit.ts`; rewrite tests                                                                  |
+| backend/04-strip-goals-server              | backend/03                                        | remove goal readers from `registry.ts` + `project-info.ts`; fix tests (rewrites start-based fixtures → needs the no-start path) |
+| frontend/01-remove-goal-ui                 | backend/03                                        | strip goal rendering from dashboard `dist/` (incl. hero subtitle binding)                                                       |
+| skills/01-skill-router-and-pilot           | backend/02, backend/03, skills/02                 | thin `SKILL.md` router + `references/pilot.md`                                                                                  |
+| skills/02-scribe-reference                 | backend/02                                        | `references/scribe.md`; delete `skills/cockpit-scribe/`                                                                         |
+| skills/03-thoughtful-command               | skills/01, skills/02                              | `commands/thoughtful.md`; delete `skills/thoughtful/`                                                                           |
+| skills/04-sessionstart-hook                | skills/03                                         | 2nd `SessionStart` entry echoing the instruction                                                                                |
+| docs/01-docs-claude-md-changelog           | backend/03, backend/04, frontend/01, skills/01–04 | CLAUDE.md + CHANGELOG                                                                                                           |
+| docs/02-final-review                       | backend/01–04, frontend/01, skills/01–04, docs/01 | **Final review** — holistic gate (transitive closure over all tasks)                                                            |
 
 ## Cross-bucket dependencies
 

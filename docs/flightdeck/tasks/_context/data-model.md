@@ -12,14 +12,14 @@ entry live in it. These types are declared in
 ```ts
 export type ScoreEntry = {
   kind: "score";
-  ts: string;              // ISO timestamp
-  task: string;            // task ref, e.g. "ui/03"
-  attempt: number;         // 1-based
+  ts: string; // ISO timestamp
+  task: string; // task ref, e.g. "ui/03"
+  attempt: number; // 1-based
   agentLabel?: string;
-  weighted: number;        // weighted average on the rubric's scale
+  weighted: number; // weighted average on the rubric's scale
   passed: boolean;
   hardFailed: boolean;
-  missing: string[];       // dimensions the rubric declared but the scores omitted
+  missing: string[]; // dimensions the rubric declared but the scores omitted
   threshold: number;
   passOp: ">" | ">=";
   breakdown: { name: string; weight: number; score: number }[];
@@ -29,7 +29,7 @@ export type NoteEntry = {
   kind: "note";
   ts: string;
   task: string;
-  role: string;            // free-form: dev / verify / judge / final-review
+  role: string; // free-form: dev / verify / judge / final-review
   attempt?: number;
   agentLabel?: string;
   message: string;
@@ -74,18 +74,18 @@ stored `message` is the empty string.
 The orchestrator assigns every workflow agent a structured label. These are the exact forms it emits
 (source: `packages/dispatch/skills/autopilot/references/orchestrator.md`):
 
-| Label form | Example | Role | Ref | Attempt |
-|---|---|---|---|---|
-| `scout-wave-<n>` | `scout-wave-3` | `scout` | — | — |
-| `dev:<ref>#<n>` | `dev:ui/03#2` | `dev` | `ui/03` | 2 |
-| `dev-<engine>:<ref>#<n>` | `dev-codex:ui/03#2` | `dev` | `ui/03` | 2 |
-| `verify:<ref>#<n>` | `verify:ui/03#2` | `verify` | `ui/03` | 2 |
-| `judge:<ref>#<n>` | `judge:ui/03#2` | `judge` | `ui/03` | 2 |
-| `review:<lens>#<n>` | `review:reuse#1` | `review` | — | 1 |
-| `fix:<ref>#<n>` | `fix:ui/03#1` | `fix` | `ui/03` | 1 |
-| `done:<ref>` | `done:ui/03` | `done` | `ui/03` | — |
-| `block:<ref>` | `block:ui/03` | `block` | `ui/03` | — |
-| `commit-post-loop` | — | `commit` | — | — |
+| Label form               | Example             | Role     | Ref     | Attempt |
+| ------------------------ | ------------------- | -------- | ------- | ------- |
+| `scout-wave-<n>`         | `scout-wave-3`      | `scout`  | —       | —       |
+| `dev:<ref>#<n>`          | `dev:ui/03#2`       | `dev`    | `ui/03` | 2       |
+| `dev-<engine>:<ref>#<n>` | `dev-codex:ui/03#2` | `dev`    | `ui/03` | 2       |
+| `verify:<ref>#<n>`       | `verify:ui/03#2`    | `verify` | `ui/03` | 2       |
+| `judge:<ref>#<n>`        | `judge:ui/03#2`     | `judge`  | `ui/03` | 2       |
+| `review:<lens>#<n>`      | `review:reuse#1`    | `review` | —       | 1       |
+| `fix:<ref>#<n>`          | `fix:ui/03#1`       | `fix`    | `ui/03` | 1       |
+| `done:<ref>`             | `done:ui/03`        | `done`   | `ui/03` | —       |
+| `block:<ref>`            | `block:ui/03`       | `block`  | `ui/03` | —       |
+| `commit-post-loop`       | —                   | `commit` | —       | —       |
 
 Two labels are written as free text by the agent itself rather than generated, so parsing must be
 tolerant:
@@ -97,15 +97,23 @@ The parser signature:
 
 ```ts
 export type AgentRole =
-  | "scout" | "dev" | "verify" | "judge"
-  | "review" | "fix" | "done" | "block" | "commit" | "unknown";
+  | "scout"
+  | "dev"
+  | "verify"
+  | "judge"
+  | "review"
+  | "fix"
+  | "done"
+  | "block"
+  | "commit"
+  | "unknown";
 
 export type ParsedLabel = {
   role: AgentRole;
-  ref?: string;      // "ui/03" when the label carries one
+  ref?: string; // "ui/03" when the label carries one
   attempt?: number;
-  lens?: string;     // review lens key, e.g. "reuse", "codex"
-  wave?: number;     // scout only
+  lens?: string; // review lens key, e.g. "reuse", "codex"
+  wave?: number; // scout only
   raw: string;
 };
 
@@ -124,12 +132,12 @@ falls through to `unknown`.
 
 ```ts
 export type ParsedTask = {
-  bucket: string;                 // "ui"
-  nn: string;                     // "01"
+  bucket: string; // "ui"
+  nn: string; // "01"
   title: string;
   h1: string;
   requiredReading: string[];
-  dependsOn: TaskRef[];           // { bucket, nn }[]
+  dependsOn: TaskRef[]; // { bucket, nn }[]
   blocks: TaskRef[];
   status: "todo" | "in-progress" | "done" | "blocked" | null;
   finalReview: boolean;
@@ -177,25 +185,21 @@ them exists on disk. Derivation rules, in precedence order:
 
 ```ts
 export type TaskState =
-  | "done"
-  | "in-progress"
-  | "ready"
-  | "blocked"
-  | "invalid";
+  "done" | "in-progress" | "ready" | "blocked" | "invalid";
 
 export type TaskView = {
   ref: string;
   bucket: string;
   nn: string;
   title: string;
-  status: string | null;      // raw file status
-  state: TaskState;           // derived
-  invalidReason: string | null;  // why state is "invalid"; null otherwise
-  blockedBy: string[];        // unfinished dependency refs; empty unless state is "blocked"
+  status: string | null; // raw file status
+  state: TaskState; // derived
+  invalidReason: string | null; // why state is "invalid"; null otherwise
+  blockedBy: string[]; // unfinished dependency refs; empty unless state is "blocked"
   dependsOn: string[];
   blocks: string[];
   finalReview: boolean;
-  attempts: number;           // highest attempt seen for this ref in the flightlog, else 0
+  attempts: number; // highest attempt seen for this ref in the flightlog, else 0
   latestScore: {
     weighted: number;
     threshold: number;
@@ -223,18 +227,18 @@ One row per agent the flightlog has seen, newest first:
 export type FleetStatus = "in-flight" | "finished";
 
 export type FleetRow = {
-  key: string;               // stable unique row id — see "Row keys" below
+  key: string; // stable unique row id — see "Row keys" below
   label: string;
   role: AgentRole;
   ref?: string;
   attempt?: number;
   lens?: string;
   status: FleetStatus;
-  startedAt?: string;        // ISO, from the start entry
-  endedAt?: string;          // ISO, from the end entry
-  elapsedMs?: number;        // endedAt - startedAt; undefined while in flight
-  message?: string;          // the end entry's message
-  score?: ScoreEntry;        // attached when a score entry shares this ref + attempt
+  startedAt?: string; // ISO, from the start entry
+  endedAt?: string; // ISO, from the end entry
+  elapsedMs?: number; // endedAt - startedAt; undefined while in flight
+  message?: string; // the end entry's message
+  score?: ScoreEntry; // attached when a score entry shares this ref + attempt
 };
 
 export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[];
@@ -271,11 +275,18 @@ Both endpoints bind `127.0.0.1` only.
 ```jsonc
 {
   "slug": "waypoints-skill",
-  "planTitle": "Waypoints skill",       // see the derivation note below
+  "planTitle": "Waypoints skill", // see the derivation note below
   "buckets": ["integration", "scripts", "skill"],
-  "tasks": [ /* TaskView[] */ ],
-  "counts": { "total": 6, "done": 6, "inProgress": 0, "ready": 0, "blocked": 0, "invalid": 0 },
-  "errors": []                           // parse errors, surfaced not swallowed — shape below
+  "tasks": [/* TaskView[] */],
+  "counts": {
+    "total": 6,
+    "done": 6,
+    "inProgress": 0,
+    "ready": 0,
+    "blocked": 0,
+    "invalid": 0,
+  },
+  "errors": [], // parse errors, surfaced not swallowed — shape below
 }
 ```
 
@@ -298,6 +309,7 @@ parsed.
   ```
 
   `loadAllTasks` returns `{ file, reason }`; derive `bucket` from the file's parent directory name.
+
 - `counts` — one tally per derived state, plus `total`.
 
 ### `GET /api/events`

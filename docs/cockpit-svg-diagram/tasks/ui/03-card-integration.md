@@ -1,6 +1,7 @@
 # UI-03: Card integration, failure fallback and lightbox
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -50,7 +51,9 @@ async function mountDiagram(card, source) {
     figure.setAttribute("aria-label", "Enlarge diagram");
     const title =
       card.querySelector(".decision-card__decision")?.textContent || "";
-    figure.addEventListener("click", () => openDiagramLightbox(result.svg, title));
+    figure.addEventListener("click", () =>
+      openDiagramLightbox(result.svg, title),
+    );
     figure.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -89,7 +92,10 @@ Leave the Mermaid branch — its markup, its pre-JS `<pre>` fallback, its failur
 Give the SVG figure an empty body:
 
 ```html
-<figure class="decision-card__diagram decision-card__diagram--svg" data-pending></figure>
+<figure
+  class="decision-card__diagram decision-card__diagram--svg"
+  data-pending
+></figure>
 ```
 
 No `<pre>` in the initial markup. Several hundred lines of escaped XML sitting in the card until the render resolves is not a graceful fallback; it is a flash of a wall of text.
@@ -102,7 +108,7 @@ The choice of the root rather than the figure is load-bearing, not cosmetic. The
 
 After the renderer returns sanitized markup, the style-scoping pass must rewrite every rule in the SVG's `<style>` elements to be prefixed by that SVG root's own id selector **before** the markup is live in the document.
 
-The current line `figure.innerHTML = result.svg` attaches immediately. By the time the render promise resolves the card is already in the DOM, so assigning `innerHTML` and *then* scoping leaves a window — however brief — in which an author's `rect { fill: red }` is a live, document-wide rule repainting every other card.
+The current line `figure.innerHTML = result.svg` attaches immediately. By the time the render promise resolves the card is already in the DOM, so assigning `innerHTML` and _then_ scoping leaves a window — however brief — in which an author's `rect { fill: red }` is a live, document-wide rule repainting every other card.
 
 Build the markup in a detached element, run the scoping pass over it, and only then move it into the attached figure. Any other approach is acceptable only if it guarantees the same ordering. Encode the reason in a comment; a future reader who reorders these two lines for tidiness reintroduces the hole.
 
@@ -163,12 +169,12 @@ One behaviour to confirm rather than assume: to blow the diagram up, the overlay
 
 > Each dimension is scored 0–5. Weighted average must be >= 4.0 to pass. Hard-fail veto: Correctness < 4 is an automatic veto, and Sanitize & scoping boundary < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A stored Mermaid entry renders differently than before, or the format routing inspects the diagram text instead of the stored field | SVG renders but a detail drifts — the reflow call is dropped, the lightbox title is lost, or the `<details>` ships open | Both paths behave exactly as specified, Mermaid is untouched, and the SVG failure state is collapsed with its source inside |
-| Sanitize & scoping boundary | ×3 | Markup is attached before scoping, so a global rule is briefly live; or an author `<style>` rule matches outside its own SVG | Scoping runs before attachment but the id is unsound — reused across cards, or drawn from `Math.random()` — so collisions or non-reproducible markup are possible | Markup is scoped while detached, the id is set on the SVG root and unique on the page, and a hostile rule provably cannot reach a sibling card |
-| Test coverage | ×2 | No check that a hostile `<style>` is contained | Only the benign SVG is exercised; the hostile and the malformed cases are untested | The live check covers the clean, hostile, malformed, and oversized cases, and the existing suite still passes |
-| Interface & readability | ×1 | The two format paths are fused into one conditional-riddled function | Paths are separate but the ordering constraint is undocumented, inviting a future reorder | Branches are cleanly separated, and the scope-before-attach ordering carries a comment naming what it prevents |
+| Dimension                   | Weight | 0–1 (fail)                                                                                                                          | 2–3 (below bar)                                                                                                                                                   | 4–5 (pass)                                                                                                                                     |
+| --------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                 | ×3     | A stored Mermaid entry renders differently than before, or the format routing inspects the diagram text instead of the stored field | SVG renders but a detail drifts — the reflow call is dropped, the lightbox title is lost, or the `<details>` ships open                                           | Both paths behave exactly as specified, Mermaid is untouched, and the SVG failure state is collapsed with its source inside                    |
+| Sanitize & scoping boundary | ×3     | Markup is attached before scoping, so a global rule is briefly live; or an author `<style>` rule matches outside its own SVG        | Scoping runs before attachment but the id is unsound — reused across cards, or drawn from `Math.random()` — so collisions or non-reproducible markup are possible | Markup is scoped while detached, the id is set on the SVG root and unique on the page, and a hostile rule provably cannot reach a sibling card |
+| Test coverage               | ×2     | No check that a hostile `<style>` is contained                                                                                      | Only the benign SVG is exercised; the hostile and the malformed cases are untested                                                                                | The live check covers the clean, hostile, malformed, and oversized cases, and the existing suite still passes                                  |
+| Interface & readability     | ×1     | The two format paths are fused into one conditional-riddled function                                                                | Paths are separate but the ordering constraint is undocumented, inviting a future reorder                                                                         | Branches are cleanly separated, and the scope-before-attach ordering carries a comment naming what it prevents                                 |
 
 ## Out of scope
 

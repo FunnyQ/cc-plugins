@@ -1,6 +1,7 @@
 # CODEX-03: Barrowkeeper TOML mirror
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -128,25 +129,37 @@ the closing review compares.
 Success:
 
 ```json
-{"success":true,"newAdrPaths":[],"validated":true,"archived":true}
+{ "success": true, "newAdrPaths": [], "validated": true, "archived": true }
 ```
 
 Path collision, returned before any write:
 
 ```json
-{"success":false,"reason":"path-collision","collisions":[]}
+{ "success": false, "reason": "path-collision", "collisions": [] }
 ```
 
 Validation error, returned after the writes landed:
 
 ```json
-{"success":false,"reason":"validation-error","newAdrPaths":[],"violations":[],"archived":false}
+{
+  "success": false,
+  "reason": "validation-error",
+  "newAdrPaths": [],
+  "violations": [],
+  "archived": false
+}
 ```
 
 Metadata-update failure after the records landed:
 
 ```json
-{"success":true,"newAdrPaths":["docs/adr/...md"],"metadataUpdateFailed":true,"error":"metadata update failed for <path>: <details>","archived":false}
+{
+  "success": true,
+  "newAdrPaths": ["docs/adr/...md"],
+  "metadataUpdateFailed": true,
+  "error": "metadata update failed for <path>: <details>",
+  "archived": false
+}
 ```
 
 Two notes on the rename:
@@ -198,12 +211,12 @@ hand needs the full list.
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted
 > average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the frozen contract, or a literal still reads `newAdr` / `newAdrPath`. | The four literals match but a rule is softened, or the collision check is not stated as total. | All four literals match the frozen contract, and the write order refuses the whole batch before any write. |
-| Completeness | ×2 | A return literal or the input rename is missing. | The literals landed but a preserved refusal was dropped, or `metadataUpdate` drifted to an array. | Every input rule, every refusal, and all four literals are present. |
-| Readability | ×1 | The mirror was rewritten as headed sections or bullet lists. | Dense prose, but a sentence runs past 25 words or stacks em dashes. | Three dense prose paragraphs in the mirror's existing voice, each sentence under the STE-lite limit. |
-| Assumptions and docs | ×1 | A rule appears that the frozen contract does not define. | The collision pre-check is stated with no reason, so a later editor cannot tell it is load-bearing. | Every non-obvious rule names the failure it prevents, and nothing is invented. |
+| Dimension            | Weight | 0–1 (fail)                                                                                       | 2–3 (below bar)                                                                                     | 4–5 (pass)                                                                                                 |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name differs from the frozen contract, or a literal still reads `newAdr` / `newAdrPath`. | The four literals match but a rule is softened, or the collision check is not stated as total.      | All four literals match the frozen contract, and the write order refuses the whole batch before any write. |
+| Completeness         | ×2     | A return literal or the input rename is missing.                                                 | The literals landed but a preserved refusal was dropped, or `metadataUpdate` drifted to an array.   | Every input rule, every refusal, and all four literals are present.                                        |
+| Readability          | ×1     | The mirror was rewritten as headed sections or bullet lists.                                     | Dense prose, but a sentence runs past 25 words or stacks em dashes.                                 | Three dense prose paragraphs in the mirror's existing voice, each sentence under the STE-lite limit.       |
+| Assumptions and docs | ×1     | A rule appears that the frozen contract does not define.                                         | The collision pre-check is stated with no reason, so a later editor cannot tell it is load-bearing. | Every non-obvious rule names the failure it prevents, and nothing is invented.                             |
 
 ## Out of scope
 

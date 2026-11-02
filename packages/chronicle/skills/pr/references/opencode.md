@@ -25,4 +25,3 @@ skill directory = /Users/<you>/.config/opencode/skills/pr
 that path has to be stated rather than resolved. State it **tilde-free** — the
 Storykeeper quotes it, and `~` does not expand inside quotes. Expand `$HOME`
 yourself and pass the result.
-

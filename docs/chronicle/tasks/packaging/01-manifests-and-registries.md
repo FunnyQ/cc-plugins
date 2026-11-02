@@ -1,6 +1,7 @@
 # PACKAGING-01: Manifests and marketplace registries
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -31,7 +32,16 @@ Follow `packages/relay/`'s manifests exactly for shape (see `../_context/shared.
   "description": "Write and guard your project's history — craft commits (auto simple/atomic) and author reviewer-legible PRs/MRs enriched by the cockpit decision trail.",
   "author": { "name": "Q" },
   "license": "MIT",
-  "keywords": ["chronicle", "git", "commit", "pull-request", "merge-request", "github", "gitlab", "history"]
+  "keywords": [
+    "chronicle",
+    "git",
+    "commit",
+    "pull-request",
+    "merge-request",
+    "github",
+    "gitlab",
+    "history"
+  ]
 }
 ```
 
@@ -96,12 +106,12 @@ Do NOT add a `version` field to either registry entry — versions live only in 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | invalid JSON / wrong source shape / version added to registry | parses but a field or registry shape is off | both manifests + both registries correct, version only in plugin.json |
-| Test coverage | ×2 | nothing checked | one file parse-checked | all four files parse-checked + grep counts verified |
-| Interface & readability | ×1 | inconsistent across files | mostly aligned | name/desc identical across manifests, clean interface block |
-| Assumptions & docs | ×1 | unexplained divergence | partial | matches relay's pattern, brandColor distinct |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                             | 4–5 (pass)                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| Correctness             | ×4     | invalid JSON / wrong source shape / version added to registry | parses but a field or registry shape is off | both manifests + both registries correct, version only in plugin.json |
+| Test coverage           | ×2     | nothing checked                                               | one file parse-checked                      | all four files parse-checked + grep counts verified                   |
+| Interface & readability | ×1     | inconsistent across files                                     | mostly aligned                              | name/desc identical across manifests, clean interface block           |
+| Assumptions & docs      | ×1     | unexplained divergence                                        | partial                                     | matches relay's pattern, brandColor distinct                          |
 
 ## Out of scope
 

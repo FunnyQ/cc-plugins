@@ -1,6 +1,7 @@
 # DECK-03: Auto-detect the source and route both APIs to it
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -36,9 +37,7 @@ three call it.
 
 ```ts
 export type DeckSource =
-  | { kind: "tasks" }
-  | { kind: "graph" }
-  | { kind: "none" };
+  { kind: "tasks" } | { kind: "graph" } | { kind: "none" };
 
 /** Impure: looks for a `tasks/` directory, then a `graph.json` file. */
 export function detectSource(planDir: string): DeckSource;
@@ -134,14 +133,14 @@ and the launcher's identity check reads exactly those three fields.
 graph source needs, so this is wiring, not a rewrite. Produce its input from the
 loaded graph and the trail:
 
-| Field | Value for the graph source |
-|---|---|
-| `slug` | the plan directory's base name |
-| `planTitle` | the graph's declared title, falling back to the slug |
-| `repo` | derived from the graph's declared repo root |
-| `bucketDirs` | the graph's lanes, **in declared order** |
+| Field        | Value for the graph source                                                  |
+| ------------ | --------------------------------------------------------------------------- |
+| `slug`       | the plan directory's base name                                              |
+| `planTitle`  | the graph's declared title, falling back to the slug                        |
+| `repo`       | derived from the graph's declared repo root                                 |
+| `bucketDirs` | the graph's lanes, **in declared order**                                    |
 | the node map | the graph's nodes, after the trail's state declarations have been folded in |
-| `entries` | the parsed trail entries |
+| `entries`    | the parsed trail entries                                                    |
 
 Reuse the existing readers rather than re-implementing them: the trail is read
 by the same reader the task-tree path uses, and the nodes arrive already
@@ -232,13 +231,13 @@ the assertion proves nothing.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Detection misreads a shape, or a source serves a malformed payload | Both shapes serve, but precedence is wrong or declared lane order is sorted away | All four detection cases correct, precedence deliberate, lane order preserved end to end |
-| Backward compatibility | ×2 | An existing plan directory behaves differently, or a caller interface changed | Existing path works but a message or return shape shifted without every caller updated | An existing plan directory behaves identically; the launcher, the daemon record, and the restart path keep their current interfaces byte for byte |
-| Test coverage | ×2 | No new tests | Detection covered, but no server stands up against the new shape | Detection's four cases on real temp directories, both endpoints served for both shapes, and the rejection message asserted to name both |
-| Interface & readability | ×1 | The rule is re-implemented per caller | One exported detector, but callers still duplicate parts of the check | One detector, three callers, and the lane-order divergence carries its one-line reason at the site |
-| Assumptions & docs | ×1 | The precedence choice and the sort divergence are undocumented | One of the two is explained | Both the both-present precedence and the lane-order decision are recorded in one line each, where the next reader hits them |
+| Dimension               | Weight | 0–1 (fail)                                                                    | 2–3 (below bar)                                                                        | 4–5 (pass)                                                                                                                                        |
+| ----------------------- | ------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Detection misreads a shape, or a source serves a malformed payload            | Both shapes serve, but precedence is wrong or declared lane order is sorted away       | All four detection cases correct, precedence deliberate, lane order preserved end to end                                                          |
+| Backward compatibility  | ×2     | An existing plan directory behaves differently, or a caller interface changed | Existing path works but a message or return shape shifted without every caller updated | An existing plan directory behaves identically; the launcher, the daemon record, and the restart path keep their current interfaces byte for byte |
+| Test coverage           | ×2     | No new tests                                                                  | Detection covered, but no server stands up against the new shape                       | Detection's four cases on real temp directories, both endpoints served for both shapes, and the rejection message asserted to name both           |
+| Interface & readability | ×1     | The rule is re-implemented per caller                                         | One exported detector, but callers still duplicate parts of the check                  | One detector, three callers, and the lane-order divergence carries its one-line reason at the site                                                |
+| Assumptions & docs      | ×1     | The precedence choice and the sort divergence are undocumented                | One of the two is explained                                                            | Both the both-present precedence and the lane-order decision are recorded in one line each, where the next reader hits them                       |
 
 ## Out of scope
 

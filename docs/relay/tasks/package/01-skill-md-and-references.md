@@ -1,6 +1,7 @@
 # PACKAGE-01: SKILL.md and references
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -23,6 +24,7 @@ Write the skill that an agent actually triggers: orchestration flow (single-step
 Model the SKILL.md on odin-codex's (port source: `/Users/funnyq/Projects/odin/odin-cc-plugin/packages/odin-codex/skills/codex/SKILL.md`) but generalize to `<backend> <mode>`.
 
 Frontmatter (portable across all three harnesses):
+
 ```yaml
 ---
 name: relay
@@ -34,6 +36,7 @@ version: 0.1.0
 ```
 
 Document the orchestration the host agent follows:
+
 1. Parse `/relay <backend> <mode> [task]`. Validate backend ∈ {codex, opencode, claude}, mode ∈ {delegate, review, image}.
 2. Capability check is enforced by the script, but mention the holes (image = codex only) so the agent doesn't try.
 3. **The agent picks the relevant files** (judgment — same rule as odin-codex: prefer `git diff --name-only` / `git status --short` / `rg --files`; ask if unclear).
@@ -53,9 +56,11 @@ Image flow: `/relay codex image "<prompt>" --out <path>`; if `--out` missing, as
 `commands/relay.md`: the slash-command file backing `/relay` (Claude/Codex resolve `/relay` from here; the skill carries the logic). Frontmatter with `description` + `argument-hint: "<codex|opencode|claude> <delegate|review|image> [task]"`; body routes to the relay skill. Model it on `/Users/funnyq/Projects/odin/odin-cc-plugin/packages/odin-codex/commands/codex.md` (optional reference).
 
 `references/backends.md`: condense `_context/cli-reference.md` into user-facing docs — each backend's flags, headless output handling, the opencode `--format json` #26855 caveat, and the **OpenCode install** line:
+
 ```
 ln -s <repo>/packages/relay/skills/relay ~/.claude/skills/relay
 ```
+
 (Claude Code / Codex install via the marketplace automatically.)
 
 ## Acceptance criteria
@@ -78,12 +83,12 @@ ln -s <repo>/packages/relay/skills/relay ~/.claude/skills/relay
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | flow wrong or commands won't run as written | covers modes but a step (two-step, save-flow) drifts | every mode/strategy/flow accurate and runnable from the doc |
-| Test coverage | ×2 | no frontmatter/validity check | frontmatter only | frontmatter valid + a runnable read-through check |
-| Interface & readability | ×1 | dense/unscannable | usable | clear sections; matches odin-codex skill ergonomics |
-| Assumptions & docs | ×1 | install/caveats missing | partial | install line + #26855 + smart-apply all present |
+| Dimension               | Weight | 0–1 (fail)                                  | 2–3 (below bar)                                      | 4–5 (pass)                                                  |
+| ----------------------- | ------ | ------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| Correctness             | ×3     | flow wrong or commands won't run as written | covers modes but a step (two-step, save-flow) drifts | every mode/strategy/flow accurate and runnable from the doc |
+| Test coverage           | ×2     | no frontmatter/validity check               | frontmatter only                                     | frontmatter valid + a runnable read-through check           |
+| Interface & readability | ×1     | dense/unscannable                           | usable                                               | clear sections; matches odin-codex skill ergonomics         |
+| Assumptions & docs      | ×1     | install/caveats missing                     | partial                                              | install line + #26855 + smart-apply all present             |
 
 ## Out of scope
 

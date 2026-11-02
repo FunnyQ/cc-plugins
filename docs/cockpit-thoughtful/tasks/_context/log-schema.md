@@ -12,18 +12,18 @@ type GoalRecord = { type: "goal"; session_goal: string; ts: string };
 type Facet = { label: string; text: string };
 
 type DecisionRecord = {
-  id: string;            // crypto.randomUUID()
-  type: "decision";      // record discriminant — DO NOT overload for the lens
-  kind?: DecisionKind;   // NEW — the lens; default "decision" when absent
+  id: string; // crypto.randomUUID()
+  type: "decision"; // record discriminant — DO NOT overload for the lens
+  kind?: DecisionKind; // NEW — the lens; default "decision" when absent
   source?: DecisionSource; // NEW — who wrote it; default "agent" when absent
-  decision: string;      // headline ("what you chose" / scribe --title)
-  reason: string;        // markdown body ("why" / scribe --text)
+  decision: string; // headline ("what you chose" / scribe --title)
+  reason: string; // markdown body ("why" / scribe --text)
   tradeoff: string;
   facets: Facet[];
   needs_your_call: boolean;
   options: string[];
   files: string[];
-  timestamp: string;     // ISO
+  timestamp: string; // ISO
 };
 
 // ResponseRecord (broker.ts) is unchanged: { id, type:"response", call, answer, ts }
@@ -49,14 +49,16 @@ cockpit scribe --recent [N]
 ```
 
 Write mode (`--type` present):
+
 - `--type` (required) — one of `decision|rationale|learning|caveat`; reject anything else with a non-zero exit + clear error.
 - `--text` (required) — maps to `reason` (markdown body).
 - `--title` (optional) — maps to `decision` (headline). Empty when omitted.
 - `--file` (repeated, optional) — maps to `files[]`.
 - `--session` / `--provider` (optional) — else auto-resolve via `findSession(provider, project)`; error if unresolved (same as `cmdLog`).
-- Side effects, in order: `upsertSession(...)` (auto-register, so `tracked:true`) → `mkdirSync(logs)` → `appendFileSync(line)` → **concurrency-safe persistence guard** (a line with `id === rec.id` must exist *somewhere* in the file — NOT a tail check; background forks interleave writes, so the tail may belong to another writer) → `refreshHeartbeat(...)`. **No goal record is written.**
+- Side effects, in order: `upsertSession(...)` (auto-register, so `tracked:true`) → `mkdirSync(logs)` → `appendFileSync(line)` → **concurrency-safe persistence guard** (a line with `id === rec.id` must exist _somewhere_ in the file — NOT a tail check; background forks interleave writes, so the tail may belong to another writer) → `refreshHeartbeat(...)`. **No goal record is written.**
 
 Recent mode (`--recent`, no `--type`):
+
 - Prints the last N (default 8) records with `source === "scribe"`, one per line, compact: `kind · title · relative-or-ISO time`. Used by the scribe fork to dedup. Exits 0 (prints nothing if the log is absent/empty).
 - `--recent` takes an optional numeric value: bare `--recent` → 8; `--recent 3` → 3; a following non-numeric flag (e.g. `--recent --provider codex`) must NOT be consumed.
 

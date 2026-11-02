@@ -43,7 +43,9 @@ Every plan gets `_context/shared.md`. It carries the convention layer that all t
 Inline the rules executors actually need:
 
 - <Style rule 1>
+
 - <Style rule 2>
+
 - Authoritative source (for verification only): `<linter config path>`
 
 ## File / directory layout
@@ -135,6 +137,6 @@ When a decision changes mid-execution:
 
 1. Update PLAN.md.
 2. Update the relevant `_context/*.md`.
-3. Notify executors. The task file itself usually doesn't need editing. It describes *what* to do, not *why*.
+3. Notify executors. The task file itself usually doesn't need editing. It describes _what_ to do, not _why_.
 
-If a change *does* require editing task files, that's a signal the original task was leaking decision context. Move the decision to `_context/`. Slim the task file.
+If a change _does_ require editing task files, that's a signal the original task was leaking decision context. Move the decision to `_context/`. Slim the task file.

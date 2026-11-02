@@ -1,6 +1,7 @@
 # DATA-01: Deck snapshot CLI
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -34,9 +35,10 @@ Import `DeckSnapshot`, `DeckTask`, `DeckAgent` from `../../../hooks/flightdeck/t
 ### `layerByDepth`
 
 ```ts
-export function layerByDepth(
-  tasks: { ref: string; dependsOn: string[] }[],
-): { waves: string[][]; unschedulable: string[] }
+export function layerByDepth(tasks: { ref: string; dependsOn: string[] }[]): {
+  waves: string[][];
+  unschedulable: string[];
+};
 ```
 
 Pure. Static dependency depth over the whole input, done tasks included:
@@ -55,7 +57,7 @@ export function buildDeckSnapshot(input: {
   plan: string;
   payload: TreePayload;
   fleet: FleetRow[];
-}): DeckSnapshot
+}): DeckSnapshot;
 ```
 
 Pure. Field by field:
@@ -71,7 +73,7 @@ Pure. Field by field:
 ### `latestPlan`
 
 ```ts
-export async function latestPlan(root: string): Promise<string | null>
+export async function latestPlan(root: string): Promise<string | null>;
 ```
 
 Impure. Among the dirs `<root>/docs/*/` that hold `.flightlog/run.jsonl`, return the absolute dir whose `run.jsonl` has the newest mtime. Return `null` when none exists or `<root>/docs` is missing.
@@ -111,12 +113,12 @@ Follow the existing fixture approach: `graph-source.test.ts` builds a temp dir w
 
 > Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Shared bands: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | JSON shape departs from the contract, or waves are computed from remaining work | happy path right; cycles, dangling deps, or `currentWave` edges wrong | every field matches the contract; cycles and dangling deps land in `unschedulable` with their dependents |
-| Test coverage | ×2 | no tests | layering happy path only | layering edges, snapshot mapping, both CLI sources, exit 2 and exit 3 all covered |
-| Interface & readability | ×1 | I/O mixed into the pure functions | pure but types loose or duplicated | pure functions typed from the reused modules; I/O only in `latestPlan` and main |
-| Assumptions & docs | ×1 | silent exit codes or magic paths | behaviour right but unexplained | exit codes and the no-tokens corner-cut each carry a one-line why |
+| Dimension               | Weight | 0–1 (fail)                                                                      | 2–3 (below bar)                                                       | 4–5 (pass)                                                                                               |
+| ----------------------- | ------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | JSON shape departs from the contract, or waves are computed from remaining work | happy path right; cycles, dangling deps, or `currentWave` edges wrong | every field matches the contract; cycles and dangling deps land in `unschedulable` with their dependents |
+| Test coverage           | ×2     | no tests                                                                        | layering happy path only                                              | layering edges, snapshot mapping, both CLI sources, exit 2 and exit 3 all covered                        |
+| Interface & readability | ×1     | I/O mixed into the pure functions                                               | pure but types loose or duplicated                                    | pure functions typed from the reused modules; I/O only in `latestPlan` and main                          |
+| Assumptions & docs      | ×1     | silent exit codes or magic paths                                                | behaviour right but unexplained                                       | exit codes and the no-tokens corner-cut each carry a one-line why                                        |
 
 ## Out of scope
 

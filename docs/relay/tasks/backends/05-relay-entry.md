@@ -1,6 +1,7 @@
 # BACKENDS-05: Relay entry point
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -41,12 +42,16 @@ import { codexBackend } from "./codex";
 import { opencodeBackend } from "./opencode";
 import { claudeBackend } from "./claude";
 export const BACKENDS: Record<string, Backend> = {
-  codex: codexBackend, opencode: opencodeBackend, claude: claudeBackend,
+  codex: codexBackend,
+  opencode: opencodeBackend,
+  claude: claudeBackend,
 };
 ```
+
 `relay.ts` imports `BACKENDS` from `./backends` and `getBackend`/`capabilityGate` from `./backends/gate`.
 
 Dispatch flow:
+
 1. `parseFlags` extracts the raw `backend` + `mode` strings (it does **not** hardcode the valid set). Validation happens at dispatch: `const b = getBackend(BACKENDS, backend)`; if `undefined` → usage error listing `Object.keys(BACKENDS).join("|")` (so a 4th backend needs no parser edit). Mode is validated against the `Mode` union (`delegate|review|image`).
 2. `const err = capabilityGate(b, mode)`; if `err` → `stderr.write(err)` + `exit 1` **before any spawn**.
 3. `resolveModel(backend, mode, flags.model)` → resolved model into `InvokeOpts`.
@@ -82,12 +87,12 @@ Note: `relay.ts` must go through `getBackend` + `capabilityGate` only — it mus
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | gate bypassable or output contract missing | dispatch works but a strategy/output branch drifts | gate-before-spawn; correct strategy routing; output contract honored; no name branching |
-| Test coverage | ×2 | no tests | flag parse only | parse + gate rejection + strategy selection across cells |
-| Interface & readability | ×1 | name-based branching | usable but mixes parse + spawn | pure parseFlags + gate/strategy routing; side effects isolated |
-| Assumptions & docs | ×1 | capture seam unexplained | present | `-o lastfile` vs stdout capture + prompt-text seam documented |
+| Dimension               | Weight | 0–1 (fail)                                 | 2–3 (below bar)                                    | 4–5 (pass)                                                                              |
+| ----------------------- | ------ | ------------------------------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | gate bypassable or output contract missing | dispatch works but a strategy/output branch drifts | gate-before-spawn; correct strategy routing; output contract honored; no name branching |
+| Test coverage           | ×2     | no tests                                   | flag parse only                                    | parse + gate rejection + strategy selection across cells                                |
+| Interface & readability | ×1     | name-based branching                       | usable but mixes parse + spawn                     | pure parseFlags + gate/strategy routing; side effects isolated                          |
+| Assumptions & docs      | ×1     | capture seam unexplained                   | present                                            | `-o lastfile` vs stdout capture + prompt-text seam documented                           |
 
 ## Out of scope
 

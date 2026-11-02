@@ -1,6 +1,7 @@
 # UI-02: task lanes
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/hangar.md`
@@ -120,13 +121,13 @@ watching.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong state colours, or a failed refresh blanks the view | Renders correctly but polling ignores visibility, or an unscored task shows an empty meter | States, badges, ordering, meter presence, visibility-aware polling, and refresh resilience all correct |
-| Design fidelity | ×2 | Invents colours or spacing, or the page body scrolls horizontally | Uses tokens but density or radius drifts from the system | Every value from the token layer, correct dot and badge and meter forms, lane strip scrolls not the body |
-| Test coverage | ×2 | No verification performed | Rendered one tree only | Both real trees checked, plus a hand-edited tree exercising ready, blocked, and dangling dependencies |
-| Interface & readability | ×1 | Derivation duplicated in the browser | Component works but mixes fetch, state, and render | Renders the server payload as given, component split cleanly from the store |
-| Assumptions & docs | ×1 | Poll interval is a bare literal | Named but unexplained | Comments explain why a failed refresh keeps the last render and why derivation is not repeated client-side |
+| Dimension               | Weight | 0–1 (fail)                                                        | 2–3 (below bar)                                                                            | 4–5 (pass)                                                                                                 |
+| ----------------------- | ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong state colours, or a failed refresh blanks the view          | Renders correctly but polling ignores visibility, or an unscored task shows an empty meter | States, badges, ordering, meter presence, visibility-aware polling, and refresh resilience all correct     |
+| Design fidelity         | ×2     | Invents colours or spacing, or the page body scrolls horizontally | Uses tokens but density or radius drifts from the system                                   | Every value from the token layer, correct dot and badge and meter forms, lane strip scrolls not the body   |
+| Test coverage           | ×2     | No verification performed                                         | Rendered one tree only                                                                     | Both real trees checked, plus a hand-edited tree exercising ready, blocked, and dangling dependencies      |
+| Interface & readability | ×1     | Derivation duplicated in the browser                              | Component works but mixes fetch, state, and render                                         | Renders the server payload as given, component split cleanly from the store                                |
+| Assumptions & docs      | ×1     | Poll interval is a bare literal                                   | Named but unexplained                                                                      | Comments explain why a failed refresh keeps the last render and why derivation is not repeated client-side |
 
 ## Out of scope
 

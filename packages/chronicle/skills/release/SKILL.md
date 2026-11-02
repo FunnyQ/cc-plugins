@@ -70,7 +70,7 @@ ask each bump. A per-component `chronicle@0.5.1` form is fine if the user writes
 
 Run each command **once per step**. `plan` then `run` are two different commands, not
 a rerun, and re-running `run` after an artifact rebuild is the documented fix, not a
-retry. What is forbidden is reaching for a *different* command after one fails: never
+retry. What is forbidden is reaching for a _different_ command after one fails: never
 rerun a failed command with changed flags, never substitute another script, and never
 hand-roll the git a stage would have done.
 
@@ -179,8 +179,8 @@ line reads `OFF RELEASE BRANCH`. Three options: open a PR, merge locally with
 acts on the answer.
 
 **c. The push** — on a `push` run, always, and phrased in full. The option text
-names the remote, the branch, and every tag: *push `origin main` +
-`chronicle-v0.16.0` + `monitor-v3.2.0`*. Batching changes when it is asked, nothing
+names the remote, the branch, and every tag: _push `origin main` +
+`chronicle-v0.16.0` + `monitor-v3.2.0`_. Batching changes when it is asked, nothing
 else about it. A decline means `--through tag`, not a stop.
 
 Build each tag name from the config's template and the versions question a offers.

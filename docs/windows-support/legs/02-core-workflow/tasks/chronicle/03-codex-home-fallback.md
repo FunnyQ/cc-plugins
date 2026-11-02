@@ -71,12 +71,12 @@ Test first, in `setup-codex-agents.test.ts`:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension               | Weight | 0–1 (fail)                                         | 2–3 (below bar)                                                | 4–5 (pass)                                                       |
-| ----------------------- | ------ | -------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Correctness             | ×3     | still reads `HOME`, or `CODEX_HOME` no longer wins | `homedir()` used but the relative-path case is still reachable | `CODEX_HOME` → `homedir()` on every OS; nothing lands in cwd     |
-| Test coverage           | ×2     | no new test                                        | test passes but could not catch a cwd write                    | test asserts the profile path and the absence of `.codex` in cwd |
+| Dimension               | Weight | 0–1 (fail)                                                | 2–3 (below bar)                                                                        | 4–5 (pass)                                                                     |
+| ----------------------- | ------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Correctness             | ×3     | still reads `HOME`, or `CODEX_HOME` no longer wins        | `homedir()` used but the relative-path case is still reachable                         | `CODEX_HOME` → `homedir()` on every OS; nothing lands in cwd                   |
+| Test coverage           | ×2     | no new test                                               | test passes but could not catch a cwd write                                            | test asserts the profile path and the absence of `.codex` in cwd               |
 | Interface & readability | ×1     | resolver missing, or more than one new function or option | resolver exists but `main` still computes the path inline, or `home` is not injectable | one pure exported `codexHome(env, home)` that `main` calls; no other new layer |
-| Assumptions & docs      | ×1     | Windows `HOME` behaviour assumed without source    | right but unexplained in the report                            | report cites `windows.md`'s `homedir()` fact                     |
+| Assumptions & docs      | ×1     | Windows `HOME` behaviour assumed without source           | right but unexplained in the report                                                    | report cites `windows.md`'s `homedir()` fact                                   |
 
 ## Out of scope
 

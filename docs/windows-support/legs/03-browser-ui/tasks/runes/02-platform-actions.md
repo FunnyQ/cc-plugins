@@ -1,6 +1,7 @@
 # RUNES-02: Open and retain runes artifacts across platforms.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -100,12 +101,12 @@ Implement `cleanup-check` for the exact `.check.png` and `.check-narrow.png` nam
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Native Windows cannot initialize or create HTML, or a failed action destroys an explanation. | Common paths work but home resolution, WSL opening, recycling or cleanup ownership drifts. | All specified platform actions preserve persisted paths and artifacts, with closed operations and explicit failure behavior. |
-| Test coverage | ×2 | Only mocked happy-path argv is checked. | Pure helpers pass but child parsing, first-run creation or preservation failures lack coverage. | Actual child contracts and mod integration tests cover platform selection, hostile path data, missing tools and failure preservation. |
-| Interface & readability | ×1 | Bun leaks into the mod or a generic shell service obscures ownership. | Operations work but runtime data, hooks and subprocess responsibilities overlap. | Small plugin-local contracts separate mod-safe data from runtime actions and keep engine objects local. |
-| Assumptions & docs | ×1 | Local contract results are claimed as real Windows/WSL UI proof. | Supported paths are listed but runtime prerequisites or failed actions are ambiguous. | Execution evidence separates isolated Bun contracts, complete mod tests and owed native Windows/WSL interaction checks. |
+| Dimension               | Weight | 0–1 (fail)                                                                                   | 2–3 (below bar)                                                                                 | 4–5 (pass)                                                                                                                            |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Native Windows cannot initialize or create HTML, or a failed action destroys an explanation. | Common paths work but home resolution, WSL opening, recycling or cleanup ownership drifts.      | All specified platform actions preserve persisted paths and artifacts, with closed operations and explicit failure behavior.          |
+| Test coverage           | ×2     | Only mocked happy-path argv is checked.                                                      | Pure helpers pass but child parsing, first-run creation or preservation failures lack coverage. | Actual child contracts and mod integration tests cover platform selection, hostile path data, missing tools and failure preservation. |
+| Interface & readability | ×1     | Bun leaks into the mod or a generic shell service obscures ownership.                        | Operations work but runtime data, hooks and subprocess responsibilities overlap.                | Small plugin-local contracts separate mod-safe data from runtime actions and keep engine objects local.                               |
+| Assumptions & docs      | ×1     | Local contract results are claimed as real Windows/WSL UI proof.                             | Supported paths are listed but runtime prerequisites or failed actions are ambiguous.           | Execution evidence separates isolated Bun contracts, complete mod tests and owed native Windows/WSL interaction checks.               |
 
 ## Out of scope
 

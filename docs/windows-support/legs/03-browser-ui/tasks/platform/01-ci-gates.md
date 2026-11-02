@@ -1,6 +1,7 @@
 # PLATFORM-01: Gate browser and UI portability in CI.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -73,12 +74,12 @@ Remote implementation-PR CI is owed until an authorized PR exists. Keep that res
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Required failures are skipped or existing gates regress. | New checks run but one OS, runes cwd or browser prerequisite behavior drifts. | All three OS run the specified blocking commands, require real Chrome everywhere and Firefox on macOS and Ubuntu, and preserve existing gates and report behavior. |
-| Test coverage | ×2 | Workflow execution is asserted without running local commands or inspecting matrix branches. | Local happy paths pass but absence, failure propagation or runner prerequisites remain unchecked. | Local suites and real smoke pass, missing prerequisites fail clearly, and each matrix branch is inspected with remote evidence kept separate. |
-| Interface & readability | ×1 | Duplicated platform workflows or shell workarounds obscure failure behavior. | Commands work but provisioning and working-directory choices are implicit. | Small workflow changes expose exact commands, cwd, prerequisites and failures without a new runner abstraction. |
-| Assumptions & docs | ×1 | Local or pure-helper results are presented as real Windows/WSL mod proof. | Tool versions or remote-check limitations are incomplete. | Evidence names the actual host and browser versions and keeps remote CI, full mod tests and human UI checks explicitly distinct. |
+| Dimension               | Weight | 0–1 (fail)                                                                                   | 2–3 (below bar)                                                                                   | 4–5 (pass)                                                                                                                                                         |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Required failures are skipped or existing gates regress.                                     | New checks run but one OS, runes cwd or browser prerequisite behavior drifts.                     | All three OS run the specified blocking commands, require real Chrome everywhere and Firefox on macOS and Ubuntu, and preserve existing gates and report behavior. |
+| Test coverage           | ×2     | Workflow execution is asserted without running local commands or inspecting matrix branches. | Local happy paths pass but absence, failure propagation or runner prerequisites remain unchecked. | Local suites and real smoke pass, missing prerequisites fail clearly, and each matrix branch is inspected with remote evidence kept separate.                      |
+| Interface & readability | ×1     | Duplicated platform workflows or shell workarounds obscure failure behavior.                 | Commands work but provisioning and working-directory choices are implicit.                        | Small workflow changes expose exact commands, cwd, prerequisites and failures without a new runner abstraction.                                                    |
+| Assumptions & docs      | ×1     | Local or pure-helper results are presented as real Windows/WSL mod proof.                    | Tool versions or remote-check limitations are incomplete.                                         | Evidence names the actual host and browser versions and keeps remote CI, full mod tests and human UI checks explicitly distinct.                                   |
 
 ## Out of scope
 

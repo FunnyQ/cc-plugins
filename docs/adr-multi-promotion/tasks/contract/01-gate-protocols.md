@@ -1,6 +1,7 @@
 # CONTRACT-01: Gate protocols for a batch of drafts
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -145,7 +146,11 @@ the same style as the gate-1 schema:
   "verdicts": [
     { "proposedPath": "docs/adr/0027-....md", "verdict": "approve" },
     { "proposedPath": "docs/adr/0028-....md", "verdict": "drop" },
-    { "proposedPath": "docs/adr/0029-....md", "verdict": "approve", "draftText": "..." }
+    {
+      "proposedPath": "docs/adr/0029-....md",
+      "verdict": "approve",
+      "draftText": "..."
+    }
   ]
 }
 ```
@@ -202,7 +207,7 @@ and the gate-2 shape from Edit 4b.
 
 The sentence "Treat the parsed response as the gate response exactly as `cockpit wait`
 would return it, including the consistency check above" points at a check that lives
-*below* it, under `triage` step 3. Fix the direction word while you are in that paragraph.
+_below_ it, under `triage` step 3. Fix the direction word while you are in that paragraph.
 Do not move either block.
 
 ## Acceptance criteria
@@ -241,12 +246,12 @@ Do not move either block.
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted
 > average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A schema field is spelled differently from the frozen contract, for example `mergeGroup` or `notes`, or the `verdicts` block is absent. | Both schemas match, but a rule is missing: the complete-set requirement, the drop-leaves-a-gap rule, or the single-member-group rule. | Both schemas match character for character, and every listed rule is stated with the failure it prevents. |
-| Completeness | ×2 | One of the five edits is untouched. | Gate 1 converted while gate 2 still reads singular, or one fallback branch converted and the other left behind. | All five edits landed, and both fallback branches render the batch at gate 2 and the `group` column at gate 1. |
-| Readability | ×1 | Instructions run past 25 words with stacked em dashes, or a heading was added. | Correct content, but the new prose uses a second term for a group, or breaks a backticked span across a line wrap. | New prose matches the file's voice, one term per thing, every instruction under 20 words. |
-| Assumptions and docs | ×1 | A new gate behavior appears that the frozen contract does not define. | Rules stated with no reason, so a later editor cannot tell which are load-bearing. | Each rule names its failure mode, for example why a partial gate-2 reply is re-surfaced. |
+| Dimension            | Weight | 0–1 (fail)                                                                                                                              | 2–3 (below bar)                                                                                                                       | 4–5 (pass)                                                                                                     |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A schema field is spelled differently from the frozen contract, for example `mergeGroup` or `notes`, or the `verdicts` block is absent. | Both schemas match, but a rule is missing: the complete-set requirement, the drop-leaves-a-gap rule, or the single-member-group rule. | Both schemas match character for character, and every listed rule is stated with the failure it prevents.      |
+| Completeness         | ×2     | One of the five edits is untouched.                                                                                                     | Gate 1 converted while gate 2 still reads singular, or one fallback branch converted and the other left behind.                       | All five edits landed, and both fallback branches render the batch at gate 2 and the `group` column at gate 1. |
+| Readability          | ×1     | Instructions run past 25 words with stacked em dashes, or a heading was added.                                                          | Correct content, but the new prose uses a second term for a group, or breaks a backticked span across a line wrap.                    | New prose matches the file's voice, one term per thing, every instruction under 20 words.                      |
+| Assumptions and docs | ×1     | A new gate behavior appears that the frozen contract does not define.                                                                   | Rules stated with no reason, so a later editor cannot tell which are load-bearing.                                                    | Each rule names its failure mode, for example why a partial gate-2 reply is re-surfaced.                       |
 
 ## Out of scope
 

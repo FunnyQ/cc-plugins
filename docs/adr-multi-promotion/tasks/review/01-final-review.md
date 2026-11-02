@@ -1,6 +1,7 @@
 # REVIEW-01: Final review 🏁
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -60,10 +61,10 @@ name must match that file exactly.
 
 Then pair each Markdown agent with its Codex mirror and diff the contract by eye:
 
-| Markdown agent | Codex mirror |
-| --- | --- |
-| `packages/chronicle/agents/codifier.md` | `packages/chronicle/agents-codex/codifier.toml` |
-| `packages/chronicle/agents/lorekeeper.md` | `packages/chronicle/agents-codex/lorekeeper.toml` |
+| Markdown agent                              | Codex mirror                                        |
+| ------------------------------------------- | --------------------------------------------------- |
+| `packages/chronicle/agents/codifier.md`     | `packages/chronicle/agents-codex/codifier.toml`     |
+| `packages/chronicle/agents/lorekeeper.md`   | `packages/chronicle/agents-codex/lorekeeper.toml`   |
 | `packages/chronicle/agents/barrowkeeper.md` | `packages/chronicle/agents-codex/barrowkeeper.toml` |
 
 Each pair must agree on every literal JSON shape, character for character in the field
@@ -107,14 +108,14 @@ grep -c 'group' $FILES
 
 Confirm each string appears in the files that should carry it:
 
-| String | Must appear in |
-| --- | --- |
-| `newAdrs` | `SKILL.md`, `lorekeeper.md`, `barrowkeeper.md`, and both of their mirrors |
-| `drafts` | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors |
-| `groups` | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors |
-| `adrNumber` | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors |
-| `verdicts` | `SKILL.md` |
-| `group` (gate-1 field) | `SKILL.md` |
+| String                 | Must appear in                                                            |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `newAdrs`              | `SKILL.md`, `lorekeeper.md`, `barrowkeeper.md`, and both of their mirrors |
+| `drafts`               | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors     |
+| `groups`               | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors     |
+| `adrNumber`            | `SKILL.md`, `codifier.md`, `lorekeeper.md`, and both of their mirrors     |
+| `verdicts`             | `SKILL.md`                                                                |
+| `group` (gate-1 field) | `SKILL.md`                                                                |
 
 A zero count in a file that needs the string is a defect. Report it and fix it.
 
@@ -231,13 +232,13 @@ have.
 > average > 4.0 to pass; Contract fidelity < 4 is an automatic veto. This table scores the
 > whole deliverable, never one file.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A stale singular field still drives a live path, or a shape the contract defines is absent from the file that must carry it | A Markdown agent and its Codex mirror disagree on one field name, or one rule is stated in one copy and dropped from the other | Every field name and rule matches the frozen contract, and each mirror pair agrees character for character |
-| Completeness | ×2 | A file in the seven was never converted | One file holds a converted section beside a sibling section still written in the singular | All seven read as one batch contract, with no half-converted section anywhere |
-| Readability | ×1 | A reader cannot tell which shape a phase returns | Correct content, but stacked em dashes, sentences over 25 words, or a second term for a thing already named | One voice across all seven, STE-lite rules held, one term per thing |
-| Assumptions and docs | ×1 | A behavior appears that the contract never defined, with no reason given | A load-bearing rule is stated with no reason, so a later editor cannot tell whether it can go | Every non-obvious rule names the failure it prevents, and the 12-group cap is flagged as a judgment call |
-| Leanness | ×1 | The change added a field, a branch, or a knob the contract does not require, and it is now load-bearing | One unrequired addition survives, unjustified but harmless | Nothing survives that the frozen contract does not require, and every kept addition names the failure it prevents |
+| Dimension            | Weight | 0–1 (fail)                                                                                                                  | 2–3 (below bar)                                                                                                                | 4–5 (pass)                                                                                                        |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A stale singular field still drives a live path, or a shape the contract defines is absent from the file that must carry it | A Markdown agent and its Codex mirror disagree on one field name, or one rule is stated in one copy and dropped from the other | Every field name and rule matches the frozen contract, and each mirror pair agrees character for character        |
+| Completeness         | ×2     | A file in the seven was never converted                                                                                     | One file holds a converted section beside a sibling section still written in the singular                                      | All seven read as one batch contract, with no half-converted section anywhere                                     |
+| Readability          | ×1     | A reader cannot tell which shape a phase returns                                                                            | Correct content, but stacked em dashes, sentences over 25 words, or a second term for a thing already named                    | One voice across all seven, STE-lite rules held, one term per thing                                               |
+| Assumptions and docs | ×1     | A behavior appears that the contract never defined, with no reason given                                                    | A load-bearing rule is stated with no reason, so a later editor cannot tell whether it can go                                  | Every non-obvious rule names the failure it prevents, and the 12-group cap is flagged as a judgment call          |
+| Leanness             | ×1     | The change added a field, a branch, or a knob the contract does not require, and it is now load-bearing                     | One unrequired addition survives, unjustified but harmless                                                                     | Nothing survives that the frozen contract does not require, and every kept addition names the failure it prevents |
 
 ## Out of scope
 

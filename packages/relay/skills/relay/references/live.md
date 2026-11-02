@@ -10,7 +10,7 @@ Under herdr, the live tab stays in the caller's Herdr workspace, even when Relay
 
 ### Choosing live vs headless
 
-Live and headless share the same CLI, model, and write access. Editing capability is **identical**. Never justify `--headless` with "more precise / deterministic / reliable for multi-file edits". Live is a *superset*: it is unattended **and** observable. Keep live as the default. Force `--headless` only for a real reason: nested delegation, a mode with no live seam, or no pane surface.
+Live and headless share the same CLI, model, and write access. Editing capability is **identical**. Never justify `--headless` with "more precise / deterministic / reliable for multi-file edits". Live is a _superset_: it is unattended **and** observable. Keep live as the default. Force `--headless` only for a real reason: nested delegation, a mode with no live seam, or no pane surface.
 
 `relay.ts` is one blocking call. Wait for its single result. Do not poll `tail`, `cat`, or pane status while it runs. If it reports a pending run, resume it with the printed `relay.ts collect` command rather than a hand-rolled wait.
 

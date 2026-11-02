@@ -246,9 +246,7 @@ export function deriveTaskViews(
             passOp: latestScore.passOp,
             passed: latestScore.passed,
             hardFailed: latestScore.hardFailed,
-            ...(latestScore.vetoedBy
-              ? { vetoedBy: latestScore.vetoedBy }
-              : {}),
+            ...(latestScore.vetoedBy ? { vetoedBy: latestScore.vetoedBy } : {}),
             breakdown: latestScore.breakdown,
             ...(latestScore.rationale
               ? { rationale: latestScore.rationale }

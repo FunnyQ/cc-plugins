@@ -48,6 +48,7 @@ this plan agrees on, and both foundation tasks change code the rest of the tree
 builds against.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -59,19 +60,19 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | Add the state entry kind to the flightlog | todo | > 4 | — |
-| contract | 02 | Extract the narrow GraphNode type | todo | > 4 | contract/01 |
-| contract | 03 | Write the graph contract specification | todo | > 4 | contract/01, contract/02 |
-| deck | 01 | Read and validate graph.json | todo | > 4 | contract/02, contract/03 |
-| deck | 02 | Derive node state from the event trail | todo | > 4 | contract/01, deck/01 |
-| deck | 03 | Auto-detect the source and route both APIs to it | todo | > 4 | deck/01, deck/02 |
-| deck | 04 | Honor the declared repo root when locating transcripts | todo | > 4 | deck/01, deck/03 |
-| deck | 05 | Honor declared lane order in the dependency graph | todo | > 4 | deck/03 |
-| review | 01 | Final review | todo | > 4 | contract/03, deck/04, skill/02 |
-| skill | 01 | The deckplan authoring reference | todo | > 4 | contract/03 |
-| skill | 02 | The runnable example, doubling as the dashboard fixture | todo | > 4 | skill/01, deck/04, deck/05 |
+| Bucket   | NN  | Title                                                   | Status | Pass line | Depends on                     |
+| -------- | --- | ------------------------------------------------------- | ------ | --------- | ------------------------------ |
+| contract | 01  | Add the state entry kind to the flightlog               | todo   | > 4       | —                              |
+| contract | 02  | Extract the narrow GraphNode type                       | todo   | > 4       | contract/01                    |
+| contract | 03  | Write the graph contract specification                  | todo   | > 4       | contract/01, contract/02       |
+| deck     | 01  | Read and validate graph.json                            | todo   | > 4       | contract/02, contract/03       |
+| deck     | 02  | Derive node state from the event trail                  | todo   | > 4       | contract/01, deck/01           |
+| deck     | 03  | Auto-detect the source and route both APIs to it        | todo   | > 4       | deck/01, deck/02               |
+| deck     | 04  | Honor the declared repo root when locating transcripts  | todo   | > 4       | deck/01, deck/03               |
+| deck     | 05  | Honor declared lane order in the dependency graph       | todo   | > 4       | deck/03                        |
+| review   | 01  | Final review                                            | todo   | > 4       | contract/03, deck/04, skill/02 |
+| skill    | 01  | The deckplan authoring reference                        | todo   | > 4       | contract/03                    |
+| skill    | 02  | The runnable example, doubling as the dashboard fixture | todo   | > 4       | skill/01, deck/04, deck/05     |
 
 ## Dependency graph
 
@@ -95,26 +96,27 @@ contract/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| skill/01 | contract/03 |
-| skill/02 | deck/04, deck/05 |
+| Task      | Depends on                     |
+| --------- | ------------------------------ |
+| skill/01  | contract/03                    |
+| skill/02  | deck/04, deck/05               |
 | review/01 | contract/03, deck/04, skill/02 |
-| deck/02 | contract/01 |
-| deck/01 | contract/02, contract/03 |
+| deck/02   | contract/01                    |
+| deck/01   | contract/02, contract/03       |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps
 
 - **The prompt-text join is proven; the out-of-repo path is not.** A real
   Workflow run of three agents was executed against a scratch run directory
-  *inside* the repository, with prompts following the announce convention this
+  _inside_ the repository, with prompts following the announce convention this
   plan specifies. All three transcripts were discovered, all three parsed their
   node, role, and attempt out of the prompt, and all three joined to their fleet
   row with real token figures. So the convention works, and the authoring rules
   built on it are sound.
 
-  The same trail copied to a directory *outside* any repository found zero
+  The same trail copied to a directory _outside_ any repository found zero
   transcripts and reported a run that spent nothing — no error, no warning. That
   is the failure the transcript-anchoring task exists to remove, now measured
   rather than predicted. It stays a gap only because the fix is not written yet;
@@ -160,7 +162,7 @@ Findings this review examined and deliberately did not apply:
   an arbitrary status string is inert.
 
 - **`detectSource` keeps its `try`/`catch` instead of `statSync(..., {
-  throwIfNoEntry: false })`.** The stdlib option was applied and reverted: it
+throwIfNoEntry: false })`.** The stdlib option was applied and reverted: it
   suppresses only `ENOENT`, so a `--plan` pointing at a plain file threw
   `ENOTDIR` and lost the launcher's validation message. A pre-existing test
   caught it. The `catch` is load-bearing, not a hand-rolled stdlib duplicate.

@@ -1,6 +1,7 @@
 # ASSETS-01: Chronicle agents in OpenCode format
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -68,25 +69,25 @@ permission:
 
 Field by field:
 
-| Source field | Target | Rule |
-|---|---|---|
-| `name` | *(dropped)* | OpenCode derives the agent name from the filename. Keep the filename identical to the source `name`. |
-| `description` | `description` | **Verbatim.** Do not reword, retitle, or shorten. It is what a caller matches on. |
-| `model` | *(omitted)* | Agents inherit the session model. Do not translate `sonnet`/`haiku` into a provider-prefixed id. |
-| `effort` | *(omitted)* | No OpenCode equivalent; do not invent one. |
-| `maxTurns: 15` | `steps: 15` | Only on `lawspeaker`, `lorekeeper`, `storykeeper` — the three that carry it. The other ten get no `steps` key at all. |
-| `tools: [...]` | `permission:` map | See below. |
-| — | `mode: subagent` | On all 13. |
-| — | `hidden: true` | On all 13. |
+| Source field   | Target            | Rule                                                                                                                  |
+| -------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `name`         | _(dropped)_       | OpenCode derives the agent name from the filename. Keep the filename identical to the source `name`.                  |
+| `description`  | `description`     | **Verbatim.** Do not reword, retitle, or shorten. It is what a caller matches on.                                     |
+| `model`        | _(omitted)_       | Agents inherit the session model. Do not translate `sonnet`/`haiku` into a provider-prefixed id.                      |
+| `effort`       | _(omitted)_       | No OpenCode equivalent; do not invent one.                                                                            |
+| `maxTurns: 15` | `steps: 15`       | Only on `lawspeaker`, `lorekeeper`, `storykeeper` — the three that carry it. The other ten get no `steps` key at all. |
+| `tools: [...]` | `permission:` map | See below.                                                                                                            |
+| —              | `mode: subagent`  | On all 13.                                                                                                            |
+| —              | `hidden: true`    | On all 13.                                                                                                            |
 
 ### The tools → permission map
 
-| Source tool | Permission key |
-|---|---|
-| `Bash` | `bash: allow` |
-| `Read` | `read: allow` |
-| `Edit` **or** `Write` | `edit: allow` |
-| `Agent` | `task: allow` |
+| Source tool           | Permission key |
+| --------------------- | -------------- |
+| `Bash`                | `bash: allow`  |
+| `Read`                | `read: allow`  |
+| `Edit` **or** `Write` | `edit: allow`  |
+| `Agent`               | `task: allow`  |
 
 `Edit` and `Write` both map to the single `edit` key — an agent carrying both still gets one `edit: allow` line, not two.
 
@@ -151,12 +152,12 @@ Both live in `../_context/runtime-facts.md`. If either is still `UNRESOLVED` whe
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong file count, a source file edited, or a description reworded | All 13 exist but a `steps`/`model`/`effort` rule is misapplied, or a body drifted beyond the listed adjustments | 13 files, every frontmatter rule applied exactly, bodies changed only where the adjustment list allows, sources byte-identical |
-| Permission-map accuracy | ×2 | An orchestrator is missing `task: allow`, or a leaf agent was granted it | Keys present but `Edit`+`Write` duplicated, or an unrequested key added | Every map derives exactly from its source `tools`, orchestrators carry `task: allow` and nothing else does |
-| Uniform structure | ×1 | Files differ in key order and shape with no pattern | Mostly consistent, one or two outliers | All 13 share one frontmatter key order and one body layout, so a reviewer can diff them side by side |
-| Assumptions & docs | ×1 | An unresolved runtime fact was guessed at and written in as settled | Adjusted bodies not reported, so the human review has nothing to target | Every adjusted body named in the report, spawn-depth note present on the three orchestrators, unresolved facts either resolved or the task blocked |
+| Dimension               | Weight | 0–1 (fail)                                                               | 2–3 (below bar)                                                                                                 | 4–5 (pass)                                                                                                                                         |
+| ----------------------- | ------ | ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong file count, a source file edited, or a description reworded        | All 13 exist but a `steps`/`model`/`effort` rule is misapplied, or a body drifted beyond the listed adjustments | 13 files, every frontmatter rule applied exactly, bodies changed only where the adjustment list allows, sources byte-identical                     |
+| Permission-map accuracy | ×2     | An orchestrator is missing `task: allow`, or a leaf agent was granted it | Keys present but `Edit`+`Write` duplicated, or an unrequested key added                                         | Every map derives exactly from its source `tools`, orchestrators carry `task: allow` and nothing else does                                         |
+| Uniform structure       | ×1     | Files differ in key order and shape with no pattern                      | Mostly consistent, one or two outliers                                                                          | All 13 share one frontmatter key order and one body layout, so a reviewer can diff them side by side                                               |
+| Assumptions & docs      | ×1     | An unresolved runtime fact was guessed at and written in as settled      | Adjusted bodies not reported, so the human review has nothing to target                                         | Every adjusted body named in the report, spawn-depth note present on the three orchestrators, unresolved facts either resolved or the task blocked |
 
 ## Out of scope
 

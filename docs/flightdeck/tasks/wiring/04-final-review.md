@@ -1,6 +1,7 @@
 # WIRING-04: final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/hangar.md`
@@ -148,12 +149,12 @@ known gap, not a reason to keep building — the version boundary was drawn deli
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration | ×3 | The pieces do not compose; a state change fails to reach the screen | Composes but the two data paths conflict, or a rule is implemented on both sides | Every layer agrees, both data paths coexist cleanly, each rule lives in exactly one place |
-| Meets the goal | ×2 | Two or more of the four recorded observations are missing or unconfirmed | Exactly one is missing, or the evidence file does not record them so they cannot be verified | All four recorded and confirmed: simultaneous live fleet detail, an observed state change, a matching verdict, and a page opened by the skill |
-| Consistency | ×2 | Cross-plugin import present, or a design anti-goal violated | Conventions mostly held with drift in one area | Runtime, types, purity, vendor surface, import surface, and the design system all hold |
-| No regressions | ×2 | An existing suite fails, or a pre-existing trail renders differently | Suites pass but the control-flow check ran against an empty working-tree diff, or rejected the three legitimate line modifications | Suites green, all four trails render identically, every orchestrator hunk matched against the permitted set across a real pre-plan baseline range |
+| Dimension      | Weight | 0–1 (fail)                                                               | 2–3 (below bar)                                                                                                                    | 4–5 (pass)                                                                                                                                        |
+| -------------- | ------ | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integration    | ×3     | The pieces do not compose; a state change fails to reach the screen      | Composes but the two data paths conflict, or a rule is implemented on both sides                                                   | Every layer agrees, both data paths coexist cleanly, each rule lives in exactly one place                                                         |
+| Meets the goal | ×2     | Two or more of the four recorded observations are missing or unconfirmed | Exactly one is missing, or the evidence file does not record them so they cannot be verified                                       | All four recorded and confirmed: simultaneous live fleet detail, an observed state change, a matching verdict, and a page opened by the skill     |
+| Consistency    | ×2     | Cross-plugin import present, or a design anti-goal violated              | Conventions mostly held with drift in one area                                                                                     | Runtime, types, purity, vendor surface, import surface, and the design system all hold                                                            |
+| No regressions | ×2     | An existing suite fails, or a pre-existing trail renders differently     | Suites pass but the control-flow check ran against an empty working-tree diff, or rejected the three legitimate line modifications | Suites green, all four trails render identically, every orchestrator hunk matched against the permitted set across a real pre-plan baseline range |
 
 ## Out of scope
 

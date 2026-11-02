@@ -15,14 +15,15 @@
   ```
 
   That conditional spread is the "lean shape" discipline: an entry with no diagram carries no key at all.
+
 - The record type is:
 
   ```ts
   type DecisionRecord = {
     id: string;
     type: "decision";
-    kind?: DecisionKind;         // "decision" | "rationale" | "learning" | "caveat"
-    source?: DecisionSource;     // "agent" | "scribe"
+    kind?: DecisionKind; // "decision" | "rationale" | "learning" | "caveat"
+    source?: DecisionSource; // "agent" | "scribe"
     decision: string;
     reason: string;
     tradeoff: string;
@@ -30,7 +31,7 @@
     needs_your_call: boolean;
     options: string[];
     files: string[];
-    diagram?: string;            // Mermaid source today
+    diagram?: string; // Mermaid source today
     timestamp: string;
   };
   ```
@@ -49,6 +50,7 @@
   ```
 
   That early return is where the SVG cross-hint belongs.
+
 - The real verdict comes from mermaid's own parser, stood up headless under happy-dom in `loadParser()`. The parser promise is memoized including its `null`, so one failed load is not retried per diagram. When the parser is unavailable, `parseProblem()` returns `undefined` and the hand-rolled heuristics carry the whole lint. That degrade is silent by design: a missing parser is not the author's problem and must never block a write. **Any new lint must degrade the same way.**
 
 ### `packages/monitor/skills/cockpit/dashboard/dist/modules/diagram.js`
@@ -83,6 +85,7 @@
   ```
 
   then after building `card.innerHTML` calls `mountDiagram(card, rec.diagram)`.
+
 - `mountDiagram(card, source)` awaits `renderDiagram(source)`. On success it replaces the figure's contents with the SVG, drops `data-pending`, adds `is-zoomable`, sets `role="button"` / `tabindex="0"` / `aria-label="Enlarge diagram"`, and wires click plus Enter/Space to `openDiagramLightbox(result.svg, title)` where `title` is the card headline's text. On failure the `<pre>` stays and the figure is flagged so CSS marks it as an unrendered fallback.
 
 ### `packages/monitor/skills/cockpit/dashboard/dist/style.css`
@@ -171,6 +174,7 @@ The contract, not the implementation:
   3. An SVG presentation attribute — `<rect fill="url(https://…)">`, and likewise `stroke`, `filter`, `mask`, `clip-path`, `marker-start`, `marker-mid`, `marker-end`, `marker`.
 
   The scoping pass closes all three, and the write-time lint reports all three. A `#` fragment survives everywhere: `fill="url(#gradient)"` referring to a `<linearGradient>` in the same document is the common legitimate case.
+
 - `@font-face` whose `src` is not a `data:` URI is dropped entirely.
 - `@keyframes` is dropped entirely. An animation name is not a selector, so prefixing cannot reach it and a surviving rule registers globally — the same escape by another door. An animated author SVG therefore shows its static first frame.
 

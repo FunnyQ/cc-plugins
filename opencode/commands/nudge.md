@@ -13,6 +13,7 @@ Run this exactly. Report the printed result back to me:
 **Actions** (default `status`): `on`, `off`, `toggle`, `clear` (drop this scope's opinion), `status`.
 
 **Scopes** (`--scope`, default `session`):
+
 - `session` — this session only (TTL-pruned file, one week idle).
 - `project` — the whole project (keyed by git root) — persists in the global config.
 - `user` — every project, every session (global default) — persists in the global config.

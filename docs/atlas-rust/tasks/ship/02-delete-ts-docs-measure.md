@@ -1,6 +1,7 @@
 # SHIP-02: Delete the TS, update docs, and measure
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -126,11 +127,11 @@ Measure on macOS arm64 with the release build.
 
 Drive each measurement from a bun script outside the repo, never a shell pipeline. `$!` of a backgrounded pipeline is the subshell's pid, so `ps` would read the wrong process.
 
-| Metric | How | Target | Baseline |
-|---|---|---|---|
-| `atlas serve` RSS | Start the server, fetch `/api/stats` once (the dashboard's first load), keep one `/api/live` poll going, then take the max of 5 readings of `ps -o rss= -p <pid>`, 1 s apart | ≤ 40 MB (Q accepted a MISS at 77.8 MB on 2026-10-01; record the measured value as a MISS, it no longer blocks) | 197 MB (TS, 2026-10-01) |
-| `/api/stats` cold build | First request after launch, wall time. Take the median of 3 launches for each implementation on the same home and the same DB copy. TS is measured in step 1. | Rust ≤ TS | measured TS |
-| `atlas statusline` overhead | With `TOKEN_ATLAS_STATUSLINE_COMMAND=true`, pipe a fixture statusline JSON to the subcommand 20 times and take the median wall time. Set the nudge markers fresh first so no nudge spawns. Measure `sh -c true` the same way and subtract it; record total, baseline, and net. The target applies to net. | ≤ 10 ms net | TS `bun statusline-collector.ts` median, measured in step 1 |
+| Metric                      | How                                                                                                                                                                                                                                                                                                       | Target                                                                                                         | Baseline                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `atlas serve` RSS           | Start the server, fetch `/api/stats` once (the dashboard's first load), keep one `/api/live` poll going, then take the max of 5 readings of `ps -o rss= -p <pid>`, 1 s apart                                                                                                                              | ≤ 40 MB (Q accepted a MISS at 77.8 MB on 2026-10-01; record the measured value as a MISS, it no longer blocks) | 197 MB (TS, 2026-10-01)                                     |
+| `/api/stats` cold build     | First request after launch, wall time. Take the median of 3 launches for each implementation on the same home and the same DB copy. TS is measured in step 1.                                                                                                                                             | Rust ≤ TS                                                                                                      | measured TS                                                 |
+| `atlas statusline` overhead | With `TOKEN_ATLAS_STATUSLINE_COMMAND=true`, pipe a fixture statusline JSON to the subcommand 20 times and take the median wall time. Set the nudge markers fresh first so no nudge spawns. Measure `sh -c true` the same way and subtract it; record total, baseline, and net. The target applies to net. | ≤ 10 ms net                                                                                                    | TS `bun statusline-collector.ts` median, measured in step 1 |
 
 Record each number, its target, and PASS or MISS. A miss is reported plainly, with the measured gap. It is never rounded into a pass and never omitted.
 
@@ -173,12 +174,12 @@ A difference is a blocking finding. Report it; do not delete the TS over it.
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | TS deleted on a red suite, a still-imported helper deleted (a typecheck or test breaks), or the launcher silently skips with no binary | Deletion and launcher correct, but a live doc or README reference still names a deleted script, or a Rust-only guard survives | Suite green against Rust with 0 skips; every deletion justified by the importer check; no live reference remains; launcher throws the exact message |
-| Test coverage | ×2 | Suite not re-run after deletion | Suite re-run but the launcher's missing-binary path, or the formerly Rust-only tests, are unexercised | Launcher self-test covers both mappings and the missing-binary error; every formerly skipped test now runs; TS-differential tests rewritten against golden or removed with a stated reason |
-| Interface & readability | ×1 | Launcher keeps dead TS-mapping code | Dead code gone but `isRust()` removed and importers broken | Launcher is minimal, `isRust()` kept for importers, one why-comment on the missing TS fallback |
-| Assumptions & docs | ×1 | Measurements missing or a MISS hidden | Numbers present but method, baseline, or kept-TS list missing | `measurements.md` records method, baselines, PASS/MISS with the gap, the real-home golden result, and each kept TS file with its importer; `CLAUDE.md` matches the Rust layout |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                             | 2–3 (below bar)                                                                                                               | 4–5 (pass)                                                                                                                                                                                 |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | TS deleted on a red suite, a still-imported helper deleted (a typecheck or test breaks), or the launcher silently skips with no binary | Deletion and launcher correct, but a live doc or README reference still names a deleted script, or a Rust-only guard survives | Suite green against Rust with 0 skips; every deletion justified by the importer check; no live reference remains; launcher throws the exact message                                        |
+| Test coverage           | ×2     | Suite not re-run after deletion                                                                                                        | Suite re-run but the launcher's missing-binary path, or the formerly Rust-only tests, are unexercised                         | Launcher self-test covers both mappings and the missing-binary error; every formerly skipped test now runs; TS-differential tests rewritten against golden or removed with a stated reason |
+| Interface & readability | ×1     | Launcher keeps dead TS-mapping code                                                                                                    | Dead code gone but `isRust()` removed and importers broken                                                                    | Launcher is minimal, `isRust()` kept for importers, one why-comment on the missing TS fallback                                                                                             |
+| Assumptions & docs      | ×1     | Measurements missing or a MISS hidden                                                                                                  | Numbers present but method, baseline, or kept-TS list missing                                                                 | `measurements.md` records method, baselines, PASS/MISS with the gap, the real-home golden result, and each kept TS file with its importer; `CLAUDE.md` matches the Rust layout             |
 
 ## Out of scope
 

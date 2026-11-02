@@ -38,6 +38,7 @@ Start with `cli/01-diagram-format-contract.md`. It is the foundation task that f
 `ui/02-style-scoping.md` has no dependencies either, so it can run in parallel from the outset.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -49,16 +50,16 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| cli | 01 | Diagram format contract and @path input | todo | >= 4 | — |
-| cli | 02 | SVG lint at write time | todo | >= 4 | cli/01 |
-| cli | 03 | Cross-format fix hint in the Mermaid lint | todo | >= 4 | cli/01 |
-| docs | 01 | Authoring reference for the SVG escape hatch | todo | >= 4 | cli/02, cli/03, ui/03 |
-| docs | 02 | Final review | todo | >= 4 | cli/01, cli/02, cli/03, ui/01, ui/02, ui/03, docs/01 |
-| ui | 01 | SVG render path, sanitize policy and theme tokens | todo | >= 4 | cli/01 |
-| ui | 02 | Scope author SVG styles to their figure | todo | >= 4 | — |
-| ui | 03 | Card integration, failure fallback and lightbox | todo | >= 4 | ui/01, ui/02 |
+| Bucket | NN  | Title                                             | Status | Pass line | Depends on                                           |
+| ------ | --- | ------------------------------------------------- | ------ | --------- | ---------------------------------------------------- |
+| cli    | 01  | Diagram format contract and @path input           | todo   | >= 4      | —                                                    |
+| cli    | 02  | SVG lint at write time                            | todo   | >= 4      | cli/01                                               |
+| cli    | 03  | Cross-format fix hint in the Mermaid lint         | todo   | >= 4      | cli/01                                               |
+| docs   | 01  | Authoring reference for the SVG escape hatch      | todo   | >= 4      | cli/02, cli/03, ui/03                                |
+| docs   | 02  | Final review                                      | todo   | >= 4      | cli/01, cli/02, cli/03, ui/01, ui/02, ui/03, docs/01 |
+| ui     | 01  | SVG render path, sanitize policy and theme tokens | todo   | >= 4      | cli/01                                               |
+| ui     | 02  | Scope author SVG styles to their figure           | todo   | >= 4      | —                                                    |
+| ui     | 03  | Card integration, failure fallback and lightbox   | todo   | >= 4      | ui/01, ui/02                                         |
 
 ## Dependency graph
 
@@ -79,11 +80,12 @@ ui/02
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| ui/01 | cli/01 |
-| docs/01 | cli/02, cli/03, ui/03 |
+| Task    | Depends on                                  |
+| ------- | ------------------------------------------- |
+| ui/01   | cli/01                                      |
+| docs/01 | cli/02, cli/03, ui/03                       |
 | docs/02 | cli/01, cli/02, cli/03, ui/01, ui/02, ui/03 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

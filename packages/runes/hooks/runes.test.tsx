@@ -2,7 +2,13 @@ import type { On } from "claude-code";
 import { expect, mock, test, type Engine } from "claude-code/testing";
 
 import { DEFAULTS, PARSE, TEMPLATE } from "./config";
-import { CONFIG, HOME, eventually, fakeHost, ran } from "./transcript/test-session";
+import {
+  CONFIG,
+  HOME,
+  eventually,
+  fakeHost,
+  ran,
+} from "./transcript/test-session";
 import type { FixtureEnv, FixtureRuntimeInfo } from "./transcript/test-session";
 
 const BAND = {
@@ -17,7 +23,12 @@ const BAND = {
   },
 } as const;
 
-const start = async ($: Engine, on: On, files = new Map<string, string>(), opts?: Parameters<typeof fakeHost>[1]) => {
+const start = async (
+  $: Engine,
+  on: On,
+  files = new Map<string, string>(),
+  opts?: Parameters<typeof fakeHost>[1],
+) => {
   const clock = mock.clock(on);
   const host = { ...fakeHost(on, { files, ...opts }), clock };
   on("ui.render", ($, e) => {
@@ -296,14 +307,30 @@ test("the host preserves a throwing runtime probe", async () => {
 const INFO_PROBE = ["bun", "/plugin/hooks/platform-cli.ts"];
 test("the host answers the runtime probe from its env, and fails it like the child with no home", async () => {
   const stdin = JSON.stringify({ op: "info" });
-  const ok = await fixtureHost({ run: () => undefined }).process.run(INFO_PROBE, { stdin });
-  expect(JSON.parse(ok.stdout)).toEqual({ platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: null });
-  const absent = await fixtureHost({ env: { HOME: undefined } }).process.run(INFO_PROBE, { stdin });
+  const ok = await fixtureHost({ run: () => undefined }).process.run(
+    INFO_PROBE,
+    { stdin },
+  );
+  expect(JSON.parse(ok.stdout)).toEqual({
+    platform: "darwin",
+    wsl: false,
+    home: HOME,
+    tmp: "/tmp",
+    chrome: null,
+  });
+  const absent = await fixtureHost({ env: { HOME: undefined } }).process.run(
+    INFO_PROBE,
+    { stdin },
+  );
   expect(absent.exitCode).toBe(1);
   expect(absent.stderr).toContain("could not resolve home");
-  const injected = await fixtureHost({ probe: () => ran("", 5, "injected") }).process.run(INFO_PROBE, { stdin });
+  const injected = await fixtureHost({
+    probe: () => ran("", 5, "injected"),
+  }).process.run(INFO_PROBE, { stdin });
   expect(injected.stderr).toBe("injected");
-  const other = await fixtureHost().process.run(INFO_PROBE, { stdin: JSON.stringify({ op: "mkdir", directory: "/d" }) });
+  const other = await fixtureHost().process.run(INFO_PROBE, {
+    stdin: JSON.stringify({ op: "mkdir", directory: "/d" }),
+  });
   expect(other.exitCode).toBe(127);
 });
 
@@ -328,8 +355,17 @@ test("the host refuses unhandled openers and keeps filesystem writes in memory",
 for (const home of [undefined, ""]) {
   test(`initialization caches the Windows snapshot with HOME ${String(home)}`, async ($, on) => {
     const profile = "C:\\Users\\Q 空間 & %#'";
-    const info = { platform: "win32", wsl: false, home: profile, tmp: "C:\\Temp", chrome: null };
-    const calls: { argv: string[]; init?: { stdin?: string; env?: Record<string, string> } }[] = [];
+    const info = {
+      platform: "win32",
+      wsl: false,
+      home: profile,
+      tmp: "C:\\Temp",
+      chrome: null,
+    };
+    const calls: {
+      argv: string[];
+      init?: { stdin?: string; env?: Record<string, string> };
+    }[] = [];
     const host = await start($, on, new Map(), {
       env: { HOME: home, USERPROFILE: profile },
       probe: (e) => {
@@ -343,7 +379,9 @@ for (const home of [undefined, ""]) {
     expect(stored).toBeDefined();
     expect(host.files.get(stored!)).toBe(TEMPLATE(DEFAULTS.enabled));
     await run($, "reload");
-    expect(calls.filter((e) => e.init?.stdin === JSON.stringify({ op: "info" }))).toHaveLength(1);
+    expect(
+      calls.filter((e) => e.init?.stdin === JSON.stringify({ op: "info" })),
+    ).toHaveLength(1);
     expect(calls[0]!.argv[1]).toMatch(/hooks\/platform-cli\.ts$/);
     expect(calls[0]!.init?.env?.USERPROFILE).toBe(profile);
   });
@@ -359,8 +397,17 @@ test("a failed runtime probe reports its diagnostic and never caches a guessed p
 });
 
 test("Windows glow uses the system scratch subtree with consistent home variables", async ($, on) => {
-  const info = { platform: "win32", wsl: false, home: "C:\\Users\\Q 空間", tmp: "C:\\Temp", chrome: null };
-  const calls: { argv: string[]; init?: { stdin?: string; env?: Record<string, string> } }[] = [];
+  const info = {
+    platform: "win32",
+    wsl: false,
+    home: "C:\\Users\\Q 空間",
+    tmp: "C:\\Temp",
+    chrome: null,
+  };
+  const calls: {
+    argv: string[];
+    init?: { stdin?: string; env?: Record<string, string> };
+  }[] = [];
   await start($, on, new Map(), {
     env: { HOME: undefined, USERPROFILE: info.home },
     probe: () => ran(JSON.stringify(info)),
@@ -371,11 +418,16 @@ test("Windows glow uses the system scratch subtree with consistent home variable
   });
   await session($);
   const ui = await $.ui.mount({
-    plugin: "runes", surface: "terminal", component: "AssistantMessage", requestId: "windows-preview",
+    plugin: "runes",
+    surface: "terminal",
+    component: "AssistantMessage",
+    requestId: "windows-preview",
     props: { text: "Windows markdown", isFirstOfReply: true },
     viewport: { columns: 60, rows: 40 },
   } as never);
-  expect(await eventually(async () => calls.some((call) => call.argv[0] === "glow"))).toBe(true);
+  expect(
+    await eventually(async () => calls.some((call) => call.argv[0] === "glow")),
+  ).toBe(true);
   const glow = calls.find((call) => call.argv[0] === "glow")!;
   expect(glow.init?.env?.HOME).toBe(`${info.tmp}/q-lab/runes/glow`);
   expect(glow.init?.env?.USERPROFILE).toBe(`${info.tmp}/q-lab/runes/glow`);

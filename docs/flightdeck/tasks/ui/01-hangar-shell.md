@@ -1,6 +1,7 @@
 # UI-01: Hangar design system and page shell
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/hangar.md`
 > - `../_context/rubric.md`
@@ -37,7 +38,7 @@ direction, not just list hex codes. Cover, in this order:
 
 1. The one-line idea, and what it is reacting against.
 2. Why dark only.
-3. The palette, with what each colour *means*. Semantics first, hex second.
+3. The palette, with what each colour _means_. Semantics first, hex second.
 4. Type: why monospace is the body face here rather than an accent.
 5. The anti-goals list, verbatim. This is the section that keeps the screen from drifting into generic
    dark-mode UI.
@@ -92,8 +93,8 @@ Assign the store to `window.__flightdeck` after mounting. That one line is what 
 verifiable before any API exists, and it stays useful afterwards for inspecting live state:
 
 ```js
-const store = reactive({ /* the shape above */ });
-window.__flightdeck = store;   // test + debug handle; petite-vue reactivity applies to assignments
+const store = reactive({/* the shape above */});
+window.__flightdeck = store; // test + debug handle; petite-vue reactivity applies to assignments
 ```
 
 Three states must be visible, not silent:
@@ -134,12 +135,12 @@ The panels themselves stay empty in this task. Leaving them as labelled empty re
 - [x] Confirm the shell itself: header, top section, and fleet section present, in the specified grid,
       with the two sections scrolling independently.
 - [x] Stub the payload to check the populated header without a server. In the browser console:
-      ```js
-      Object.assign(window.__flightdeck, {
-        planTitle: "Waypoints skill", slug: "waypoints-skill", loading: false, loadError: null,
-        counts: { total: 6, done: 6, inProgress: 0, ready: 0, blocked: 0 },
-      });
-      ```
+      `js
+    Object.assign(window.__flightdeck, {
+      planTitle: "Waypoints skill", slug: "waypoints-skill", loading: false, loadError: null,
+      counts: { total: 6, done: 6, inProgress: 0, ready: 0, blocked: 0 },
+    });
+    `
       Then assert the DOM: the header shows `Waypoints skill`, the counts read 6 of 6, and the progress
       ring's `stroke-dasharray` shows a full circle with no remaining gap.
 - [x] Confirm no stray hex outside the token block:
@@ -155,13 +156,13 @@ The panels themselves stay empty in this task. Leaving them as labelled empty re
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Shell does not render, or the grid and scroll behaviour are wrong | Renders but a required state is silent, or the responsive break is missing | Grid, independent scroll, responsive stack, and all three states behave as specified |
-| Design fidelity | ×2 | Invents colours or spacing, or violates a stated anti-goal | Tokens declared but raw values still appear in rules | Every token transcribed exactly, no raw hex outside `:root`, spacing on the 4px steps, radius ceiling respected |
-| Test coverage | ×2 | No verification performed | Loads once, states unchecked | Every Verification step run, including the mechanical hex and vendor checks |
-| Interface & readability | ×1 | Styles and markup tangled, store shape undocumented | Works but the store carries ad-hoc extra keys | Store matches the specified shape, stylesheet ordered tokens then layout then components |
-| Assumptions & docs | ×1 | `PRODUCT.md` is a hex list | Documents values without arguing the direction | Argues the direction, explains dark-only and monospace-body, anti-goals verbatim |
+| Dimension               | Weight | 0–1 (fail)                                                        | 2–3 (below bar)                                                            | 4–5 (pass)                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Shell does not render, or the grid and scroll behaviour are wrong | Renders but a required state is silent, or the responsive break is missing | Grid, independent scroll, responsive stack, and all three states behave as specified                            |
+| Design fidelity         | ×2     | Invents colours or spacing, or violates a stated anti-goal        | Tokens declared but raw values still appear in rules                       | Every token transcribed exactly, no raw hex outside `:root`, spacing on the 4px steps, radius ceiling respected |
+| Test coverage           | ×2     | No verification performed                                         | Loads once, states unchecked                                               | Every Verification step run, including the mechanical hex and vendor checks                                     |
+| Interface & readability | ×1     | Styles and markup tangled, store shape undocumented               | Works but the store carries ad-hoc extra keys                              | Store matches the specified shape, stylesheet ordered tokens then layout then components                        |
+| Assumptions & docs      | ×1     | `PRODUCT.md` is a hex list                                        | Documents values without arguing the direction                             | Argues the direction, explains dark-only and monospace-body, anti-goals verbatim                                |
 
 ## Out of scope
 

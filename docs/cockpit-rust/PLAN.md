@@ -37,6 +37,7 @@ Current cockpit TS, non-test: 8,769 LOC — daemon closure 5,479, channel 977, C
 Verified: the plugin cache preserves `+x`; cache files carry `com.apple.provenance`, not `com.apple.quarantine`, so curl-downloaded binaries pass Gatekeeper. rmcp exposes `CustomNotification { method, params }` in both directions (context7, docs.rs/rmcp).
 
 Coupling outside cockpit that must keep working:
+
 - usage-dashboard `atlas-server.ts` imports `cockpit/scripts/cockpit-home.ts` and `cockpit/scripts/http.ts`; `live.ts` imports `cockpit-home.ts` and reads `daemon.json` (`port`) and `registry.json`. These two TS files stay.
 - `install/scripts/reap-stale.ts` finds orphans by regex on `.../cockpit/scripts/(cockpit-channel|cockpit-server).ts`.
 - `install/scripts/setup.ts` checks `cockpit-channel.ts` exists.
@@ -121,34 +122,34 @@ usage-dashboard (Bun) ─▶ reads daemon.json / registry.json, imports cockpit-
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | launcher-harness | todo | > 4.0 | — |
-| contract | 02 | daemon-http-contract | todo | > 4.0 | contract/01 |
-| contract | 03 | channel-mcp-contract | todo | > 4.0 | contract/01 |
-| contract | 04 | cli-hook-contract | todo | > 4.0 | contract/01 |
-| core | 01 | crate-scaffold-paths-config | todo | > 4.0 | — |
-| core | 02 | registry-logroot-daemon-lifecycle | todo | > 4.0 | core/01 |
-| core | 03 | shared-find-session-nudge-toggle | todo | > 4.0 | core/02 |
-| channel | 01 | rmcp-handshake-spike | todo | > 4.0 | core/01, contract/03 |
-| channel | 02 | channel-full | todo | > 4.0 | channel/01, core/03, server/01 |
-| server | 01 | server-foundation-startup-static | todo | > 4.0 | core/03, contract/02 |
-| server | 02 | log-stream-sse-tailer | todo | > 4.0 | server/01 |
-| server | 03 | transcript-stream-history | todo | > 4.0 | server/02, server/08 |
-| server | 04 | broker-inbox-send | todo | > 4.0 | server/01 |
-| server | 05 | permission-relay | todo | > 4.0 | server/04, server/02 |
-| server | 06 | codex-control-send | todo | > 4.0 | server/01 |
-| server | 07 | opencode-send | todo | > 4.0 | server/01 |
-| server | 08 | views-sessions-design | todo | > 4.0 | server/01, server/04 |
-| cli | 01 | cli-trail-config-subcommands | todo | > 4.0 | core/03, contract/04 |
-| cli | 02 | cli-wait-send-restart-lint | todo | > 4.0 | cli/01, server/05 |
-| hooks | 01 | session-start-hooks | todo | > 4.0 | core/03, contract/04 |
-| hooks | 02 | stop-hook-scribe-nudge | todo | > 4.0 | hooks/01 |
-| ship | 01 | sh-shim-download | todo | > 4.0 | core/01 |
-| ship | 02 | ci-release-workflow | todo | > 4.0 | ship/01 |
-| ship | 03 | wire-plugins-to-shim | todo | > 4.0 | ship/01, channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
-| ship | 04 | delete-ts-docs-rss | todo | > 4.0 | ship/02, ship/03 |
-| review | 01 | final review 🏁 | todo | > 4.0 | ship/04 |
+| Bucket   | NN  | Title                             | Status | Pass line | Depends on                                                                                   |
+| -------- | --- | --------------------------------- | ------ | --------- | -------------------------------------------------------------------------------------------- |
+| contract | 01  | launcher-harness                  | todo   | > 4.0     | —                                                                                            |
+| contract | 02  | daemon-http-contract              | todo   | > 4.0     | contract/01                                                                                  |
+| contract | 03  | channel-mcp-contract              | todo   | > 4.0     | contract/01                                                                                  |
+| contract | 04  | cli-hook-contract                 | todo   | > 4.0     | contract/01                                                                                  |
+| core     | 01  | crate-scaffold-paths-config       | todo   | > 4.0     | —                                                                                            |
+| core     | 02  | registry-logroot-daemon-lifecycle | todo   | > 4.0     | core/01                                                                                      |
+| core     | 03  | shared-find-session-nudge-toggle  | todo   | > 4.0     | core/02                                                                                      |
+| channel  | 01  | rmcp-handshake-spike              | todo   | > 4.0     | core/01, contract/03                                                                         |
+| channel  | 02  | channel-full                      | todo   | > 4.0     | channel/01, core/03, server/01                                                               |
+| server   | 01  | server-foundation-startup-static  | todo   | > 4.0     | core/03, contract/02                                                                         |
+| server   | 02  | log-stream-sse-tailer             | todo   | > 4.0     | server/01                                                                                    |
+| server   | 03  | transcript-stream-history         | todo   | > 4.0     | server/02, server/08                                                                         |
+| server   | 04  | broker-inbox-send                 | todo   | > 4.0     | server/01                                                                                    |
+| server   | 05  | permission-relay                  | todo   | > 4.0     | server/04, server/02                                                                         |
+| server   | 06  | codex-control-send                | todo   | > 4.0     | server/01                                                                                    |
+| server   | 07  | opencode-send                     | todo   | > 4.0     | server/01                                                                                    |
+| server   | 08  | views-sessions-design             | todo   | > 4.0     | server/01, server/04                                                                         |
+| cli      | 01  | cli-trail-config-subcommands      | todo   | > 4.0     | core/03, contract/04                                                                         |
+| cli      | 02  | cli-wait-send-restart-lint        | todo   | > 4.0     | cli/01, server/05                                                                            |
+| hooks    | 01  | session-start-hooks               | todo   | > 4.0     | core/03, contract/04                                                                         |
+| hooks    | 02  | stop-hook-scribe-nudge            | todo   | > 4.0     | hooks/01                                                                                     |
+| ship     | 01  | sh-shim-download                  | todo   | > 4.0     | core/01                                                                                      |
+| ship     | 02  | ci-release-workflow               | todo   | > 4.0     | ship/01                                                                                      |
+| ship     | 03  | wire-plugins-to-shim              | todo   | > 4.0     | ship/01, channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
+| ship     | 04  | delete-ts-docs-rss                | todo   | > 4.0     | ship/02, ship/03                                                                             |
+| review   | 01  | final review 🏁                   | todo   | > 4.0     | ship/04                                                                                      |
 
 Rubric: shared bar in `_context/rubric.md` — Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1, pass > 4.0, Correctness < 4 veto. review/01 adds Leanness ×1.
 

@@ -128,7 +128,7 @@ Use a free port, never 5938. Every output — `atlas.json`, `codex-sessions.db`,
 - **HTTPS via reqwest + rustls** with bundled webpki roots.
 - **No schema change.** `rollup.db` stays v3. Rust refuses an unknown or newer version exactly like TS.
 - **One-time backup**: the first Rust open of a `rollup.db` whose `meta` lacks `writer = rust` runs `VACUUM INTO '<db>.pre-rust.bak'` (skip when that file already exists), then inserts `writer = rust`.
-- **Statusline migration**: `setup.ts --session-check` rewrites an *existing* `bun …statusline-collector.ts` statusline command to the shim's `atlas statusline`. It still never fresh-wires.
+- **Statusline migration**: `setup.ts --session-check` rewrites an _existing_ `bun …statusline-collector.ts` statusline command to the shim's `atlas statusline`. It still never fresh-wires.
 - **Delete the TS** once the Rust suite is green, like cockpit.
 - **Targets** (macOS arm64, `ps -o rss=`): `atlas serve` ≤ 40 MB after one `/api/stats` build with the dashboard open; `/api/stats` cold build ≤ TS on the same home; `atlas statusline` own overhead ≤ 10 ms. Misses are reported, never hidden.
 - **Max parallel 3** — each worktree runs its own `cargo build`.

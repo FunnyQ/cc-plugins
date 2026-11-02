@@ -1,6 +1,7 @@
 # REVIEW-01: Final Review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/types.md`
 > - `../_context/data-model.md`
@@ -64,7 +65,7 @@ transcripts the way the feature does, sum `message.usage.output_tokens` over eve
 `assistant` line of every matching file with a throwaway script, and compare. **Sum
 across every matching workflow directory, not just one** — plan usage is cumulative
 over every execution, so a plan that ran twice has two directories and both count; a
-single-directory sum disagrees with a *correct* dashboard and reads as a feature bug
+single-directory sum disagrees with a _correct_ dashboard and reads as a feature bug
 when the bug is in the check.
 
 Say in your report whether this second comparison ran or was skipped for lack of data.
@@ -128,6 +129,7 @@ in the order they are likely to have happened:
   The optional parameters that exist purely as test seams are also not findings. There
   are two of them by design, each defaulted to the real construction, each the reason a
   path is testable at all. Removing one would trade a working test for nothing.
+
 - Hand-rolled versions of what already exists in this directory: the byte-cursor
   helpers, the identity key, the HTML escaper, the score formatter.
 
@@ -186,13 +188,13 @@ what has no current requirement behind it.
 > Scale 0–5. Weighted average `> 4.0` to pass. `Meets the goal < 4` is an automatic veto.
 > This task scores the assembled feature, not the individual layers — see `../_context/rubric.md` for the per-layer bar it does not repeat.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Meets the goal | ×3 | the displayed total does not match ground truth, or no end-to-end check was run | the total matches but a distinction was lost — unavailable renders as zero, or the two panels disagree about scope | the header, card, and column figures all trace to disk correctly, and unavailable stays distinct from zero |
-| Integration | ×2 | a layer's output does not fit the next layer's input; the assembled path throws or silently drops data | the layers compose but a seam leaks — a raw wire name inland, a duplicated formatter, a type declared twice | reader, attribution, stream, and render compose cleanly with one owner per file and one name per concept |
-| No regressions | ×2 | the fleet panel, the stream, or the tree endpoint broke | an existing test needed changing for a reason other than a deliberately changed signature | every pre-existing test passes, the fleet panel still streams and reaps, the tree payload is untouched |
-| Consistency | ×1 | naming, error handling, and comment style differ layer to layer | mostly consistent with one or two unexplained deviations | reads as one author, and every dependence on the undocumented on-disk layout is flagged for re-verification |
-| Leanness | ×1 | a cache, persistence layer, extra timer, or extra route was added that nothing required | one single-caller indirection or one hand-rolled copy of an existing helper survives | nothing was built that no stated requirement needed; existing helpers were reused rather than re-written; small local helpers and defaulted test seams left alone |
+| Dimension      | Weight | 0–1 (fail)                                                                                             | 2–3 (below bar)                                                                                                    | 4–5 (pass)                                                                                                                                                        |
+| -------------- | ------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Meets the goal | ×3     | the displayed total does not match ground truth, or no end-to-end check was run                        | the total matches but a distinction was lost — unavailable renders as zero, or the two panels disagree about scope | the header, card, and column figures all trace to disk correctly, and unavailable stays distinct from zero                                                        |
+| Integration    | ×2     | a layer's output does not fit the next layer's input; the assembled path throws or silently drops data | the layers compose but a seam leaks — a raw wire name inland, a duplicated formatter, a type declared twice        | reader, attribution, stream, and render compose cleanly with one owner per file and one name per concept                                                          |
+| No regressions | ×2     | the fleet panel, the stream, or the tree endpoint broke                                                | an existing test needed changing for a reason other than a deliberately changed signature                          | every pre-existing test passes, the fleet panel still streams and reaps, the tree payload is untouched                                                            |
+| Consistency    | ×1     | naming, error handling, and comment style differ layer to layer                                        | mostly consistent with one or two unexplained deviations                                                           | reads as one author, and every dependence on the undocumented on-disk layout is flagged for re-verification                                                       |
+| Leanness       | ×1     | a cache, persistence layer, extra timer, or extra route was added that nothing required                | one single-caller indirection or one hand-rolled copy of an existing helper survives                               | nothing was built that no stated requirement needed; existing helpers were reused rather than re-written; small local helpers and defaulted test seams left alone |
 
 ## Out of scope
 

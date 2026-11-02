@@ -1,6 +1,7 @@
 # INTEGRATION-02: dispatch plugin metadata bump
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -54,12 +55,14 @@ Follow the repo's Keep-a-Changelog format and the per-plugin heading convention 
 ## [dispatch 3.13.0]
 
 ### Added
+
 - **waypoints** — a fourth dispatch skill: a rolling-wave milestone-roadmap tier above flightplan. Writes
   `docs/<proj>/WAYPOINTS.md` (milestones + `[x]`/`[~]`/`[ ]` status), a `waypoints.ts` CLI
   (`active` / `leg-scaffold` / `advance`), and a flightplan "waypoint mode" that plans one leg at a time
   into `docs/<proj>/legs/NN-slug/`. Tracks the scoped tag `dispatch-v3.13.0`.
 
 ### Changed
+
 - **flightplan** (0.6.0) — gains waypoint mode; `flightplan-lint.sh` now lints nested leg task files.
 ```
 
@@ -85,12 +88,12 @@ Match the exact heading style and section ordering used by the nearest existing 
 
 > Scale and shared dimensions: see `../_context/rubric.md` (dimension set B — docs tasks). Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong version, invalid JSON, or marketplace files touched | version right but prose or CHANGELOG heading drifts from convention | both manifests 3.13.0, valid JSON, prose names four skills, CHANGELOG matches format |
-| Completeness | ×2 | a file missed | version done but CHANGELOG or prose missing | all three files updated |
-| Clarity & consistency | ×1 | CHANGELOG phrasing inconsistent | readable but off-format | CHANGELOG + prose consistent with existing entries |
-| Conventions | ×1 | adds a version to marketplace or breaks JSON | minor format slip | follows the per-plugin versioning + changelog conventions exactly |
+| Dimension             | Weight | 0–1 (fail)                                                | 2–3 (below bar)                                                     | 4–5 (pass)                                                                           |
+| --------------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Correctness           | ×3     | wrong version, invalid JSON, or marketplace files touched | version right but prose or CHANGELOG heading drifts from convention | both manifests 3.13.0, valid JSON, prose names four skills, CHANGELOG matches format |
+| Completeness          | ×2     | a file missed                                             | version done but CHANGELOG or prose missing                         | all three files updated                                                              |
+| Clarity & consistency | ×1     | CHANGELOG phrasing inconsistent                           | readable but off-format                                             | CHANGELOG + prose consistent with existing entries                                   |
+| Conventions           | ×1     | adds a version to marketplace or breaks JSON              | minor format slip                                                   | follows the per-plugin versioning + changelog conventions exactly                    |
 
 ## Out of scope
 

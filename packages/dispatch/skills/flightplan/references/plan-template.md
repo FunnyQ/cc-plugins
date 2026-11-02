@@ -62,8 +62,8 @@ Freeze the choices that affect more than one task. These flow into `_context/sha
 ## Architecture
 
 <Diagram or prose. How the pieces fit. Where the new code lives. What it talks to.>
-
 ```
+
 <ascii diagram if helpful>
 ```
 
@@ -81,13 +81,13 @@ Tasks live under `tasks/<bucket>/`. Bucketing strategy and rationale:
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| ui | 01 | <slug> | todo | > 4.0 | — |
-| ui | 02 | <slug> | todo | > 4.0 | ui/01 |
-| backend | 01 | <slug> | todo | > 4.0 | — |
-| api | 01 | <slug> | todo | > 4.0 | ui/02, backend/01 |
-| review | 01 | final review 🏁 | todo | > 4.0 | api/01, ui/02, backend/01 |
+| Bucket  | NN  | Title           | Status | Pass line | Depends on                |
+| ------- | --- | --------------- | ------ | --------- | ------------------------- |
+| ui      | 01  | <slug>          | todo   | > 4.0     | —                         |
+| ui      | 02  | <slug>          | todo   | > 4.0     | ui/01                     |
+| backend | 01  | <slug>          | todo   | > 4.0     | —                         |
+| api     | 01  | <slug>          | todo   | > 4.0     | ui/02, backend/01         |
+| review  | 01  | final review 🏁 | todo   | > 4.0     | api/01, ui/02, backend/01 |
 
 (Mirrors the table in `tasks/README.md` — keep them in sync. The last row is the **final review** task, marked `> **Final review**: true` in its file; its `Depends on` must reach every other task. It always sits at `review/01` — its own reserved bucket, never the next number in a feature bucket.)
 
@@ -115,6 +115,7 @@ backend/01 ─────┘
 ## References
 
 - <Link to design doc, ticket, slack thread, etc.>
+
 ```
 
 ## Tailoring rules
@@ -129,3 +130,4 @@ backend/01 ─────┘
 Under Claude Code, lower **Max parallel** only when tasks share an **external live resource** that a worktree cannot isolate: a live device, a LaunchAgent or service that a verification reinstalls, or a local database that a migration rewrites. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). When `Depends on` edges already sequence every conflict, write `unlimited` or omit the line. Write the value as a bare positive integer or `unlimited`. Do not describe a lock or serial execution in prose instead: nothing reads it.
 
 Do not omit "Non-goals". It is the single best lever against scope creep.
+```

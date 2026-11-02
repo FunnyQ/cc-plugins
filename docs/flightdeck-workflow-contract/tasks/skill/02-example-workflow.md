@@ -1,6 +1,7 @@
 # SKILL-02: The runnable example, doubling as the dashboard fixture
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -118,6 +119,7 @@ run needs and a fixture does not:
    - **the working repository** — where the agents actually do the job, which is also the value the graph declares as its repository root
 
    Say plainly that a path left as a shell variable expands to nothing in the child, and that this is the failure the step exists to prevent.
+
 8. Run it, and watch the same panels update live.
 
 Keep the two lists visibly separate. A reader who does A and believes they have
@@ -162,13 +164,13 @@ A reader who follows the walkthrough and sees all five is looking at a working p
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The script would not run — an import, a filesystem call, or a global that does not exist; or the trail contradicts itself and would not render | Script runs but a prompt's announce and completion disagree, or the trail misses a displayed state, or a path is relative | The script would run as written, and the trail renders every displayed state exactly as the walkthrough claims |
-| Backward compatibility | ×2 | The added test or files change how an existing task-tree directory loads or renders | New files sit apart, but the modified test file disturbs existing cases | Purely additive: existing loading and rendering are untouched, and the modified test file only gains cases |
-| Test coverage | ×2 | The example is committed but nothing asserts it | A test loads the graph but ignores the trail, or asserts only node count and absence of errors — which an emptied trail also satisfies | The committed trail is run against the committed graph through the existing derivation, asserting each node's displayed state by name, the counts, and the retry and score results, so losing any part of the fixture fails the test |
-| Interface & readability | ×1 | The script reads as generated filler an author would delete rather than adapt | Readable but the conformance rules are invisible in it — an author would have to read the specification to know why a line is there | An author can adapt it directly, and each rule it follows is visible where it applies |
-| Assumptions & docs | ×1 | The repository-root value and the fixture placement are left unstated, so the example works only on the machine that wrote it | Placement is described but the reason is not, so the next person moves it back | The placement decision and the repository-root substitution are both written down with the failure each prevents |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                     | 2–3 (below bar)                                                                                                                        | 4–5 (pass)                                                                                                                                                                                                                           |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The script would not run — an import, a filesystem call, or a global that does not exist; or the trail contradicts itself and would not render | Script runs but a prompt's announce and completion disagree, or the trail misses a displayed state, or a path is relative              | The script would run as written, and the trail renders every displayed state exactly as the walkthrough claims                                                                                                                       |
+| Backward compatibility  | ×2     | The added test or files change how an existing task-tree directory loads or renders                                                            | New files sit apart, but the modified test file disturbs existing cases                                                                | Purely additive: existing loading and rendering are untouched, and the modified test file only gains cases                                                                                                                           |
+| Test coverage           | ×2     | The example is committed but nothing asserts it                                                                                                | A test loads the graph but ignores the trail, or asserts only node count and absence of errors — which an emptied trail also satisfies | The committed trail is run against the committed graph through the existing derivation, asserting each node's displayed state by name, the counts, and the retry and score results, so losing any part of the fixture fails the test |
+| Interface & readability | ×1     | The script reads as generated filler an author would delete rather than adapt                                                                  | Readable but the conformance rules are invisible in it — an author would have to read the specification to know why a line is there    | An author can adapt it directly, and each rule it follows is visible where it applies                                                                                                                                                |
+| Assumptions & docs      | ×1     | The repository-root value and the fixture placement are left unstated, so the example works only on the machine that wrote it                  | Placement is described but the reason is not, so the next person moves it back                                                         | The placement decision and the repository-root substitution are both written down with the failure each prevents                                                                                                                     |
 
 ## Out of scope
 

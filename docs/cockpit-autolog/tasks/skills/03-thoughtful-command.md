@@ -1,6 +1,7 @@
 # SKILLS-03: Thoughtful command + delete the thoughtful skill
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -47,8 +48,8 @@ Port the substance of the current `thoughtful` skill into the command body. It i
   deliberate-but-odd implementation, a tricky learning, or a sharp caveat), spawn a
   **background fork** to distill it.
 - **Claude Code**: use the Agent tool with **`subagent_type` omitted** (inherits the
-  conversation context, cache-warm) and the prompt: *"Run /cockpit scribe to distill the
-  work we just completed into cockpit decision-trail entries."* Fire-and-forget.
+  conversation context, cache-warm) and the prompt: _"Run /cockpit scribe to distill the
+  work we just completed into cockpit decision-trail entries."_ Fire-and-forget.
 - **Codex**: spawn a background sub-agent with `fork_context: true` and no `agent_type`,
   prompt stating it runs under Codex and must pass `--provider codex`.
 - Volume bias: one fork per logical chunk, skip trivial edits. No `cockpit start` needed —
@@ -79,12 +80,12 @@ there. Make the command self-contained for both surfaces.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | command missing or spawns wrong fork type | works on Claude only / old skill left | both surfaces covered; subagent_type omitted; old skill deleted |
-| Test coverage | ×2 | no checks | existence only | file-exists + skill-gone + grep-for-key-instructions |
-| Interface & readability | ×1 | unclear when to fire | acceptable | clear WHEN/HOW + skip rules |
-| Assumptions & docs | ×1 | drops the no-custom-agent rationale | partial | states why subagent_type stays omitted |
+| Dimension               | Weight | 0–1 (fail)                                | 2–3 (below bar)                       | 4–5 (pass)                                                      |
+| ----------------------- | ------ | ----------------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| Correctness             | ×3     | command missing or spawns wrong fork type | works on Claude only / old skill left | both surfaces covered; subagent_type omitted; old skill deleted |
+| Test coverage           | ×2     | no checks                                 | existence only                        | file-exists + skill-gone + grep-for-key-instructions            |
+| Interface & readability | ×1     | unclear when to fire                      | acceptable                            | clear WHEN/HOW + skip rules                                     |
+| Assumptions & docs      | ×1     | drops the no-custom-agent rationale       | partial                               | states why subagent_type stays omitted                          |
 
 ## Out of scope
 

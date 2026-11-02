@@ -6,17 +6,17 @@ Guidance for Claude Code (claude.ai/code) in this repository.
 
 `q-lab-marketplace` — a plugin marketplace for Claude Code, Codex, and OpenCode. It holds nine plugins. Each versions independently, and each but `runes` ships to Claude Code and Codex; OpenCode is a third runtime layered on top of the same skills (see `opencode/` below), versioned with none of them.
 
-| Plugin        | Purpose                                                                 | Skills                                                                 |
-| ------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **monitor**   | Usage analytics + live session cockpit                                  | `usage-dashboard`, `cockpit`, `install`                                |
-| **dispatch**  | Interview-driven planning and execution                                 | `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan` |
-| **relay**     | Delegate a task to another harness CLI                                  | `relay`                                                                |
-| **chronicle** | ADR curation, commit, PR/MR, and release automation                     | `adr`, `commit`, `pr`, `release`, `install`                            |
+| Plugin        | Purpose                                                                 | Skills                                                                         |
+| ------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **monitor**   | Usage analytics + live session cockpit                                  | `usage-dashboard`, `cockpit`, `install`                                        |
+| **dispatch**  | Interview-driven planning and execution                                 | `preflight`, `hop`, `flightplan`, `autopilot`, `waypoints`, `deckplan`         |
+| **relay**     | Delegate a task to another harness CLI                                  | `relay`                                                                        |
+| **chronicle** | ADR curation, commit, PR/MR, and release automation                     | `adr`, `commit`, `pr`, `release`, `install`                                    |
 | **herdr**     | Reference + agent orchestration for the Herdr terminal                  | `herdr`, `herdr-app`, `tell`, `ask`, `herdr-browser`, `herdr-protocol-upgrade` |
-| **guard**     | Coding rules the harness enforces, as hooks; an on-demand comment sweep | `comments-reaper`                                                      |
-| **browsers**  | Drive Firefox, Zen, Chrome, and Safari from the terminal                | `firefox`, `chrome`, `safari`                                          |
-| **atelier**   | Tune visual effects and animations with live controls                   | `tune`                                                                 |
-| **runes**     | Switchable UI mods, Claude Code only; first rune is the Clawd mascot    | _(none — a function-hooks mod, toggled by `/runes`)_                   |
+| **guard**     | Coding rules the harness enforces, as hooks; an on-demand comment sweep | `comments-reaper`                                                              |
+| **browsers**  | Drive Firefox, Zen, Chrome, and Safari from the terminal                | `firefox`, `chrome`, `safari`                                                  |
+| **atelier**   | Tune visual effects and animations with live controls                   | `tune`                                                                         |
+| **runes**     | Switchable UI mods, Claude Code only; first rune is the Clawd mascot    | _(none — a function-hooks mod, toggled by `/runes`)_                           |
 
 Read the plugin's own `skills/*/SKILL.md` for its contract. This file documents only what no `SKILL.md` covers: per-plugin design facts, the repo layout, monitor's dashboard internals, the cockpit and harness constraints, the commands, and the release rules.
 

@@ -807,7 +807,13 @@ describe("executeRelay live routing", () => {
   it("reattaches a herdr-app pane through hc on collect", async () => {
     let herdScriptPath: string | undefined;
     await executeRelay(
-      ["collect", "--agent", "relay-claude-delegate-ab12", "--result", "/tmp/r.md"],
+      [
+        "collect",
+        "--agent",
+        "relay-claude-delegate-ab12",
+        "--result",
+        "/tmp/r.md",
+      ],
       deps({
         env: { HC_TERMINAL_ID: "t46" },
         collectLive: (opts) => {
@@ -1000,9 +1006,7 @@ describe("executeRelay live routing", () => {
       "- The file's last line must be exactly: ==== RELAY RESULT END ====",
     );
 
-    expect(liveOpts!.bootstrapText).toContain(
-      join(RUN_DIR, "live-prompt.md"),
-    );
+    expect(liveOpts!.bootstrapText).toContain(join(RUN_DIR, "live-prompt.md"));
     expect(liveOpts!.bootstrapText).not.toContain("built prompt");
     expect(liveOpts!.resultPath).toBe(join(RUN_DIR, "result.md"));
   });

@@ -1,6 +1,7 @@
 # HOOKS-01: Session-start hook
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -58,7 +59,14 @@ session-start: a missing stdin or invalid JSON becomes `HookInput::default()` an
 - The shape is shared with relay; it is a path and a shape, never code:
 
 ```json
-{ "cwd": "/abs", "backend": "codex", "startedAt": 0, "armUntil": 0, "expiresAt": 0, "sessionIds": [] }
+{
+  "cwd": "/abs",
+  "backend": "codex",
+  "startedAt": 0,
+  "armUntil": 0,
+  "expiresAt": 0,
+  "sessionIds": []
+}
 ```
 
 - Read every `*.json` in the directory. Skip a file that is unreadable, or whose `cwd` is not a string, `expiresAt` or `armUntil` is not a number, or `sessionIds` is not an array. A missing directory means no markers.
@@ -69,11 +77,12 @@ pub struct Classification { pub delegated: bool, pub bind_to: Option<String>, pu
 pub fn classify_markers(files: &[(String, Marker)], cwd: Option<&str>, session_id: Option<&str>, now_ms: i64) -> Classification;
 ```
 
-  1. Split the files into expired (`expiresAt <= now`) and live.
-  2. If `session_id` is `Some` and any live marker's `sessionIds` contains it, return `delegated: true` with no binding.
-  3. If `cwd` is `None`, return `delegated: false`.
-  4. Armed markers are the live ones with `cwd == input cwd` and `now <= armUntil`. If there are none, return `delegated: false`.
-  5. Otherwise `delegated: true`. The target is the first armed marker with empty `sessionIds`, else the first armed marker. `bind_to` is that target's name only when `session_id` is `Some`.
+1. Split the files into expired (`expiresAt <= now`) and live.
+2. If `session_id` is `Some` and any live marker's `sessionIds` contains it, return `delegated: true` with no binding.
+3. If `cwd` is `None`, return `delegated: false`.
+4. Armed markers are the live ones with `cwd == input cwd` and `now <= armUntil`. If there are none, return `delegated: false`.
+5. Otherwise `delegated: true`. The target is the first armed marker with empty `sessionIds`, else the first armed marker. `bind_to` is that target's name only when `session_id` is `Some`.
+
 - I/O after classifying:
   - Delete every expired file, ignoring errors.
   - When `bind_to` is set, push the session id onto that marker's `sessionIds` and rewrite the file as compact JSON (`JSON.stringify`, no indent), ignoring errors.
@@ -141,12 +150,12 @@ Spawn no subprocess. `find_session` for Codex reads sqlite locally. Make no HTTP
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Guidance text differs, or a delegated or subagent session is not silenced | Main paths match, but the marker binding, the PLUGIN_ROOT gate, or the `claude`-on-PATH silence drifts | Contract group green against Rust and TS; the marker two-phase match is exact |
-| Test coverage | ×2 | No cargo tests | Guidance strings only | Every `classify_markers` branch and all guidance variants are unit-tested |
-| Interface & readability | ×1 | Marker logic inlined in the entry point; `unwrap` on marker JSON | Works, but skip logic is duplicated where the Stop hook will need it | `reminder.rs` exposes `should_skip`, `is_claude_code`, and `resolve_parent_session` for reuse; the classifier is pure |
-| Assumptions & docs | ×1 | The marker shape is changed silently | The shared-with-relay contract is not noted | A one-line comment names relay's writer as the other side of the marker contract |
+| Dimension               | Weight | 0–1 (fail)                                                                | 2–3 (below bar)                                                                                        | 4–5 (pass)                                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Guidance text differs, or a delegated or subagent session is not silenced | Main paths match, but the marker binding, the PLUGIN_ROOT gate, or the `claude`-on-PATH silence drifts | Contract group green against Rust and TS; the marker two-phase match is exact                                         |
+| Test coverage           | ×2     | No cargo tests                                                            | Guidance strings only                                                                                  | Every `classify_markers` branch and all guidance variants are unit-tested                                             |
+| Interface & readability | ×1     | Marker logic inlined in the entry point; `unwrap` on marker JSON          | Works, but skip logic is duplicated where the Stop hook will need it                                   | `reminder.rs` exposes `should_skip`, `is_claude_code`, and `resolve_parent_session` for reuse; the classifier is pure |
+| Assumptions & docs      | ×1     | The marker shape is changed silently                                      | The shared-with-relay contract is not noted                                                            | A one-line comment names relay's writer as the other side of the marker contract                                      |
 
 ## Out of scope
 

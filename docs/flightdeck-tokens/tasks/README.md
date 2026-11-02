@@ -37,6 +37,7 @@ tasks/
 type file every later task imports. The chain after it is strictly linear.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -48,13 +49,13 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| review | 01 | Final Review | todo | > 4 | work/04 |
-| work | 01 | Transcript Source | todo | > 4 | — |
-| work | 02 | Usage Attribution | todo | > 4 | work/01 |
-| work | 03 | SSE Wiring | todo | > 4 | work/02 |
-| work | 04 | Dashboard Rendering | todo | > 4 | work/03 |
+| Bucket | NN  | Title               | Status | Pass line | Depends on |
+| ------ | --- | ------------------- | ------ | --------- | ---------- |
+| review | 01  | Final Review        | todo   | > 4       | work/04    |
+| work   | 01  | Transcript Source   | todo   | > 4       | —          |
+| work   | 02  | Usage Attribution   | todo   | > 4       | work/01    |
+| work   | 03  | SSE Wiring          | todo   | > 4       | work/02    |
+| work   | 04  | Dashboard Rendering | todo   | > 4       | work/03    |
 
 ## Dependency graph
 
@@ -70,9 +71,10 @@ work/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| review/01 | work/04 |
+| Task      | Depends on |
+| --------- | ---------- |
+| review/01 | work/04    |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

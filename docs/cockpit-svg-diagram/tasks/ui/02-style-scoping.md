@@ -1,6 +1,7 @@
 # UI-02: Scope author SVG styles to their figure
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -27,13 +28,19 @@ A `<style>` element inside inline SVG is a **document-level** style element once
 Mermaid's output is immune because mermaid emits id-scoped rules:
 
 ```css
-#cockpit-mmd-3 .node rect { fill: #222537; }
+#cockpit-mmd-3 .node rect {
+  fill: #222537;
+}
 ```
 
 A hand-authored or Excalidraw-exported SVG carries no such discipline. One decision card holding this:
 
 ```html
-<style>rect { fill: #fff }</style>
+<style>
+  rect {
+    fill: #fff;
+  }
+</style>
 ```
 
 repaints every `rect` in the dashboard — other cards, the transcript, the chrome. DOMPurify's SVG profile **permits** the `style` tag, so sanitization alone does not stop this. Nothing in the existing pipeline closes this hole. This pass is the thing that closes it.
@@ -64,18 +71,20 @@ Pick whichever mechanism satisfies these. The tests assert the behaviour.
   - `@media`, whose inner rules are each rewritten by the rule above.
 
   **Dropped, without exception:**
-  - `@keyframes`, `@font-face` with a non-`data:` `src`, `@import`, `@supports`, `@namespace`, `@layer`, `@container`, `@scope`, `@property`, and any at-rule not named above. An unknown at-rule is dropped precisely *because* it is unknown.
+  - `@keyframes`, `@font-face` with a non-`data:` `src`, `@import`, `@supports`, `@namespace`, `@layer`, `@container`, `@scope`, `@property`, and any at-rule not named above. An unknown at-rule is dropped precisely _because_ it is unknown.
   - Any rule whose selector text the pass cannot fully tokenise — this includes a selector containing an unbalanced bracket or paren, a CSS escape sequence (`\`), or a string literal.
   - Any rule reached only through a construct the pass does not model, such as a nested rule inside a style rule.
 
   Adversarial cases the tests must cover, because each is browser-valid and each is a plausible way to slip a rule past a naive implementation: a comment splitting a selector (`re/*x*/ct { … }`), a string containing a brace (`[title="a{b"] { … }`), a nested function in a value (`fill: var(--x, url(https://…))`), a selector using an escape (`.a\.b { … }`), and an `@supports` block wrapping an otherwise ordinary rule. Each must end up **absent** from the output — not present unchanged, not partially rewritten.
 
   Dropping a rule costs the author some styling on their own diagram. Passing one through costs every other card on the page.
+
 - **Remove any `url()` in a declaration that is not a `data:` URI or a `#` fragment.** This belongs here, not in the sanitizer: DOMPurify's `ALLOWED_URI_REGEXP` governs **URI-valued attributes only** and never reaches CSS text, so a `url()` inside `<style>` sails straight through sanitization. Relative counts as removable, not just remote — it would resolve against the dashboard's own origin.
 - **Apply the same `url()` rule to every inline `style` attribute in the subtree.** `<rect style="fill:url(https://example.com/x.svg)">` is CSS living in an attribute: `ALLOWED_URI_REGEXP` does not inspect it because `style` is not a URI-valued attribute, and a pass that only walks `<style>` elements never sees it. That leaves a remote fetch on card render — the one thing this feature promises cannot happen. Walk `svgEl.querySelectorAll("[style]")` as well, and strip disallowed `url()` values from each. Scoping does not apply here (an inline style cannot leak past its element); only the URI rule does.
 - **Apply it a third time, to SVG presentation attributes that take a `url()` value.** `<rect fill="url(https://example.com/p.svg#g)">` is the same fetch through yet another door: `fill` is a presentation attribute, not a URI-valued one, so the sanitizer's URI policy does not govern it either. Walk this attribute set on every element in the subtree and strip any `url()` that is not a `#` fragment: `fill`, `stroke`, `filter`, `mask`, `clip-path`, `marker-start`, `marker-mid`, `marker-end`, `marker`, `fill-opacity`-adjacent paint servers via `paint-order` are not URL-bearing and need no check. A `url(#gradient)` fragment — the overwhelmingly common legitimate use, pointing at a `<linearGradient>` in the same document — must survive untouched.
 
 Three surfaces, three doors, one rule. Write the URI predicate once and call it from all three walks; three copies of the same regex is how one of them ends up looser than the others.
+
 - **Drop `@font-face` entirely when its `src` is not a `data:` URI.** A remote font is a remote fetch from a decision card.
 - **Remove a `<style>` element that ends up with no surviving rules.** An empty `<style>` is noise in the DOM and reads as though something survived.
 
@@ -141,12 +150,12 @@ Cost to the author: an animated SVG renders as its static first frame. That is a
 
 > Scale and shared dimension definitions: see `../_context/rubric.md`. Each dimension is scored 0–5; weighted average >= 4.0 to pass. Correctness < 4 is an automatic veto, and Sanitize & scoping boundary < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | prefixing is wrong or absent; the function does not mutate and return `svgEl` | plain rules are prefixed but selector lists, `@media`, or emptied `<style>` removal drift | every listed behaviour holds, including selector lists rewritten member by member and emptied `<style>` elements removed |
-| Sanitize & scoping boundary | ×3 | a rule matches outside the figure, or an unparseable rule is emitted unchanged, or a remote `url()`/`@font-face src` survives | scoping holds for the simple cases but an unhandled construct is passed through rather than dropped | fail-closed throughout: anything not confidently rewritten is dropped, and no remote reference survives in CSS text |
-| Test coverage | ×2 | no test, or only a string-shape assertion | benign cases covered; no adversarial case | asserts a hostile rule fails to reach a sibling element outside the figure, not merely that the output string looks right; covers dropped rules, remote `url()`, `@font-face`, and the emptied-`<style>` case |
-| Interface & readability | ×1 | mixes unrelated concerns into the module, or hard-codes the scope selector | works but the mechanism choice is undocumented and the drop conditions are implicit | one exported function with a clear contract; a top comment records the happy-dom probe result and why the chosen mechanism won; each drop condition is commented with the leak it prevents |
+| Dimension                   | Weight | 0–1 (fail)                                                                                                                    | 2–3 (below bar)                                                                                     | 4–5 (pass)                                                                                                                                                                                                    |
+| --------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                 | ×3     | prefixing is wrong or absent; the function does not mutate and return `svgEl`                                                 | plain rules are prefixed but selector lists, `@media`, or emptied `<style>` removal drift           | every listed behaviour holds, including selector lists rewritten member by member and emptied `<style>` elements removed                                                                                      |
+| Sanitize & scoping boundary | ×3     | a rule matches outside the figure, or an unparseable rule is emitted unchanged, or a remote `url()`/`@font-face src` survives | scoping holds for the simple cases but an unhandled construct is passed through rather than dropped | fail-closed throughout: anything not confidently rewritten is dropped, and no remote reference survives in CSS text                                                                                           |
+| Test coverage               | ×2     | no test, or only a string-shape assertion                                                                                     | benign cases covered; no adversarial case                                                           | asserts a hostile rule fails to reach a sibling element outside the figure, not merely that the output string looks right; covers dropped rules, remote `url()`, `@font-face`, and the emptied-`<style>` case |
+| Interface & readability     | ×1     | mixes unrelated concerns into the module, or hard-codes the scope selector                                                    | works but the mechanism choice is undocumented and the drop conditions are implicit                 | one exported function with a clear contract; a top comment records the happy-dom probe result and why the chosen mechanism won; each drop condition is commented with the leak it prevents                    |
 
 ## Out of scope
 

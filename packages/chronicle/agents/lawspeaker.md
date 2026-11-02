@@ -30,7 +30,7 @@ the command. If a declared placeholder is still in the command, report the missi
 input and stop. Never rewrite one as `$NAME` — nothing sets that variable in your
 shell, so it expands to empty and the command runs against `/`.
 
-**The diff tells you *what* changed. `contextBrief` is your only source of *why*.**
+**The diff tells you _what_ changed. `contextBrief` is your only source of _why_.**
 Never infer a rationale from the code and never invent one. A body that explains
 what the diff already shows is the failure this rule exists to prevent.
 
@@ -105,7 +105,7 @@ uses it, a fixture and its test — there is no ordering to find. Merge them.
 
 Then put the groups in the order they should be committed. **Every commit must
 build on its own.** The trap is a reference outliving its target: a group that
-deletes a file lands *after* the group that removes the last reference to it, and
+deletes a file lands _after_ the group that removes the last reference to it, and
 the same holds for a renamed export, a dropped config key, or a removed registry
 entry. Ignore any claim in `contextBrief` that the ordering is free — the main
 agent is describing the change it made, not the groups you just cut.
@@ -121,26 +121,26 @@ repo is itself an unassigned change, and `apply` refuses it.
 
 ```ts
 type PlanFile = {
-  mode?: "auto" | "simple";     // as you were given it
-  moduleSpread?: string[];      // top-level modules the changeset spans
+  mode?: "auto" | "simple"; // as you were given it
+  moduleSpread?: string[]; // top-level modules the changeset spans
   totalFiles?: number;
   elidedFiles?: number;
-  notes?: string[];             // why the groups are in this order
-  exclude?: string[];           // the caller's list, verbatim; omit when none
+  notes?: string[]; // why the groups are in this order
+  exclude?: string[]; // the caller's list, verbatim; omit when none
   commits: {
-    type: string;               // feat / fix / docs / refactor / chore / remove / …
-    subject: string;            // imperative, ≤ ~50 chars, no trailing period
-    files: string[];            // repo-root-relative, both halves of a rename
-    emoji?: string;             // omit it — commit.ts derives it from `type`
-    body?: string;              // English markdown bullets
-    summary?: string;           // 繁體中文摘要
+    type: string; // feat / fix / docs / refactor / chore / remove / …
+    subject: string; // imperative, ≤ ~50 chars, no trailing period
+    files: string[]; // repo-root-relative, both halves of a rename
+    emoji?: string; // omit it — commit.ts derives it from `type`
+    body?: string; // English markdown bullets
+    summary?: string; // 繁體中文摘要
   }[];
-  simple?: { type, subject, body?, summary? };  // no `files` — see below
+  simple?: { type; subject; body?; summary? }; // no `files` — see below
 };
 ```
 
 Write each `body` and `summary` from `contextBrief`, per the template in the
-digest. Be terse on purpose: about 3–4 one-line bullets saying *why*, and a 繁中
+digest. Be terse on purpose: about 3–4 one-line bullets saying _why_, and a 繁中
 摘要 of 1–3 sentences that summarizes rather than re-translates. A trivial
 one-liner may omit both. If the digest reported elided or held-back diffs,
 mention the incomplete diff once, in the body it affects.

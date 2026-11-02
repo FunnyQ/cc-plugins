@@ -1,6 +1,7 @@
 # ORCHESTRATOR-01: give the commit step its own agent
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/rubric.md`
@@ -22,7 +23,7 @@ Known gap rather than claimed here.
 ## Files to create / modify
 
 - `packages/dispatch/skills/autopilot/references/orchestrator.md` (modify) — inside the fenced
-  ```` ```javascript ```` block: add `COMMIT_SCHEMA`, extract the commit out of the scout prompt into
+  ` ```javascript ` block: add `COMMIT_SCHEMA`, extract the commit out of the scout prompt into
   its own agent call, move it after the guards, turn `COMMIT_INSTRUCTIONS` into a label-taking builder with
   start/end flightlog calls, and give the post-loop commit the same schema and escalation.
 - The same file, **outside** the fenced block (modify) — the prose this change makes stale. The wave-loop
@@ -39,7 +40,7 @@ Known gap rather than claimed here.
 
 ### The two defects this closes
 
-**A blocked commit is unreportable.** Today the inter-wave commit is a *prefix string* glued onto the
+**A blocked commit is unreportable.** Today the inter-wave commit is a _prefix string_ glued onto the
 scout's prompt:
 
 ```js
@@ -61,13 +62,13 @@ and say so explicitly in your summary" — but under a tree schema there is no s
 
 **Commits never enter the audit trail.** No commit path calls `flightlog.ts`. The dashboard side is
 already finished: `fleet.ts` carries `commit` in its role union, parses the `commit-post-loop` label, and
-falls back to an entry's own `role` field when the label has no task ref. Only *emission* is missing, so
+falls back to an entry's own `role` field when the label has no task ref. Only _emission_ is missing, so
 this is a one-line prompt change, not a `fleet.ts` change.
 
 ### Ordering is the correctness fix, not a tidy-up
 
 The commit currently runs **before** the scout. So a wave that corrupted a task file gets that corruption
-committed — and described by the commit agent, from the diff, as an intentional change — *before* the
+committed — and described by the commit agent, from the diff, as an intentional change — _before_ the
 scout reports a non-empty `errors` array or `invalid > 0` and aborts the run. Committing into a tree that
 the very next guard is about to declare untrustworthy is exactly what the `escalations.length === 0` guard
 exists to prevent; the guard simply cannot see a defect the scout has not found yet.
@@ -92,15 +93,15 @@ and in-flight edits share one working tree, so not committing is the safe behavi
 // silently not happen. A rejecting hook, a conflict, or an index lock needs
 // somewhere to land, so the step reports a verdict instead of a narrative.
 const COMMIT_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
-    committed: { type: 'boolean' },                        // at least one commit was created
-    shas:      { type: 'array', items: { type: 'string' } },// the commits actually created
-    failed:    { type: 'boolean' },                        // a git command failed
-    reason:    { type: 'string' },                         // the git error, or why nothing was committed
+    committed: { type: "boolean" }, // at least one commit was created
+    shas: { type: "array", items: { type: "string" } }, // the commits actually created
+    failed: { type: "boolean" }, // a git command failed
+    reason: { type: "string" }, // the git error, or why nothing was committed
   },
-  required: ['committed', 'shas', 'failed', 'reason'],
-}
+  required: ["committed", "shas", "failed", "reason"],
+};
 ```
 
 Keep the gating condition byte-identical — `wave > 1 && CFG.commitBetweenWaves && escalations.length === 0`
@@ -110,16 +111,28 @@ Keep the gating condition byte-identical — `wave > 1 && CFG.commitBetweenWaves
 if (wave > 1 && CFG.commitBetweenWaves && escalations.length === 0) {
   const committed = await agent(
     `Commit all changes from the previous wave.\n${commitInstructions(`commit-wave-${wave}`)}`,
-    { label: `commit-wave-${wave}`, phase: 'Execute', model: MODEL.commit, schema: COMMIT_SCHEMA })
+    {
+      label: `commit-wave-${wave}`,
+      phase: "Execute",
+      model: MODEL.commit,
+      schema: COMMIT_SCHEMA,
+    },
+  );
   // A failed commit is not a reason to abandon ready tasks: the guard above
   // already stops every later commit once this escalation exists. Report and
   // carry on.
   if (!committed || committed.failed) {
     const reason = committed
-      ? `the wave ${wave - 1} commit failed: ${committed.reason || 'no reason reported'}`
-      : `the wave ${wave - 1} commit agent returned no structured result, so whether anything was committed is unknown`
-    log(reason)
-    escalations.push({ task: '(commit)', attempt: 0, infrastructure: true, parked: false, reason })
+      ? `the wave ${wave - 1} commit failed: ${committed.reason || "no reason reported"}`
+      : `the wave ${wave - 1} commit agent returned no structured result, so whether anything was committed is unknown`;
+    log(reason);
+    escalations.push({
+      task: "(commit)",
+      attempt: 0,
+      infrastructure: true,
+      parked: false,
+      reason,
+    });
   }
 }
 ```
@@ -139,12 +152,12 @@ should say so rather than inventing a git error.
 ### The flightlog line
 
 The commit worker follows the **same start/end lifecycle every other worker prompt uses**: an announce
-call before the work, a completion call after it, with the *identical* `--agent` label in both. A lone
+call before the work, a completion call after it, with the _identical_ `--agent` label in both. A lone
 `--phase end` entry would be an unmatched terminal event, and the trail renderer pairs entries by label.
 
 **`COMMIT_INSTRUCTIONS` must therefore become a builder, not a constant.** Every other worker prompt tells
 the agent to invent a label and reuse it (`--agent "<your label>"`), which is acceptable there because only
-that agent's own two entries need to agree. It is *not* acceptable here: two different call sites share this
+that agent's own two entries need to agree. It is _not_ acceptable here: two different call sites share this
 one string, and the audit trail is only useful if an entry's label matches the `agent()` label the run
 actually dispatched (`commit-wave-<n>` or `commit-post-loop`). Leaving `<your label>` in place lets the
 agent fabricate any label it likes, and the trail then pairs entries under a name that appears nowhere in
@@ -165,8 +178,8 @@ const commitInstructions = (agentLabel) =>
 Call sites pass their own label, which is the same literal used in `opts.label`:
 
 ```js
-commitInstructions(`commit-wave-${wave}`)   // inter-wave
-commitInstructions('commit-post-loop')      // post-loop
+commitInstructions(`commit-wave-${wave}`); // inter-wave
+commitInstructions("commit-post-loop"); // post-loop
 ```
 
 Add two steps to the built string. First an announce step **before** the existing `git status --porcelain`
@@ -218,7 +231,9 @@ no ref):
 
 ```js
 if (label.startsWith("commit-")) {
-  return commits.length > 0 ? commits.shift() : { committed: true, shas: ["abc1234"], failed: false, reason: "" }
+  return commits.length > 0
+    ? commits.shift()
+    : { committed: true, shas: ["abc1234"], failed: false, reason: "" };
 }
 ```
 
@@ -250,11 +265,11 @@ In `fleet.test.ts`, add one case that feeds a synthesized flightlog line carryin
   `git add <path>` stages whatever that path holds at that moment and same-wave pipelines share one
   working tree — a large amount of machinery for worse grouping. Rejected.
 - Relaxing or removing the `escalations.length === 0` guard.
-- Anything to do with the scout's result *shape*. This task only removes commit text from its prompt.
+- Anything to do with the scout's result _shape_. This task only removes commit text from its prompt.
 
 ## Acceptance criteria
 
-- [x] `COMMIT_SCHEMA` exists inside the fenced ```` ```javascript ```` block with all four fields
+- [x] `COMMIT_SCHEMA` exists inside the fenced ` ```javascript ` block with all four fields
       (`committed`, `shas`, `failed`, `reason`) listed in `required`.
 - [x] The inter-wave commit is its own `agent()` call labelled `commit-wave-<n>`, running on
       `MODEL.commit` with `schema: COMMIT_SCHEMA`.
@@ -292,7 +307,7 @@ In `fleet.test.ts`, add one case that feeds a synthesized flightlog line carryin
 
 ## Verification
 
-- [x] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
+- [x] Every **executable-script** change lands inside the fenced ` ```javascript ` block of
       `orchestrator.md` — the fixture extracts that block verbatim by string search, so script logic
       written in the surrounding prose is invisible to both the runtime and the test.
 - [x] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
@@ -315,9 +330,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The commit still runs before a guard, or a failed commit breaks the loop, or `SCOUT_SCHEMA` was touched. | The split and schema are right but the placement or an escalation shape is off in one case. | Placement after all guards, both escalation shapes, the preserved guard condition, and the untouched scout schema all hold. |
-| Test coverage | ×2 | No fixture change, or tests that would pass before the change. | The failure case only. | Failure, null, intra-wave ordering, guard-abort, and the `done === total` no-double-commit cases are all pinned, and the per-task accounting invariant is re-asserted. |
-| Interface & readability | ×1 | The commit prompt is duplicated between the two call sites, or `COMMIT_INSTRUCTIONS` is restructured. | Works but drifts from the file's schema/comment style. | `COMMIT_SCHEMA` matches the neighbouring schema style, the flightlog line matches the existing prompt idiom, and no prompt text is duplicated. |
-| Assumptions & docs | ×1 | The ordering rationale is left unexplained in the script. | Mentioned in passing. | The why-after-the-guards reasoning and the deliberate no-`break` choice are both recorded as *why* comments, and the notes/gotchas prose is updated to match the new position. |
+| Dimension               | Weight | 0–1                                                                                                      | 2–3                                                                                         | 4–5                                                                                                                                                                            |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The commit still runs before a guard, or a failed commit breaks the loop, or `SCOUT_SCHEMA` was touched. | The split and schema are right but the placement or an escalation shape is off in one case. | Placement after all guards, both escalation shapes, the preserved guard condition, and the untouched scout schema all hold.                                                    |
+| Test coverage           | ×2     | No fixture change, or tests that would pass before the change.                                           | The failure case only.                                                                      | Failure, null, intra-wave ordering, guard-abort, and the `done === total` no-double-commit cases are all pinned, and the per-task accounting invariant is re-asserted.         |
+| Interface & readability | ×1     | The commit prompt is duplicated between the two call sites, or `COMMIT_INSTRUCTIONS` is restructured.    | Works but drifts from the file's schema/comment style.                                      | `COMMIT_SCHEMA` matches the neighbouring schema style, the flightlog line matches the existing prompt idiom, and no prompt text is duplicated.                                 |
+| Assumptions & docs      | ×1     | The ordering rationale is left unexplained in the script.                                                | Mentioned in passing.                                                                       | The why-after-the-guards reasoning and the deliberate no-`break` choice are both recorded as _why_ comments, and the notes/gotchas prose is updated to match the new position. |

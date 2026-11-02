@@ -6,7 +6,7 @@ Interview at milestone depth. The output is `WAYPOINTS.md`, not a task tree.
 
 1. Project outcome: what the finished project enables, who uses it, and why it matters.
 2. Vertical milestone legs: each leg should ship an observable slice of value, not a technical layer by itself.
-3. Done-state for each leg: one clear acceptance summary after the ` — ` separator.
+3. Done-state for each leg: one clear acceptance summary after the `—` separator.
 4. Dependency order: what must be true before the next leg can be planned or built.
 5. Leg size: each leg should be one `flightplan` worth of work, not a whole project inside the project.
 
@@ -59,7 +59,7 @@ Possible roadmap:
 
 ```markdown
 - [~] 1. Auth foundation — users can sign up / sign in with email
-      → legs/01-auth/
+  → legs/01-auth/
 - [ ] 2. Workspace core loop — a logged-in user can create and update one workspace
       → legs/02-workspace/
 - [ ] 3. Billing — paid plans can be purchased and reflected in workspace limits
@@ -82,7 +82,7 @@ Possible roadmap:
 
 ```markdown
 - [~] 1. Manual import path — an operator can upload one CSV and see parsed records
-      → legs/01-manual-import/
+  → legs/01-manual-import/
 - [ ] 2. Validation preview — invalid rows are explained before anything is committed
       → legs/02-validation/
 - [ ] 3. Scheduled ingestion — imports can run on a schedule with an audit trail

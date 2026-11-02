@@ -1,6 +1,7 @@
 # PACKAGE-04: Backend alias commands
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -30,6 +31,7 @@ Each file: frontmatter `description` + `argument-hint`, body routes to the relay
 description: Delegate to the codex CLI (delegate / review / image) — alias for /relay codex.
 argument-hint: "<delegate|review|image> [task]"
 ---
+
 The user invoked `/codex` — an alias for `/relay codex`. Treat `$ARGUMENTS` as the `<mode> [task]` for the **codex** backend and follow the relay skill's orchestration with backend fixed to `codex`.
 ```
 
@@ -55,12 +57,12 @@ Do not duplicate orchestration logic in the alias files — they only fix the ba
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong backend routing or invalid frontmatter | routes but duplicates logic / wrong argument-hint | all three route correctly, defer to skill, hints match each backend's modes |
-| Test coverage | ×2 | no validity check | frontmatter parse only | frontmatter valid + alias-identity + no-duplicated-logic checks |
-| Interface & readability | ×1 | bloated/divergent files | minor drift | three near-identical thin files, consistent shape |
-| Assumptions & docs | ×1 | namespacing/coexistence unstated | partial | namespacing + odin-codex coexistence note present |
+| Dimension               | Weight | 0–1 (fail)                                   | 2–3 (below bar)                                   | 4–5 (pass)                                                                  |
+| ----------------------- | ------ | -------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| Correctness             | ×3     | wrong backend routing or invalid frontmatter | routes but duplicates logic / wrong argument-hint | all three route correctly, defer to skill, hints match each backend's modes |
+| Test coverage           | ×2     | no validity check                            | frontmatter parse only                            | frontmatter valid + alias-identity + no-duplicated-logic checks             |
+| Interface & readability | ×1     | bloated/divergent files                      | minor drift                                       | three near-identical thin files, consistent shape                           |
+| Assumptions & docs      | ×1     | namespacing/coexistence unstated             | partial                                           | namespacing + odin-codex coexistence note present                           |
 
 ## Out of scope
 

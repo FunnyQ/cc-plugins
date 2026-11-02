@@ -1,6 +1,7 @@
 # UI-02: Attention — notification, title flash, badge
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/protocol.md`
 >
@@ -23,8 +24,8 @@ favicon badge — all cleared when the request closes.
 
 ## Implementation notes
 
-This layers on the modal's open/close lifecycle: attention is *raised* when a
-`request` opens the modal and *cleared* on every close path (own-verdict,
+This layers on the modal's open/close lifecycle: attention is _raised_ when a
+`request` opens the modal and _cleared_ on every close path (own-verdict,
 `resolved`, TTL). Drive it from the modal module (`permission-modal.js`) so there
 is a single close path to hook.
 
@@ -34,7 +35,7 @@ is a single close path to hook.
   (one-time). Cache the result; never re-prompt.
 - If granted, on a new request show
   `new Notification("Tool permission needed", { body: \`${tool_name}: ${description}\`, tag: request_id })`.
-  Use `tag: request_id` so re-renders coalesce. Clicking it `window.focus()`es.
+Use `tag: request_id`so re-renders coalesce. Clicking it`window.focus()`es.
 - If denied/unsupported, **degrade silently** to title flash + badge only. Never
   hard-depend on notifications.
 
@@ -54,7 +55,11 @@ is a single close path to hook.
 
 ```ts
 // attention.js exports
-export function raiseAttention(req: { request_id, tool_name, description }): void;
+export function raiseAttention(req: {
+  request_id;
+  tool_name;
+  description;
+}): void;
 export function clearAttention(request_id: string): void;
 ```
 

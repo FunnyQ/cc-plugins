@@ -1,6 +1,7 @@
 # COMMIT-01: Port analyze-changes script
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -37,16 +38,22 @@ This script gathers raw git change data as JSON; the LLM does the grouping later
 
 ```ts
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
-export type ParsedStatus = { path: string; oldPath?: string; staged: boolean; status: FileStatus };
-export function parseStatusLine(line: string): ParsedStatus[]
-export function unquoteGitPath(rawPath: string): string
-export function shouldSkipDiff(path: string): boolean
-export function isBinaryFile(path: string): boolean
+export type ParsedStatus = {
+  path: string;
+  oldPath?: string;
+  staged: boolean;
+  status: FileStatus;
+};
+export function parseStatusLine(line: string): ParsedStatus[];
+export function unquoteGitPath(rawPath: string): string;
+export function shouldSkipDiff(path: string): boolean;
+export function isBinaryFile(path: string): boolean;
 ```
 
 The CLI entry (`if (import.meta.main)`) writes the full analysis to a temp file and prints `{ outputPath, promptPath, totalFiles }` so the calling agent reads the big payload via the Read tool rather than through stdout.
 
 **`parseStatusLine` rules** (porcelain `XY PATH`; `X`=index/staged at pos 0, `Y`=worktree/unstaged at pos 1, path from pos 3; renames are `old -> new`, take the new path, keep `oldPath`):
+
 - `?` index → single `{staged:false, status:"added"}` (untracked), return early.
 - index `A`/`D`/`R`/`M` → push `{staged:true, status: added/deleted/renamed/modified}`.
 - worktree `M`/`D` → push `{staged:false, status: modified/deleted}` (independent of index, so `MM`/`AM`/`AD` yield two entries).
@@ -63,7 +70,10 @@ The CLI entry (`if (import.meta.main)`) writes the full analysis to a temp file 
 Replace the odin-git settings lookup. Default to chronicle's bundled template; allow a user override under a `chronicle` settings namespace.
 
 ```ts
-const DEFAULT_PROMPT_PATH = resolve(SCRIPT_DIR, "../references/commit-template.md");
+const DEFAULT_PROMPT_PATH = resolve(
+  SCRIPT_DIR,
+  "../references/commit-template.md",
+);
 // override path: ~/.claude/settings.json → settings?.skills?.chronicle?.commit?.templatePath
 // expand a leading "~" to homedir(); fall back to DEFAULT_PROMPT_PATH on any miss/error
 ```
@@ -81,6 +91,7 @@ No references to "odin", "atomic-commit" settings keys, or odin paths anywhere i
 ### Tests
 
 Port/author `bun:test` cases for the four pure functions. Cover at minimum:
+
 - `parseStatusLine`: untracked `?? f`, staged add `A  f`, combined `MM f`, rename `R  old -> new`, deletion, a `< 4`-char line → `[]`.
 - `unquoteGitPath`: plain path unchanged; `"path with spaces.txt"` unquoted; malformed quotes fall back to slice.
 - `shouldSkipDiff`: `bun.lockb`, `package-lock.json`, `node_modules/x` → true; `src/a.ts` → false.
@@ -105,12 +116,12 @@ Port/author `bun:test` cases for the four pure functions. Cover at minimum:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | parsing diverges from source / odin path leaks | works on happy path but a status combo or template override breaks | identical parsing, template resolves to chronicle's own, temp dir changed, no odin leak |
-| Test coverage | ×2 | no tests | only one function tested | all four pure fns + edge cases (rename, combined status, malformed quote) |
-| Interface & readability | ×1 | tangled, unclear types | usable but exports unclear | clean exports, types preserved, I/O at edges |
-| Assumptions & docs | ×1 | magic paths unexplained | partial notes | settings key + temp dir documented in comments |
+| Dimension               | Weight | 0–1 (fail)                                     | 2–3 (below bar)                                                    | 4–5 (pass)                                                                              |
+| ----------------------- | ------ | ---------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| Correctness             | ×4     | parsing diverges from source / odin path leaks | works on happy path but a status combo or template override breaks | identical parsing, template resolves to chronicle's own, temp dir changed, no odin leak |
+| Test coverage           | ×2     | no tests                                       | only one function tested                                           | all four pure fns + edge cases (rename, combined status, malformed quote)               |
+| Interface & readability | ×1     | tangled, unclear types                         | usable but exports unclear                                         | clean exports, types preserved, I/O at edges                                            |
+| Assumptions & docs      | ×1     | magic paths unexplained                        | partial notes                                                      | settings key + temp dir documented in comments                                          |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # TRIAGE-01: Plan an archive move set
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -70,7 +71,7 @@ export type SourceBucket = "inbox" | "watch";
 export type Assignment = {
   sessionId: string;
   target: ArchiveTarget;
-  from: SourceBucket;   // defaults to "inbox" when the caller omits it
+  from: SourceBucket; // defaults to "inbox" when the caller omits it
 };
 
 export type Move = {
@@ -86,11 +87,15 @@ export type Refusal = {
   detail: string;
 };
 
-export type ArchivePlan = { trailRoot: string; moves: Move[]; refused: Refusal[] };
+export type ArchivePlan = {
+  trailRoot: string;
+  moves: Move[];
+  refused: Refusal[];
+};
 
 export type PlanDeps = {
   nowMs: number;
-  mtimeOf: (path: string) => number | null;   // null when the file is absent
+  mtimeOf: (path: string) => number | null; // null when the file is absent
   exists: (path: string) => boolean;
 };
 
@@ -137,11 +142,11 @@ design set out to avoid.
 
 So `Assignment.from` names the current bucket, defaulting to `"inbox"`. The legal transitions:
 
-| From | To | Meaning |
-|---|---|---|
-| `inbox` | `done` | dispositioned `promote` or `skip` |
-| `inbox` | `watch` | promising, not yet stable |
-| `watch` | `done` | woken, re-judged, now settled |
+| From    | To      | Meaning                                                           |
+| ------- | ------- | ----------------------------------------------------------------- |
+| `inbox` | `done`  | dispositioned `promote` or `skip`                                 |
+| `inbox` | `watch` | promising, not yet stable                                         |
+| `watch` | `done`  | woken, re-judged, now settled                                     |
 | `watch` | `watch` | woken, re-judged, still unsettled — a `no-op` refusal, not a move |
 
 `done` is terminal and never a source. Nothing re-queues from it, and nothing needs to: the drafting
@@ -242,12 +247,12 @@ there is no space pressure to trade against.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4 (pass) | 5 |
-|---|---|---|---|---|---|
-| Correctness | ×3 | Any execution path exists, or a live session is planned as a move, or something under `.cockpit/` changes. | The guard exists but the boundary is off by one, or a transition-table row is wrong, or a repeated run errors instead of no-opping. | All five refusal reasons produced correctly, the boundary exact on both sides, every transition row right, and `.cockpit/` provably untouched. | Also handles an assignment naming a session id that appears in two buckets at once. |
-| Test coverage | ×2 | No tests, or none that exercise a refusal. | Only "a live file is refused" — the boundary asserted from one side. | The boundary from both sides plus the exact-`STALE_MS` case; every refusal reason and every transition row covered; the JSON round-trip asserted. | Table-driven over the transition matrix so a new row cannot be added without a case. |
-| Interface & readability | ×1 | `planArchive` reaches the filesystem, so the decision logic needs a temp directory to test. | Pure, but the refusal reasons are strings rather than a closed union, or `PlanDeps` leaks a concrete `fs` type. | `planArchive` pure over `PlanDeps`; refusal reasons a closed union; the types read as the shared vocabulary the applier will import. | A reader can reconstruct the whole decision matrix from the types alone. |
-| Assumptions & docs | ×1 | `STALE_MS` appears as a bare number with no source. | Imported, but the reason for the guard is not written down. | A comment states why moving a live log splits a session, and the ported constant names its source of truth. | Also records why the guard is re-checked downstream rather than trusted from here. |
+| Dimension               | Weight | 0–1 (fail)                                                                                                 | 2–3 (below bar)                                                                                                                     | 4 (pass)                                                                                                                                          | 5                                                                                    |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Any execution path exists, or a live session is planned as a move, or something under `.cockpit/` changes. | The guard exists but the boundary is off by one, or a transition-table row is wrong, or a repeated run errors instead of no-opping. | All five refusal reasons produced correctly, the boundary exact on both sides, every transition row right, and `.cockpit/` provably untouched.    | Also handles an assignment naming a session id that appears in two buckets at once.  |
+| Test coverage           | ×2     | No tests, or none that exercise a refusal.                                                                 | Only "a live file is refused" — the boundary asserted from one side.                                                                | The boundary from both sides plus the exact-`STALE_MS` case; every refusal reason and every transition row covered; the JSON round-trip asserted. | Table-driven over the transition matrix so a new row cannot be added without a case. |
+| Interface & readability | ×1     | `planArchive` reaches the filesystem, so the decision logic needs a temp directory to test.                | Pure, but the refusal reasons are strings rather than a closed union, or `PlanDeps` leaks a concrete `fs` type.                     | `planArchive` pure over `PlanDeps`; refusal reasons a closed union; the types read as the shared vocabulary the applier will import.              | A reader can reconstruct the whole decision matrix from the types alone.             |
+| Assumptions & docs      | ×1     | `STALE_MS` appears as a bare number with no source.                                                        | Imported, but the reason for the guard is not written down.                                                                         | A comment states why moving a live log splits a session, and the ported constant names its source of truth.                                       | Also records why the guard is re-checked downstream rather than trusted from here.   |
 
 ## Out of scope
 

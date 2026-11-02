@@ -144,6 +144,7 @@ The system is **Committed** on a dark, tinted-violet deep-space surface that car
 The cockpit leans into a literal flight-deck aesthetic: the viewport is a **HUD** (corner reticles, thin readouts) over a forward warp, and the two instrument panels read as lit **display screens** (faint scanlines, edge vignette). The line we hold is **restraint, not abstinence**: this is premium HUD, not a movie set. The thing to reject is **cheap sci-fi** (heavy neon glow, blinking everything, fake telemetry, LCARS curves, novelty space fonts, a hyperspace-fast starfield) and **generic dark SaaS** (pure black plus one corporate-blue accent). HUD chrome is hairline-thin aurora at low opacity, every readout shows real data, the warp is a slow cruise, and the scanlines sit barely above the threshold of perception.
 
 **Key Characteristics:**
+
 - Deep-space surface tinted violet (hue ~278), never pure black; built from a four-step tonal ramp.
 - One cool aurora accent (teal-cyan, hue ~195) for everything navigational; one warm signal (amber, hue ~70) reserved for `needs_your_call` and waiting.
 - "Cold is autopilot, warm is your turn" — color carries the one distinction that matters.
@@ -156,20 +157,26 @@ The cockpit leans into a literal flight-deck aesthetic: the viewport is a **HUD*
 A tinted deep-space surface lit by a single cool aurora accent, with one warm signal reserved for the pilot's turn.
 
 ### Primary
+
 - **Aurora** (`oklch(80% 0.13 195)`): The cool navigation accent. Active/engine status, links, focus rings, the heading indicator, primary interactive chrome. Teal-cyan, deliberately off the corporate-blue axis. Restraint is the point — it means "the agent is flying."
 - **Aurora Strong** (`oklch(72% 0.15 195)`): Primary-button fill (with Void text), pressed/emphasis states, hover-deepened accents.
 - **Aurora Deep** (`oklch(60% 0.13 198)`): Borders and washes that need the accent hue at lower lightness on the dark surface.
 
 ### The Warm Reserve
+
 - **Signal** (`oklch(82% 0.14 70)`): The only warm color in the system, and it appears in exactly one situation: the pilot must act. `needs_your_call` cards, the waiting status LED, the respond-control focus ring. A warm light in a cold cabin reads instantly as "your turn."
 - **Signal Strong** (`oklch(75% 0.16 65)`): Pressed/emphasis on the warm reserve.
 
 ### Reserved Atmosphere
+
 The **Nebula** gradient — a distant horizon glow used in exactly one place, the lower edge of the viewport, the way token-atlas reserves its sunrise wave for the hero.
+
 - **Nebula Violet** (`oklch(42% 0.13 300)`) → **Nebula Indigo** (`oklch(30% 0.09 285)`) → fades into Void. A faint sense of a horizon you are flying toward. Never tiled, never repeated on chrome.
 
 ### Semantic State
+
 Status reads as instrument LEDs; the cool/warm axis is load-bearing.
+
 - **Engine** (`oklch(80% 0.13 195)`, = Aurora): Active/busy session — engines on, autopilot flying.
 - **Idle** (`oklch(66% 0.055 200)`): Connected but quiet; a calm dim cyan-gray.
 - **Ended** (`oklch(46% 0.02 280)`): Session over; faint violet-gray, recedes into the hull.
@@ -178,7 +185,9 @@ Status reads as instrument LEDs; the cool/warm axis is load-bearing.
 - **Danger** (`oklch(64% 0.19 25)`): Errors, diff removals; warm red, distinct from the Signal amber.
 
 ### Neutral
+
 Every neutral is tinted cool toward hue 278. The surface is a tonal ramp, not borders.
+
 - **Void** (`oklch(14% 0.028 278)`): Deepest. The viewport's depth and the page base. Space text sits on Void only inside the viewport (with Starlight).
 - **Space** (`oklch(18% 0.03 278)`): The main working surface and panel-head fill.
 - **Hull** (`oklch(22% 0.032 278)`): Default panel and card fill — the lit instrument housing, one step up from Space.
@@ -189,6 +198,7 @@ Every neutral is tinted cool toward hue 278. The surface is a tonal ramp, not bo
 - **Edge** (`oklch(36% 0.03 278)`) / **Edge Soft** (`oklch(30% 0.028 278)`): The rare 1px hairlines — panel separators, control borders, transcript dividers. Never a thick colored stripe.
 
 ### Named Rules
+
 **The Cold/Warm Rule.** Cool (aurora + the space neutrals) means autopilot: the agent is flying, you are watching. Warm (signal) means your turn, and it is reserved for `needs_your_call` and waiting only. If a warm color appears anywhere the pilot is not being asked to act, it is wrong.
 
 **The One Accent Rule.** Aurora is the only navigational accent. Links, focus, active state, primary buttons all speak aurora. A second cool accent is rainbow puke; pull from the space neutral ramp instead.
@@ -207,6 +217,7 @@ No web fonts. The dashboard ships with no build step and must work offline, so t
 **Character:** System sans keeps the destination and prose clean and credible. System mono is the instrument voice — it carries every readout that a real gauge would show: timestamps, session ids, token/line counts, status legends, code, and diffs. Mono plus uppercase legends plus tabular figures reads as a control panel without a single sci-fi flourish.
 
 ### Hierarchy
+
 - **Destination** (system sans, 600, `clamp(20px, 2.4vw, 30px)`, line-height 1.15, letter-spacing -0.01em): The session goal in the viewport — the one heading you are flying toward. The largest voice, sitting on Void.
 - **Title** (system sans, 650, 14px, line-height 1.3): Panel context and project names.
 - **Body** (system sans, 400, 14px, line-height 1.5): Default reading text; transcript prose. Cap measure at 76ch in transcript bubbles.
@@ -214,18 +225,21 @@ No web fonts. The dashboard ships with no build step and must work offline, so t
 - **Legend** (system mono, 600, 10px, letter-spacing 0.1em, UPPERCASE): Panel-head labels, status legends, badges. The control-panel stencil voice.
 
 ### Named Rules
+
 **The Instrument-Mono Rule.** Every value a gauge would display — time, counts, ids, paths, code — is mono with `tabular-nums`. Prose and headings are sans. A timestamp in a proportional font breaks the instrument read.
 
 **The Stencil-Legend Rule.** Panel heads and status labels are uppercase mono legends with wide tracking (0.1em), the way a physical panel silk-screens its labels. Reserve this voice for chrome legends, never body text.
 
 ## 4. Elevation
 
-No shadows, no glass. Depth is **tonal layering** of the space ramp (Void → Space → Hull → Hull-2) plus spacing and 1px hairline edges. The cabin is dark; lift is read as a panel sitting one tonal step brighter than the surface behind it, not as a drop shadow. The only motion-as-depth is the viewport starfield's slow parallax drift, which sits *behind* everything and reads as distance, not as a lifted card.
+No shadows, no glass. Depth is **tonal layering** of the space ramp (Void → Space → Hull → Hull-2) plus spacing and 1px hairline edges. The cabin is dark; lift is read as a panel sitting one tonal step brighter than the surface behind it, not as a drop shadow. The only motion-as-depth is the viewport starfield's slow parallax drift, which sits _behind_ everything and reads as distance, not as a lifted card.
 
 ### Shadow Vocabulary
+
 None. Glassmorphism, drop shadows, bevels, and neon glows are banned. (A status LED's ambient ring is a tight `box-shadow` used as a glow halo on an 8px disc only — it is an instrument light, not surface elevation.)
 
 ### Named Rules
+
 **The Tonal-Lift Rule.** To raise a surface, step the ramp (Space → Hull → Hull-2), never add a shadow. A `box-shadow` with a visible blur or offset on a panel is forbidden; the LED halo is the single sanctioned exception.
 
 **The Starfield-Is-Distance Rule.** The viewport starfield drifts slowly behind all content at low contrast to read as forward motion through space. It never overlaps text legibly, never tiles as a pattern on chrome, and freezes entirely under reduced-motion.
@@ -233,45 +247,56 @@ None. Glassmorphism, drop shadows, bevels, and neon glows are banned. (A status 
 ## 5. Components
 
 ### The Viewport HUD (signature hero — top row)
+
 A heads-up display framing a forward warp into deep space, showing where the active session is heading.
+
 - **Warp:** a canvas starfield (`modules/starfield.js`) where stars emanate from the viewport center and streak outward as they approach, reading as flying forward. Deliberately a slow cruise, WAY slower than a hyperspace jump. Pauses when the tab is hidden; renders one static frame under reduced-motion.
-- **Beacon (the goal object):** a small aurora waypoint marker at the viewport center (the warp's vanishing point) — a slowly rotating diamond ring + a pulsing core. It *is* the destination you're flying toward.
+- **Beacon (the goal object):** a small aurora waypoint marker at the viewport center (the warp's vanishing point) — a slowly rotating diamond ring + a pulsing core. It _is_ the destination you're flying toward.
 - **Leader line:** a solid aurora underline tracing the destination box width, then a dashed, slowly-flowing connector from the underline's bottom-right corner to the beacon, like a HUD callout pointing at the waypoint it tracks. Measured live from the DOM (`modules/lead.js`, ResizeObserver) so it tracks the dynamic text width; pixel-space SVG viewBox, 1px non-scaling stroke.
 - **Readouts:** `◢ HEADING [project]` pinned top-left, the session goal as a small subtitle directly beneath it, and a mono telemetry line (session id · flight count) pinned bottom-left. No corner brackets, no status badge — the cabin stays clean.
 - **Nebula:** a single soft gradient glow at the lower edge.
 
 ### The Manifest (collapsed drawer — second row)
+
 Projects and their sessions as a drawer beneath the viewport, **collapsed by default** to a single bar (the viewport already names the current flight, so the list stays out of the way until opened).
+
 - **Bar:** a `Projects` legend + flight count + a gently pulsing aurora caret as the open affordance. Clicking expands the drawer.
 - **Open:** a horizontal strip of flights. **Project:** a flight; **session:** a leg. Each carries a status LED, a goal snippet in body sans, ids/counts in mono readout.
 - **Active leg:** aurora wash (`color-mix(aurora 14%, hull)`) + a full 1px aurora hairline ring (inset box-shadow) — never a thick side stripe. The drawer scrolls horizontally if flights overflow.
 
 ### Instruments (bottom row — two display screens)
+
 - **Live Transcript** (the comms feed) and **Decision Log** (the flight log), side by side, each a Hull panel styled as a lit screen: a faint scanline overlay + edge vignette (`::after`, `mix-blend-mode: multiply`, low opacity, `pointer-events: none`), with a stencil-legend head carrying a small lit aurora power tick.
 - Held barely above perception so the screen effect never fights the text. Panels separated by a 1px Edge hairline, the way two instruments sit in one housing.
 
 ### Status LED (signature instrument)
+
 8px disc with a 3px ambient ring (the one sanctioned glow). **Engine/active** → aurora with a 1.3s scale pulse. **Idle** → steady idle cyan-gray. **Ended** → dim ended violet-gray, no ring. **Waiting** → signal amber with a slower 2.2s expanding-glow pulse. State must read from color **and** pulse, never hue alone.
 
 ### Decision Card / The Call Alert
+
 - **Plain decision:** Hull card, mono timestamp readout, optional aurora "resolved" tick, file chips in mono.
 - **`needs_your_call` (the Call Alert):** the one warm surface in the system. Signal-tinted fill (`color-mix(signal 12%, hull)`), a Signal legend badge, the respond controls (option buttons + free-text) focusing Signal. This is the warm light flicking on in the cold cabin.
 - Resolved calls cool back down to a Positive (aurora-green) tick; the warmth retreats once the pilot has acted.
 
 ### Buttons / Inputs
+
 - **Default button:** aurora wash on Hull (`color-mix(aurora 14%, hull)`), Starlight text, 34px, 6px radius, 1px Edge border, no shadow. **Hover:** wash deepens toward aurora.
 - **Primary button:** Aurora Strong fill with Void text.
 - **Respond option (on a Call Alert):** same shape but signal-tinted, signal border, signal focus.
 - **Input:** Space fill, Starlight text, 1px Edge border; **focus:** 2px aurora outline at 2px offset (signal on a Call Alert).
 
 ### Live Transcript Entries
+
 The transcript renderer is shared with token-atlas's markup (`live-entry` / `live-seg` / `live-code` / `live-diff`); restyle onto the space tokens.
+
 - **Role accent (`--entry-accent`):** user → aurora; assistant → positive (aurora-green); tool/function → signal amber; system → nebula violet. Chip is a mono legend pill; bubble border + wash derive from the accent.
 - **Code & diffs:** highlight.js mapped onto the space palette — keywords → nebula violet, strings/additions → positive, numbers/attrs → signal, types/tags → aurora. Diffs inline: additions on a positive wash, removals on a danger wash, hunks/meta in Ink Faint.
 
 ## 6. Do's and Don'ts
 
 ### Do:
+
 - **Do** keep the surface a tinted deep-space ramp (Void → Space → Hull → Hull-2), every step cool toward hue 278.
 - **Do** use aurora as the single navigational accent, and reserve signal warmth strictly for `needs_your_call` and waiting.
 - **Do** make state read from color **and** LED pulse, never hue alone.
@@ -282,6 +307,7 @@ The transcript renderer is shared with token-atlas's markup (`live-entry` / `liv
 - **Do** face forward: surfaces answer "where is this going / what does it need from me," not "what did it cost."
 
 ### Don't:
+
 - **Don't** drift into cheap sci-fi: no heavy neon glow, blinking-everything, fake telemetry, LCARS curves, novelty space display fonts, or a hyperspace-fast starfield. The HUD is premium and restrained, not a movie set.
 - **Don't** drift into generic dark SaaS: no pure-black neutral, no flat corporate-blue accent. The dark is tinted cosmos; the accent is teal-cyan aurora.
 - **Don't** let a warm color appear anywhere the pilot is not being asked to act.

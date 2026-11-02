@@ -7,6 +7,7 @@
 The `monitor` plugin (in the `q-lab-marketplace` Claude Code + Codex plugin repo) bundles a usage dashboard and a per-project **cockpit**. Cockpit captures a session's decision trail and renders it in a local web dashboard. This work adds a **thoughtful mode**: the agent auto-writes typed decision-trail entries by forking a background scribe, instead of relying on `cockpit start` + manual `cockpit log`.
 
 All cockpit code lives under `packages/monitor/skills/cockpit/`:
+
 - `scripts/` — Bun/TypeScript CLI + daemon + SSE engines.
 - `dashboard/dist/` — committed petite-vue SPA (no build step), "Night Flight" dark design system.
 

@@ -1,6 +1,7 @@
 # RUNTIME-01: OpenCode plugin module
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -27,14 +28,14 @@ Nothing else. In particular the two shell scripts this module invokes stay byte-
 
 `../_context/runtime-facts.md` is the gate. This task consumes six of its entries:
 
-| Fact | What it decides here |
-|---|---|
-| **S8** | Whether `import.meta.dir` inside a symlink-loaded plugin gives the realpath. **Hard blocker** — without it the module cannot find the repo root at all. |
-| **S3** | Whether the branch guard throws or mutates `output.permission`. |
-| **S4** | How a lint violation is surfaced, and whether the write has already landed. |
-| **S5** | The argument path for the bash command inside the tool-execute input. |
-| **S15** | The exact wrapper `scribe-nudge.ts` emits when neither harness env var is set. |
-| **S1 / S2** | Which session events actually fire, and how often. |
+| Fact        | What it decides here                                                                                                                                    |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **S8**      | Whether `import.meta.dir` inside a symlink-loaded plugin gives the realpath. **Hard blocker** — without it the module cannot find the repo root at all. |
+| **S3**      | Whether the branch guard throws or mutates `output.permission`.                                                                                         |
+| **S4**      | How a lint violation is surfaced, and whether the write has already landed.                                                                             |
+| **S5**      | The argument path for the bash command inside the tool-execute input.                                                                                   |
+| **S15**     | The exact wrapper `scribe-nudge.ts` emits when neither harness env var is set.                                                                          |
+| **S1 / S2** | Which session events actually fire, and how often.                                                                                                      |
 
 **If any of these is still marked `UNRESOLVED`, set `> **Status**: blocked` in this file and stop.** Do not infer the answer from OpenCode's documentation, do not pick the reasonable default, and do not write a branch for each possibility. A wrong runtime assumption here propagates into the installer, five skill documents, and the README before anyone notices.
 
@@ -51,15 +52,21 @@ Single file. **Zero imports from anywhere in this repo** — not from `packages/
 ```ts
 // EXACTLY ONE EXPORT. See the warning below — this is not a style preference.
 export const QLabPlugin = async (ctx) => ({
-  event: async ({ event }) => { /* … */ },
-  "tool.execute.before": async (input, output) => { /* … */ },
-  "tool.execute.after": async (input, output) => { /* … */ },
+  event: async ({ event }) => {
+    /* … */
+  },
+  "tool.execute.before": async (input, output) => {
+    /* … */
+  },
+  "tool.execute.after": async (input, output) => {
+    /* … */
+  },
 });
 ```
 
 > ⚠️ **Export the plugin function and nothing else. No `id`, no version constant, no shared type — nothing.**
 >
-> The loader iterates the module's exported *values* and calls each one. A non-function export poisons that loop: the module still evaluates, no error is printed anywhere, and **every hook silently does nothing**. Observed directly on opencode 1.18.18 — a module exporting `id` plus the plugin function logged its module-level marker and was never initialized; deleting the `id` line made it initialize immediately. Recorded as **S18** in `../_context/runtime-facts.md`.
+> The loader iterates the module's exported _values_ and calls each one. A non-function export poisons that loop: the module still evaluates, no error is printed anywhere, and **every hook silently does nothing**. Observed directly on opencode 1.18.18 — a module exporting `id` plus the plugin function logged its module-level marker and was never initialized; deleting the `id` line made it initialize immediately. Recorded as **S18** in `../_context/runtime-facts.md`.
 >
 > This is the single easiest way to ship a module that looks correct and does nothing, so the acceptance criteria gate on it.
 
@@ -72,11 +79,11 @@ const root = dirname(import.meta.dir);
 
 ### Event wiring
 
-| Trigger | Action |
-|---|---|
-| `event` → `session.created` | `bun <root>/packages/monitor/skills/cockpit/scripts/decision-log-start.ts` |
-| `event` → `session.idle` | `bun <root>/packages/monitor/skills/cockpit/scripts/scribe-nudge.ts` |
-| `tool.execute.before` (bash) | pipe a command payload to `<root>/packages/chronicle/hooks/check-branch.sh` |
+| Trigger                           | Action                                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `event` → `session.created`       | `bun <root>/packages/monitor/skills/cockpit/scripts/decision-log-start.ts`      |
+| `event` → `session.idle`          | `bun <root>/packages/monitor/skills/cockpit/scripts/scribe-nudge.ts`            |
+| `tool.execute.before` (bash)      | pipe a command payload to `<root>/packages/chronicle/hooks/check-branch.sh`     |
 | `tool.execute.after` (write/edit) | pipe a file-path payload to `<root>/packages/dispatch/hooks/flightplan-lint.sh` |
 
 `scribe-nudge.ts` switches its output shape on the Codex marker variable. Under OpenCode neither harness variable is set, so it emits the Claude hook-JSON wrapper rather than plain text — handle that wrapper per **S15**. Printing it raw shows the user a blob of JSON instead of a reminder.
@@ -112,10 +119,18 @@ type HookResult = { exitCode: number; stdout: string; stderr: string };
 
 // Spawns the script with the payload on stdin. Resolves to null when the script
 // is missing — a fresh checkout without one of the plugins must not break sessions.
-async function runHook(root: string, relScript: string, payload: string): Promise<HookResult | null>;
+async function runHook(
+  root: string,
+  relScript: string,
+  payload: string,
+): Promise<HookResult | null>;
 
 // Fire-and-report for the two session scripts.
-async function runScript(root: string, relScript: string, args: string[]): Promise<HookResult | null>;
+async function runScript(
+  root: string,
+  relScript: string,
+  args: string[],
+): Promise<HookResult | null>;
 ```
 
 ### Fail-open rules
@@ -167,12 +182,12 @@ Never spawn a real shell, a real script, or a real OpenCode process in a unit te
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A workflow rule was re-derived in TypeScript, a shell script was edited, or a fail-open path throws | Happy paths wire up, but malformed output or a missing script produces an error instead of a no-op | Every observed script output is handled including malformed and empty, fail-open holds everywhere, the guard message passes through verbatim, and no workflow rule was re-derived |
-| Test coverage | ×2 | No tests, or tests that spawn a real shell | Only the success case per function | Each pure function covered across success, empty, malformed, and every distinguished exit code; payload round-trips with quotes and multi-byte input |
-| Interface & readability | ×1 | Spawning smuggled into the verdict functions, or logic split across several files | Single file and roughly pure, but the types are vague or the wiring is hard to follow | One file, no repo imports, verdict functions provably pure, `type` over `interface`, spawn confined to two named wrappers |
-| Assumptions & docs | ×1 | A runtime behavior assumed with no citation, or a branch written for both possible answers | Facts cited loosely, failure modes undocumented | Every runtime-dependent line names the fact it rests on, and each fail-open rule carries a one-line reason |
+| Dimension               | Weight | 0–1 (fail)                                                                                          | 2–3 (below bar)                                                                                    | 4–5 (pass)                                                                                                                                                                        |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A workflow rule was re-derived in TypeScript, a shell script was edited, or a fail-open path throws | Happy paths wire up, but malformed output or a missing script produces an error instead of a no-op | Every observed script output is handled including malformed and empty, fail-open holds everywhere, the guard message passes through verbatim, and no workflow rule was re-derived |
+| Test coverage           | ×2     | No tests, or tests that spawn a real shell                                                          | Only the success case per function                                                                 | Each pure function covered across success, empty, malformed, and every distinguished exit code; payload round-trips with quotes and multi-byte input                              |
+| Interface & readability | ×1     | Spawning smuggled into the verdict functions, or logic split across several files                   | Single file and roughly pure, but the types are vague or the wiring is hard to follow              | One file, no repo imports, verdict functions provably pure, `type` over `interface`, spawn confined to two named wrappers                                                         |
+| Assumptions & docs      | ×1     | A runtime behavior assumed with no citation, or a branch written for both possible answers          | Facts cited loosely, failure modes undocumented                                                    | Every runtime-dependent line names the fact it rests on, and each fail-open rule carries a one-line reason                                                                        |
 
 ## Out of scope
 

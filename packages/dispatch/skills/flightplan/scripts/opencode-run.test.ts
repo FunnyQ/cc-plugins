@@ -6,13 +6,7 @@ import {
   expect,
   test,
 } from "bun:test";
-import {
-  mkdir,
-  mkdtemp,
-  rm,
-  writeFile,
-  readFile,
-} from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { isolateHome, restoreEnv, writeFakeBin } from "./lib/fake-bin.ts";

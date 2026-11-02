@@ -138,7 +138,9 @@ export const register: Register = (on) => {
         },
       });
       if (result.exitCode !== 0)
-        throw new Error(result.stderr.trim() || `bun exited ${result.exitCode}`);
+        throw new Error(
+          result.stderr.trim() || `bun exited ${result.exitCode}`,
+        );
       const info = JSON.parse(result.stdout) as RuntimeInfo;
       runtime.info = info;
       where.home = info.home;
@@ -197,7 +199,11 @@ export const register: Register = (on) => {
         void session
           .then((id) =>
             $.process.run(
-              ["bun", `${$.plugin.root}/hooks/teacher/lessons-cli.ts`, "record"],
+              [
+                "bun",
+                `${$.plugin.root}/hooks/teacher/lessons-cli.ts`,
+                "record",
+              ],
               {
                 stdin: JSON.stringify({
                   ...a,

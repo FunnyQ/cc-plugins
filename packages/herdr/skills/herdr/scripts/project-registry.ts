@@ -66,7 +66,10 @@ export async function readRegistry(
 export function isTempPath(path: string, tempRoot: string = tmpdir()): boolean {
   if (/^(?:[a-z]:[\\/]|[\\/]{2}[^\\/])/i.test(tempRoot)) {
     const normalized = win32.normalize(path).toLowerCase();
-    const root = win32.normalize(tempRoot).toLowerCase().replace(/[\\/]+$/, "");
+    const root = win32
+      .normalize(tempRoot)
+      .toLowerCase()
+      .replace(/[\\/]+$/, "");
     if (
       normalized.replace(/[\\/]+$/, "") === root ||
       normalized.startsWith(`${root}\\`)

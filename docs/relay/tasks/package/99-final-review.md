@@ -1,6 +1,7 @@
 # PACKAGE-99: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -22,24 +23,29 @@ Holistic gate over the whole `relay` package: the layers compose, the capability
 Check the seams, not individual task internals (those passed their own rubrics):
 
 ### Integration / does it compose
+
 - `relay.ts` dispatches purely through `getBackend` + `capabilityGate` + `b.strategy`/`b.invoke` — no `if (backend === ...)` branching anywhere.
 - The prompt-text seam settled in the opencode/claude backend tasks is actually consistent in `InvokeOpts` and consumed correctly in `relay.ts`.
 - The output contract (full stdout + `/tmp/relay/<ts>/last.md`) holds for every backend path, including codex `-o lastfile` and image (saved path printed).
 - `bun test packages/relay/skills/relay/scripts/` passes as a whole suite (not just per-file).
 
 ### Capability matrix end-to-end
+
 - Every hole fails fast before spawn: `/relay opencode image` and `/relay claude image` exit non-zero with the gate message.
 - Every supported cell routes to the right strategy (codex/claude review = native; opencode review + all delegate = prompt; codex custom-file review = prompt).
 
 ### Superset-of-odin-codex
+
 - delegate, review (incl. native flags), and image all reproduce odin-codex behaviour through the codex backend — nothing from odin-codex's three subcommands is lost (so odin-codex can be retired later).
 
 ### Packaging & consistency
+
 - The three version surfaces agree at `0.1.0`: Claude `plugin.json`, Codex `plugin.json`, and `SKILL.md` frontmatter (relay's marketplace entries are not per-plugin versioned).
 - `relay` is in both marketplace registries; descriptions consistent across manifests, registries, SKILL.md, CHANGELOG, CLAUDE.md.
 - SKILL.md frontmatter is portable (the same file works under Claude/Codex/OpenCode); the opencode symlink path matches the real skill location.
 
 ### Meets the PLAN goal
+
 - A reader of the shipped package can run `/relay <backend> <mode>` for every supported cell and get the documented behaviour.
 - The three alias commands (`/codex`, `/opencode`, `/claude`) exist, route to the relay skill with their backend fixed, and add no behaviour beyond `/relay <backend>` (no duplicated gate/strategy/report logic).
 
@@ -64,12 +70,12 @@ Check the seams, not individual task internals (those passed their own rubrics):
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration / composes < 4 is an automatic veto. This rubric scores **integration**, not individual tasks.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration / composes | ×3 | layers don't wire; suite fails | composes but a seam (prompt-text/output) leaks | clean two-layer composition; suite green; no name branching |
-| Meets the PLAN goal | ×2 | core modes unusable end-to-end | works but a cell/mode missing | every supported cell runnable as documented; odin-codex superset intact |
-| Consistency | ×1 | versions/registries/docs disagree | minor drift | versions, registries, descriptions all aligned |
-| No regressions | ×1 | breaks repo conventions/other plugins | minor | additive only; monitor/dispatch untouched; repo conventions held |
+| Dimension              | Weight | 0–1 (fail)                            | 2–3 (below bar)                                | 4–5 (pass)                                                              |
+| ---------------------- | ------ | ------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| Integration / composes | ×3     | layers don't wire; suite fails        | composes but a seam (prompt-text/output) leaks | clean two-layer composition; suite green; no name branching             |
+| Meets the PLAN goal    | ×2     | core modes unusable end-to-end        | works but a cell/mode missing                  | every supported cell runnable as documented; odin-codex superset intact |
+| Consistency            | ×1     | versions/registries/docs disagree     | minor drift                                    | versions, registries, descriptions all aligned                          |
+| No regressions         | ×1     | breaks repo conventions/other plugins | minor                                          | additive only; monitor/dispatch untouched; repo conventions held        |
 
 ## Out of scope
 

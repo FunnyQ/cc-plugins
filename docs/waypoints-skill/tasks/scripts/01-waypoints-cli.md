@@ -1,6 +1,7 @@
 # SCRIPTS-01: waypoints CLI core (parse · active · leg-scaffold)
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -33,12 +34,12 @@ not `interface`. Structure `main()` so a fourth verb (`advance`) can be added la
 export type LegStatus = "done" | "active" | "pending";
 
 export type Leg = {
-  num: number;        // 1-based, from the "N." in the list item
-  nn: string;         // zero-padded, e.g. "02"
-  slug: string;       // from the "→ legs/NN-slug/" pointer
+  num: number; // 1-based, from the "N." in the list item
+  nn: string; // zero-padded, e.g. "02"
+  slug: string; // from the "→ legs/NN-slug/" pointer
   status: LegStatus;
-  title: string;      // milestone name — text BEFORE the em dash (e.g. "Auth foundation")
-  doneState: string;  // acceptance summary — text AFTER the em dash
+  title: string; // milestone name — text BEFORE the em dash (e.g. "Auth foundation")
+  doneState: string; // acceptance summary — text AFTER the em dash
   landedDate?: string;
   outcome?: string;
 };
@@ -52,9 +53,9 @@ A leg is a top-level list item under `## Legs`. The exact, concrete `WAYPOINTS.m
 `../_context/shared.md` (Required reading) — parse it per the rules below rather than duplicating it here.
 
 ```ts
-export function parseRoadmap(md: string): Roadmap
-export function serializeRoadmap(roadmap: Roadmap): string   // inverse of parseRoadmap
-export function assertSingleActive(roadmap: Roadmap): void   // throws if [~] count > 1 (zero is valid at terminal)
+export function parseRoadmap(md: string): Roadmap;
+export function serializeRoadmap(roadmap: Roadmap): string; // inverse of parseRoadmap
+export function assertSingleActive(roadmap: Roadmap): void; // throws if [~] count > 1 (zero is valid at terminal)
 ```
 
 - `[x]`→done, `[~]`→active, `[ ]`→pending.
@@ -63,7 +64,7 @@ export function assertSingleActive(roadmap: Roadmap): void   // throws if [~] co
   carry this pointer** (see the format rules in `../_context/shared.md`); a leg missing it is a malformed
   roadmap → `parseRoadmap` throws with a clear message. If the pointer's NN disagrees with the derived
   `nn`, prefer the list number (the number is authoritative).
-- `title` / `doneState` split on the ` — ` **em dash** (U+2014): `title` is the trimmed text before it (after
+- `title` / `doneState` split on the `—` **em dash** (U+2014): `title` is the trimmed text before it (after
   the `N. ` number prefix), `doneState` the trimmed text after. The em dash is the **only** accepted
   separator — split on it, not on ASCII `-`, so a title containing a hyphen (e.g. "Multi-factor auth — …")
   is never mis-cut. A leg item with no em dash is malformed → throw. **Both** fields must survive
@@ -75,7 +76,10 @@ export function assertSingleActive(roadmap: Roadmap): void   // throws if [~] co
 ### `active <proj>`
 
 ```ts
-export function formatActive(roadmap: Roadmap, priorGoals: Record<string, string>): string
+export function formatActive(
+  roadmap: Roadmap,
+  priorGoals: Record<string, string>,
+): string;
 ```
 
 Pure formatter; `main()` supplies `priorGoals` by reading the Overview first line of each landed leg's
@@ -92,13 +96,13 @@ PRIOR LANDED LEGS:
 
 - No `[~]` leg → `main()` prints a clear message to stderr and exits non-zero, distinguishing **roadmap
   complete** (all legs `[x]`) from **nothing active yet** (pending legs exist). Zero active is a valid state,
-  not a parse/assert error — `assertSingleActive` only rejects *more than one* `[~]`.
+  not a parse/assert error — `assertSingleActive` only rejects _more than one_ `[~]`.
 
 ### `leg-scaffold <proj> <NN-slug> <buckets>`
 
 ```ts
-export function validateLegSlug(nnSlug: string): void   // throws on bad shape
-export function validateBucket(bucket: string): void    // throws on internal dashes / non-kebab
+export function validateLegSlug(nnSlug: string): void; // throws on bad shape
+export function validateBucket(bucket: string): void; // throws on internal dashes / non-kebab
 ```
 
 - `NN-slug` must match `^\d{2}-[a-z][a-z0-9-]*$`; each bucket must match `^[a-z][a-z0-9]*$` (single token,
@@ -125,12 +129,12 @@ export function validateBucket(bucket: string): void    // throws on internal da
 
 > Scale and shared dimensions: see `../_context/rubric.md` (dimension set A — code tasks). Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | verbs misbehave or parse is wrong | happy path parses but edges (NN/pointer mismatch, missing pointer, no-active) drift | parse/serialize/active/leg-scaffold correct, edges + validation handled per spec |
-| Test coverage | ×2 | no tests | happy-path parse only | parse all glyphs + missing-pointer + round-trip + leg-scaffold good/bad inputs |
-| Interface & readability | ×1 | logic tangled into `main()`, filesystem in helpers | verbs work but helpers impure or types vague | pure parse/serialize/format/validate helpers, clear `type`s, thin impure `main()` |
-| Assumptions & docs | ×1 | magic strings, undocumented format assumptions | some assumptions unstated | format assumptions inline, helpers pure and composable |
+| Dimension               | Weight | 0–1 (fail)                                         | 2–3 (below bar)                                                                     | 4–5 (pass)                                                                        |
+| ----------------------- | ------ | -------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Correctness             | ×3     | verbs misbehave or parse is wrong                  | happy path parses but edges (NN/pointer mismatch, missing pointer, no-active) drift | parse/serialize/active/leg-scaffold correct, edges + validation handled per spec  |
+| Test coverage           | ×2     | no tests                                           | happy-path parse only                                                               | parse all glyphs + missing-pointer + round-trip + leg-scaffold good/bad inputs    |
+| Interface & readability | ×1     | logic tangled into `main()`, filesystem in helpers | verbs work but helpers impure or types vague                                        | pure parse/serialize/format/validate helpers, clear `type`s, thin impure `main()` |
+| Assumptions & docs      | ×1     | magic strings, undocumented format assumptions     | some assumptions unstated                                                           | format assumptions inline, helpers pure and composable                            |
 
 ## Out of scope
 

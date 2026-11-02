@@ -1,6 +1,7 @@
 # RUNTIME-02: OpenCode installer
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -29,12 +30,12 @@ Plain Bun script. Entry guarded by `if (import.meta.main)`. No harness dependenc
 
 Four facts in `../_context/runtime-facts.md` gate this task. **S7 is the hard blocker**: if the runtime does not resolve an entry symlink to its realpath, every skill that imports out of its own directory breaks and the whole symlink model has to be replaced with copies or per-skill re-export shims — which is a different task, not an adjustment to this one.
 
-| Fact | What it decides here |
-|---|---|
-| **S7** | Whether symlinked skills work at all. `UNRESOLVED` → set `> **Status**: blocked` and stop. |
-| **S6** | Whether OpenCode discovers a symlinked skill directory. `UNRESOLVED` → blocked. |
-| **S8** | The plugin target's shape. Realpath → a plain symlink. Link path → the installer must instead **generate** a one-line file `export * from "<abs repo>/opencode/plugin.ts"` at the plugin target, and the target's `kind` becomes a generated file rather than a symlink. `UNRESOLVED` → blocked. |
-| **S14** | The `subagent_depth` default and whether the value is read live or at startup. Affects only the wording of the report (whether to tell the user to restart), not the write itself. `UNRESOLVED` → still implement the write; report the restart advice as unknown rather than guessing. |
+| Fact    | What it decides here                                                                                                                                                                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **S7**  | Whether symlinked skills work at all. `UNRESOLVED` → set `> **Status**: blocked` and stop.                                                                                                                                                                                                       |
+| **S6**  | Whether OpenCode discovers a symlinked skill directory. `UNRESOLVED` → blocked.                                                                                                                                                                                                                  |
+| **S8**  | The plugin target's shape. Realpath → a plain symlink. Link path → the installer must instead **generate** a one-line file `export * from "<abs repo>/opencode/plugin.ts"` at the plugin target, and the target's `kind` becomes a generated file rather than a symlink. `UNRESOLVED` → blocked. |
+| **S14** | The `subagent_depth` default and whether the value is read live or at startup. Affects only the wording of the report (whether to tell the user to restart), not the write itself. `UNRESOLVED` → still implement the write; report the restart advice as unknown rather than guessing.          |
 
 Do not infer any of these from documentation. Blocking is the correct outcome.
 
@@ -45,9 +46,9 @@ export type TargetKind = "symlink" | "config";
 
 export type Target = {
   kind: TargetKind;
-  label: string;      // human-readable, e.g. "skill: cockpit"
-  source: string;     // absolute path inside this repo
-  installed: string;  // absolute path under ~/.config/opencode/
+  label: string; // human-readable, e.g. "skill: cockpit"
+  source: string; // absolute path inside this repo
+  installed: string; // absolute path under ~/.config/opencode/
 };
 
 export function buildTargets(repoRoot: string, home: string): Target[];
@@ -57,13 +58,13 @@ export function buildTargets(repoRoot: string, home: string): Target[];
 
 It produces exactly 32 entries — 31 symlinks plus 1 config edit:
 
-| Count | Source | Installed | Kind |
-|---|---|---|---|
-| 15 | `packages/*/skills/<name>` | `<home>/.config/opencode/skills/<name>` | symlink (directory) |
-| 1 | `opencode/plugin.ts` | `<home>/.config/opencode/plugin/q-lab.ts` | symlink |
-| 13 | `opencode/agents/<name>.md` | `<home>/.config/opencode/agents/<name>.md` | symlink |
-| 2 | `opencode/commands/<name>.md` | `<home>/.config/opencode/commands/<name>.md` | symlink |
-| 1 | — | `<home>/.config/opencode/opencode.json` | config |
+| Count | Source                        | Installed                                    | Kind                |
+| ----- | ----------------------------- | -------------------------------------------- | ------------------- |
+| 15    | `packages/*/skills/<name>`    | `<home>/.config/opencode/skills/<name>`      | symlink (directory) |
+| 1     | `opencode/plugin.ts`          | `<home>/.config/opencode/plugin/q-lab.ts`    | symlink             |
+| 13    | `opencode/agents/<name>.md`   | `<home>/.config/opencode/agents/<name>.md`   | symlink             |
+| 2     | `opencode/commands/<name>.md` | `<home>/.config/opencode/commands/<name>.md` | symlink             |
+| 1     | —                             | `<home>/.config/opencode/opencode.json`      | config              |
 
 **Skill enumeration is by `SKILL.md` presence.** Walk `packages/*/skills/*` and keep only directories containing a `SKILL.md`. A bare glob returns 16 because `packages/monitor/skills/shared/` has no `SKILL.md` — it holds scripts the other monitor skills import, and symlinking it as a skill would surface a phantom skill in OpenCode. Excluding it is an explicit acceptance criterion, not an incidental detail. The expected 15 names are listed in `../_context/repo-state.md`.
 
@@ -73,11 +74,11 @@ The agent and command counts come from what is on disk under `opencode/agents/` 
 
 ```ts
 export type LinkState =
-  | "ok"        // symlink resolving to the expected source
-  | "missing"   // nothing there
-  | "stale"     // symlink into this repo, wrong source
-  | "broken"    // symlink whose target does not exist
-  | "foreign";  // a real file/dir, or a symlink pointing outside this repo
+  | "ok" // symlink resolving to the expected source
+  | "missing" // nothing there
+  | "stale" // symlink into this repo, wrong source
+  | "broken" // symlink whose target does not exist
+  | "foreign"; // a real file/dir, or a symlink pointing outside this repo
 
 export function classifyLink(
   probe: { exists: boolean; isSymlink: boolean; resolved: string | null },
@@ -108,14 +109,14 @@ export function decideSubagentDepth(config: unknown): DepthDecision;
 
 Behavior, cell by cell:
 
-| `subagent_depth` in the config | `action` | `value` |
-|---|---|---|
-| key absent | `write` | 2 |
-| `1` (or any number below 2) | `write` | 2 |
-| `2` | `ok` | 2 |
-| `5` (any number above 2) | `ok` | 5 — **leave it alone** |
-| not a number | `write` | 2 |
-| the file is not a JSON object | `unparsable` | 2 |
+| `subagent_depth` in the config | `action`     | `value`                |
+| ------------------------------ | ------------ | ---------------------- |
+| key absent                     | `write`      | 2                      |
+| `1` (or any number below 2)    | `write`      | 2                      |
+| `2`                            | `ok`         | 2                      |
+| `5` (any number above 2)       | `ok`         | 5 — **leave it alone** |
+| not a number                   | `write`      | 2                      |
+| the file is not a JSON object  | `unparsable` | 2                      |
 
 **Only ever raise.** A larger value belongs to the user or to another tool. On `unparsable`, refuse to write and print the manual edit instead:
 
@@ -194,12 +195,12 @@ The installer writes **only** inside `<home>/.config/opencode/`. Never `~/.claud
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong target count, `shared` installed as a skill, or anything written outside `~/.config/opencode/` | The four modes work on a clean home, but a foreign file gets overwritten or the depth write drops a key | All 32 targets correct, foreign entries skipped with a non-zero exit, depth raised only when below 2 with every other key intact |
-| Test coverage | ×2 | No tests, or tests that touch the real `$HOME` | Happy-path enumeration only | Target counts and the `shared` exclusion, all five link states, all six depth cells, and the foreign-skip path |
-| Interface & readability | ×1 | `lstat` calls buried inside the "pure" functions; home read from the environment internally | Pure/impure split exists but `home` is not injectable, so tests need the real filesystem | `buildTargets`/`classifyLink`/`decideSubagentDepth` pure with injected inputs, `type` over `interface`, thin impure probe and runner |
-| Assumptions & docs | ×1 | Guesses a blocking runtime fact instead of blocking | Blocks correctly but does not say which fact stopped it | Blocking facts cited by name; the `--unlink` leaves-depth-alone decision and the never-overwrite-foreign rule stated where a reader hits them |
+| Dimension               | Weight | 0–1 (fail)                                                                                           | 2–3 (below bar)                                                                                         | 4–5 (pass)                                                                                                                                    |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong target count, `shared` installed as a skill, or anything written outside `~/.config/opencode/` | The four modes work on a clean home, but a foreign file gets overwritten or the depth write drops a key | All 32 targets correct, foreign entries skipped with a non-zero exit, depth raised only when below 2 with every other key intact              |
+| Test coverage           | ×2     | No tests, or tests that touch the real `$HOME`                                                       | Happy-path enumeration only                                                                             | Target counts and the `shared` exclusion, all five link states, all six depth cells, and the foreign-skip path                                |
+| Interface & readability | ×1     | `lstat` calls buried inside the "pure" functions; home read from the environment internally          | Pure/impure split exists but `home` is not injectable, so tests need the real filesystem                | `buildTargets`/`classifyLink`/`decideSubagentDepth` pure with injected inputs, `type` over `interface`, thin impure probe and runner          |
+| Assumptions & docs      | ×1     | Guesses a blocking runtime fact instead of blocking                                                  | Blocks correctly but does not say which fact stopped it                                                 | Blocking facts cited by name; the `--unlink` leaves-depth-alone decision and the never-overwrite-foreign rule stated where a reader hits them |
 
 ## Out of scope
 

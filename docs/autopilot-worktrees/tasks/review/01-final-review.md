@@ -1,6 +1,7 @@
 # REVIEW-01: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/models.md`
 > - `../_context/worktree.md`
@@ -55,7 +56,7 @@ This is the holistic gate. It does not re-score individual tasks. It checks that
 
 ### Cross-checks to make
 
-1. **Models flow.** Trace one header from a task file to the `agent()` call options. Name each hop and confirm its field names match: the ready item's `modelsRaw`, the scout schema's required `modelsRaw`, the stdout cross-check, the in-script parse, and the orchestrator lookup. The in-script parser must accept and reject exactly what `lint-task.ts` does: both implement the four-step grammar in `../_context/models.md`, and both test files pin the same nine parity fixtures, including `judge = opus / xhigh`, `dev=opus,`, and ` dev=sonnet/low , verify=haiku `.
+1. **Models flow.** Trace one header from a task file to the `agent()` call options. Name each hop and confirm its field names match: the ready item's `modelsRaw`, the scout schema's required `modelsRaw`, the stdout cross-check, the in-script parse, and the orchestrator lookup. The in-script parser must accept and reject exactly what `lint-task.ts` does: both implement the four-step grammar in `../_context/models.md`, and both test files pin the same nine parity fixtures, including `judge = opus / xhigh`, `dev=opus,`, and `dev=sonnet/low , verify=haiku`.
 2. **CLI contract.** Every `worktree.ts` invocation in `orchestrator.md` must match the script. Check subcommand names, flags (`--repo`, `--slug`, `--expect`, `--op`, `--keep`), and the JSON fields read back (`path`, `base`, `exists`, `status`, `drift`, `files`, `paths`, `fingerprint`, `previous`, `conflicted`, `removed`, `kept`, `restored`). For `land`, check every status against the land result-field table. Check that each schema the orchestrator passes to those agents mirrors the printed object.
 3. **One role map.** Compare three sources: the defaults in `orchestrator.md`, the Model policy table in autopilot `SKILL.md`, and the table in `../_context/models.md`. They must agree on every role, model, and effort.
 4. **No remnants.** Check for prompt text that still tells agents the wave shares one working tree. Check for tests that still exercise deferral or `heldBack`.
@@ -83,13 +84,13 @@ This is the holistic gate. It does not re-score individual tasks. It checks that
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration < 4 and No regressions < 4 are each an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration | ×3 | Models or worktree calls break at a hop, for example a field name mismatch or a schema that does not mirror the CLI | Pieces connect on the happy path, but a branch (conflict, drift, park, resume) calls the CLI wrongly | Every hop and every branch composes, including conflict, drift, leak abort, and resume, and the CLI contract matches exactly |
-| Meets the PLAN goal | ×3 | Parallel waves still need `Max parallel: 1` for a whole-target build, or overrides are ignored | Isolation works, but cleanup leaves worktrees, or escalation ignores the override | Waves run isolated in parallel, overrides and escalation apply, and a clean run leaves no worktree for the slug |
-| Consistency | ×2 | The role map or the CLI differs across code and docs | Minor drift in one doc | Code, `SKILL.md` files, templates, `opencode.md`, and `CLAUDE.md` all agree |
-| No regressions | ×2 | `bun test packages/dispatch/` fails, or tsc reports new errors in `packages/dispatch` | Tests pass but a pre-existing behaviour (Max parallel slots, external engines, resume) silently changed | The full suite and typecheck are clean, and existing behaviour is preserved outside the planned changes |
-| Leanness | ×1 | Abstractions with one caller, options nobody sets, or a hand-rolled version of a git primitive | Some avoidable indirection | Minimal additions; obsolete code deleted |
+| Dimension           | Weight | 0–1 (fail)                                                                                                          | 2–3 (below bar)                                                                                         | 4–5 (pass)                                                                                                                   |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Integration         | ×3     | Models or worktree calls break at a hop, for example a field name mismatch or a schema that does not mirror the CLI | Pieces connect on the happy path, but a branch (conflict, drift, park, resume) calls the CLI wrongly    | Every hop and every branch composes, including conflict, drift, leak abort, and resume, and the CLI contract matches exactly |
+| Meets the PLAN goal | ×3     | Parallel waves still need `Max parallel: 1` for a whole-target build, or overrides are ignored                      | Isolation works, but cleanup leaves worktrees, or escalation ignores the override                       | Waves run isolated in parallel, overrides and escalation apply, and a clean run leaves no worktree for the slug              |
+| Consistency         | ×2     | The role map or the CLI differs across code and docs                                                                | Minor drift in one doc                                                                                  | Code, `SKILL.md` files, templates, `opencode.md`, and `CLAUDE.md` all agree                                                  |
+| No regressions      | ×2     | `bun test packages/dispatch/` fails, or tsc reports new errors in `packages/dispatch`                               | Tests pass but a pre-existing behaviour (Max parallel slots, external engines, resume) silently changed | The full suite and typecheck are clean, and existing behaviour is preserved outside the planned changes                      |
+| Leanness            | ×1     | Abstractions with one caller, options nobody sets, or a hand-rolled version of a git primitive                      | Some avoidable indirection                                                                              | Minimal additions; obsolete code deleted                                                                                     |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # SERVER-07: OpenCode send
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -72,12 +73,12 @@ Only this file changes. Use the HTTP client crate already in `Cargo.toml` (added
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong server targeted (e.g. an `opencode serve`), or delivery reported without both steps succeeding | Main path works; timeouts, `directory` param, or error-message fallbacks drift | Discovery, health, session check, two-step delivery, auth, and every message match TS |
-| Test coverage | ×2 | Contract group not run on Rust | Group passes; no fake-server test | Group passes on both; `cargo test` covers the `ps` parser and a fake bridge including failure bodies |
-| Interface & readability | ×1 | Discovery, check, and delivery interleaved | Separated but duplicated request setup | Three small functions mirroring TS; one request helper applies auth and timeouts |
-| Assumptions & docs | ×1 | Timeouts are magic numbers | Named, unexplained | Timeouts named with their TS source; the `true`-body success rule commented |
+| Dimension               | Weight | 0–1 (fail)                                                                                           | 2–3 (below bar)                                                                | 4–5 (pass)                                                                                           |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong server targeted (e.g. an `opencode serve`), or delivery reported without both steps succeeding | Main path works; timeouts, `directory` param, or error-message fallbacks drift | Discovery, health, session check, two-step delivery, auth, and every message match TS                |
+| Test coverage           | ×2     | Contract group not run on Rust                                                                       | Group passes; no fake-server test                                              | Group passes on both; `cargo test` covers the `ps` parser and a fake bridge including failure bodies |
+| Interface & readability | ×1     | Discovery, check, and delivery interleaved                                                           | Separated but duplicated request setup                                         | Three small functions mirroring TS; one request helper applies auth and timeouts                     |
+| Assumptions & docs      | ×1     | Timeouts are magic numbers                                                                           | Named, unexplained                                                             | Timeouts named with their TS source; the `true`-body success rule commented                          |
 
 ## Out of scope
 

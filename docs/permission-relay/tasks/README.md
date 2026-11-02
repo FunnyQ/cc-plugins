@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- probe-deep:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,13 +48,13 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Depends on |
-|---|---|---|---|---|
-| backend | 01 | Permission broker module | todo | — |
-| backend | 02 | Wire permission routes into the daemon | todo | backend/01 |
-| channel | 01 | Channel permission relay | todo | backend/01 |
-| ui | 01 | Permission modal | todo | backend/01 |
-| ui | 02 | Attention — notification, title flash, badge | todo | ui/01 |
+| Bucket  | NN  | Title                                        | Status | Depends on |
+| ------- | --- | -------------------------------------------- | ------ | ---------- |
+| backend | 01  | Permission broker module                     | todo   | —          |
+| backend | 02  | Wire permission routes into the daemon       | todo   | backend/01 |
+| channel | 01  | Channel permission relay                     | todo   | backend/01 |
+| ui      | 01  | Permission modal                             | todo   | backend/01 |
+| ui      | 02  | Attention — notification, title flash, badge | todo   | ui/01      |
 
 ## Dependency graphs
 
@@ -81,10 +82,11 @@ ui/02  <-  ui/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| ui/01 | backend/01 |
+| Task       | Depends on |
+| ---------- | ---------- |
+| ui/01      | backend/01 |
 | channel/01 | backend/01 |
+
 <!-- probe-deep:generated:end -->
 
 ## Known gaps

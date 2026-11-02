@@ -1,6 +1,7 @@
 # BACKEND-01: Permission broker module
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/protocol.md`
 >
@@ -51,11 +52,19 @@ const streams = new Map<string, Set<ReadableStreamDefaultController>>();
 
 // Verdict waiting to be pulled by the channel's long-poll (cold-start race:
 // the verdict can arrive before the channel re-parks its pull).
-type StashedVerdict = { requestId: string; behavior: "allow" | "deny"; expires: number };
+type StashedVerdict = {
+  requestId: string;
+  behavior: "allow" | "deny";
+  expires: number;
+};
 const verdictStash = new Map<string, StashedVerdict>();
 
 // At most one parked channel pull per session.
-type ParkedPull = { resolve: (v: { requestId: string; behavior: "allow" | "deny" } | null) => void };
+type ParkedPull = {
+  resolve: (
+    v: { requestId: string; behavior: "allow" | "deny" } | null,
+  ) => void;
+};
 const pendingPulls = new Map<string, ParkedPull>();
 ```
 
@@ -85,7 +94,9 @@ export async function handlePermissionVerdict(req: Request): Promise<Response>;
 //   Channel long-polls for the verdict. Drain the stash first; else park (one per
 //   session) under the wait budget; resolve with {request_id, behavior} or a
 //   re-pollable {verdict:null, timeout:true}. Abort on req.signal.
-export function handlePermissionPull(req: Request): Response | Promise<Response>;
+export function handlePermissionPull(
+  req: Request,
+): Response | Promise<Response>;
 
 // POST /api/permission-resolved  { session, token, request_id }   (best-effort)
 //   Channel calls this IF it ever receives a cancel/resolved notification from

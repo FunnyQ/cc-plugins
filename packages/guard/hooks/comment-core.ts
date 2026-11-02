@@ -6,7 +6,12 @@
 
 // node:path is out of a mod's reach; accept both path separators here.
 export function baseName(filePath: string): string {
-  return filePath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "";
+  return (
+    filePath
+      .replace(/[\\/]+$/, "")
+      .split(/[\\/]/)
+      .pop() ?? ""
+  );
 }
 
 export function extName(filePath: string): string {

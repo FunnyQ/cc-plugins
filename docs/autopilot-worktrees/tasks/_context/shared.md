@@ -17,7 +17,7 @@
 - Use `type` over `interface`.
 - Follow the surrounding file's idiom. Comments say why, one line. No indirection with one caller; no option nobody sets.
 - Scripts under `flightplan/scripts/` export a tested pure function where they can and keep I/O in a thin `main`.
-- The orchestrator is a **plain JavaScript** Workflow script inside the first ```` ```javascript ```` fence of `packages/dispatch/skills/autopilot/references/orchestrator.md`. No TypeScript syntax there, and no `Date.now()`, `Math.random()`, or argless `new Date()` (they throw in Workflow scripts).
+- The orchestrator is a **plain JavaScript** Workflow script inside the first ` ```javascript ` fence of `packages/dispatch/skills/autopilot/references/orchestrator.md`. No TypeScript syntax there, and no `Date.now()`, `Math.random()`, or argless `new Date()` (they throw in Workflow scripts).
 
 ## File / directory layout
 

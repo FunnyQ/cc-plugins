@@ -24,7 +24,7 @@ Wraps the local `codex`, `opencode`, and `claude` CLIs to delegate tasks across 
 
 **Choosing between modes:**
 
-- **`delegate`** — ask a backend to *do* something (implement, refactor, debug). Code changes expected.
+- **`delegate`** — ask a backend to _do_ something (implement, refactor, debug). Code changes expected.
 - **`review`** — ask a backend for analysis. Output is critique + suggestions. No code changes.
 - **`image`** — generate an image (codex only, via its built-in imagegen skill).
 
@@ -120,6 +120,7 @@ For non-review tasks: implementing features, refactoring, suggesting an approach
    where `<backend>` ∈ `{codex, opencode, claude}`.
 
    Examples:
+
    ```bash
    relay.ts codex delegate --task "add error handling to api.ts" --files api.ts
    relay.ts opencode delegate --task "refactor the auth flow" --files auth.ts,middleware.ts
@@ -178,6 +179,7 @@ Report the final saved path. If the user wants a different name, use a non-destr
 Evaluate each backend suggestion and act:
 
 **Auto-apply** (for delegate only):
+
 - The backend provided a concrete diff or exact file/line edit
 - The change is inside the selected scope
 - The current agent can run verification afterward
@@ -189,6 +191,7 @@ After applying, run any available verification (lint / type check / tests) via B
 If verification fails, undo only your own attempted edit. Move the suggestion to "report only."
 
 **Report only** (for review, or when uncertain):
+
 - Architectural changes
 - Logic changes affecting behavior
 - Multi-file / interconnected changes
@@ -203,11 +206,13 @@ If verification fails, undo only your own attempted edit. Move the suggestion to
 When the user passes an explicit `--model` flag:
 
 1. Run relay with the specified model:
+
    ```bash
    relay.ts <backend> <mode> --model "<provider/model>" ...
    ```
 
 2. After a successful run, ask via AskUserQuestion:
+
    ```
    AskUserQuestion("儲存 <model> 作為 <backend> <mode> 的預設值嗎？")
    ```
@@ -252,15 +257,19 @@ If `relay.ts` cannot run, report that and stop.
 ## Relay Review (<backend>)
 
 ### 重大問題
+
 - `file.ts:42` — issue, impact, suggested fix
 
 ### 其他建議
+
 - `file.ts:88` — suggestion
 
 ### 可套用修正
+
 - [Safe] description — pending explicit approval
 
 ### 驗證
+
 - Lint/Tests: pass / fail / skipped
 ```
 
@@ -270,18 +279,23 @@ If `relay.ts` cannot run, report that and stop.
 ## Relay 回覆 (<backend>)
 
 ### 任務
+
 [what was delegated]
 
 ### 建議摘要
+
 [concise summary in zh-TW]
 
 ### 已套用變更
+
 - [Applied] `file.ts:42` — description
 
 ### 待確認建議
+
 - [Suggestion] description — why it needs human review
 
 ### 驗證
+
 - Lint/Tests: pass / fail / skipped
 ```
 

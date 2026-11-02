@@ -1,6 +1,7 @@
 # CONTRACT-02: HTTP and lifecycle contract suite
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -27,13 +28,16 @@ Use these, never spawn `bun atlas-server.ts` or a binary path directly:
 ```ts
 // contract/launcher.ts
 export function atlasCommand(sub: string, args?: string[]): string[]; // COCKPIT_BIN set → [$COCKPIT_BIN, "atlas", sub, ...args]; unset → ["bun", <TS script>, ...args]
-export function isRust(): boolean;                                    // true when COCKPIT_BIN is set
+export function isRust(): boolean; // true when COCKPIT_BIN is set
 
 // contract/fixtures.ts
 export function makeFixtureHome(): Promise<{
-  home: string;                        // temp HOME with Claude/Codex/OpenCode fixtures
-  env: Record<string, string>;         // HOME, XDG_DATA_HOME, XDG_CONFIG_HOME, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, stub URLs
-  stub: { url: string; respondWith(path: string, status: number, body: string): void };
+  home: string; // temp HOME with Claude/Codex/OpenCode fixtures
+  env: Record<string, string>; // HOME, XDG_DATA_HOME, XDG_CONFIG_HOME, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, stub URLs
+  stub: {
+    url: string;
+    respondWith(path: string, status: number, body: string): void;
+  };
   cleanup(): Promise<void>;
 }>;
 export function freePort(): Promise<number>;
@@ -44,8 +48,18 @@ Force the OpenRouter 500 with `stub.respondWith(<OpenRouter path>, 500, "{}")`.
 ### `serve.ts`
 
 ```ts
-export type AtlasProc = { port: number; proc: Subprocess; stdout(): string; stderr(): string; stop(): Promise<void> };
-export async function startAtlas(env: Record<string, string>, port: number, extraArgs?: string[]): Promise<AtlasProc>;
+export type AtlasProc = {
+  port: number;
+  proc: Subprocess;
+  stdout(): string;
+  stderr(): string;
+  stop(): Promise<void>;
+};
+export async function startAtlas(
+  env: Record<string, string>,
+  port: number,
+  extraArgs?: string[],
+): Promise<AtlasProc>;
 ```
 
 Spawns `atlasCommand("serve", ["--port", String(port), "--no-open", ...extraArgs])` with `env` merged over a minimal `PATH`. Resolves once stdout contains `Claude Stats Dashboard → http://localhost:<port>`; rejects after 15 s with the captured stdout/stderr. `stop()` sends SIGTERM and awaits exit. Every test registers `stop()` and `cleanup()` in `afterEach`/`afterAll`, so a failing test leaks no process.
@@ -74,7 +88,7 @@ One fixture home and one server per `describe`, fresh port from `freePort()`.
 ### `lifecycle.contract.test.ts`
 
 - **atlas.json**: after start, `$COCKPIT_HOME/atlas.json` text equals `JSON.stringify({pid, port, root}, null, 2) + "\n"`, where `pid` is the server's pid, `port` the bound port, and `root` ends with `/skills/usage-dashboard/scripts`.
-- **Reuse**: a second launch with the same env and a *different* free port prints `Claude Stats Dashboard already running → http://localhost:<first port> (pid <pid>)`, exits 0 within 5 s, and the second port refuses connections.
+- **Reuse**: a second launch with the same env and a _different_ free port prints `Claude Stats Dashboard already running → http://localhost:<first port> (pid <pid>)`, exits 0 within 5 s, and the second port refuses connections.
 - **Supersede**: spawn `sleep 60`; write `atlas.json` `{pid: <sleep pid>, port: <free port>, root: "/elsewhere/skills/usage-dashboard/scripts"}`; launch → stdout contains `superseding stale atlas server (pid <sleep pid>`, the sleep process exits, the new server binds, and `atlas.json` now holds the new pid.
 - **Port in use**: hold a port with `Bun.listen` (or `Bun.serve`) on `127.0.0.1`; launch on it → exit code 1, stderr contains `atlas: port <n> is in use by another process — stop it or pass --port <n>.`
 - **Corrupt atlas.json**: write `{not json` → normal start and a rewritten, valid `atlas.json`.
@@ -103,12 +117,12 @@ One fixture home and one server per `describe`, fresh port from `freePort()`.
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Tests fail against TS, or assert behavior the TS does not have (e.g. expect a 500 where TS returns `openRouterError`) | Green against TS but some headers or exact strings from contracts.md §2–§3 are asserted loosely (`toContain` on a whole message, key presence without values) | Every header, status, exact stdout/stderr string, and `atlas.json` byte shape in §2–§3 is asserted exactly and passes against TS |
-| Test coverage | ×2 | Only the happy-path routes | Routes covered but failure paths (dead pid, corrupt override, corrupt `atlas.json`, port in use, traversal) missing | Every route, every failure path above, reuse/supersede, and the Rust-only concurrency test that cannot pass vacuously |
-| Interface & readability | ×1 | Spawn/teardown copy-pasted per test; leaked processes | Shared helper exists but teardown is not guaranteed on failure | One `startAtlas` helper, teardown in hooks, tests read as a spec of §2–§3 |
-| Assumptions & docs | ×1 | Skip or stub choices unexplained | Some choices explained | The Rust-only skip and any stub workaround each carry a one-line reason |
+| Dimension               | Weight | 0–1 (fail)                                                                                                            | 2–3 (below bar)                                                                                                                                               | 4–5 (pass)                                                                                                                       |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Tests fail against TS, or assert behavior the TS does not have (e.g. expect a 500 where TS returns `openRouterError`) | Green against TS but some headers or exact strings from contracts.md §2–§3 are asserted loosely (`toContain` on a whole message, key presence without values) | Every header, status, exact stdout/stderr string, and `atlas.json` byte shape in §2–§3 is asserted exactly and passes against TS |
+| Test coverage           | ×2     | Only the happy-path routes                                                                                            | Routes covered but failure paths (dead pid, corrupt override, corrupt `atlas.json`, port in use, traversal) missing                                           | Every route, every failure path above, reuse/supersede, and the Rust-only concurrency test that cannot pass vacuously            |
+| Interface & readability | ×1     | Spawn/teardown copy-pasted per test; leaked processes                                                                 | Shared helper exists but teardown is not guaranteed on failure                                                                                                | One `startAtlas` helper, teardown in hooks, tests read as a spec of §2–§3                                                        |
+| Assumptions & docs      | ×1     | Skip or stub choices unexplained                                                                                      | Some choices explained                                                                                                                                        | The Rust-only skip and any stub workaround each carry a one-line reason                                                          |
 
 ## Out of scope
 

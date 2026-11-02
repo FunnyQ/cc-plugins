@@ -337,7 +337,8 @@ describe("shared score rendering", () => {
   test("fleet and lanes import the score meter from here and define no copy", () => {
     for (const panel of ["./fleet.js", "./lanes.js"]) {
       const text = source(panel);
-      const imports = text.match(/import \{([^}]*)\} from "\.\/format\.js"/)?.[1] ?? "";
+      const imports =
+        text.match(/import \{([^}]*)\} from "\.\/format\.js"/)?.[1] ?? "";
       for (const name of ["percent", "formatScore", "scoreClass"]) {
         expect(imports).toContain(name);
         expect(text).not.toMatch(new RegExp(`(function|const|let) ${name}\\b`));

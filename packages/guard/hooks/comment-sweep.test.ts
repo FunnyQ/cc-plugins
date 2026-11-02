@@ -196,21 +196,18 @@ describe("comment-guard records what it reported", () => {
     await snapshot(payload);
     const file = join(repo, "app.ts");
     await Bun.write(file, BLOCK);
-    const proc = Bun.spawn(
-      ["bun", join(import.meta.dir, "comment-guard.ts")],
-      {
-        stdin: new TextEncoder().encode(
-          JSON.stringify({
-            session_id: SESSION,
-            tool_name: "Write",
-            tool_input: { file_path: file, content: BLOCK },
-            tool_response: { type: "create", structuredPatch: [] },
-          }),
-        ),
-        stderr: "pipe",
-        env: { ...process.env, GUARD_STATE_DIR: state },
-      },
-    );
+    const proc = Bun.spawn(["bun", join(import.meta.dir, "comment-guard.ts")], {
+      stdin: new TextEncoder().encode(
+        JSON.stringify({
+          session_id: SESSION,
+          tool_name: "Write",
+          tool_input: { file_path: file, content: BLOCK },
+          tool_response: { type: "create", structuredPatch: [] },
+        }),
+      ),
+      stderr: "pipe",
+      env: { ...process.env, GUARD_STATE_DIR: state },
+    });
     expect(await proc.exited).toBe(2);
     expect(await sweep(payload)).toBeNull();
   });

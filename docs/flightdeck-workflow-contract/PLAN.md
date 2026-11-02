@@ -39,6 +39,7 @@ skill so Claude writes conforming workflows.
   the contract promises something the panel breaks. The change takes the road
   order as an input instead of deriving it; nothing about how a road looks
   changes.
+
 - Executing a real Workflow run as part of a task's own verification. Each task
   proves itself with unit tests and the committed fixture. One probe run of
   three agents was executed while writing this plan, to settle whether the
@@ -69,7 +70,7 @@ verified:
    lands only when the run completes, fails, or is killed. Verified in the
    2.1.261 CLI bundle and by scanning 90 records: every `status` is
    `completed` / `failed` / `killed`, never `running`. The sibling
-   `journal.jsonl` *is* appended live, but each line is only
+   `journal.jsonl` _is_ appended live, but each line is only
    `{type, key, agentId, result}` — no label, no phase, no state. An agent
    transcript's `slug` is the parent session's, identical across every agent in
    the run.
@@ -209,19 +210,19 @@ reused unchanged.
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | state-entry-kind | todo | > 4.0 | — |
-| contract | 02 | graph-node-type | todo | > 4.0 | contract/01 |
-| contract | 03 | contract-spec | todo | > 4.0 | contract/01, contract/02 |
-| deck | 01 | graph-json-loader | todo | > 4.0 | contract/02, contract/03 |
-| deck | 02 | state-derivation | todo | > 4.0 | contract/01, deck/01 |
-| deck | 03 | source-autodetect | todo | > 4.0 | deck/01, deck/02 |
-| deck | 04 | transcript-repo-root | todo | > 4.0 | deck/01, deck/03 |
-| deck | 05 | declared-lane-order | todo | > 4.0 | deck/03 |
-| skill | 01 | deckplan-reference | todo | > 4.0 | contract/03 |
-| skill | 02 | example-workflow | todo | > 4.0 | skill/01, deck/04, deck/05 |
-| review | 01 | final review 🏁 | todo | > 4.0 | contract/03, deck/04, skill/02 |
+| Bucket   | NN  | Title                | Status | Pass line | Depends on                     |
+| -------- | --- | -------------------- | ------ | --------- | ------------------------------ |
+| contract | 01  | state-entry-kind     | todo   | > 4.0     | —                              |
+| contract | 02  | graph-node-type      | todo   | > 4.0     | contract/01                    |
+| contract | 03  | contract-spec        | todo   | > 4.0     | contract/01, contract/02       |
+| deck     | 01  | graph-json-loader    | todo   | > 4.0     | contract/02, contract/03       |
+| deck     | 02  | state-derivation     | todo   | > 4.0     | contract/01, deck/01           |
+| deck     | 03  | source-autodetect    | todo   | > 4.0     | deck/01, deck/02               |
+| deck     | 04  | transcript-repo-root | todo   | > 4.0     | deck/01, deck/03               |
+| deck     | 05  | declared-lane-order  | todo   | > 4.0     | deck/03                        |
+| skill    | 01  | deckplan-reference   | todo   | > 4.0     | contract/03                    |
+| skill    | 02  | example-workflow     | todo   | > 4.0     | skill/01, deck/04, deck/05     |
+| review   | 01  | final review 🏁      | todo   | > 4.0     | contract/03, deck/04, skill/02 |
 
 ## Cross-bucket dependencies
 
@@ -281,6 +282,7 @@ the node forever on something that does not exist.
    The same trail outside a repository found zero transcripts and reported a run
    that spent nothing, silently — which is the premise `deck/04` is built on,
    now measured rather than assumed. Re-run the check once that task lands.
+
 2. **A dispatch version bump** is out of scope here and belongs to a separate
    `/chronicle:release` once this ships.
 

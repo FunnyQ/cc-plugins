@@ -1,6 +1,7 @@
 # MODELS-02: Per-role model and effort map in the orchestrator
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/models.md`
 > - `../_context/rubric.md`
@@ -38,16 +39,26 @@ Every autopilot pipeline role runs on the model and effort from the default map 
 
 ```js
 // Spreads a {model, effort} choice into agent() opts; a null effort is omitted, never sent.
-const pick = (choice) => choice.effort ? { model: choice.model, effort: choice.effort } : { model: choice.model }
+const pick = (choice) =>
+  choice.effort
+    ? { model: choice.model, effort: choice.effort }
+    : { model: choice.model };
 ```
 
 - The effort ladder raises one step at a time, and `max` stays `max`. A choice with no effort stays without effort:
 
 ```js
-const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
-const raise = (choice) => choice.effort
-  ? { ...choice, effort: EFFORTS[Math.min(EFFORTS.indexOf(choice.effort) + 1, EFFORTS.length - 1)] }
-  : choice
+const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+const raise = (choice) =>
+  choice.effort
+    ? {
+        ...choice,
+        effort:
+          EFFORTS[
+            Math.min(EFFORTS.indexOf(choice.effort) + 1, EFFORTS.length - 1)
+          ],
+      }
+    : choice;
 ```
 
 ### Resolving a task's choice
@@ -91,21 +102,22 @@ Rewrite the `## Model policy` table rows to state the new model and effort per r
 ### Tests
 
 The stub `agent()` in `orchestrator-script.test.ts` records `opts.model` into `models[]` (around lines 204–245, read back through `modelFor(log, label)`).
+
 - Record `opts.effort` into a parallel `efforts[]`, and add an `effortFor(log, label)` beside `modelFor`.
 - Existing assertions on `'sonnet'` for dev and `'haiku'` for verify change to the new defaults. Update them; do not delete them.
 - **Parity fixtures.** Add one table-driven test that runs the in-script parser over this exact list. `parse-task.ts` pins the same list, so the two parsers cannot drift. Reach the in-script parser through the scout path: a ready item whose `modelsRaw` is the fixture either runs with the stated roles or derails as a `(scout)` failure.
 
-  | # | `modelsRaw` | Result |
-  |---|---|---|
-  | 1 | `dev=opus/high, verify=sonnet` | dev opus/high, verify sonnet with no effort |
-  | 2 | `judge = opus / xhigh` | judge opus/xhigh |
-  | 3 | `dev=opus,` | dev opus with no effort |
-  | 4 | ` dev=sonnet/low , verify=haiku ` | dev sonnet/low, verify haiku with no effort |
-  | 5 | `dev=opus, dev=sonnet` | rejected |
-  | 6 | `dev=gpt5` | rejected |
-  | 7 | `dev=Opus` | rejected |
-  | 8 | *(empty string)* | rejected |
-  | 9 | `dev=opus/high/max` | rejected |
+  | #   | `modelsRaw`                     | Result                                      |
+  | --- | ------------------------------- | ------------------------------------------- |
+  | 1   | `dev=opus/high, verify=sonnet`  | dev opus/high, verify sonnet with no effort |
+  | 2   | `judge = opus / xhigh`          | judge opus/xhigh                            |
+  | 3   | `dev=opus,`                     | dev opus with no effort                     |
+  | 4   | `dev=sonnet/low , verify=haiku` | dev sonnet/low, verify haiku with no effort |
+  | 5   | `dev=opus, dev=sonnet`          | rejected                                    |
+  | 6   | `dev=gpt5`                      | rejected                                    |
+  | 7   | `dev=Opus`                      | rejected                                    |
+  | 8   | _(empty string)_                | rejected                                    |
+  | 9   | `dev=opus/high/max`             | rejected                                    |
 
 - The scout stub builds ready items and the structured scout result. Give each ready item `modelsRaw: null` by default, in both the stdout blob and the structured `readyModels` field, so existing scenarios keep passing. Let a scenario set `modelsRaw` per item, and let it drop or alter either copy on its own.
 
@@ -133,12 +145,12 @@ The stub `agent()` in `orchestrator-script.test.ts` records `opts.model` into `m
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Defaults differ from `models.md`, or an override is ignored | Defaults right, but a dropped or mismatched `modelsRaw` silently falls back to defaults, the retry mixes model and effort, or `effort: null` reaches `agent()` | Every role matches the map. Overrides replace whole choices. The last rung raises effort only. A missing, mismatched, or unparseable `modelsRaw` is a `(scout)` failure. |
-| Test coverage | ×2 | No effort assertions | Default map asserted, but the override ladder, `max` ceiling, or a scout derail is untested | Every role label, the override ladder, `max`, all three derails, `null` defaults, the resume override, and a retried call are pinned |
-| Interface & readability | ×1 | Model/effort logic scattered as ad-hoc ternaries per call site | One helper, but call sites inconsistent | One `pick`/`raise` pair used everywhere; the `MODEL` comment block describes the new map |
-| Assumptions & docs | ×1 | `SKILL.md` still says Sonnet → Opus | Table updated, but the resume step, the override sentence, or the residual note is missing | Table, override sentence, `CFG.resumeModelsRaw` step, and the two-coordinated-errors residual note are all present |
+| Dimension               | Weight | 0–1 (fail)                                                     | 2–3 (below bar)                                                                                                                                                | 4–5 (pass)                                                                                                                                                               |
+| ----------------------- | ------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Defaults differ from `models.md`, or an override is ignored    | Defaults right, but a dropped or mismatched `modelsRaw` silently falls back to defaults, the retry mixes model and effort, or `effort: null` reaches `agent()` | Every role matches the map. Overrides replace whole choices. The last rung raises effort only. A missing, mismatched, or unparseable `modelsRaw` is a `(scout)` failure. |
+| Test coverage           | ×2     | No effort assertions                                           | Default map asserted, but the override ladder, `max` ceiling, or a scout derail is untested                                                                    | Every role label, the override ladder, `max`, all three derails, `null` defaults, the resume override, and a retried call are pinned                                     |
+| Interface & readability | ×1     | Model/effort logic scattered as ad-hoc ternaries per call site | One helper, but call sites inconsistent                                                                                                                        | One `pick`/`raise` pair used everywhere; the `MODEL` comment block describes the new map                                                                                 |
+| Assumptions & docs      | ×1     | `SKILL.md` still says Sonnet → Opus                            | Table updated, but the resume step, the override sentence, or the residual note is missing                                                                     | Table, override sentence, `CFG.resumeModelsRaw` step, and the two-coordinated-errors residual note are all present                                                       |
 
 ## Out of scope
 

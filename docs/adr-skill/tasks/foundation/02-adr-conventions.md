@@ -1,6 +1,7 @@
 # FOUNDATION-02: Freeze the ADR template and conventions
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -15,19 +16,19 @@ Every field an ADR carries — sections, status vocabulary, numbering, evidence 
 
 The validator does not parse this file at run time; it encodes the same rules in code, because a rule expressed as prose is not executable and a rule expressed twice drifts. **That drift is a real risk, so make the file diffable against the rule list**: state every rule under the name the validator uses, so a reader can line the two up in one pass. All eleven, each with the prose requirement it enforces:
 
-| Rule name | What the file must state |
-|---|---|
-| `filename` | Records live at `docs/adr/NNNN-<kebab-title>.md`, four-digit zero-padded. |
-| `id-mismatch` | The H1's `ADR-NNNN` number equals the filename's number. |
-| `missing-section` | All five section headings are present: Context, Considered alternatives, Decision, Consequences, Evidence. |
-| `bad-status` | Status is exactly one of `Accepted`, `Proposed`, `Superseded`, `Deprecated`, and the line is never absent. |
-| `bad-date` | Date is present and `YYYY-MM-DD`. |
-| `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line. |
-| `deprecated-linked` | A `Deprecated` record carries no successor link — deprecation means nothing replaced it. |
-| `link-missing` | A referenced `ADR-NNNN` names a record that exists. |
-| `link-not-mutual` | Supersession is declared in both directions. |
-| `self-link` | A record never references its own id. |
-| `empty-evidence` | The Evidence section holds at least one entry — a **warning**, not an error, because a hand-written record legitimately has nothing to cite. |
+| Rule name            | What the file must state                                                                                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `filename`           | Records live at `docs/adr/NNNN-<kebab-title>.md`, four-digit zero-padded.                                                                    |
+| `id-mismatch`        | The H1's `ADR-NNNN` number equals the filename's number.                                                                                     |
+| `missing-section`    | All five section headings are present: Context, Considered alternatives, Decision, Consequences, Evidence.                                   |
+| `bad-status`         | Status is exactly one of `Accepted`, `Proposed`, `Superseded`, `Deprecated`, and the line is never absent.                                   |
+| `bad-date`           | Date is present and `YYYY-MM-DD`.                                                                                                            |
+| `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line.                                                                                       |
+| `deprecated-linked`  | A `Deprecated` record carries no successor link — deprecation means nothing replaced it.                                                     |
+| `link-missing`       | A referenced `ADR-NNNN` names a record that exists.                                                                                          |
+| `link-not-mutual`    | Supersession is declared in both directions.                                                                                                 |
+| `self-link`          | A record never references its own id.                                                                                                        |
+| `empty-evidence`     | The Evidence section holds at least one entry — a **warning**, not an error, because a hand-written record legitimately has nothing to cite. |
 
 Changing a rule here means changing it there. The matching names are what make an omission visible instead of invisible.
 
@@ -56,9 +57,13 @@ So the block carries only what every record has, with exactly three substitution
 - Date: YYYY-MM-DD
 
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
@@ -78,8 +83,8 @@ All five section headings are required in every record. `Status` shows `Accepted
 Then, immediately after, document the two lifecycle lines as additions rather than fields to fill in — and say what each looks like filled in, so nobody transcribes a placeholder:
 
 ```md
-- Supersedes: ADR-0003        ← add only when this record replaces ADR-0003
-- Superseded by: ADR-0007     ← add only when ADR-0007 has replaced this one
+- Supersedes: ADR-0003 ← add only when this record replaces ADR-0003
+- Superseded by: ADR-0007 ← add only when ADR-0007 has replaced this one
 ```
 
 Spell out the rule in a sentence: never leave `ADR-NNNN` literally in a record. It is a shape, not a value, and a record carrying it is broken in a way that looks deliberate.
@@ -105,12 +110,12 @@ A reader scanning the directory listing should be able to tell what was decided 
 
 Reproduce this table in the file:
 
-| Value | Means | Requires |
-| --- | --- | --- |
-| `Accepted` | Live in the code today | — |
-| `Proposed` | Drafted ahead of the work | — |
-| `Superseded` | Replaced by a named successor | a `Superseded by: ADR-NNNN` line |
-| `Deprecated` | No longer applies, with no successor | no successor link |
+| Value        | Means                                | Requires                         |
+| ------------ | ------------------------------------ | -------------------------------- |
+| `Accepted`   | Live in the code today               | —                                |
+| `Proposed`   | Drafted ahead of the work            | —                                |
+| `Superseded` | Replaced by a named successor        | a `Superseded by: ADR-NNNN` line |
+| `Deprecated` | No longer applies, with no successor | no successor link                |
 
 Record the reasoning, not just the table. The conventional ADR lifecycle tracks agreement between people and runs forward: someone drafts `Proposed`, the team reviews, it becomes `Accepted`, then the work starts. This flow runs backward — a candidate only exists because the decision was already made, already implemented, and already recorded in the trail. Calling that `Proposed` describes it wrongly. So the promote path writes `Accepted`.
 
@@ -177,14 +182,14 @@ State the exclusion list plainly: no secrets, no credentials, no personal data, 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-This task ships no code, so two dimensions are retargeted. Read **Test coverage** as *specification coverage*, and **Interface & readability** as *usability by a drafting agent*. The weights are unchanged.
+This task ships no code, so two dimensions are retargeted. Read **Test coverage** as _specification coverage_, and **Interface & readability** as _usability by a drafting agent_. The weights are unchanged.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A stated rule contradicts the frozen decisions — e.g. the promote path is described as writing `Proposed`, or evidence is told to cite a log path | Rules are right but incomplete: the status table is present without its "Requires" column, or numbering is described without a worked filename-and-ID pair | Every rule matches the frozen decisions, and the numbering, status, lifecycle, and evidence sections are each usable without interpretation |
-| Test coverage | ×2 | Only the happy shape is specified; no rule says what makes an ADR invalid | The valid cases are covered, but the failure cases are not — nothing says a `Superseded` without a successor is invalid, or that a `Deprecated` must not carry one | Every field an ADR can carry has a stated rule, including the failure cases: `Superseded` with no successor, `Deprecated` with one, and evidence that points at a path instead of embedding a summary |
-| Interface & readability | ×1 | The template is described in prose rather than given literally, so it cannot be copied | The template is present but the rules are scattered, so a drafter must piece the format together across sections | A drafting agent could produce a valid ADR from this file alone: the template is literal, and each rule sits under a heading naming the field it governs |
-| Assumptions & docs | ×1 | Rules are asserted with no reasoning, so a later reader cannot tell which are load-bearing | The reasoning is present but partial — the `Accepted` choice is stated without the rejected `Proposed` default | Each non-obvious rule carries its *why*: why status tracks implementation state, why `Proposed` as a default was rejected, and why evidence embeds a summary instead of a reference |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                        | 2–3 (below bar)                                                                                                                                                    | 4–5 (pass)                                                                                                                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A stated rule contradicts the frozen decisions — e.g. the promote path is described as writing `Proposed`, or evidence is told to cite a log path | Rules are right but incomplete: the status table is present without its "Requires" column, or numbering is described without a worked filename-and-ID pair         | Every rule matches the frozen decisions, and the numbering, status, lifecycle, and evidence sections are each usable without interpretation                                                           |
+| Test coverage           | ×2     | Only the happy shape is specified; no rule says what makes an ADR invalid                                                                         | The valid cases are covered, but the failure cases are not — nothing says a `Superseded` without a successor is invalid, or that a `Deprecated` must not carry one | Every field an ADR can carry has a stated rule, including the failure cases: `Superseded` with no successor, `Deprecated` with one, and evidence that points at a path instead of embedding a summary |
+| Interface & readability | ×1     | The template is described in prose rather than given literally, so it cannot be copied                                                            | The template is present but the rules are scattered, so a drafter must piece the format together across sections                                                   | A drafting agent could produce a valid ADR from this file alone: the template is literal, and each rule sits under a heading naming the field it governs                                              |
+| Assumptions & docs      | ×1     | Rules are asserted with no reasoning, so a later reader cannot tell which are load-bearing                                                        | The reasoning is present but partial — the `Accepted` choice is stated without the rejected `Proposed` default                                                     | Each non-obvious rule carries its _why_: why status tracks implementation state, why `Proposed` as a default was rejected, and why evidence embeds a summary instead of a reference                   |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # SERVER-05: the fleet event stream
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -71,13 +72,19 @@ line. Keep this logic pure and tested:
 
 ```ts
 /** Split a chunk into complete lines and the trailing partial remainder. */
-export function splitCompleteLines(text: string): { complete: string[]; partial: string };
+export function splitCompleteLines(text: string): {
+  complete: string[];
+  partial: string;
+};
 
 /**
  * Decide how to advance after a stat. A file smaller than the cursor means it was
  * truncated or replaced, so the cursor resets to zero and the whole file is re-read.
  */
-export function nextCursor(prev: number, size: number): { from: number; reset: boolean };
+export function nextCursor(
+  prev: number,
+  size: number,
+): { from: number; reset: boolean };
 ```
 
 **Exactly one strategy, and it must not be mixed with the other.** The cursor advances through **every
@@ -90,7 +97,7 @@ next chunk. Concretely, each pass:
 4. set `cursor` to the size just read
 5. replace the held partial with the new one
 
-The tempting alternative — leaving the cursor sitting before the partial *and* holding a copy — reads
+The tempting alternative — leaving the cursor sitting before the partial _and_ holding a copy — reads
 those bytes twice: the next pass starts at the partial again and then prepends the saved duplicate. The
 result is corrupted JSON on a split line and a double count. Pick the strategy above; do not retain the
 cursor at the partial boundary.
@@ -157,12 +164,12 @@ exhaust file handles over a long session.
 - [x] Split a multi-byte character across the boundary and confirm it survives. Write an entry whose
       message contains non-ASCII text, then append it in two writes that cut **inside** one character's
       byte sequence:
-      ```bash
-      LINE='{"kind":"note","ts":"2026-01-01T00:00:00.000Z","task":"probe","role":"dev","agentLabel":"probe","message":"驗證多位元組"}'
-      printf '%s' "$LINE" | head -c 90 >> <log>
-      sleep 1
-      printf '%s' "$LINE" | tail -c +91 >> <log>; printf '\n' >> <log>
-      ```
+      `bash
+    LINE='{"kind":"note","ts":"2026-01-01T00:00:00.000Z","task":"probe","role":"dev","agentLabel":"probe","message":"驗證多位元組"}'
+    printf '%s' "$LINE" | head -c 90 >> <log>
+    sleep 1
+    printf '%s' "$LINE" | tail -c +91 >> <log>; printf '\n' >> <log>
+    `
       The resulting snapshot must show the message intact, with `entryCount` up by exactly one.
 - [x] Append three entries within 250ms and confirm one snapshot arrives, not three.
 - [x] Append a deliberately malformed line and confirm the stream continues and `entryCount` does not grow.
@@ -175,12 +182,12 @@ exhaust file handles over a long session.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | 404s on a missing file, or streams raw entries instead of snapshots | Streams snapshots but has no poll fallback, or stops emitting after truncation | Missing file waits with a snapshot, watch plus poll, partials held, truncation resets, malformed skipped, debounced |
-| Test coverage | ×2 | No tests | Line splitting only | Splitting, cursor reset, frame formatting, live append, debounce, malformed line, missing-file path, and a multi-byte character split across reads |
-| Interface & readability | ×1 | Cursor arithmetic inlined in the stream callback | Extracted but not pure, or the cursor and partial strategies are mixed | Pure `splitCompleteLines` and `nextCursor`, one consistent cursor strategy, handler thin, aggregation reused |
-| Assumptions & docs | ×1 | Intervals are bare numbers | Named constants without reasons | Comments explain why a missing file is not a 404, why polling backs up the watcher, and why full re-aggregation beats an incremental fold |
+| Dimension               | Weight | 0–1 (fail)                                                          | 2–3 (below bar)                                                                | 4–5 (pass)                                                                                                                                         |
+| ----------------------- | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | 404s on a missing file, or streams raw entries instead of snapshots | Streams snapshots but has no poll fallback, or stops emitting after truncation | Missing file waits with a snapshot, watch plus poll, partials held, truncation resets, malformed skipped, debounced                                |
+| Test coverage           | ×2     | No tests                                                            | Line splitting only                                                            | Splitting, cursor reset, frame formatting, live append, debounce, malformed line, missing-file path, and a multi-byte character split across reads |
+| Interface & readability | ×1     | Cursor arithmetic inlined in the stream callback                    | Extracted but not pure, or the cursor and partial strategies are mixed         | Pure `splitCompleteLines` and `nextCursor`, one consistent cursor strategy, handler thin, aggregation reused                                       |
+| Assumptions & docs      | ×1     | Intervals are bare numbers                                          | Named constants without reasons                                                | Comments explain why a missing file is not a 404, why polling backs up the watcher, and why full re-aggregation beats an incremental fold          |
 
 ## Out of scope
 

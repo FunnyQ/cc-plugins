@@ -2,7 +2,7 @@
 
 INTENT.md is what you wanted, written down before you decided how to build it. It is captured in one short session and then frozen: `flightplan` reads it later as the baseline the eventual PLAN.md must still be traceable to.
 
-It is deliberately **not** a spec. Everything about *how* belongs in PLAN.md, written after the full interview.
+It is deliberately **not** a spec. Everything about _how_ belongs in PLAN.md, written after the full interview.
 
 ## Template
 
@@ -29,7 +29,7 @@ implemented — "I can see X without opening Y", not "adds an X endpoint".>
 
 ## Constraints
 
-Only facts you do not get to choose. A choice you *made* is a decision, and
+Only facts you do not get to choose. A choice you _made_ is a decision, and
 decisions belong to PLAN.md.
 
 - <Hard fact — a deadline, a platform, a system that must keep working>
@@ -52,7 +52,7 @@ file — resist letting it come out empty.
 
 ## Capture rules
 
-1. **Refuse to answer *how*.** No architecture, no stack, no file layout, no task breakdown, no API shape. Every one of those that surfaces goes into Open questions as a question, not into the body as an answer.
+1. **Refuse to answer _how_.** No architecture, no stack, no file layout, no task breakdown, no API shape. Every one of those that surfaces goes into Open questions as a question, not into the body as an answer.
 2. **An empty Open questions section is a failure, not a clean capture.** A vague idea rendered as confident structure reads as settled when nothing was settled. If nothing is open, the idea was already specced and belongs in a full `flightplan` run.
 3. **Keep the originator's words.** Do not upgrade "the dashboard is slow to read" into "reduce time-to-first-insight". The point of capturing early is a record of what was actually meant.
 4. **Stop at one page.** Capture is minutes, not an interview. Depth is `flightplan`'s job, and paying for it twice is how the second pass gets skipped.

@@ -1,6 +1,7 @@
 # WORK-02: Wave tree-watch and writer accounting
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/orchestrator-anatomy.md`
@@ -42,20 +43,34 @@ verbatim:
 // is not a stable notion of quiet — this is a live count whose waiters resolve on
 // the next zero-crossing, not a one-shot barrier.
 const makeTreeWatch = (size) => {
-  let writers = 0
-  let waiters = []
+  let writers = 0;
+  let waiters = [];
   return {
     size,
-    enter: () => { writers++ },
+    enter: () => {
+      writers++;
+    },
     leave: () => {
-      if (--writers === 0) { const w = waiters; waiters = []; w.forEach(r => r()) }
+      if (--writers === 0) {
+        const w = waiters;
+        waiters = [];
+        w.forEach((r) => r());
+      }
     },
     active: () => writers,
-    quiet: () => writers === 0 ? Promise.resolve() : new Promise(r => waiters.push(r)),
-  }
-}
+    quiet: () =>
+      writers === 0 ? Promise.resolve() : new Promise((r) => waiters.push(r)),
+  };
+};
 
-const withWriter = async (watch, fn) => { watch.enter(); try { return await fn() } finally { watch.leave() } }
+const withWriter = async (watch, fn) => {
+  watch.enter();
+  try {
+    return await fn();
+  } finally {
+    watch.leave();
+  }
+};
 ```
 
 **This is the final shape — five members, no more.** Two of them have no caller in this task,
@@ -63,7 +78,7 @@ and both exist so the watch's contract is settled before its consumer lands rath
 renegotiated mid-plan:
 
 - `active()` is the live writer count, read by the capability that decides whether a
-  verification re-run is warranted; it needs to know whether *any* writer is running at the
+  verification re-run is warranted; it needs to know whether _any_ writer is running at the
   moment a gate verdict arrives. It takes no argument on purpose. A task asking the question has
   already left the writer set, so a non-zero count always means somebody else.
 - `size` is the number of tasks this wave dispatched, which the same consumer needs in order to
@@ -77,15 +92,17 @@ Give each a comment naming the consumer, so neither reads as dead code.
 Create the watch **inside the wave loop**, immediately before the `parallel(...)` dispatch:
 
 ```js
-const watch = makeTreeWatch(fresh.length)
-const results = await parallel(fresh.map(item => () => runTaskGuarded(item, watch)))
+const watch = makeTreeWatch(fresh.length);
+const results = await parallel(
+  fresh.map((item) => () => runTaskGuarded(item, watch)),
+);
 ```
 
 Then thread it down: `runTaskGuarded(item, watch)` → `executeTask(item, watch)` →
 `parkBlocked(ref, path, reason, watch)`.
 
 **Do not hoist it to module scope**, and record why in a comment. Be accurate about the reason:
-a module-scoped watch's *waiting* would still work, because later `enter()` calls increment the
+a module-scoped watch's _waiting_ would still work, because later `enter()` calls increment the
 same counter and `quiet()` registers a waiter whenever that counter is non-zero. The reason is
 `size`. It is a per-wave fact, so a surviving watch either reports a stale dispatch count or has
 to be mutated between waves — and the consumer that reads it uses it to decide whether a task
@@ -106,16 +123,17 @@ Wrap each of these with `withWriter`, because each mutates the **tracked** tree:
   and the fixer are both inside that function, and splitting them would mean threading the watch
   into it for no gain.
 
-  Its read-only review lenses are therefore *enclosed* by that aggregate window. That is
+  Its read-only review lenses are therefore _enclosed_ by that aggregate window. That is
   intended, not a contradiction with the exclusion below, which forbids giving a review-lens
   `agent()` call its **own** wrapper. The cost of the aggregate window — the quiet signal stays
   held for the whole review round — is free here: the final-review task is dependency-serialized
   and runs alone in its wave, so no sibling is ever waiting on it.
+
 - The mark-done agent, which runs the script that rewrites `Status: done` and ticks every gate
   box in the task file.
 - `parkBlocked` itself. Wrap the body **inside that function**, not at its call sites: it is
   reached from five places, and one of them is the catch inside the guarded task wrapper, which
-  runs *outside* the task pipeline entirely. Anything scoped to the inside of the pipeline
+  runs _outside_ the task pipeline entirely. Anything scoped to the inside of the pipeline
   misses it, and that path is precisely when a sibling is rewriting a task file while other
   tasks are still running.
 
@@ -188,7 +206,7 @@ need neither — they sequence on promise resolution, never on elapsed time.
 **What these tests deliberately cannot prove, and why.** The count has no observable effect
 until something waits on it, and nothing in this task waits. A test that releases a held dev
 promise only proves the agent finished; a test that observes the park's label only proves the
-park ran, which is equally true with the wrapper removed. So the *accounting* — that dev,
+park ran, which is equally true with the wrapper removed. So the _accounting_ — that dev,
 mark-done and the catch-path park each open a counted window — is only testable once a consumer
 waits on the quiet signal, and it is asserted there rather than here. Do not manufacture a
 test-only accessor on the watch to close that gap: the script exposes nothing to the fixture
@@ -237,12 +255,12 @@ raising the limit.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The count can strand — an `enter` without a `finally`-`leave`, or the watch hoisted to module scope | Every listed window wrapped except the park helper's body, so the guarded wrapper's catch path runs uncounted | Every listed window counted including the catch-path park; every `enter` released through `finally`; watch created per wave and passed explicitly |
-| Test coverage | ×2 | No held-writer test at all, or a test-only accessor bolted onto the watch so the accounting could be asserted here | The three cases exist but the limits are unstated, so a later reader believes the accounting is proved | The three cases pass, and the file says plainly which property each one does and does not establish — the accounting itself is left to the consumer that waits |
-| Interface & readability | ×1 | A second coordination primitive or a global added alongside the watch | The helpers work but the threading is inconsistent — some callers read an outer binding | Two small helpers, one explicit parameter chain, matching the fence's existing idiom |
-| Assumptions & docs | ×1 | The judge exclusion and the per-wave lifetime left unexplained | A comment notes what the code does rather than why | Comments give the reasons: why per-wave not module scope, why a live count not a barrier, why the judge is excluded, and why a hang becomes the miscount signal once a consumer waits |
+| Dimension               | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                                               | 4–5 (pass)                                                                                                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The count can strand — an `enter` without a `finally`-`leave`, or the watch hoisted to module scope                | Every listed window wrapped except the park helper's body, so the guarded wrapper's catch path runs uncounted | Every listed window counted including the catch-path park; every `enter` released through `finally`; watch created per wave and passed explicitly                                     |
+| Test coverage           | ×2     | No held-writer test at all, or a test-only accessor bolted onto the watch so the accounting could be asserted here | The three cases exist but the limits are unstated, so a later reader believes the accounting is proved        | The three cases pass, and the file says plainly which property each one does and does not establish — the accounting itself is left to the consumer that waits                        |
+| Interface & readability | ×1     | A second coordination primitive or a global added alongside the watch                                              | The helpers work but the threading is inconsistent — some callers read an outer binding                       | Two small helpers, one explicit parameter chain, matching the fence's existing idiom                                                                                                  |
+| Assumptions & docs      | ×1     | The judge exclusion and the per-wave lifetime left unexplained                                                     | A comment notes what the code does rather than why                                                            | Comments give the reasons: why per-wave not module scope, why a live count not a barrier, why the judge is excluded, and why a hang becomes the miscount signal once a consumer waits |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # CORE-01: Types and shared utilities
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -27,24 +28,29 @@ Provide the shared type vocabulary and mechanical utilities every other relay sc
 export type Mode = "delegate" | "review" | "image";
 export type Strategy = "native" | "prompt";
 
-export type RunResult = { ok: boolean; stdout: string; stderr: string; code: number };
+export type RunResult = {
+  ok: boolean;
+  stdout: string;
+  stderr: string;
+  code: number;
+};
 
 // What relay.ts hands a backend after parsing argv + (maybe) building a prompt.
 // This is the single shared seam — backends must not invent their own extensions.
 export type InvokeOpts = {
-  promptFile?: string;   // path to the built prompt (strategy === "prompt"); codex feeds it on stdin
-  promptText?: string;   // prompt body already read from promptFile, for CLIs with no --prompt-file flag (opencode/claude)
-  task?: string;         // raw task/focus text (e.g. codex image prompt source)
-  scope?: string;        // native review scope: "uncommitted" | "base:<ref>" | "commit:<sha>" | "custom-files"
-  focus?: string;        // user's specific concern (review) / effort level
-  out?: string;          // image output path
-  model?: string;        // resolved model (may be undefined → CLI default)
-  lastFile?: string;     // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first
-  dangerous?: boolean;   // delegate sandbox opt-out
+  promptFile?: string; // path to the built prompt (strategy === "prompt"); codex feeds it on stdin
+  promptText?: string; // prompt body already read from promptFile, for CLIs with no --prompt-file flag (opencode/claude)
+  task?: string; // raw task/focus text (e.g. codex image prompt source)
+  scope?: string; // native review scope: "uncommitted" | "base:<ref>" | "commit:<sha>" | "custom-files"
+  focus?: string; // user's specific concern (review) / effort level
+  out?: string; // image output path
+  model?: string; // resolved model (may be undefined → CLI default)
+  lastFile?: string; // pre-created output-capture path (codex `-o <lastFile>`); relay creates the tmp dir first
+  dangerous?: boolean; // delegate sandbox opt-out
 };
 
 export type Backend = {
-  name: string;   // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
+  name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
   supports: Set<Mode>;
   strategy(mode: Mode, opts: InvokeOpts): Strategy;
   // Build the argv (and optional stdin) for this mode. Pure — no spawning here.
@@ -67,7 +73,7 @@ Mirror odin-codex's helpers (port source in `cli-reference.md`):
 export const TMP_ROOT = "/tmp/relay";
 
 export function run(args: string[], opts?: { stdin?: string }): RunResult; // Bun.spawnSync wrapper
-export function createTmpRunDir(): string;          // TMP_ROOT/<ts>-<pid>-<rand8>, mkdir -p, returns path
+export function createTmpRunDir(): string; // TMP_ROOT/<ts>-<pid>-<rand8>, mkdir -p, returns path
 export function timestampForPath(now?: Date): string;
 export function addTimestampSuffix(filePath: string): string; // foo.png -> foo_YYYYMMDD-HHMM.png
 ```
@@ -76,22 +82,30 @@ Model resolution — precedence `--model` flag > config file > built-in constant
 
 ```ts
 export const DEFAULT_MODELS: Record<string, Partial<Record<Mode, string>>> = {
-  codex: {},                                              // unset → CLI default
-  claude: {},                                             // unset → CLI default
+  codex: {}, // unset → CLI default
+  claude: {}, // unset → CLI default
   opencode: {
     delegate: "opencode-go/kimi-k2.7-code",
     review: "opencode-go/qwen3.7-max",
   },
 };
 
-export const CONFIG_PATH =
-  join(homedir(), ".config", "q-lab", "cc-plugins", "relay", "config.json");
+export const CONFIG_PATH = join(
+  homedir(),
+  ".config",
+  "q-lab",
+  "cc-plugins",
+  "relay",
+  "config.json",
+);
 // config shape: { models?: { [backend]: { [mode]: "provider/model" } } }
 
 // flagModel wins; else config.models[backend][mode]; else DEFAULT_MODELS[backend][mode]; else undefined.
 export function resolveModel(
-  backend: string, mode: Mode, flagModel?: string,
-  readConfig?: () => unknown,   // injectable for tests; defaults to reading CONFIG_PATH
+  backend: string,
+  mode: Mode,
+  flagModel?: string,
+  readConfig?: () => unknown, // injectable for tests; defaults to reading CONFIG_PATH
 ): string | undefined;
 ```
 
@@ -115,12 +129,12 @@ export function resolveModel(
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong precedence or throws on bad config | precedence ok but edge cases (undefined, malformed) drift | flag>config>constant exact; missing/malformed config safe; helpers match odin-codex behaviour |
-| Test coverage | ×2 | no tests | only one precedence branch | all precedence branches + malformed config + timestamp shape |
-| Interface & readability | ×1 | I/O baked into resolveModel | usable but config read not injectable | resolveModel pure via injected reader; clear `type`s |
-| Assumptions & docs | ×1 | model ids/paths unlabeled | present but unexplained | model ids + CONFIG_PATH + TMP_ROOT labeled constants |
+| Dimension               | Weight | 0–1 (fail)                               | 2–3 (below bar)                                           | 4–5 (pass)                                                                                    |
+| ----------------------- | ------ | ---------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | wrong precedence or throws on bad config | precedence ok but edge cases (undefined, malformed) drift | flag>config>constant exact; missing/malformed config safe; helpers match odin-codex behaviour |
+| Test coverage           | ×2     | no tests                                 | only one precedence branch                                | all precedence branches + malformed config + timestamp shape                                  |
+| Interface & readability | ×1     | I/O baked into resolveModel              | usable but config read not injectable                     | resolveModel pure via injected reader; clear `type`s                                          |
+| Assumptions & docs      | ×1     | model ids/paths unlabeled                | present but unexplained                                   | model ids + CONFIG_PATH + TMP_ROOT labeled constants                                          |
 
 ## Out of scope
 

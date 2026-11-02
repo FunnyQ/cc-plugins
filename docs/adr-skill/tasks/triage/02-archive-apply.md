@@ -1,6 +1,7 @@
 # TRIAGE-02: Execute an approved archive plan, safely
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -59,7 +60,10 @@ export function validatePlan(plan: ArchivePlan, trustedRoot: string): string[];
  * The only function that touches the trail.
  * `trustedRoot` is resolved by the CALLER from cwd — never read from the plan.
  */
-export function applyArchive(plan: ArchivePlan, trustedRoot: string): Promise<ApplyResult>;
+export function applyArchive(
+  plan: ArchivePlan,
+  trustedRoot: string,
+): Promise<ApplyResult>;
 ```
 
 `validatePlan` returns the list of structural problems it found; empty means the plan is executable.
@@ -105,7 +109,7 @@ been checked. Anchor on what does exist instead:
    pre-move check `lstat`s the source and refuses a symlink, so a doctored entry cannot redirect a
    read even though its path parsed as legal.
 4. The destination is **derived, never trusted**: `join(root, ".cockpit", "archive", move.target,
-   basename(move.from))`. Compare it to `resolve(move.to)` and reject a mismatch. Building the path
+basename(move.from))`. Compare it to `resolve(move.to)` and reject a mismatch. Building the path
    from the validated root and the validated basename means a doctored `to` cannot reach outside the
    archive even in principle — the comparison is a consistency check on the plan, not the security
    boundary.
@@ -242,12 +246,12 @@ byte-identical at its destination.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4 (pass) | 5 |
-|---|---|---|---|---|---|
-| Correctness | ×3 | A tampered plan can move a file outside the trail, or the root is taken from the plan, or a directory is created before validation, or anything is deleted. | Validation exists but one vector slips through — an unchecked ancestor symlink, or a structural violation that skips the move instead of aborting the run. | Every listed vector rejected before any directory is created; structural violations abort while apply-time refusals skip; the re-stat boundary is exact. | Also rejects a plan carrying two moves onto the same destination. |
-| Test coverage | ×2 | No tests, or none that feed a hostile plan. | The happy path plus one tampering case. | Every tampering vector and both seam cases have a test, each asserting nothing was created or moved. | The hostile cases are table-driven so a new validation rule cannot land without one. |
-| Interface & readability | ×1 | Validation is inlined into the move loop, so hostile input cannot be tested without executing. | Separated, but `applyArchive` re-decides or re-globs instead of walking `plan.moves`. | `validatePlan` is callable and testable on its own; `applyArchive` executes the plan and nothing more. | The two failure classes are distinguishable from the return type alone, not just by exit code. |
-| Assumptions & docs | ×1 | The path checks appear without the attack they prevent, so a later reader simplifies them away. | Noted but generic. | Each check carries the concrete failure it prevents, and the re-stat carries why the plan cannot certify freshness. | The reasoning would survive a reviewer arguing the checks are paranoid. |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                                  | 2–3 (below bar)                                                                                                                                            | 4 (pass)                                                                                                                                                 | 5                                                                                              |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A tampered plan can move a file outside the trail, or the root is taken from the plan, or a directory is created before validation, or anything is deleted. | Validation exists but one vector slips through — an unchecked ancestor symlink, or a structural violation that skips the move instead of aborting the run. | Every listed vector rejected before any directory is created; structural violations abort while apply-time refusals skip; the re-stat boundary is exact. | Also rejects a plan carrying two moves onto the same destination.                              |
+| Test coverage           | ×2     | No tests, or none that feed a hostile plan.                                                                                                                 | The happy path plus one tampering case.                                                                                                                    | Every tampering vector and both seam cases have a test, each asserting nothing was created or moved.                                                     | The hostile cases are table-driven so a new validation rule cannot land without one.           |
+| Interface & readability | ×1     | Validation is inlined into the move loop, so hostile input cannot be tested without executing.                                                              | Separated, but `applyArchive` re-decides or re-globs instead of walking `plan.moves`.                                                                      | `validatePlan` is callable and testable on its own; `applyArchive` executes the plan and nothing more.                                                   | The two failure classes are distinguishable from the return type alone, not just by exit code. |
+| Assumptions & docs      | ×1     | The path checks appear without the attack they prevent, so a later reader simplifies them away.                                                             | Noted but generic.                                                                                                                                         | Each check carries the concrete failure it prevents, and the re-stat carries why the plan cannot certify freshness.                                      | The reasoning would survive a reviewer arguing the checks are paranoid.                        |
 
 ## Out of scope
 

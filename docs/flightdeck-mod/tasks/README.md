@@ -36,6 +36,7 @@ tasks/
 Start with `data/01-deck-snapshot-cli.md`. It creates `packages/dispatch/hooks/flightdeck/types.ts`, the `DeckSnapshot` contract every later task imports.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,13 +48,13 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| data | 01 | Deck snapshot CLI | todo | > 4 | — |
-| mod | 01 | Pane layout rows | todo | > 4 | data/01 |
-| mod | 02 | Flightdeck pane mod | todo | > 4 | data/01, mod/01 |
-| mod | 03 | Docs for the pane | todo | > 4 | mod/02 |
-| review | 01 | Final review | todo | > 4 | data/01, mod/01, mod/02, mod/03 |
+| Bucket | NN  | Title               | Status | Pass line | Depends on                      |
+| ------ | --- | ------------------- | ------ | --------- | ------------------------------- |
+| data   | 01  | Deck snapshot CLI   | todo   | > 4       | —                               |
+| mod    | 01  | Pane layout rows    | todo   | > 4       | data/01                         |
+| mod    | 02  | Flightdeck pane mod | todo   | > 4       | data/01, mod/01                 |
+| mod    | 03  | Docs for the pane   | todo   | > 4       | mod/02                          |
+| review | 01  | Final review        | todo   | > 4       | data/01, mod/01, mod/02, mod/03 |
 
 ## Dependency graph
 
@@ -71,11 +72,12 @@ data/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
+| Task      | Depends on                      |
+| --------- | ------------------------------- |
 | review/01 | data/01, mod/01, mod/02, mod/03 |
-| mod/01 | data/01 |
-| mod/02 | data/01 |
+| mod/01    | data/01                         |
+| mod/02    | data/01                         |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

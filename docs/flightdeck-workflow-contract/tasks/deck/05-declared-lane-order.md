@@ -1,6 +1,7 @@
 # DECK-05: Honor declared lane order in the dependency graph
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -53,7 +54,7 @@ redraw.
 ```js
 // opts gains one field. Absent or empty falls back to today's behaviour
 // exactly, so a caller that does not supply it is unaffected.
-layoutGraph(nodes, { lanes: ["scout", "build", "verify"], ...rest })
+layoutGraph(nodes, { lanes: ["scout", "build", "verify"], ...rest });
 ```
 
 Rules for the road list, in this order:
@@ -76,7 +77,7 @@ list at all, and by tests.
 ### What must not change
 
 `compareTaskOrder` keeps sorting the nodes. It fixes tie-breaks in depth and
-slot placement, and only the *road* order is being taken out of its hands. A
+slot placement, and only the _road_ order is being taken out of its hands. A
 node still never leaves its own road, which is what makes a crossover mean "this
 dependency changed road" rather than "the layout needed room".
 
@@ -162,13 +163,13 @@ Cover:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Declared order is still re-sorted, or an undeclared node is dropped | Order survives but an empty lane draws no road, or the redraw key misses it so a lane change does not repaint | All four road rules hold, empty roads draw, and no supplied order reproduces today's layout exactly |
-| Backward compatibility | ×2 | An existing layout assertion was changed to accommodate the new input | Layout matches but an existing test was rewritten rather than added to | Every existing assertion passes untouched, and the no-lanes path is proven identical to today |
-| Test coverage | ×2 | No test for the new input | Only an alphabetical declared order is asserted, which the old code also satisfies | A non-alphabetical order, an empty lane, an undeclared bucket, and the fallback are each asserted |
-| Interface & readability | ×1 | The order is threaded through the node objects, or a second road-building path appears beside the old one | The option works but the four rules are unexplained where they are applied | One road-building path, the option's fallback is obvious, and the corrected comment states what the code actually does |
-| Assumptions & docs | ×1 | The taller panel and the undeclared-bucket rule are left for the next reader to discover | The rules are implemented but the reason for keeping an undeclared bucket is unrecorded | Both the height consequence and the keep-don't-drop choice are recorded in one line each |
+| Dimension               | Weight | 0–1 (fail)                                                                                                | 2–3 (below bar)                                                                                               | 4–5 (pass)                                                                                                             |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Declared order is still re-sorted, or an undeclared node is dropped                                       | Order survives but an empty lane draws no road, or the redraw key misses it so a lane change does not repaint | All four road rules hold, empty roads draw, and no supplied order reproduces today's layout exactly                    |
+| Backward compatibility  | ×2     | An existing layout assertion was changed to accommodate the new input                                     | Layout matches but an existing test was rewritten rather than added to                                        | Every existing assertion passes untouched, and the no-lanes path is proven identical to today                          |
+| Test coverage           | ×2     | No test for the new input                                                                                 | Only an alphabetical declared order is asserted, which the old code also satisfies                            | A non-alphabetical order, an empty lane, an undeclared bucket, and the fallback are each asserted                      |
+| Interface & readability | ×1     | The order is threaded through the node objects, or a second road-building path appears beside the old one | The option works but the four rules are unexplained where they are applied                                    | One road-building path, the option's fallback is obvious, and the corrected comment states what the code actually does |
+| Assumptions & docs      | ×1     | The taller panel and the undeclared-bucket rule are left for the next reader to discover                  | The rules are implemented but the reason for keeping an undeclared bucket is unrecorded                       | Both the height consequence and the keep-don't-drop choice are recorded in one line each                               |
 
 ## Out of scope
 

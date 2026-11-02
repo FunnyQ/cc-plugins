@@ -88,12 +88,12 @@ export function inferRefFromPath(
 
 Change the split to `filePath.split(/[\\/]/)`. Drop the `sep` import if nothing else uses it. Test in `lint-task.test.ts` (it already imports `inferRefFromPath`):
 
-| Input                             | Output                       |
-| --------------------------------- | ---------------------------- |
-| `docs/x/tasks/ui` + `/` + `01-a.md` (all `/`) | `{ bucket: "ui", nn: "01" }` |
-| `docs\x\tasks\ui\01-a.md`         | `{ bucket: "ui", nn: "01" }` |
+| Input                                               | Output                       |
+| --------------------------------------------------- | ---------------------------- |
+| `docs/x/tasks/ui` + `/` + `01-a.md` (all `/`)       | `{ bucket: "ui", nn: "01" }` |
+| `docs\x\tasks\ui\01-a.md`                           | `{ bucket: "ui", nn: "01" }` |
 | `C:\repo\docs/x\tasks\ui` + `/` + `01-a.md` (mixed) | `{ bucket: "ui", nn: "01" }` |
-| `docs/x/tasks/01-a.md`            | `null`                       |
+| `docs/x/tasks/01-a.md`                              | `null`                       |
 
 ### 3. Worktree path identity
 

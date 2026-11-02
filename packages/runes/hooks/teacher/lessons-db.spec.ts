@@ -388,7 +388,9 @@ describe("unlabeled and label", () => {
     ).toBe(false);
     expect(
       db
-        .query("SELECT needs, verdict, note, labeled_at FROM attempts WHERE id = 2")
+        .query(
+          "SELECT needs, verdict, note, labeled_at FROM attempts WHERE id = 2",
+        )
         .get(),
     ).toEqual({ needs: 1, verdict: "good", note: null, labeled_at: AT });
     db.close();

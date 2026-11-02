@@ -1,6 +1,7 @@
 # ENGINE-03: Rollup ingest and the rollup-update subcommand
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -122,12 +123,12 @@ pub fn run(args: &[String]) -> std::process::ExitCode;
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Any golden `rollup` table differs, or a replay changes `usage_hourly` | Tables match on a fresh ingest, but incremental, delete, or rebuild scenarios drift (a double-counted sibling request, zeroed tool_calls, a stale ledger row after truncate-to-empty) | Every golden `rollup` test passes on both TS and Rust; prune-before-ingest, first-wins dedup, and per-session tool dedup match TS line for line |
-| Test coverage | ×2 | No cargo tests | Happy-path ingest only | All five named units, including a sibling-held request surviving a delete and a partial trailing line |
-| Interface & readability | ×1 | Signatures differ from `engine-api.md`, or `unwrap` on transcript or DB data | Works, but a monolithic function obscures the three phases | `update_rollup` / `ingest_file` / `parse_slice` / `prune_missing_files` mirror the TS phases; clippy clean |
-| Assumptions & docs | ×1 | Silent deviations from TS | Deviations present but unexplained | Each non-obvious rule (why prune runs first, why the rebuild gate differs from `start == 0`, first-wins) carries a one-line why comment |
+| Dimension               | Weight | 0–1 (fail)                                                                   | 2–3 (below bar)                                                                                                                                                                       | 4–5 (pass)                                                                                                                                      |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Any golden `rollup` table differs, or a replay changes `usage_hourly`        | Tables match on a fresh ingest, but incremental, delete, or rebuild scenarios drift (a double-counted sibling request, zeroed tool_calls, a stale ledger row after truncate-to-empty) | Every golden `rollup` test passes on both TS and Rust; prune-before-ingest, first-wins dedup, and per-session tool dedup match TS line for line |
+| Test coverage           | ×2     | No cargo tests                                                               | Happy-path ingest only                                                                                                                                                                | All five named units, including a sibling-held request surviving a delete and a partial trailing line                                           |
+| Interface & readability | ×1     | Signatures differ from `engine-api.md`, or `unwrap` on transcript or DB data | Works, but a monolithic function obscures the three phases                                                                                                                            | `update_rollup` / `ingest_file` / `parse_slice` / `prune_missing_files` mirror the TS phases; clippy clean                                      |
+| Assumptions & docs      | ×1     | Silent deviations from TS                                                    | Deviations present but unexplained                                                                                                                                                    | Each non-obvious rule (why prune runs first, why the rebuild gate differs from `start == 0`, first-wins) carries a one-line why comment         |
 
 ## Out of scope
 

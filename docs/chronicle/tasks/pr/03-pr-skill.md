@@ -1,6 +1,7 @@
 # PR-03: PR skill (history + cockpit → reviewer-legible PR/MR)
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -24,7 +25,8 @@ Write the `pr` skill's `SKILL.md` so it turns the branch's commit history and co
 ```yaml
 ---
 name: pr
-description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a body a
+description:
+  Open a PR (GitHub) or MR (GitLab) for the current branch, with a body a
   reviewer can actually understand — why the change exists, what changed, what to focus
   on, how to judge it — enriched by the cockpit decision trail when present. Triggers on
   "/chronicle:pr", "create a PR", "open a pull request", "open an MR", "幫我開 PR",
@@ -35,6 +37,7 @@ description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a bo
 ### Orchestration prose (the flow to document)
 
 **Phase A — analyze (spawn a sub-agent):**
+
 1. Run `analyze-branch.ts`. If `commitCount === 0`, report "no commits to propose" and stop.
 2. Read the `BranchMaterial` from `outputPath`.
 3. Synthesize a **4-section** PR/MR body (this is the judgment — keep it in the fork):
@@ -45,10 +48,12 @@ description: Open a PR (GitHub) or MR (GitLab) for the current branch, with a bo
 4. Also propose a **title** (concise, imperative, from the dominant change). Return `{ title, body, base, head, provider }` to the main agent.
 
 **Main agent gate:**
+
 - Present the proposed title + 4-section body.
 - Confirm via the **host's interactive user-prompt** (on Claude Code: `AskUserQuestion`; on Codex/other harnesses: the equivalent confirmation prompt): "Create it (Recommended)" / "Open as draft" / "Edit title/body" / "Abort". On "Edit", revise and re-confirm. "Open as draft" sets `draft:true`.
 
 **Phase B — create (spawn a sub-agent):**
+
 - Build a `CreateInput` `{ provider, title, body, base, head, draft }` and run `request-creator.ts`.
 - On `{ok:true}` → report the URL. On `{ok:false}` → relay the `reason` plainly: `missing-cli` (suggest installing `gh`/`glab`), `no-remote` (no git remote configured), `cli-error` (show the message). Never pretend success.
 
@@ -81,12 +86,12 @@ Point at `scripts/analyze-branch.ts` and `scripts/request-creator.ts`; never at 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | flow wrong / hard cockpit dep / guesses provider | flow right but a hand-off or section mapping is fuzzy | exact flow, typed hand-offs, soft cockpit, unknown-provider stop, honest failures |
-| Trigger & flow correctness | ×2 | won't trigger or auto-fires | triggers but flow has a gap | triggers correctly, flow executable end-to-end |
-| Interface & readability | ×1 | rambling | usable but verbose | tight, structured, scannable |
-| Assumptions & docs | ×1 | fallback unstated | partial | cockpit-absent + unknown-provider + failure-reasons all spelled out |
+| Dimension                  | Weight | 0–1 (fail)                                       | 2–3 (below bar)                                       | 4–5 (pass)                                                                        |
+| -------------------------- | ------ | ------------------------------------------------ | ----------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Correctness                | ×4     | flow wrong / hard cockpit dep / guesses provider | flow right but a hand-off or section mapping is fuzzy | exact flow, typed hand-offs, soft cockpit, unknown-provider stop, honest failures |
+| Trigger & flow correctness | ×2     | won't trigger or auto-fires                      | triggers but flow has a gap                           | triggers correctly, flow executable end-to-end                                    |
+| Interface & readability    | ×1     | rambling                                         | usable but verbose                                    | tight, structured, scannable                                                      |
+| Assumptions & docs         | ×1     | fallback unstated                                | partial                                               | cockpit-absent + unknown-provider + failure-reasons all spelled out               |
 
 ## Out of scope
 

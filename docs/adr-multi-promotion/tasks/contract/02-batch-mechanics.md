@@ -1,6 +1,7 @@
 # CONTRACT-02: Batch mechanics and failed-batch recovery
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -182,8 +183,7 @@ reach for a rollback that does not exist:
 
 ### 7. The no-promotion branch
 
-The `### No-promotion branch` subsection currently ends with `pass no `newAdr` and no
-`metadataUpdate`.` Change the field name to `newAdrs`. Change nothing else about the
+The `### No-promotion branch` subsection currently ends with `pass no `newAdr`and no`metadataUpdate`.` Change the field name to `newAdrs`. Change nothing else about the
 branch. It still skips `draft` and gate 2, and it still invokes `commit` with only the
 approved plan.
 
@@ -269,12 +269,12 @@ field names change.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name drifts from the frozen contract, or `newAdr` survives anywhere in the file | The `groups` and `newAdrs` shapes are right, but the `+ i` rule, the 12-group cap, or the gate-2 re-plan is missing or softened | Every shape and rule matches the frozen contract, and each rule names the failure it prevents |
-| Completeness | ×2 | Constraint 7 or the recovery section is absent | The new content landed, but a stale singular payload reference still sits in the Topology intro or in a single-record mode | All eight items landed, and no singular payload reference remains |
-| Readability | ×1 | The new prose breaks the file's numbered-step structure, or renumbers the constraints | Correct content, but sentences run past 25 words, em dashes stack, or a new term appears for `group` or `batch` | The new steps read as one voice with the file, warnings sit before their step, and every term matches the frozen contract |
-| Assumptions and docs | ×1 | The 12-group cap is presented as a measured technical limit | The cap, the re-fold scope, or the `moves[]` prohibition is stated with no reason | Each non-obvious rule carries its reason, and the cap is stated as a judgment call from one 26-group run |
+| Dimension            | Weight | 0–1 (fail)                                                                              | 2–3 (below bar)                                                                                                                 | 4–5 (pass)                                                                                                                |
+| -------------------- | ------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name drifts from the frozen contract, or `newAdr` survives anywhere in the file | The `groups` and `newAdrs` shapes are right, but the `+ i` rule, the 12-group cap, or the gate-2 re-plan is missing or softened | Every shape and rule matches the frozen contract, and each rule names the failure it prevents                             |
+| Completeness         | ×2     | Constraint 7 or the recovery section is absent                                          | The new content landed, but a stale singular payload reference still sits in the Topology intro or in a single-record mode      | All eight items landed, and no singular payload reference remains                                                         |
+| Readability          | ×1     | The new prose breaks the file's numbered-step structure, or renumbers the constraints   | Correct content, but sentences run past 25 words, em dashes stack, or a new term appears for `group` or `batch`                 | The new steps read as one voice with the file, warnings sit before their step, and every term matches the frozen contract |
+| Assumptions and docs | ×1     | The 12-group cap is presented as a measured technical limit                             | The cap, the re-fold scope, or the `moves[]` prohibition is stated with no reason                                               | Each non-obvious rule carries its reason, and the cap is stated as a judgment call from one 26-group run                  |
 
 ## Out of scope
 

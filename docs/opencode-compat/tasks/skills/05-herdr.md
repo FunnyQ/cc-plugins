@@ -1,6 +1,7 @@
 # SKILLS-05: Herdr skills — OpenCode branches
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -30,7 +31,7 @@ Under `packages/herdr`, only `.md` files may change. Touching any `.ts` there sc
 
 ### What the existing skills do today
 
-Both skills resolve their scripts from a `$SKILL_DIR` that the executor is told to take from Claude Code's load-time *"Base directory for this skill"* banner, and both already warn that `${CLAUDE_PLUGIN_ROOT}` is unreliable inside a Bash call:
+Both skills resolve their scripts from a `$SKILL_DIR` that the executor is told to take from Claude Code's load-time _"Base directory for this skill"_ banner, and both already warn that `${CLAUDE_PLUGIN_ROOT}` is unreliable inside a Bash call:
 
 - `packages/herdr/skills/herdr/SKILL.md:25` states the banner rule; line 28 assigns `HERD="$SKILL_DIR/scripts/herd.ts"`.
 - `packages/herdr/skills/herdr-protocol-upgrade/SKILL.md:25` states the same banner rule; line 22 invokes `bun "$SKILL_DIR/scripts/protocol-check.ts" --repo /path/to/plugin`.
@@ -97,12 +98,12 @@ This task needs no entry from `../_context/runtime-facts.md`. If the executor fi
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A non-`.md` file under `packages/` changed, or an OpenCode instruction still resolves scripts through a Claude-only banner | Both blocks added but one still relies on `CLAUDE_PLUGIN_ROOT` or omits the literal installed path | Both skills give the literal `~/.config/opencode/skills/<name>/` path, and no OpenCode instruction depends on a Claude Code mechanism |
-| Non-regression | ×2 | A pre-existing Claude or Codex instruction was reworded, reordered, or removed | Existing instructions survive but the new block is interleaved so a Claude reader has to disentangle it | Additions only, in one clearly fenced block per file; a Claude reader skips it in a glance |
-| Claims verified not inferred | ×1 | The pane note asserts OpenCode support that was never observed | Spawn attempted but the result was not confirmed, and no marker was left | The pane was spawned and confirmed, or the claim carries an explicit unverified marker |
-| Assumptions & docs | ×1 | The type-union cross-check instruction was copied into a skill | The agent-kind claim is stated with no note on how it was checked | The absence of a validated agent-kind union is stated, so a future reader does not go looking for one |
+| Dimension                    | Weight | 0–1 (fail)                                                                                                                 | 2–3 (below bar)                                                                                         | 4–5 (pass)                                                                                                                            |
+| ---------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                  | ×3     | A non-`.md` file under `packages/` changed, or an OpenCode instruction still resolves scripts through a Claude-only banner | Both blocks added but one still relies on `CLAUDE_PLUGIN_ROOT` or omits the literal installed path      | Both skills give the literal `~/.config/opencode/skills/<name>/` path, and no OpenCode instruction depends on a Claude Code mechanism |
+| Non-regression               | ×2     | A pre-existing Claude or Codex instruction was reworded, reordered, or removed                                             | Existing instructions survive but the new block is interleaved so a Claude reader has to disentangle it | Additions only, in one clearly fenced block per file; a Claude reader skips it in a glance                                            |
+| Claims verified not inferred | ×1     | The pane note asserts OpenCode support that was never observed                                                             | Spawn attempted but the result was not confirmed, and no marker was left                                | The pane was spawned and confirmed, or the claim carries an explicit unverified marker                                                |
+| Assumptions & docs           | ×1     | The type-union cross-check instruction was copied into a skill                                                             | The agent-kind claim is stated with no note on how it was checked                                       | The absence of a validated agent-kind union is stated, so a future reader does not go looking for one                                 |
 
 ## Out of scope
 

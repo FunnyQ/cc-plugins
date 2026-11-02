@@ -65,13 +65,15 @@ const session = ($: Engine, on: On, view: ExplainView, glow?: string) => {
   const box = seed(on, view);
   return startSession($, on, {
     probe: () =>
-      ran(JSON.stringify({
-        platform: "darwin",
-        wsl: false,
-        home: HOME,
-        tmp: "/tmp",
-        chrome: null,
-      })),
+      ran(
+        JSON.stringify({
+          platform: "darwin",
+          wsl: false,
+          home: HOME,
+          tmp: "/tmp",
+          chrome: null,
+        }),
+      ),
     run: (e) => {
       box.opens.push(e.argv);
       if (e.argv[1]?.endsWith("/hooks/platform-cli.ts")) {

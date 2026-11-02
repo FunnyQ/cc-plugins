@@ -38,6 +38,7 @@ tasks/
 `README.md`, so nothing here parallelizes. Two agents editing the same file at once conflict.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -49,11 +50,11 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| integration | 01 | final review | todo | > 4 | readme/02 |
-| readme | 01 | chronicle section | todo | > 4 | — |
-| readme | 02 | installation coverage and skill counts | todo | > 4 | readme/01 |
+| Bucket      | NN  | Title                                  | Status | Pass line | Depends on |
+| ----------- | --- | -------------------------------------- | ------ | --------- | ---------- |
+| integration | 01  | final review                           | todo   | > 4       | readme/02  |
+| readme      | 01  | chronicle section                      | todo   | > 4       | —          |
+| readme      | 02  | installation coverage and skill counts | todo   | > 4       | readme/01  |
 
 ## Dependency graph
 
@@ -67,9 +68,10 @@ readme/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| integration/01 | readme/02 |
+| Task           | Depends on |
+| -------------- | ---------- |
+| integration/01 | readme/02  |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

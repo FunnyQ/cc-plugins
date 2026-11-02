@@ -18,9 +18,13 @@ The prologue (above the markers) and epilogue (`## Known gaps`, below them) are 
 # <Topic> — Task System
 
 ## Purpose
+
 ## Directory layout
+
 ## Reading order for executors
+
 ## Naming convention
+
 (these four ship pre-filled in the skeleton; edit only to add topic-specific detail)
 
 ## Where to start

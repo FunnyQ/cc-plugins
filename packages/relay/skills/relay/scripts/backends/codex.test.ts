@@ -291,9 +291,9 @@ describe("codexBackend", () => {
       mkdirSync(join(tempDir, "sub"), { recursive: true });
       const pngPath = join(tempDir, "sub\\a.png");
       writeFileSync(pngPath, "fake");
-      expect(
-        extractGeneratedPngPath("saved to ~\\sub\\a.png", tempDir),
-      ).toBe(pngPath);
+      expect(extractGeneratedPngPath("saved to ~\\sub\\a.png", tempDir)).toBe(
+        pngPath,
+      );
     });
 
     it("should return null if no .png found in output", () => {

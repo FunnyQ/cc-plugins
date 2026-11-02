@@ -123,12 +123,25 @@ describe("createHcClient timing", () => {
         lists++;
         return lists < 3
           ? { spaces: [] }
-          : { spaces: [{ tabs: [{ id: "tb9", terminals: [{ terminal: "t9" }] }] }] };
+          : {
+              spaces: [
+                { tabs: [{ id: "tb9", terminals: [{ terminal: "t9" }] }] },
+              ],
+            };
       }
       return {};
     });
-    const client = createHcClient({ HC_TERMINAL_ID: "t46" }, run, () => "ab12", async () => {});
-    await client.spawn({ role: "relay-claude-delegate", agent: "claude", workspace: "sp1" });
+    const client = createHcClient(
+      { HC_TERMINAL_ID: "t46" },
+      run,
+      () => "ab12",
+      async () => {},
+    );
+    await client.spawn({
+      role: "relay-claude-delegate",
+      agent: "claude",
+      workspace: "sp1",
+    });
     expect(calls.at(-1)?.[2]).toBe("tab.rename");
   });
 

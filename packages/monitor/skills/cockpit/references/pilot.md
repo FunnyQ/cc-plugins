@@ -67,7 +67,7 @@ session.
 - **It powers `wait` / `send`.** The control loop talks to this daemon. The
   daemon must be running before you park a `cockpit wait` (see below).
 - **Restarting onto new code.** Re-running `cockpit server` from the
-  *same* install reuses the live daemon. It does not pick up a plugin
+  _same_ install reuses the live daemon. It does not pick up a plugin
   update or a working-tree edit. Use `/cockpit restart` for that. Offer it
   after a `/monitor:install`, a plugin update, or an edit to any cockpit
   script. See [references/restart.md](restart.md).
@@ -76,8 +76,8 @@ session.
 
 A decision card exists to carry what a `git diff` throws away: **the
 thinking behind the change, not the change itself.** The diff already shows
-*what* the code does. Your job here is to record *why it ended up this
-way*. A future reader — or you, six months from now — should not have to
+_what_ the code does. Your job here is to record _why it ended up this
+way_. A future reader — or you, six months from now — should not have to
 reverse-engineer it.
 
 The filter for whether to log at all: **would someone reading the diff
@@ -110,12 +110,12 @@ MMD
 
 **What each field carries:**
 
-- `--decision` — *what* you chose or did, in one line.
-- `--reason` — the lead: *why this path and not another,* in prose. The core
+- `--decision` — _what_ you chose or did, in one line.
+- `--reason` — the lead: _why this path and not another,_ in prose. The core
   narrative of the call.
 - `--facet "LABEL: text"` (**repeatable**) — break out a distinct dimension of the
   reasoning into its own labeled row. **You choose the label.** Pick the
-  label that fits *this* decision. No two decisions involve the same
+  label that fits _this_ decision. No two decisions involve the same
   dimensions. Below is a suggested vocabulary. Use it loosely, do not force
   it, and invent a label when none fit:
   - `PROBLEM` — what you understood the task to be, when it isn't obvious from the code.
@@ -124,11 +124,12 @@ MMD
   - `ASSUMPTION` — what you're now leaning on that, if it changed, would break this.
   - `PRIOR-ART` — the existing pattern/decision you're following (or deliberately not).
 
-  Reach only for the facets that *actually apply*. A card with one sharp
+  Reach only for the facets that _actually apply_. A card with one sharp
   `REJECTED` beats one padded with five hollow rows. Each facet renders as
   its own stencil row in the dashboard, so the card reads like a field
   manual of how the call was made.
-- `--tradeoff` — what the choice *costs*: what you gave up. (A forward-looking
+
+- `--tradeoff` — what the choice _costs_: what you gave up. (A forward-looking
   risk often reads better as an `ASSUMPTION` or `RISK` facet — use whichever
   frames it best.)
 
@@ -157,8 +158,8 @@ MMD
             log sizes, would need an LRU if a session ran for days."
 ```
 
-The ✅ version lets a reader reconstruct *why the pair*, *what bug it fixes*, and
-*when it stops working* — each on its own scannable row.
+The ✅ version lets a reader reconstruct _why the pair_, _what bug it fixes_, and
+_when it stops working_ — each on its own scannable row.
 
 **Example 2 — the whole call turns on the alternative you rejected:**
 
@@ -185,8 +186,8 @@ trial. Now it is a labeled line they can scan to in a second.
 --needs-call --option "Global ~/.config" --option "Per-project .cockpit/"
 ```
 
-The `--reason` still earns its place. It tells the user *why the fork
-exists* before they pick. The answer then lands in the trail with its
+The `--reason` still earns its place. It tells the user _why the fork
+exists_ before they pick. The answer then lands in the trail with its
 context intact.
 
 - `--session` is optional. When omitted, `log` resolves the current session
@@ -217,7 +218,7 @@ context intact.
 ## While a session is live — decide in the open, ask through the cockpit
 
 **First decide whether this even needs a question.** The decision trail
-should be *predominantly your own autonomous calls* — the reasoning a `git
+should be _predominantly your own autonomous calls_ — the reasoning a `git
 diff` can't show. Log those as plain `log` cards (decision / reason /
 facets / tradeoff) whenever a future reader would ask "why was it done this
 way?" That is the bulk of a healthy trail. `needs_your_call` is the

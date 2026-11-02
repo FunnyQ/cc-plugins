@@ -217,9 +217,16 @@ test("a press that writes an html page spawns the checker from inside runes' own
   mock.clock(on);
   fakeHost(on, {
     files: new Map([[CONFIG, ""]]),
-    probe: () => ran(JSON.stringify({
-      platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: "/test/chrome",
-    })),
+    probe: () =>
+      ran(
+        JSON.stringify({
+          platform: "darwin",
+          wsl: false,
+          home: HOME,
+          tmp: "/tmp",
+          chrome: "/test/chrome",
+        }),
+      ),
     run: () => ({
       value: {
         exitCode: 0,

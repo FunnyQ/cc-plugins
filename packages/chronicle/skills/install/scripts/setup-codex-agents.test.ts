@@ -9,7 +9,10 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { codexHome as resolveCodexHome, RETIRED_ROLES } from "./setup-codex-agents";
+import {
+  codexHome as resolveCodexHome,
+  RETIRED_ROLES,
+} from "./setup-codex-agents";
 
 const script = resolve(import.meta.dir, "setup-codex-agents.ts");
 const pluginRoot = resolve(import.meta.dir, "../../..");
@@ -142,9 +145,9 @@ describe("setup-codex-agents", () => {
 
       expect(result.exitCode).toBe(0);
       expect(configFile).not.toBeNull();
-      expect(JSON.parse(configFile![1]).startsWith(join(profile, ".codex"))).toBe(
-        true,
-      );
+      expect(
+        JSON.parse(configFile![1]).startsWith(join(profile, ".codex")),
+      ).toBe(true);
       expect(existsSync(join(cwd, ".codex"))).toBe(false);
     } finally {
       rmSync(profile, { recursive: true, force: true });

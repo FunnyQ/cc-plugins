@@ -4,7 +4,7 @@
 
 Autopilot dispatches every ready task of a wave in parallel. In one shared working tree, a whole-target build (SwiftPM, `tsc`, Rust, Go) compiles a sibling's half-written file and fails correct work. Each non-final task therefore runs its whole pipeline — dev, verify, judge — in its own git worktree, and only a judged-passing result is merged back into the main tree.
 
-Workflow `agent()` has **no `cwd` option**, and `agent(..., {isolation: 'worktree'})` gives each *agent call* a fresh throwaway worktree that is never merged back, so it cannot span a pipeline. The orchestrator owns the worktrees through `worktree.ts` and passes the path to every prompt.
+Workflow `agent()` has **no `cwd` option**, and `agent(..., {isolation: 'worktree'})` gives each _agent call_ a fresh throwaway worktree that is never merged back, so it cannot span a pipeline. The orchestrator owns the worktrees through `worktree.ts` and passes the path to every prompt.
 
 ## Layout
 
@@ -25,25 +25,27 @@ Copy this from `packages/guard/hooks/comment-sweep.ts` (`worktreeTree`, lines 44
 ## `worktree.ts` CLI
 
 The script lives at `packages/dispatch/skills/flightplan/scripts/worktree.ts`.
+
 - Every subcommand takes `--repo <abs main-tree root>` and `--slug <slug>`.
 - Every subcommand prints one JSON object on stdout.
 - Exit codes: `0` for success, including a `conflict` or `drift` result; `2` for bad arguments or a missing target; `1` for any other git failure. On a failure, stderr carries the git command and its stderr.
 
-| Subcommand | Does | Prints |
-|---|---|---|
-| `create <ref>` | Snapshots the main tree. Runs `git worktree add --detach <path> <snapshot>`, removing any existing worktree for this ref first. Clones every ignored path into the worktree with `cp -c -R` (see Seeding). Records state. | `{ "path": "<abs>", "base": "<commit>" }` |
-| `land <ref> --expect <tree> --op <id>` | Leak check first, then see Land. Every field is always present; see "Land result fields". | `{ "status": "clean" \| "conflict" \| "leak", "drift": <bool>, "files": [...], "paths": [...], "fingerprint": "<tree>", "previous": "<tree>" }` |
-| `unland <ref> --op <id>` | Restores the main tree to the `previous` fingerprint tree of the last clean land of this ref. Touches only the paths that land changed. Used when the drift re-verify fails. | `{ "restored": [...] }` |
-| `rebase <ref> --op <id>` | Writes the three-way result, conflict markers included, into the worktree, overwriting it. Sets its base to the current main snapshot. | `{ "path": "<abs>", "base": "<commit>", "conflicted": [...] }` |
-| `fingerprint [--expect <tree>]` | The main-tree snapshot tree hash, with the excluded path left out. With `--expect`, `paths` lists what differs from that tree; it is empty when they match. | `{ "fingerprint": "<tree>", "paths": [...] }` |
-| `show <ref>` | Reads state and checks the disk. Used by a single-task resume. | `{ "path": "<abs>", "base": "<commit>" \| null, "exists": <bool> }` |
-| `remove <ref>` | Runs `git worktree remove --force` and drops the state entry. Succeeds when the worktree is already gone. | `{ "removed": <bool> }` |
-| `sweep [--keep <ref,...>]` | Removes every worktree under the slug's root that is not kept, then runs `git worktree prune`. Drops the root dir once it is empty. | `{ "removed": ["<ref>", ...], "kept": [{ "ref": "<ref>", "path": "<abs>" }, ...] }` |
-| `sweep --keep-all` | Lists every worktree under the slug's root and removes nothing, not even stale registrations. Used when no trustworthy keep list exists. | `{ "removed": [], "kept": [{ "ref": "<ref>", "path": "<abs>" }, ...] }` |
+| Subcommand                             | Does                                                                                                                                                                                                                      | Prints                                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create <ref>`                         | Snapshots the main tree. Runs `git worktree add --detach <path> <snapshot>`, removing any existing worktree for this ref first. Clones every ignored path into the worktree with `cp -c -R` (see Seeding). Records state. | `{ "path": "<abs>", "base": "<commit>" }`                                                                                                       |
+| `land <ref> --expect <tree> --op <id>` | Leak check first, then see Land. Every field is always present; see "Land result fields".                                                                                                                                 | `{ "status": "clean" \| "conflict" \| "leak", "drift": <bool>, "files": [...], "paths": [...], "fingerprint": "<tree>", "previous": "<tree>" }` |
+| `unland <ref> --op <id>`               | Restores the main tree to the `previous` fingerprint tree of the last clean land of this ref. Touches only the paths that land changed. Used when the drift re-verify fails.                                              | `{ "restored": [...] }`                                                                                                                         |
+| `rebase <ref> --op <id>`               | Writes the three-way result, conflict markers included, into the worktree, overwriting it. Sets its base to the current main snapshot.                                                                                    | `{ "path": "<abs>", "base": "<commit>", "conflicted": [...] }`                                                                                  |
+| `fingerprint [--expect <tree>]`        | The main-tree snapshot tree hash, with the excluded path left out. With `--expect`, `paths` lists what differs from that tree; it is empty when they match.                                                               | `{ "fingerprint": "<tree>", "paths": [...] }`                                                                                                   |
+| `show <ref>`                           | Reads state and checks the disk. Used by a single-task resume.                                                                                                                                                            | `{ "path": "<abs>", "base": "<commit>" \| null, "exists": <bool> }`                                                                             |
+| `remove <ref>`                         | Runs `git worktree remove --force` and drops the state entry. Succeeds when the worktree is already gone.                                                                                                                 | `{ "removed": <bool> }`                                                                                                                         |
+| `sweep [--keep <ref,...>]`             | Removes every worktree under the slug's root that is not kept, then runs `git worktree prune`. Drops the root dir once it is empty.                                                                                       | `{ "removed": ["<ref>", ...], "kept": [{ "ref": "<ref>", "path": "<abs>" }, ...] }`                                                             |
+| `sweep --keep-all`                     | Lists every worktree under the slug's root and removes nothing, not even stale registrations. Used when no trustworthy keep list exists.                                                                                  | `{ "removed": [], "kept": [{ "ref": "<ref>", "path": "<abs>" }, ...] }`                                                                         |
 
 ## Repeat calls are safe
 
 An agent can finish a `worktree.ts` call and then fail to return its structured result, so the orchestrator may run the same call twice. Every subcommand is therefore idempotent for identical arguments:
+
 - `land`, `unland`, and `rebase` take a required `--op <id>`. They record their printed result in `state.json` under the ref, keyed by that id. A repeat call with a recorded id prints the recorded result and changes nothing; a new id always acts. Without this, a repeated `land` would see its own first write as a leak.
 - The orchestrator builds the id from the attempt and the step: `a<attempt>-land`, `a<attempt>-unland`, `a<attempt>-rebase`. A resumed run continues the attempt numbering, so its ids never collide with the parked run's ids.
 - `create` removes any existing worktree for the ref first, so a repeat builds the same thing again.
@@ -55,11 +57,11 @@ An agent can finish a `worktree.ts` call and then fail to return its structured 
 
 ## Land result fields
 
-| status | drift | files | paths | fingerprint | previous |
-|---|---|---|---|---|---|
-| `clean` | ours-tree ≠ base-tree | paths changed between ours-tree and `R` | `[]` | `R` (the new main fingerprint) | ours-tree |
-| `conflict` | ours-tree ≠ base-tree | the conflicted paths | `[]` | ours-tree (main is unchanged) | ours-tree |
-| `leak` | `false` | `[]` | paths differing between `--expect` and the actual main fingerprint | the actual main fingerprint | the `--expect` value |
+| status     | drift                 | files                                   | paths                                                              | fingerprint                    | previous             |
+| ---------- | --------------------- | --------------------------------------- | ------------------------------------------------------------------ | ------------------------------ | -------------------- |
+| `clean`    | ours-tree ≠ base-tree | paths changed between ours-tree and `R` | `[]`                                                               | `R` (the new main fingerprint) | ours-tree            |
+| `conflict` | ours-tree ≠ base-tree | the conflicted paths                    | `[]`                                                               | ours-tree (main is unchanged)  | ours-tree            |
+| `leak`     | `false`               | `[]`                                    | paths differing between `--expect` and the actual main fingerprint | the actual main fingerprint    | the `--expect` value |
 
 ## Seeding ignored paths
 
@@ -109,6 +111,7 @@ Each non-final task runs the steps below.
 5. Run `remove`.
 
 **Run-wide abort.** A leak, whether found by a land or by the wave-end check, sets one `aborted` flag with its paths.
+
 - Every task checks the flag before it takes a `Max parallel` slot, before each attempt, and before each land.
 - A task that sees the flag stops without landing and without parking. Its result is an infrastructure failure naming the abort.
 - **A task whose land was clean before the abort still finishes.** It runs mark-done and `remove`, because its work is already in the main tree and its worktree holds nothing unlanded. The abort only preserves worktrees whose work has not landed.
@@ -116,6 +119,7 @@ Each non-final task runs the steps below.
 - The end sweep is skipped, so every worktree with unlanded work survives for inspection, and the run result lists every entry still in the `live` map.
 
 Other rules:
+
 - A retry after conflict or drift reuses the rebased worktree. A retry after an ordinary verify or judge failure reuses the same worktree unchanged.
 - **Cleanup failures** go in their own run-result field, `cleanupFailures: [{ ref, path }]`: a landed task whose worktree removal could not be confirmed. The task stays in `completed`, and the path is not in `worktrees`. The run is not clean.
 - **Park**: keep the worktree and do not land. The escalation carries the worktree path.

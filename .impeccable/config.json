@@ -1,7 +1,5 @@
 {
-  "files": [
-    "cockpit/skills/cockpit/dashboard/dist/index.html"
-  ],
+  "files": ["cockpit/skills/cockpit/dashboard/dist/index.html"],
   "insertBefore": "</body>",
   "commentSyntax": "html",
   "cspChecked": true,
@@ -12,9 +10,7 @@
       {
         "rule": "cream-palette",
         "value": "*",
-        "files": [
-          "packages/runes/hooks/explain/themes/picture-book.html"
-        ],
+        "files": ["packages/runes/hooks/explain/themes/picture-book.html"],
         "createdAt": "2026-10-26T05:18:30.415Z",
         "reason": "agent decided: --paper #f3eee3 is the cold-press sheet of the documented Picture-Book Workshop design (CLAUDE.md runes explain), predates this session"
       }

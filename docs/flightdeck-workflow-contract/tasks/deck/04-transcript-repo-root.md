@@ -1,6 +1,7 @@
 # DECK-04: Honor the declared repo root when locating transcripts
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -86,7 +87,7 @@ export function createTranscriptSource(
   planDir: string,
   projectsRoot?: string,
   repoRoot?: string,
-): TranscriptSource
+): TranscriptSource;
 ```
 
 `resolveSlugDir()` uses the passed `repoRoot` when it is a non-empty string and
@@ -99,8 +100,8 @@ task; leaving a mixed convention behind fails the readability dimension.
 
 Two subtleties worth a one-line comment each in the source:
 
-- **`planDir` stays the membership anchor.** The repo root only chooses *which
-  directory to enumerate*. Whether a discovered transcript belongs to this run
+- **`planDir` stays the membership anchor.** The repo root only chooses _which
+  directory to enumerate_. Whether a discovered transcript belongs to this run
   is still decided by `mentionsPlanDir(text, planDir)` against the run
   directory. Do not substitute one for the other.
 - **The existing "failure to resolve is not cached" comment still holds, and now
@@ -149,7 +150,7 @@ export function eventsHandler(
     codexSource?: CodexSource;
     repoRoot?: string;
   },
-): Response
+): Response;
 ```
 
 ```ts
@@ -330,13 +331,13 @@ won.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The explicit root is accepted but not used, or the walk still runs and wins | Works for the plain case but a non-existent root throws, or precedence is decided the wrong way round | Explicit root always wins, absent root falls back exactly as before, a missing directory yields an empty list, and the codex join uses the same resolved value |
-| Backward compatibility | ×2 | An existing in-repository run changes behaviour, or an existing call site no longer compiles | Behaviour is preserved but only argued for, with no test that would catch a regression | A test pins the no-explicit-root path against the walk, and the whole autopilot suite passes untouched |
-| Test coverage | ×2 | No test, or one that would still pass with the change reverted | Only the happy path — an explicit root that resolves | All four named cases covered with real temp directories, plus the handler pass-through |
-| Interface & readability | ×1 | Mixed conventions left behind, or the root threaded through as a second source of truth | Works but the new parameter's meaning is unclear at the call site | One resolved value used by both consumers, the parameter's purpose obvious, no call site left on the old shape |
-| Assumptions & docs | ×1 | The silent-failure reason is nowhere in the source | The change is made but the reader cannot tell why an explicit root exists | A one-line comment records why the walk cannot work here and that the run directory stays the membership anchor |
+| Dimension               | Weight | 0–1 (fail)                                                                                   | 2–3 (below bar)                                                                                       | 4–5 (pass)                                                                                                                                                     |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The explicit root is accepted but not used, or the walk still runs and wins                  | Works for the plain case but a non-existent root throws, or precedence is decided the wrong way round | Explicit root always wins, absent root falls back exactly as before, a missing directory yields an empty list, and the codex join uses the same resolved value |
+| Backward compatibility  | ×2     | An existing in-repository run changes behaviour, or an existing call site no longer compiles | Behaviour is preserved but only argued for, with no test that would catch a regression                | A test pins the no-explicit-root path against the walk, and the whole autopilot suite passes untouched                                                         |
+| Test coverage           | ×2     | No test, or one that would still pass with the change reverted                               | Only the happy path — an explicit root that resolves                                                  | All four named cases covered with real temp directories, plus the handler pass-through                                                                         |
+| Interface & readability | ×1     | Mixed conventions left behind, or the root threaded through as a second source of truth      | Works but the new parameter's meaning is unclear at the call site                                     | One resolved value used by both consumers, the parameter's purpose obvious, no call site left on the old shape                                                 |
+| Assumptions & docs      | ×1     | The silent-failure reason is nowhere in the source                                           | The change is made but the reader cannot tell why an explicit root exists                             | A one-line comment records why the walk cannot work here and that the run directory stays the membership anchor                                                |
 
 ## Out of scope
 

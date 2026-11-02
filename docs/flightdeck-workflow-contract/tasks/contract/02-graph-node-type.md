@@ -1,6 +1,7 @@
 # CONTRACT-02: Extract the narrow GraphNode type
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -102,7 +103,7 @@ export function unmetNodeDependencies(
 
 The replacement implements the identical rule: **a dependency is unmet when the ref is absent from `byRef`, OR when that node's `validity.kind !== "complete"`.** Both cases, exactly those two.
 
-That rule living in exactly one place is what keeps the dashboard and the CLI scout from disagreeing about which task is blocked. This task *moves* that single place for the dashboard's half — it must not fork it into a second, subtly different rule. The library's own function stays as it is and unchanged; the CLI scout keeps calling it.
+That rule living in exactly one place is what keeps the dashboard and the CLI scout from disagreeing about which task is blocked. This task _moves_ that single place for the dashboard's half — it must not fork it into a second, subtly different rule. The library's own function stays as it is and unchanged; the CLI scout keeps calling it.
 
 Write the reason down in a one-line comment above the helper, the way the surrounding code already annotates non-obvious decisions.
 
@@ -115,7 +116,8 @@ if (validity.kind === "invalid") state = "invalid";
 else if (task.status === "done") state = "done";
 else if (task.status === "blocked") state = "blocked";
 else if (task.status === "in-progress") state = "in-progress";
-else if (task.status === "todo" && hasOpenStart(aggregate)) state = "in-progress";
+else if (task.status === "todo" && hasOpenStart(aggregate))
+  state = "in-progress";
 else if (task.status === "todo" && blockedBy.length === 0) state = "ready";
 else state = "blocked";
 ```
@@ -164,13 +166,13 @@ The new test file covers the adapter and the readiness helper with in-memory fix
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The adapter drops a field, or the readiness helper implements a different rule than "missing, or not complete" | Adapter and helper work on well-formed input but one of the three unmet cases is mishandled, or `validity` is transformed rather than passed through | Every field maps, all three unmet cases return the ref, an all-complete dependency list returns empty, and the widened `NodeValidity` accepts the concrete validity with no mapping code |
-| Backward compatibility | ×2 | The state ladder is rewritten, reordered, or collapsed; or the flightplan library is edited | The ladder is intact but a returned view field changed shape, or an existing assertion was edited to make a test pass | Ladder branch-for-branch identical, every returned field unchanged, the shared library untouched, and both existing suites pass with only fixture-factory edits |
-| Test coverage | ×2 | No tests for the new module | Happy-path conversion only; the readiness helper's unmet cases untested | The adapter asserted on a whole returned node with `toEqual`, all three unmet cases plus the empty case covered, and a node whose `validity` is `invalid` shown to still block a dependent |
-| Interface & readability | ×1 | The conversion is smuggled into the pure payload builder, or the exported names do not say what they do | Types are right but the widening and the single-rule constraint are unexplained | Conversion sits on the impure side, the pure builder stays free of markdown knowledge, and each non-obvious choice carries the one-line why-comment this codebase uses |
-| Assumptions & docs | ×1 | The omitted `ParsedTask` fields are dropped with no trace | The omission is visible in the type but the reason is not recorded | A one-line comment records why the rich fields are off the type and why the two validity fields widen, so the next producer does not re-litigate either |
+| Dimension               | Weight | 0–1 (fail)                                                                                                     | 2–3 (below bar)                                                                                                                                      | 4–5 (pass)                                                                                                                                                                                 |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The adapter drops a field, or the readiness helper implements a different rule than "missing, or not complete" | Adapter and helper work on well-formed input but one of the three unmet cases is mishandled, or `validity` is transformed rather than passed through | Every field maps, all three unmet cases return the ref, an all-complete dependency list returns empty, and the widened `NodeValidity` accepts the concrete validity with no mapping code   |
+| Backward compatibility  | ×2     | The state ladder is rewritten, reordered, or collapsed; or the flightplan library is edited                    | The ladder is intact but a returned view field changed shape, or an existing assertion was edited to make a test pass                                | Ladder branch-for-branch identical, every returned field unchanged, the shared library untouched, and both existing suites pass with only fixture-factory edits                            |
+| Test coverage           | ×2     | No tests for the new module                                                                                    | Happy-path conversion only; the readiness helper's unmet cases untested                                                                              | The adapter asserted on a whole returned node with `toEqual`, all three unmet cases plus the empty case covered, and a node whose `validity` is `invalid` shown to still block a dependent |
+| Interface & readability | ×1     | The conversion is smuggled into the pure payload builder, or the exported names do not say what they do        | Types are right but the widening and the single-rule constraint are unexplained                                                                      | Conversion sits on the impure side, the pure builder stays free of markdown knowledge, and each non-obvious choice carries the one-line why-comment this codebase uses                     |
+| Assumptions & docs      | ×1     | The omitted `ParsedTask` fields are dropped with no trace                                                      | The omission is visible in the type but the reason is not recorded                                                                                   | A one-line comment records why the rich fields are off the type and why the two validity fields widen, so the next producer does not re-litigate either                                    |
 
 ## Out of scope
 

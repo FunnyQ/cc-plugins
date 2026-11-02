@@ -1,6 +1,7 @@
 # INTEGRATION-01: final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -84,12 +85,12 @@ plan's scope, do not fix it — record it in the summary as a reported problem.
 > the per-task ones. Each dimension 0–5; weighted average > 4.0 to pass; Meets the plan goal < 4 is an
 > automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Meets the plan goal | ×3 | A reader still cannot install some plugin, or chronicle still has no section. | Both gaps closed but a stale count or a wrong claim survives. | Chronicle documented, all five plugins installable from the installation sections, and every count matches what ships. |
-| Integration & consistency | ×2 | The new sections read as a different document. | Consistent in shape but the voice drifts in places. | The whole file reads as one document — same shape, same voice, same level of detail throughout. |
-| No regressions | ×2 | A true claim or a working link was dropped. | A removed line was replaced by something weaker. | Nothing true was lost; every removal is an improvement and is justified in the summary. |
-| Evidence | ×1 | Findings asserted with no commands run. | Commands run but output not quoted. | Every check in `## Verification` was run and its actual output is quoted, including the ones that found nothing. |
+| Dimension                 | Weight | 0–1 (fail)                                                                    | 2–3 (below bar)                                               | 4–5 (pass)                                                                                                             |
+| ------------------------- | ------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Meets the plan goal       | ×3     | A reader still cannot install some plugin, or chronicle still has no section. | Both gaps closed but a stale count or a wrong claim survives. | Chronicle documented, all five plugins installable from the installation sections, and every count matches what ships. |
+| Integration & consistency | ×2     | The new sections read as a different document.                                | Consistent in shape but the voice drifts in places.           | The whole file reads as one document — same shape, same voice, same level of detail throughout.                        |
+| No regressions            | ×2     | A true claim or a working link was dropped.                                   | A removed line was replaced by something weaker.              | Nothing true was lost; every removal is an improvement and is justified in the summary.                                |
+| Evidence                  | ×1     | Findings asserted with no commands run.                                       | Commands run but output not quoted.                           | Every check in `## Verification` was run and its actual output is quoted, including the ones that found nothing.       |
 
 ## Out of scope
 

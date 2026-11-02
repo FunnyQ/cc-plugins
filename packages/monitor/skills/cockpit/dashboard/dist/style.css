@@ -181,12 +181,12 @@ body {
   opacity: 0;
 }
 .viewport.is-collapsed
-:is(
-  .lead-underline,
-  .lead-connector,
-  .viewport__beacon-ring,
-  .viewport__beacon-core
-) {
+  :is(
+    .lead-underline,
+    .lead-connector,
+    .viewport__beacon-ring,
+    .viewport__beacon-core
+  ) {
   animation-play-state: paused;
 }
 .viewport__warp,

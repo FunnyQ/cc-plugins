@@ -1,6 +1,7 @@
 # ENGINE-07: Claude usage source and usage limits
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -149,12 +150,12 @@ Deep-equality ignores object key order, but array order must match TS.
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | `source claude` golden fails, or `load` reads transcript contents | golden passes, but the `hour_ms = 0` exclusion, ledger origin-cwd order, empty-string coercion, or the stale threshold drifts from TS | golden and rollup tests pass; every rule in Implementation notes matches TS, including the clock going through `now_ms()` |
-| Test coverage | ×2 | no `cargo test` for this module | happy path only | units cover coercion, window clamps, all `read_usage_limits` branches, malformed history lines, `hour_ms = 0`, and a multi-file session |
-| Interface & readability | ×1 | signatures differ from `engine-api.md`, or `unwrap` on file or JSON data | signatures match but TS helpers are split into one-caller abstractions | one module mirroring the TS sections, clear types, clippy clean |
-| Assumptions & docs | ×1 | silent divergences from TS | divergences exist without a comment | each deliberate difference (for example, the parse-error message text) has a one-line why comment |
+| Dimension               | Weight | 0–1 (fail)                                                               | 2–3 (below bar)                                                                                                                       | 4–5 (pass)                                                                                                                              |
+| ----------------------- | ------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | `source claude` golden fails, or `load` reads transcript contents        | golden passes, but the `hour_ms = 0` exclusion, ledger origin-cwd order, empty-string coercion, or the stale threshold drifts from TS | golden and rollup tests pass; every rule in Implementation notes matches TS, including the clock going through `now_ms()`               |
+| Test coverage           | ×2     | no `cargo test` for this module                                          | happy path only                                                                                                                       | units cover coercion, window clamps, all `read_usage_limits` branches, malformed history lines, `hour_ms = 0`, and a multi-file session |
+| Interface & readability | ×1     | signatures differ from `engine-api.md`, or `unwrap` on file or JSON data | signatures match but TS helpers are split into one-caller abstractions                                                                | one module mirroring the TS sections, clear types, clippy clean                                                                         |
+| Assumptions & docs      | ×1     | silent divergences from TS                                               | divergences exist without a comment                                                                                                   | each deliberate difference (for example, the parse-error message text) has a one-line why comment                                       |
 
 ## Out of scope
 

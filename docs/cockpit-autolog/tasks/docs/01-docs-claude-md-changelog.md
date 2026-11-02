@@ -1,6 +1,7 @@
 # DOCS-01: Update CLAUDE.md + CHANGELOG
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -68,7 +69,7 @@ metadata, not structural keys:
     auto-logging decisions a diff can't explain, streaming live transcripts, and the
     `needs_your_call` bridge.
   - `interface.defaultPrompt` is an array containing `"Start a cockpit session for this
-    project."` — remove that line (there is no `start` anymore). Keep the dashboard / log /
+project."` — remove that line (there is no `start` anymore). Keep the dashboard / log /
     wait prompts; optionally replace the removed line with an auto-logging-flavored prompt
     (e.g. enabling thoughtful mode). Leave `displayName`, `category`, `capabilities`,
     `brandColor`, `developerName`, `shortDescription` (if goal-free) intact.
@@ -98,12 +99,12 @@ Do not change `version` in either manifest (release flow owns it).
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. "Test coverage" here = the grep/manual checks below.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | docs still describe old 3-skill shape | partial update, stale refs remain | docs match end state; no stale goal/start/scribe-skill refs |
-| Test coverage | ×2 | no checks | one grep | both greps + manual cross-check against produced files |
-| Interface & readability | ×1 | sprawling edits | acceptable | surgical, only cockpit passages changed |
-| Assumptions & docs | ×1 | invents version bump | partial | leaves versioning to release flow; changelog matches format |
+| Dimension               | Weight | 0–1 (fail)                            | 2–3 (below bar)                   | 4–5 (pass)                                                  |
+| ----------------------- | ------ | ------------------------------------- | --------------------------------- | ----------------------------------------------------------- |
+| Correctness             | ×3     | docs still describe old 3-skill shape | partial update, stale refs remain | docs match end state; no stale goal/start/scribe-skill refs |
+| Test coverage           | ×2     | no checks                             | one grep                          | both greps + manual cross-check against produced files      |
+| Interface & readability | ×1     | sprawling edits                       | acceptable                        | surgical, only cockpit passages changed                     |
+| Assumptions & docs      | ×1     | invents version bump                  | partial                           | leaves versioning to release flow; changelog matches format |
 
 ## Out of scope
 

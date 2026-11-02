@@ -1,6 +1,7 @@
 # SERVER-04: Broker, inbox, send-message
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -91,12 +92,12 @@ In this exact order:
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Answers lost, cross-delivered, or a wait hangs past its budget | Happy path works; stash/superseded/gate ordering or disconnect cleanup drifts | Every race TS handles (cold-start stash, superseded call, replaced park, disconnect) behaves identically |
-| Test coverage | ×2 | Contract groups not run on Rust | Groups pass; no Rust tests for park replacement or drop guards | Groups pass on both; `cargo test` covers stash TTL, `call_matches`, replacement, guard generation check, presence TTL |
-| Interface & readability | ×1 | Lock held across `.await`, or edits outside `broker.rs`/`inbox.rs` | Works but park bookkeeping duplicated between wait and inbox | One small park helper reused by wait and inbox; state lives in `BrokerState`/`InboxState` |
-| Assumptions & docs | ×1 | Env budgets hard-coded | Env honoured; ordering rationale missing | The three pre-park checks carry a one-line why for their order; deviations commented |
+| Dimension               | Weight | 0–1 (fail)                                                         | 2–3 (below bar)                                                               | 4–5 (pass)                                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Answers lost, cross-delivered, or a wait hangs past its budget     | Happy path works; stash/superseded/gate ordering or disconnect cleanup drifts | Every race TS handles (cold-start stash, superseded call, replaced park, disconnect) behaves identically              |
+| Test coverage           | ×2     | Contract groups not run on Rust                                    | Groups pass; no Rust tests for park replacement or drop guards                | Groups pass on both; `cargo test` covers stash TTL, `call_matches`, replacement, guard generation check, presence TTL |
+| Interface & readability | ×1     | Lock held across `.await`, or edits outside `broker.rs`/`inbox.rs` | Works but park bookkeeping duplicated between wait and inbox                  | One small park helper reused by wait and inbox; state lives in `BrokerState`/`InboxState`                             |
+| Assumptions & docs      | ×1     | Env budgets hard-coded                                             | Env honoured; ordering rationale missing                                      | The three pre-park checks carry a one-line why for their order; deviations commented                                  |
 
 ## Out of scope
 

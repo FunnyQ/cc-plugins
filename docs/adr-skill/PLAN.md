@@ -46,12 +46,12 @@ do not compete with the trail — they consume it.
 
 ### Boundary with the other "why" stores
 
-| Store | Owns | Lifetime |
-| --- | --- | --- |
-| Cockpit trail | Raw in-flight decisions | Expires — it is the raw material |
-| **ADR** | Cross-release architecture commitments | Permanent, with a lifecycle |
-| `CLAUDE.md` | How the repo works right now | Always describes the present |
-| `memory/` | Harness behaviour and traps | Follows the harness, not the code |
+| Store         | Owns                                   | Lifetime                          |
+| ------------- | -------------------------------------- | --------------------------------- |
+| Cockpit trail | Raw in-flight decisions                | Expires — it is the raw material  |
+| **ADR**       | Cross-release architecture commitments | Permanent, with a lifecycle       |
+| `CLAUDE.md`   | How the repo works right now           | Always describes the present      |
+| `memory/`     | Harness behaviour and traps            | Follows the harness, not the code |
 
 Do not migrate `memory/` into ADRs. It mixes genuine harness facts, which belong there, with project
 decisions that landed there only because nothing else existed. Move the second kind later,
@@ -106,7 +106,7 @@ threshold and for archiving rather than removing.
 
 - **Stack**: Bun + TypeScript, no transpile step, no external npm dependencies. `type` over
   `interface`.
-- **Storage**: the filesystem. Position in the tree *is* the state — there is no ledger, no database.
+- **Storage**: the filesystem. Position in the tree _is_ the state — there is no ledger, no database.
 - **Deployment**: ships inside the `chronicle` plugin, to both Claude Code and Codex.
 - **Conventions**: see `tasks/_context/shared.md`.
 
@@ -116,7 +116,7 @@ threshold and for archiving rather than removing.
 cross-package imports. Plugins install independently under version-pinned cache paths
 (`.../chronicle/0.9.6/`, `.../monitor/3.x.y/`), so "resolve the trail root with cockpit's
 `log-root.ts` walk-up" is not literally implementable. **Decision:** create
-`packages/chronicle/shared/scripts/cockpit-trail.ts` and *port* the walk-up and `STALE_MS` into it,
+`packages/chronicle/shared/scripts/cockpit-trail.ts` and _port_ the walk-up and `STALE_MS` into it,
 with a comment naming monitor's originals as the spec. Accepted cost: two implementations that must
 be hand-synced.
 
@@ -284,12 +284,12 @@ flow runs backward (built → recorded), so `Proposed` describes an accomplished
 Defaulting everything to `Proposed` was rejected: no moment in this workflow would promote them
 later, so every ADR would sit at `Proposed` forever and the field would carry no information.
 
-| Value | Means | Requires |
-| --- | --- | --- |
-| `Accepted` | Live in the code today | — |
-| `Proposed` | Drafted ahead of the work | — |
-| `Superseded` | Replaced by a named successor | `Superseded by: ADR-NNNN` |
-| `Deprecated` | No longer applies, with no successor | no link |
+| Value        | Means                                | Requires                  |
+| ------------ | ------------------------------------ | ------------------------- |
+| `Accepted`   | Live in the code today               | —                         |
+| `Proposed`   | Drafted ahead of the work            | —                         |
+| `Superseded` | Replaced by a named successor        | `Superseded by: ADR-NNNN` |
+| `Deprecated` | No longer applies, with no successor | no link                   |
 
 ## Bucketing
 
@@ -308,21 +308,21 @@ later, so every ADR would sit at `Proposed` forever and the field would carry no
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| foundation | 01 | extract-cockpit-trail | todo | ≥ 4.0 | — |
-| foundation | 02 | adr-conventions | todo | ≥ 4.0 | — |
-| foundation | 03 | collect-adr-context | todo | ≥ 4.0 | foundation/01, foundation/02 |
-| foundation | 04 | adr-index | todo | ≥ 4.0 | foundation/02 |
-| triage | 01 | archive-plan | todo | ≥ 4.0 | foundation/01 |
-| triage | 02 | archive-apply | todo | ≥ 4.0 | triage/01 |
-| triage | 03 | adr-read-agents | todo | ≥ 4.0 | foundation/03, foundation/04, triage/01 |
-| triage | 04 | adr-write-agents | todo | ≥ 4.0 | triage/02, triage/03 |
-| triage | 05 | codex-agent-parity | todo | ≥ 4.0 | triage/03, triage/04 |
-| promote | 01 | adr-validate | todo | ≥ 4.0 | foundation/02, foundation/04 |
-| promote | 02 | skill-adr | todo | ≥ 4.0 | triage/03, triage/04, triage/05, promote/01 |
-| promote | 03 | forward-test-fixtures | todo | ≥ 4.0 | promote/02 |
-| promote | 04 | final-review 🏁 | todo | ≥ 4.0 | promote/03 |
+| Bucket     | NN  | Title                 | Status | Pass line | Depends on                                  |
+| ---------- | --- | --------------------- | ------ | --------- | ------------------------------------------- |
+| foundation | 01  | extract-cockpit-trail | todo   | ≥ 4.0     | —                                           |
+| foundation | 02  | adr-conventions       | todo   | ≥ 4.0     | —                                           |
+| foundation | 03  | collect-adr-context   | todo   | ≥ 4.0     | foundation/01, foundation/02                |
+| foundation | 04  | adr-index             | todo   | ≥ 4.0     | foundation/02                               |
+| triage     | 01  | archive-plan          | todo   | ≥ 4.0     | foundation/01                               |
+| triage     | 02  | archive-apply         | todo   | ≥ 4.0     | triage/01                                   |
+| triage     | 03  | adr-read-agents       | todo   | ≥ 4.0     | foundation/03, foundation/04, triage/01     |
+| triage     | 04  | adr-write-agents      | todo   | ≥ 4.0     | triage/02, triage/03                        |
+| triage     | 05  | codex-agent-parity    | todo   | ≥ 4.0     | triage/03, triage/04                        |
+| promote    | 01  | adr-validate          | todo   | ≥ 4.0     | foundation/02, foundation/04                |
+| promote    | 02  | skill-adr             | todo   | ≥ 4.0     | triage/03, triage/04, triage/05, promote/01 |
+| promote    | 03  | forward-test-fixtures | todo   | ≥ 4.0     | promote/02                                  |
+| promote    | 04  | final-review 🏁       | todo   | ≥ 4.0     | promote/03                                  |
 
 The last row is the **final review** task, marked `> **Final review**: true` in its file. Its
 `Depends on` reaches every other task transitively.

@@ -31,29 +31,29 @@ every diagram type Mermaid 12.1 has plus a few of its own. Pick the type
 whose shape matches the insight; a flowchart is the default only when
 nothing below fits better.
 
-| The insight is... | Use |
-|---|---|
-| states/statuses and what moves between them | `stateDiagram-v2` |
-| a call chain / who-talks-to-whom over time | `sequenceDiagram` |
-| a decision tree, branch, or fallback cascade | `flowchart TD` |
-| a pipeline or dependency chain | `flowchart LR` |
-| a before/after or two compared designs | `flowchart` with two `subgraph`s |
-| a process handed between owners (user, hook, daemon) | `swimlane-beta LR` |
-| why one failure happened, cause by cause | `ishikawa-beta` |
-| options weighed on two axes (cost vs. payoff) | `quadrantChart` |
-| a number measured across runs, sizes, or versions | `xychart` |
-| shares of one whole (where the time or tokens went) | `pie` |
-| a quantity flowing through stages and dropping out | `sankey` |
-| sizes nested in a hierarchy (a bundle, a budget) | `treemap-beta` |
-| a file or directory layout | `treeView-beta` |
-| types, modules, and how they relate | `classDiagram` |
-| tables, keys, and relations | `erDiagram` |
-| services and the links between them | `architecture-beta` |
-| branches, merges, and tags | `gitGraph` |
-| what happened in order (an incident, a migration) | `timeline` |
-| the space of options around one topic | `mindmap` |
-| the bit or byte layout of a format | `packet` |
-| the grammar of a command or format | `railroad-ebnf-beta` |
+| The insight is...                                    | Use                              |
+| ---------------------------------------------------- | -------------------------------- |
+| states/statuses and what moves between them          | `stateDiagram-v2`                |
+| a call chain / who-talks-to-whom over time           | `sequenceDiagram`                |
+| a decision tree, branch, or fallback cascade         | `flowchart TD`                   |
+| a pipeline or dependency chain                       | `flowchart LR`                   |
+| a before/after or two compared designs               | `flowchart` with two `subgraph`s |
+| a process handed between owners (user, hook, daemon) | `swimlane-beta LR`               |
+| why one failure happened, cause by cause             | `ishikawa-beta`                  |
+| options weighed on two axes (cost vs. payoff)        | `quadrantChart`                  |
+| a number measured across runs, sizes, or versions    | `xychart`                        |
+| shares of one whole (where the time or tokens went)  | `pie`                            |
+| a quantity flowing through stages and dropping out   | `sankey`                         |
+| sizes nested in a hierarchy (a bundle, a budget)     | `treemap-beta`                   |
+| a file or directory layout                           | `treeView-beta`                  |
+| types, modules, and how they relate                  | `classDiagram`                   |
+| tables, keys, and relations                          | `erDiagram`                      |
+| services and the links between them                  | `architecture-beta`              |
+| branches, merges, and tags                           | `gitGraph`                       |
+| what happened in order (an incident, a migration)    | `timeline`                       |
+| the space of options around one topic                | `mindmap`                        |
+| the bit or byte layout of a format                   | `packet`                         |
+| the grammar of a command or format                   | `railroad-ebnf-beta`             |
 
 Any other type pele lists also passes the lint. The `-beta` types and
 `swimlane-beta` are pele's own, so write them from the examples below rather

@@ -1,6 +1,7 @@
 # SERVER-03: the launcher
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -26,7 +27,7 @@ caller.
 ## Implementation notes
 
 The server process already exists and can bind, serve, and record itself. This task is everything that
-happens *around* it. Import the record module rather than redefining the record's shape or path.
+happens _around_ it. Import the record module rather than redefining the record's shape or path.
 
 ### Why the launcher must not block
 
@@ -67,10 +68,14 @@ Split validation so the interesting half needs no fixtures:
 export type Args = { plan: string; port: number; open: boolean };
 
 /** Pure. Shape only: presence, absoluteness, port range. Touches no filesystem. */
-export function parseArgs(argv: string[]): { ok: true; args: Args } | { ok: false; message: string };
+export function parseArgs(
+  argv: string[],
+): { ok: true; args: Args } | { ok: false; message: string };
 
 /** Impure. Confirms the plan directory exists and holds a `tasks/` child. */
-export function validatePlanDir(planDir: string): { ok: true } | { ok: false; message: string };
+export function validatePlanDir(
+  planDir: string,
+): { ok: true } | { ok: false; message: string };
 ```
 
 `main()` calls both in that order and exits `2` with the message from whichever fails.
@@ -82,7 +87,11 @@ Pure and injectable, so it can be exercised without processes or ports.
 ```ts
 export type StartupDecision =
   | { action: "reuse"; info: DaemonInfo }
-  | { action: "supersede"; info: DaemonInfo; reason: "moved-install" | "different-plan" | "port-change" }
+  | {
+      action: "supersede";
+      info: DaemonInfo;
+      reason: "moved-install" | "different-plan" | "port-change";
+    }
   | { action: "start" };
 
 export function decideStartup(
@@ -152,12 +161,12 @@ with no opener must not fail the launch — the URL was already printed.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Blocks its caller, or double-binds the port | Detaches but a supersede reason is unhandled, or a failed start still exits 0 | All five outcomes correct, detaches and verifies, stale pid handled, port override wins |
-| Test coverage | ×2 | No tests | `decideStartup` happy path only | Argument parsing without fixtures, all five decisions, stale-pid case, and the suite provably binds nothing |
-| Interface & readability | ×1 | Decision, parsing, and spawning tangled together | Separated but `parseArgs` touches the filesystem | Pure `parseArgs` and `decideStartup`, filesystem isolated in `validatePlanDir`, record module imported not redefined |
-| Assumptions & docs | ×1 | Timeout and port are bare literals | Named but unexplained | Comments explain why the launch must not block, why a failed start must not exit 0, and why the port override supersedes |
+| Dimension               | Weight | 0–1 (fail)                                       | 2–3 (below bar)                                                               | 4–5 (pass)                                                                                                               |
+| ----------------------- | ------ | ------------------------------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Blocks its caller, or double-binds the port      | Detaches but a supersede reason is unhandled, or a failed start still exits 0 | All five outcomes correct, detaches and verifies, stale pid handled, port override wins                                  |
+| Test coverage           | ×2     | No tests                                         | `decideStartup` happy path only                                               | Argument parsing without fixtures, all five decisions, stale-pid case, and the suite provably binds nothing              |
+| Interface & readability | ×1     | Decision, parsing, and spawning tangled together | Separated but `parseArgs` touches the filesystem                              | Pure `parseArgs` and `decideStartup`, filesystem isolated in `validatePlanDir`, record module imported not redefined     |
+| Assumptions & docs      | ×1     | Timeout and port are bare literals               | Named but unexplained                                                         | Comments explain why the launch must not block, why a failed start must not exit 0, and why the port override supersedes |
 
 ## Out of scope
 

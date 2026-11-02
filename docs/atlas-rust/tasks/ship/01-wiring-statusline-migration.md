@@ -1,6 +1,7 @@
 # SHIP-01: Wire callers to the shim and migrate the statusline
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -49,13 +50,13 @@ No new `permissions.allow` entry is needed: `SCRIPT_PERMISSIONS` in `setup.ts` a
 
 `decideStatusLine(statusLine, collectorCommand)` keeps its `skip | write` result and adds nothing to its signature:
 
-| Existing `statusLine.command` | Result |
-|---|---|
-| New form whose path equals the live shim | `skip` |
-| New form at another path (older clone, other cache root) | `write`, collector part re-pointed, wrapped prefix kept |
-| Old form, any path | `write`, collector part replaced by `collectorCommand`, wrapped prefix kept, `preserved: null` |
-| Non-collector command | `write`, wrapped as `TOKEN_ATLAS_STATUSLINE_COMMAND='<cmd>' <collectorCommand>`, `preserved: <cmd>` (unchanged behavior) |
-| Missing | `write`, bare `collectorCommand` (unchanged) |
+| Existing `statusLine.command`                            | Result                                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| New form whose path equals the live shim                 | `skip`                                                                                                                   |
+| New form at another path (older clone, other cache root) | `write`, collector part re-pointed, wrapped prefix kept                                                                  |
+| Old form, any path                                       | `write`, collector part replaced by `collectorCommand`, wrapped prefix kept, `preserved: null`                           |
+| Non-collector command                                    | `write`, wrapped as `TOKEN_ATLAS_STATUSLINE_COMMAND='<cmd>' <collectorCommand>`, `preserved: <cmd>` (unchanged behavior) |
+| Missing                                                  | `write`, bare `collectorCommand` (unchanged)                                                                             |
 
 Examples to pin as tests:
 
@@ -71,7 +72,7 @@ Add one exported pure helper for the session-check path, e.g. `migrateCollectorC
 
 ### `setup.ts` session-check
 
-- Replace the comment above `migrate()` ("Never touches the statusline: any collector path keeps working across plugin updates…"). That stopped being true when the TS collector was deleted: an old-form path no longer exists after the marketplace clone updates, so every statusline tick fails. New rule, one line of why: `migrate()` rewrites an *existing* old-form collector command to the shim; it still never fresh-wires, because wiring is the user's opt-in via `/monitor:install`.
+- Replace the comment above `migrate()` ("Never touches the statusline: any collector path keeps working across plugin updates…"). That stopped being true when the TS collector was deleted: an old-form path no longer exists after the marketplace clone updates, so every statusline tick fails. New rule, one line of why: `migrate()` rewrites an _existing_ old-form collector command to the shim; it still never fresh-wires, because wiring is the user's opt-in via `/monitor:install`.
 - `migrate()` calls `migrateCollectorCommand(cmd, COLLECTOR_COMMAND)`. On a non-null result: back up `settings.json` to `settings.json.bak` and write it the way `applyStatusline()` in `setup-statusline.ts` already does (`JSON.stringify(settings, null, 2) + "\n"`; reuse that writer or extract the shared part — do not add a second format), then push `"statusline collector"` onto `changed`. Unparseable `settings.json` → untouched (the drift watch already reports it). Missing `statusLine` → untouched.
 - It runs inside the existing once-per-version gate (`$CLAUDE_PLUGIN_DATA/.wired-version`), so a second session of the same version changes nothing; a second `migrate()` call on already-migrated settings also returns no change (idempotent).
 - Output: nothing prints directly. `migrate()` reports through the existing `captureLogs` path, so the only stdout of `--session-check` stays the single `{"systemMessage": …}` JSON line.
@@ -106,12 +107,12 @@ The exclusion is by omission (only cockpit channel/daemon command lines are sele
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Migration drops a wrapped user command, fresh-wires a statusline that was absent, or prints extra stdout from the hook | Old form migrates, but a drifted new-form path or the drift watch disagrees with what `install.ts` calls wired | Every row of the decision table, both pinned examples, idempotence, and the single-JSON stdout rule hold |
-| Test coverage | ×2 | No new tests | Happy-path migration only | Old/new/drifted/foreign/missing forms, invalid JSON untouched, idempotent second run, drift items, and the reap-stale exclusion row |
-| Interface & readability | ×1 | Detection regex copied into several files | One regex, but migration logic lives in `setup.ts` untested | One exported regex and one pure `migrateCollectorCommand` helper, both unit-tested; `setup.ts` only wires them |
-| Assumptions & docs | ×1 | The stale "never touches the statusline" comment remains | Comment updated without the reason | The comment states the new rule and why (the collector file is gone after an update), and SKILL.md explains the new command |
+| Dimension               | Weight | 0–1 (fail)                                                                                                             | 2–3 (below bar)                                                                                                | 4–5 (pass)                                                                                                                          |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Migration drops a wrapped user command, fresh-wires a statusline that was absent, or prints extra stdout from the hook | Old form migrates, but a drifted new-form path or the drift watch disagrees with what `install.ts` calls wired | Every row of the decision table, both pinned examples, idempotence, and the single-JSON stdout rule hold                            |
+| Test coverage           | ×2     | No new tests                                                                                                           | Happy-path migration only                                                                                      | Old/new/drifted/foreign/missing forms, invalid JSON untouched, idempotent second run, drift items, and the reap-stale exclusion row |
+| Interface & readability | ×1     | Detection regex copied into several files                                                                              | One regex, but migration logic lives in `setup.ts` untested                                                    | One exported regex and one pure `migrateCollectorCommand` helper, both unit-tested; `setup.ts` only wires them                      |
+| Assumptions & docs      | ×1     | The stale "never touches the statusline" comment remains                                                               | Comment updated without the reason                                                                             | The comment states the new rule and why (the collector file is gone after an update), and SKILL.md explains the new command         |
 
 ## Out of scope
 

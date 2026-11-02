@@ -1,6 +1,7 @@
 # REVIEW-01: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -57,13 +58,13 @@ Autopilot commits between waves, so `git status` no longer lists earlier tasks' 
 
 > Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Shared bands: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The pane does not open, or shows data that contradicts the plan files and run log | The pane works for a tasks tree but a graph run, a stale refresh, or auto-open fails | The plan goal is met end to end: command, auto-open, refresh, both layouts, and graph runs all behave as `shared.md` says |
-| Integration | ×2 | The CLI output and the pane disagree on the contract | One contract, but a field `../_context/shared.md` lists as rendered or used is not consumed, or the pane reads a field the CLI never produces | One `DeckSnapshot` definition, every field `../_context/shared.md` lists as rendered or used has a consumer; identification-only fields (`deckSource`, `planTitle`) only need to be produced correctly |
-| Consistency with shared.md | ×1 | Glyphs, colours, ids, or intervals differ from `shared.md` | One or two values drift | Every pane decision matches `shared.md` exactly |
-| No regressions | ×2 | The flightplan-lint hook or the dispatch bun suite fails | Suites pass but a server file or version file changed | All suites pass; server, SPA, and version files untouched |
-| Leanness | ×1 | Re-implements task parsing or fleet aggregation, or adds unused options | One abstraction with a single caller, or a config nobody sets | Reuses the existing flightdeck data code; nothing beyond what `shared.md` names |
+| Dimension                  | Weight | 0–1 (fail)                                                                        | 2–3 (below bar)                                                                                                                               | 4–5 (pass)                                                                                                                                                                                             |
+| -------------------------- | ------ | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness                | ×3     | The pane does not open, or shows data that contradicts the plan files and run log | The pane works for a tasks tree but a graph run, a stale refresh, or auto-open fails                                                          | The plan goal is met end to end: command, auto-open, refresh, both layouts, and graph runs all behave as `shared.md` says                                                                              |
+| Integration                | ×2     | The CLI output and the pane disagree on the contract                              | One contract, but a field `../_context/shared.md` lists as rendered or used is not consumed, or the pane reads a field the CLI never produces | One `DeckSnapshot` definition, every field `../_context/shared.md` lists as rendered or used has a consumer; identification-only fields (`deckSource`, `planTitle`) only need to be produced correctly |
+| Consistency with shared.md | ×1     | Glyphs, colours, ids, or intervals differ from `shared.md`                        | One or two values drift                                                                                                                       | Every pane decision matches `shared.md` exactly                                                                                                                                                        |
+| No regressions             | ×2     | The flightplan-lint hook or the dispatch bun suite fails                          | Suites pass but a server file or version file changed                                                                                         | All suites pass; server, SPA, and version files untouched                                                                                                                                              |
+| Leanness                   | ×1     | Re-implements task parsing or fleet aggregation, or adds unused options           | One abstraction with a single caller, or a config nobody sets                                                                                 | Reuses the existing flightdeck data code; nothing beyond what `shared.md` names                                                                                                                        |
 
 ## Out of scope
 

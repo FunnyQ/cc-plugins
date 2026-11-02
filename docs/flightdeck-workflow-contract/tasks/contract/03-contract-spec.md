@@ -1,6 +1,7 @@
 # CONTRACT-03: Write the graph contract specification
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -77,7 +78,7 @@ asymmetry with its reason, never as two unrelated bullets:
   a run in progress, which misleads worse than an empty panel carrying the
   error.
 - A **dangling dependency ref** inside an otherwise valid file is removed from
-  that node's dependency array and reported. The spec must say *removed*, not
+  that node's dependency array and reported. The spec must say _removed_, not
   merely "ignored" or "dropped from the drawing" — the distinction is load
   bearing. The readiness rule counts an unresolvable ref as unmet, so a ref left
   in the array would block its node forever on something that does not exist.
@@ -164,13 +165,13 @@ concrete check, not an impression.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A normative claim contradicts the code or the shared context, or a validation rule is invented or dropped | Claims are broadly right but a field's requiredness, a default, or a type is wrong or unstated | Every normative claim matches the code and the shared context; requiredness and defaults are stated for every field |
-| Backward compatibility | ×2 | Describes existing behaviour as changing, or omits what an old reader does with a newer trail | States the old-reader behaviour but leaves the guarantee vague, or blurs which path is unchanged | States the degrade-not-throw guarantee explicitly and makes clear the existing task-tree path is untouched |
-| Test coverage | ×2 | Rules are asserted with no example and no checklist item | Some rules demonstrated; the worked example or the checklist is thin or partial | Every rule is demonstrated by the worked example or checkable from the conformance checklist |
-| Interface & readability | ×1 | Reference-manual dump with no reading order; a stranger cannot find the rule they need | Complete but unordered, or reasons missing from several rules | Sections in a deliberate order, one instruction per sentence, every rule carrying the failure it prevents |
-| Assumptions & docs | ×1 | Resolves an ambiguity silently, or leaves a normative statement ambiguous | Resolves ambiguities but does not flag which ones were open | Every ambiguity resolved from the shared context is called out where a reader will hit it |
+| Dimension               | Weight | 0–1 (fail)                                                                                                | 2–3 (below bar)                                                                                  | 4–5 (pass)                                                                                                          |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A normative claim contradicts the code or the shared context, or a validation rule is invented or dropped | Claims are broadly right but a field's requiredness, a default, or a type is wrong or unstated   | Every normative claim matches the code and the shared context; requiredness and defaults are stated for every field |
+| Backward compatibility  | ×2     | Describes existing behaviour as changing, or omits what an old reader does with a newer trail             | States the old-reader behaviour but leaves the guarantee vague, or blurs which path is unchanged | States the degrade-not-throw guarantee explicitly and makes clear the existing task-tree path is untouched          |
+| Test coverage           | ×2     | Rules are asserted with no example and no checklist item                                                  | Some rules demonstrated; the worked example or the checklist is thin or partial                  | Every rule is demonstrated by the worked example or checkable from the conformance checklist                        |
+| Interface & readability | ×1     | Reference-manual dump with no reading order; a stranger cannot find the rule they need                    | Complete but unordered, or reasons missing from several rules                                    | Sections in a deliberate order, one instruction per sentence, every rule carrying the failure it prevents           |
+| Assumptions & docs      | ×1     | Resolves an ambiguity silently, or leaves a normative statement ambiguous                                 | Resolves ambiguities but does not flag which ones were open                                      | Every ambiguity resolved from the shared context is called out where a reader will hit it                           |
 
 ## Out of scope
 

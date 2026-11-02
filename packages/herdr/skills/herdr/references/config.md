@@ -18,11 +18,13 @@ herdr server reload-config
 ## Key Sections
 
 ### Onboarding
+
 ```toml
 onboarding = false  # skip first-run setup
 ```
 
 ### Updates
+
 ```toml
 [update]
 channel = "stable"     # or "preview"
@@ -31,6 +33,7 @@ manifest_check = true  # background agent-detection manifest checks
 ```
 
 ### Terminal Defaults
+
 ```toml
 [terminal]
 default_shell = "nu"       # executable name/path; fallback: $SHELL → /bin/sh
@@ -44,6 +47,7 @@ Apps show images by writing standard Kitty graphics to their terminal. The Herdr
 `terminal.kitty_graphics` replaces `experimental.kitty_graphics`. Herdr still accepts the old key; `terminal.kitty_graphics` takes precedence when both are set. Restart the server or reattach the client after changing it.
 
 ### Headless Server
+
 ```toml
 [server]
 headless_cols = 120  # virtual terminal size when no client is attached
@@ -53,18 +57,21 @@ headless_rows = 40
 Attached clients always use their own terminal size. Set these when a detached `herdr server` spawns panes for agents that never get a client.
 
 ### Worktrees
+
 ```toml
 [worktrees]
 directory = "~/.herdr/worktrees"  # checkouts under <dir>/<repo>/<branch-slug>
 ```
 
 ### Remote Attach
+
 ```toml
 [remote]
 manage_ssh_config = true  # temporary SSH config with keepalive fallback
 ```
 
 ### Keybindings
+
 ```toml
 [keys]
 prefix = "ctrl+b"                      # or several: ["ctrl+space", "ctrl+s"]
@@ -88,6 +95,7 @@ resize_pane_down = "ctrl+shift+alt+down"   # also resize_pane_up, resize_pane_ri
 Key syntax examples: `prefix+n`, `ctrl+a`, `shift+n`, `alt+1`, `cmd+k`. Special keys include `enter`, `tab`, `esc`, and `left`. Named punctuation includes `minus`, `comma`, `plus`, and `backtick`.
 
 Custom command keybindings:
+
 ```toml
 [[keys.command]]
 key = "prefix+alt+g"
@@ -105,6 +113,7 @@ height = "80%"
 Reset to defaults: `herdr config reset-keys`
 
 ### Theme
+
 ```toml
 [theme]
 name = "catppuccin"        # built-in: catppuccin, terminal, tokyo-night, dracula, nord, gruvbox, one-dark, solarized, kanagawa, rose-pine, vesper
@@ -133,6 +142,7 @@ Values accept hex (`#rrggbb`), named colors, `rgb(r,g,b)`, or `"reset"`. Run `he
 `[theme.custom.light]` and `[theme.custom.dark]` layer appearance-specific overrides on top of `[theme.custom]` when `auto_switch` is enabled.
 
 ### UI / Sidebar
+
 ```toml
 [ui]
 sidebar_width = 26
@@ -191,12 +201,14 @@ Sidebar rows may use built-in tokens or custom `$name` values. Herdr reports the
 A row entry may be a table instead of a plain token name, to style that occurrence: `{ token = "workspace", fg = "#89b4fa", bold = true, dim = false }`. Omitted style fields keep the contextual default. `ui.sidebar.spaces` accepts the same style tables; `fg` there only accepts strict `#rgb`/`#rrggbb` hex.
 
 That table also accepts a `rules` array for value-based styling, for example:
+
 ```toml
 { token = "branch", rules = [
   { contains = "release/", fg = "yellow" },
   { equals = "main", fg = "green", bold = true },
 ] }
 ```
+
 Rules are ordered; the first match overrides the styles it specifies. Set `hide = true` on a rule to drop the matching token and its separator; a row left with no tokens disappears. `{ token = "machine", rules = [{ equals = "Local", hide = true }] }` hides the label `Local`, not the connection type. Text conditions are `equals`, `contains`, and `starts_with`, and take an optional `ignore_case`. Numeric conditions are `gt` and `lt`, and require a finite number. Limits: 16 rules per token, 16 tokens per row, 16 rows per layout. `state_icon` (both layouts) and `git_status` (spaces only) accept a fixed style only — no `rules`.
 
 `window_title` tokens are `{hostname}`, `{workspace}`, `{tab}`, `{pane}`, and `{terminal_title}`; write `{{` and `}}` for literal braces. The title renders on the Herdr server, so `{hostname}` names the machine the panes run on even under `herdr --remote`.
@@ -204,6 +216,7 @@ Rules are ordered; the first match overrides the styles it specifies. Set `hide 
 `tab_bar_right` is empty by default. `hostname`, `datetime`, and `command` also resolve on the server. `datetime` takes `strftime` formatting and rejects directives needing a UTC offset or Unix timestamp, such as `%z` and `%s`. A `command` entry runs immediately, then every `interval_seconds`, without overlapping a previous run; Herdr keeps the last line of successful output and clears it on failure, empty output, or `timeout_seconds`.
 
 ### Notifications (Toast)
+
 ```toml
 [ui.toast]
 delivery = "off"           # "off" | "herdr" | "terminal" | "system"
@@ -218,6 +231,7 @@ position = "bottom-center"
 ```
 
 ### Sound
+
 ```toml
 [ui.sound]
 enabled = true
@@ -231,6 +245,7 @@ claude = "on"
 ```
 
 ### Session / Restore
+
 ```toml
 [session]
 resume_agents_on_restore = true  # native agent session restore (default on)
@@ -246,17 +261,19 @@ switch_ascii_input_source_in_prefix = false  # macOS and Windows
 ```
 
 ### Scrollback
+
 ```toml
 [advanced]
 scrollback_limit_bytes = 10000000  # ~10 MB
 ```
 
 ### Environment Variables
-| Variable | Purpose |
-|---|---|
-| `HERDR_CONFIG_PATH` | Override config file path |
-| `HERDR_SESSION` | Select named session |
-| `HERDR_SOCKET_PATH` | Low-level socket override |
-| `HERDR_LOG` | Log filter (e.g. `herdr=debug`) |
-| `HERDR_DISABLE_SOUND` | Disable sound even if enabled in config |
+
+| Variable                  | Purpose                                                                |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `HERDR_CONFIG_PATH`       | Override config file path                                              |
+| `HERDR_SESSION`           | Select named session                                                   |
+| `HERDR_SOCKET_PATH`       | Low-level socket override                                              |
+| `HERDR_LOG`               | Log filter (e.g. `herdr=debug`)                                        |
+| `HERDR_DISABLE_SOUND`     | Disable sound even if enabled in config                                |
 | `HERDR_PROCESS_DETECTION` | Set `child-groups` on Linux runtimes without foreground process groups |

@@ -1,6 +1,7 @@
 # SERVER-01: Server foundation, startup, static
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -143,12 +144,12 @@ Implement every method fully here (behavior as commented), with `cargo test` for
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Startup double-binds or kills a foreign process; `daemon.json` shape differs | Happy path works; port precedence, supersede timing, or ETag/304 drift | Startup rule, port precedence, `daemon.json`, `/api/token` and static serving match TS on every fixture |
-| Test coverage | ×2 | Contract groups not run against Rust | Groups pass; no `cargo test` for pure helpers | Groups pass on both; `cargo test` covers port precedence, ETag, path confinement, presence TTL |
-| Interface & readability | ×1 | Later route groups must edit `mod.rs`/`AppState`/`Cargo.toml` | Router works but group state is not isolated per module | `AppState` and stubs let each group touch only its own file; no lock held across `.await` |
-| Assumptions & docs | ×1 | Silent deviations | Deviations exist without comments | ETag integer-ms deviation and every added crate carry a one-line why |
+| Dimension               | Weight | 0–1 (fail)                                                                   | 2–3 (below bar)                                                        | 4–5 (pass)                                                                                              |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Startup double-binds or kills a foreign process; `daemon.json` shape differs | Happy path works; port precedence, supersede timing, or ETag/304 drift | Startup rule, port precedence, `daemon.json`, `/api/token` and static serving match TS on every fixture |
+| Test coverage           | ×2     | Contract groups not run against Rust                                         | Groups pass; no `cargo test` for pure helpers                          | Groups pass on both; `cargo test` covers port precedence, ETag, path confinement, presence TTL          |
+| Interface & readability | ×1     | Later route groups must edit `mod.rs`/`AppState`/`Cargo.toml`                | Router works but group state is not isolated per module                | `AppState` and stubs let each group touch only its own file; no lock held across `.await`               |
+| Assumptions & docs      | ×1     | Silent deviations                                                            | Deviations exist without comments                                      | ETag integer-ms deviation and every added crate carry a one-line why                                    |
 
 ## Out of scope
 

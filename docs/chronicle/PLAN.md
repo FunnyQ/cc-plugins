@@ -6,12 +6,12 @@
 
 ## Overview
 
-Add a fourth plugin, `chronicle`, to the `q-lab-marketplace` repo: the plugin that *writes and guards the project's history*. v1 ships two skills — `commit` (crafts commits, auto-deciding simple vs atomic) and `pr` (turns commit history + cockpit decisions into a reviewer-legible GitHub PR or GitLab MR).
+Add a fourth plugin, `chronicle`, to the `q-lab-marketplace` repo: the plugin that _writes and guards the project's history_. v1 ships two skills — `commit` (crafts commits, auto-deciding simple vs atomic) and `pr` (turns commit history + cockpit decisions into a reviewer-legible GitHub PR or GitLab MR).
 
 ## Goals
 
 - `/chronicle:commit` — one skill that auto-decides between a single commit (simple) and an atomic split, pulling the human in only for the structural split decision.
-- `/chronicle:pr` — author a PR/MR whose body tells a reviewer *why* the change exists, *what* changed, *what to focus on*, and *how to judge it*, enriched by the cockpit decision trail when present.
+- `/chronicle:pr` — author a PR/MR whose body tells a reviewer _why_ the change exists, _what_ changed, _what to focus on_, and _how to judge it_, enriched by the cockpit decision trail when present.
 - Ship to both the Claude and Codex marketplaces; carry chronicle's own copies of everything (zero dependency on the installed `odin-git` plugin).
 
 ## Non-goals
@@ -98,17 +98,17 @@ packages/chronicle/
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| commit | 01 | port-analyze-changes | todo | > 4.2 | — |
-| commit | 02 | commit-template | todo | > 4.2 | — |
-| commit | 03 | commit-skill | todo | > 4.2 | commit/01, commit/02 |
-| pr | 01 | analyze-branch | todo | > 4.2 | — |
-| pr | 02 | request-creator | todo | > 4.2 | — |
-| pr | 03 | pr-skill | todo | > 4.2 | pr/01, pr/02 |
-| packaging | 01 | manifests-and-registries | todo | > 4.2 | commit/03, pr/03 |
-| packaging | 02 | changelog-and-docs | todo | > 4.2 | packaging/01 |
-| packaging | 03 | final-review | todo | > 4.2 | commit/01-03, pr/01-03, packaging/01-02 |
+| Bucket    | NN  | Title                    | Status | Pass line | Depends on                              |
+| --------- | --- | ------------------------ | ------ | --------- | --------------------------------------- |
+| commit    | 01  | port-analyze-changes     | todo   | > 4.2     | —                                       |
+| commit    | 02  | commit-template          | todo   | > 4.2     | —                                       |
+| commit    | 03  | commit-skill             | todo   | > 4.2     | commit/01, commit/02                    |
+| pr        | 01  | analyze-branch           | todo   | > 4.2     | —                                       |
+| pr        | 02  | request-creator          | todo   | > 4.2     | —                                       |
+| pr        | 03  | pr-skill                 | todo   | > 4.2     | pr/01, pr/02                            |
+| packaging | 01  | manifests-and-registries | todo   | > 4.2     | commit/03, pr/03                        |
+| packaging | 02  | changelog-and-docs       | todo   | > 4.2     | packaging/01                            |
+| packaging | 03  | final-review             | todo   | > 4.2     | commit/01-03, pr/01-03, packaging/01-02 |
 
 ## Cross-bucket dependencies
 

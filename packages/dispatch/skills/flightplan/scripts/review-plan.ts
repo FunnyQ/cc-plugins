@@ -116,11 +116,13 @@ export function parseArgs(argv: string[]): ReviewArgs {
       out.engine = v;
     } else if (a === "--model") {
       const v = argv[++i];
-      if (!v || v.startsWith("--")) throw new Error("Missing value after --model");
+      if (!v || v.startsWith("--"))
+        throw new Error("Missing value after --model");
       out.model = v;
     } else if (a === "--prior-findings") {
       const v = argv[++i];
-      if (!v || v.startsWith("--")) throw new Error("Missing value after --prior-findings");
+      if (!v || v.startsWith("--"))
+        throw new Error("Missing value after --prior-findings");
       out.priorFindings = v;
     } else if (a === "--print") {
       out.print = true;

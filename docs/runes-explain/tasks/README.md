@@ -40,6 +40,7 @@ Commit `docs/runes-explain/` before the first task runs: the final review measur
 commit that added `tasks/_context/protocol.md`.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -51,17 +52,17 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| core | 01 | config-and-state | todo | > 4 | — |
-| core | 02 | fork-protocol | todo | > 4 | — |
-| core | 03 | orchestrator | todo | > 4 | core/01, core/02, html/01, html/02 |
-| docs | 01 | claude-md | todo | > 4 | ui/01, ui/02 |
-| html | 01 | template-and-writer | todo | > 4 | — |
-| html | 02 | layout-checker | todo | > 4 | core/01, html/01 |
-| review | 01 | final review | todo | > 4 | docs/01 |
-| ui | 01 | band-button | todo | > 4 | core/03 |
-| ui | 02 | explain-pane | todo | > 4 | core/03 |
+| Bucket | NN  | Title               | Status | Pass line | Depends on                         |
+| ------ | --- | ------------------- | ------ | --------- | ---------------------------------- |
+| core   | 01  | config-and-state    | todo   | > 4       | —                                  |
+| core   | 02  | fork-protocol       | todo   | > 4       | —                                  |
+| core   | 03  | orchestrator        | todo   | > 4       | core/01, core/02, html/01, html/02 |
+| docs   | 01  | claude-md           | todo   | > 4       | ui/01, ui/02                       |
+| html   | 01  | template-and-writer | todo   | > 4       | —                                  |
+| html   | 02  | layout-checker      | todo   | > 4       | core/01, html/01                   |
+| review | 01  | final review        | todo   | > 4       | docs/01                            |
+| ui     | 01  | band-button         | todo   | > 4       | core/03                            |
+| ui     | 02  | explain-pane        | todo   | > 4       | core/03                            |
 
 ## Dependency graph
 
@@ -83,14 +84,15 @@ html/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| ui/01 | core/03 |
-| ui/02 | core/03 |
-| core/03 | html/01, html/02 |
-| html/02 | core/01 |
-| docs/01 | ui/01, ui/02 |
-| review/01 | docs/01 |
+| Task      | Depends on       |
+| --------- | ---------------- |
+| ui/01     | core/03          |
+| ui/02     | core/03          |
+| core/03   | html/01, html/02 |
+| html/02   | core/01          |
+| docs/01   | ui/01, ui/02     |
+| review/01 | docs/01          |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

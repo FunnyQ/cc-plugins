@@ -1,6 +1,7 @@
 # WORKTREE-05: Run-wide abort on leak, and single-task resume in worktrees
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/models.md`
@@ -24,6 +25,7 @@ A write to the main tree from outside a land stops the whole run before anything
 ### Starting state
 
 The orchestrator already runs every non-final task in its own worktree:
+
 - Every `wt-*` call runs under the one main-tree lock.
 - The `live` map tracks each worktree the run created and has not removed. Every report of kept worktrees reads it.
 - A clean land marks the task done and removes the worktree. A conflict rebases. A drifted land runs `reverify` in the main tree, and unlands on a failure.
@@ -62,12 +64,14 @@ The tree watch, deferral, requalify, and `heldBack` machinery is still present a
 ### Final review exemptions
 
 The Final review task runs in the main tree, and its fixer writes the main tree on purpose.
+
 - **Wave-end check:** a wave that ran the Final review task runs no `wt-leak:<wave>`. The fingerprint is not compared again after it.
 - **Resume:** a single-task resume of the Final review task, from `dev`, `verify`, or `judge`, takes no baseline and runs no `wt-show` or `wt-create`. It runs in the main tree exactly as it does today.
 
 ### Single-task resume
 
 A single-task resume (`CFG.resumeTask` set, for a non-final task) runs one pipeline, with no scout and no wave loop.
+
 - **Baseline.** At resume start, before any other step, take the main-tree lock and run `fingerprint` with no `--expect`, labelled `wt-leak:resume`. Record the result as the fingerprint baseline. Every later `wt-land --expect` in the resume uses it.
 - **`CFG.resumeFrom` is `verify` or `judge`:**
   - Under the lock, run `wt-show:<ref>`. It returns `{ path, base, exists }`.
@@ -114,12 +118,12 @@ A single-task resume (`CFG.resumeTask` set, for a non-final task) runs one pipel
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A task lands or a commit runs after an abort, or a resume lands against no baseline | The abort works, but a queued task still creates a worktree, the Final review trips the leak check, or a missing worktree is silently recreated | Abort, exemptions, and resume behave exactly as specified, with no land after an abort |
-| Test coverage | ×2 | No new cases | Leak cases covered, but the waiting-sibling, judge-resume, or missing-worktree case is not | All eleven cases, each asserting the labels named |
-| Interface & readability | ×1 | The abort is threaded through several flags | Works, but checks are scattered across call sites | One abort state and one check helper; labels exactly as `worktree.md` names them |
-| Assumptions & docs | ×1 | Design notes still describe a leak as a per-task failure | Notes updated but vague | Design notes state the abort rule, the Final review exemptions, and why a missing worktree halts instead of recreating |
+| Dimension               | Weight | 0–1 (fail)                                                                          | 2–3 (below bar)                                                                                                                                 | 4–5 (pass)                                                                                                             |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A task lands or a commit runs after an abort, or a resume lands against no baseline | The abort works, but a queued task still creates a worktree, the Final review trips the leak check, or a missing worktree is silently recreated | Abort, exemptions, and resume behave exactly as specified, with no land after an abort                                 |
+| Test coverage           | ×2     | No new cases                                                                        | Leak cases covered, but the waiting-sibling, judge-resume, or missing-worktree case is not                                                      | All eleven cases, each asserting the labels named                                                                      |
+| Interface & readability | ×1     | The abort is threaded through several flags                                         | Works, but checks are scattered across call sites                                                                                               | One abort state and one check helper; labels exactly as `worktree.md` names them                                       |
+| Assumptions & docs      | ×1     | Design notes still describe a leak as a per-task failure                            | Notes updated but vague                                                                                                                         | Design notes state the abort rule, the Final review exemptions, and why a missing worktree halts instead of recreating |
 
 ## Out of scope
 

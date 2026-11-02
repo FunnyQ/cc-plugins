@@ -135,7 +135,9 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
+    const result = await buildReviewPrompt([file], undefined, {
+      lens: "tower",
+    });
     expect(result.startsWith("You are reviewing a flightplan artifact")).toBe(
       true,
     );
@@ -148,7 +150,10 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    for (const opts of [{ lens: "tower" as const }, { narrow: true as const }]) {
+    for (const opts of [
+      { lens: "tower" as const },
+      { narrow: true as const },
+    ]) {
       const result = await buildReviewPrompt([file], undefined, opts);
       expect(result).toContain("`<baseRef>`");
       expect(result).toContain("autopilot substitutes");
@@ -166,7 +171,9 @@ describe("buildReviewPrompt", () => {
     await writeFile(plan, "# Plan\n");
     await writeFile(task, "# Build\n");
 
-    const result = await buildReviewPrompt([plan, task], undefined, { lens: "tower" });
+    const result = await buildReviewPrompt([plan, task], undefined, {
+      lens: "tower",
+    });
     expect(result).toContain(`## ${relative(process.cwd(), plan)}`);
     expect(result).toContain(`## ${relative(process.cwd(), task)}`);
 
@@ -178,7 +185,9 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n\nAcceptance criteria\n");
 
-    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
+    const result = await buildReviewPrompt([file], undefined, {
+      lens: "tower",
+    });
     expect(result).toContain(
       `## ${relative(process.cwd(), file)}\n\`\`\`markdown\n# Plan\n\nAcceptance criteria\n\n\`\`\``,
     );
@@ -191,7 +200,9 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file], undefined, { lens: "tower" });
+    const result = await buildReviewPrompt([file], undefined, {
+      lens: "tower",
+    });
     expect(result).not.toContain("Findings already reported");
 
     await rm(root, { recursive: true });
@@ -227,7 +238,9 @@ describe("buildReviewPrompt", () => {
     const file = join(root, "PLAN.md");
     await writeFile(file, "# Plan\n");
 
-    const result = await buildReviewPrompt([file], "   \n  ", { lens: "tower" });
+    const result = await buildReviewPrompt([file], "   \n  ", {
+      lens: "tower",
+    });
     expect(result).not.toContain("Findings already reported");
 
     await rm(root, { recursive: true });
@@ -240,7 +253,9 @@ describe("buildReviewPrompt", () => {
     await writeFile(second, "# Second\n");
     await writeFile(first, "# First\n");
 
-    const result = await buildReviewPrompt([second, first], undefined, { lens: "tower" });
+    const result = await buildReviewPrompt([second, first], undefined, {
+      lens: "tower",
+    });
     const secondIndex = result.indexOf(`## ${relative(process.cwd(), second)}`);
     const firstIndex = result.indexOf(`## ${relative(process.cwd(), first)}`);
     expect(secondIndex).toBeGreaterThan(-1);
@@ -266,7 +281,9 @@ describe("buildReviewPrompt (lenses)", () => {
     const prompts = new Set<string>();
     for (const [lens, title] of LENSES) {
       const out = await buildReviewPrompt([file], undefined, { lens });
-      expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(true);
+      expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(
+        true,
+      );
       expect(out).toContain(`# Your lens: ${title}`);
       expect(out).toContain("Report only findings inside your lens");
       expect(out).toContain("Label every finding P1 or P2");
@@ -287,7 +304,9 @@ describe("buildReviewPrompt (lenses)", () => {
       lens: "navigator",
       scope: "design",
     });
-    const tree = await buildReviewPrompt([file], undefined, { lens: "navigator" });
+    const tree = await buildReviewPrompt([file], undefined, {
+      lens: "navigator",
+    });
     expect(design).toContain("Do not report missing task files");
     expect(tree).not.toContain("Do not report missing task files");
 
@@ -341,7 +360,13 @@ describe("parseArgs", () => {
   });
 
   test("--lens and --scope are captured", () => {
-    const out = parseArgs(["docs/p", "--lens", "navigator", "--scope", "design"]);
+    const out = parseArgs([
+      "docs/p",
+      "--lens",
+      "navigator",
+      "--scope",
+      "design",
+    ]);
     expect(out.lens).toBe("navigator");
     expect(out.scope).toBe("design");
   });
@@ -363,9 +388,9 @@ describe("parseArgs", () => {
   });
 
   test("rejects --lens with --narrow, since the narrow phase is one unified prompt", () => {
-    expect(() =>
-      parseArgs(["docs/p", "--narrow", "--lens", "tower"]),
-    ).toThrow(/--narrow takes no --lens/);
+    expect(() => parseArgs(["docs/p", "--narrow", "--lens", "tower"])).toThrow(
+      /--narrow takes no --lens/,
+    );
   });
 
   test("rejects --scope design with --narrow, since the narrow phase reviews the tree", () => {
@@ -403,15 +428,20 @@ describe("parseArgs", () => {
   });
 
   test("flag order is irrelevant; planDir can come after flags", () => {
-    expect(parseArgs(["--engine", "opencode", "--lens", "tower", "docs/p"]).planDir).toBe(
-      "docs/p",
-    );
+    expect(
+      parseArgs(["--engine", "opencode", "--lens", "tower", "docs/p"]).planDir,
+    ).toBe("docs/p");
   });
 
   test("--prior-findings captures the path", () => {
     expect(
-      parseArgs(["docs/p", "--lens", "tower", "--prior-findings", "/tmp/round-2.md"])
-        .priorFindings,
+      parseArgs([
+        "docs/p",
+        "--lens",
+        "tower",
+        "--prior-findings",
+        "/tmp/round-2.md",
+      ]).priorFindings,
     ).toBe("/tmp/round-2.md");
   });
 
@@ -431,9 +461,9 @@ describe("parseArgs", () => {
   });
 
   test("rejects an unknown engine", () => {
-    expect(() => parseArgs(["docs/p", "--lens", "tower", "--engine", "gemini"])).toThrow(
-      /Unknown --engine/,
-    );
+    expect(() =>
+      parseArgs(["docs/p", "--lens", "tower", "--engine", "gemini"]),
+    ).toThrow(/Unknown --engine/);
   });
 
   test("rejects an unexpected argument", () => {
@@ -455,9 +485,9 @@ describe("parseArgs", () => {
   });
 
   test("rejects --prior-passes without --narrow rather than silently running a lens prompt", () => {
-    expect(() => parseArgs(["docs/p", "--lens", "tower", "--prior-passes", "8"])).toThrow(
-      /--prior-passes requires --narrow/,
-    );
+    expect(() =>
+      parseArgs(["docs/p", "--lens", "tower", "--prior-passes", "8"]),
+    ).toThrow(/--prior-passes requires --narrow/);
   });
 
   test("rejects a non-positive-integer --prior-passes", () => {
@@ -496,10 +526,13 @@ describe("--print (integration)", () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n\nGoal: ship it.\n");
 
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print", "--lens", "tower"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--print", "--lens", "tower"],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
     expect(res.success).toBe(true);
     const out = res.stdout.toString();
     expect(out.startsWith("You are reviewing a flightplan artifact")).toBe(
@@ -540,7 +573,16 @@ describe("--print --scope design (integration)", () => {
     await writeFile(join(root, "tasks/ui/01-build.md"), "Task body.\n");
 
     const res = Bun.spawnSync(
-      ["bun", SCRIPT, root, "--print", "--lens", "check-airman", "--scope", "design"],
+      [
+        "bun",
+        SCRIPT,
+        root,
+        "--print",
+        "--lens",
+        "check-airman",
+        "--scope",
+        "design",
+      ],
       { stdout: "pipe", stderr: "pipe" },
     );
     expect(res.success).toBe(true);
@@ -620,10 +662,13 @@ describe("formatCodexReviewOutput", () => {
 describe("review-plan CLI exit codes", () => {
   test("an empty plan dir exits 2, never the reviewer's 1, and names the working directory", async () => {
     const root = await newRoot();
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--print", "--lens", "tower"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--print", "--lens", "tower"],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
     expect(res.exitCode).toBe(2);
     expect(res.stderr.toString()).toContain(
       `Working directory: ${process.cwd()}`,
@@ -655,16 +700,19 @@ describe("review-plan CLI exit codes", () => {
   test("an unreachable opencode warns and skips the gate with exit 0, like a missing codex", async () => {
     const root = await newRoot();
     await writeFile(join(root, "PLAN.md"), "# Plan\n");
-    const res = Bun.spawnSync(["bun", SCRIPT, root, "--engine", "opencode", "--lens", "sim-instructor"], {
-      stdout: "pipe",
-      stderr: "pipe",
-      env: {
-        ...process.env,
-        HOME: root,
-        USERPROFILE: root,
-        OPENCODE_BIN: join(root, "no-opencode"),
+    const res = Bun.spawnSync(
+      ["bun", SCRIPT, root, "--engine", "opencode", "--lens", "sim-instructor"],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...process.env,
+          HOME: root,
+          USERPROFILE: root,
+          OPENCODE_BIN: join(root, "no-opencode"),
+        },
       },
-    });
+    );
     expect(res.exitCode).toBe(0);
     expect(res.stderr.toString()).toContain("opencode unreachable");
     await rm(root, { recursive: true });

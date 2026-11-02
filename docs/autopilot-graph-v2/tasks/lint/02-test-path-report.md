@@ -1,6 +1,7 @@
 # LINT-02: informational test-path report
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/lint-contract.md`
 > - `../_context/rubric.md`
@@ -28,7 +29,7 @@ being able to change the verdict.
 The tree-level regression-net check enforces **presence** only: a closing gate satisfies it with
 `bun test one/narrow/dir` while missing most of the tree. Reach cannot be decided mechanically from a
 command string — an argument may be a directory, a single file, a glob, or absent entirely, and a bare
-`bun test` with no argument is the *widest* possible net rather than the narrowest. Any attempt to score
+`bun test` with no argument is the _widest_ possible net rather than the narrowest. Any attempt to score
 breadth would be guessing with a straight face.
 
 So the countermeasure is advisory: print the path arguments side by side and let a human judge. That is
@@ -41,10 +42,10 @@ Add beside the tree-level check:
 
 ```ts
 export type TestNetReportRow = {
-  ref: string;          // "bucket/NN"
+  ref: string; // "bucket/NN"
   finalReview: boolean;
-  commands: string[];   // the test commands as written, in document order
-  paths: string[];      // path-ish arguments across those commands; empty means "no argument given"
+  commands: string[]; // the test commands as written, in document order
+  paths: string[]; // path-ish arguments across those commands; empty means "no argument given"
 };
 
 /**
@@ -53,7 +54,7 @@ export type TestNetReportRow = {
  * compares the closing gate against the tree above it. Returns [] when no task
  * in the tree runs a test at all.
  */
-export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[]
+export function testNetReport(tasks: ParsedTask[]): TestNetReportRow[];
 ```
 
 Build each row from the exported test-command detector — the helper that returns a task's backticked
@@ -66,10 +67,10 @@ Then a separate formatter, so the rows stay assertable without string matching:
 
 ```ts
 /** Render the rows as an indented, human-scannable block. Pure. */
-export function formatTestNetReport(rows: TestNetReportRow[]): string
+export function formatTestNetReport(rows: TestNetReportRow[]): string;
 ```
 
-The formatter labels the final-review row distinctly (it is the row the reader is comparing *against*)
+The formatter labels the final-review row distinctly (it is the row the reader is comparing _against_)
 and renders an empty `paths` array as `(all)` — an argument-less runner sweeps everything, and printing
 a blank there would read as "no coverage", the exact opposite of the truth.
 
@@ -88,15 +89,16 @@ The rules, in order:
 2. Drop the leading runner tokens — exactly the words the runner pattern consumed. The count is **not**
    uniform, and the three-token `run` forms are the trap:
 
-   | Command form | Tokens consumed |
-   |---|---|
-   | `bun test`, `cargo test`, `go test`, `make test`, `npm test`, `pnpm test`, `yarn test` | 2 |
-   | `npm run test`, `pnpm run test`, `yarn run test` | **3** |
-   | `pytest`, `rspec` | 1 |
+   | Command form                                                                           | Tokens consumed |
+   | -------------------------------------------------------------------------------------- | --------------- |
+   | `bun test`, `cargo test`, `go test`, `make test`, `npm test`, `pnpm test`, `yarn test` | 2               |
+   | `npm run test`, `pnpm run test`, `yarn run test`                                       | **3**           |
+   | `pytest`, `rspec`                                                                      | 1               |
 
    Consuming two tokens from `npm run test` leaves the literal `test` sitting in `paths`, which reads
    as a covered directory named `test`. Derive the count from what the pattern matched rather than
    hardcoding 2.
+
 3. Drop any remaining token beginning with `-`.
 4. Keep everything else verbatim.
 
@@ -182,9 +184,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The report changes the exit code, is swallowed on a failing tree, or prints for a single-file argument. | Prints correctly on a clean tree but mishandles the failing-tree or argument-less-command case. | Report content, stdout placement, both exit codes, and the `(all)` case all behave as specified. |
-| Test coverage | ×2 | No test, or tests that would pass without the change. | Builder tested in isolation only, so exit-code neutrality is unproven. | Builder and formatter unit-tested, plus subprocess checks pinning exit 0 and exit 1 with the report present in both. |
-| Interface & readability | ×1 | Report building and formatting tangled together, or path extraction reaching for the filesystem. | Works but drifts from the file's existing style. | Pure builder, pure formatter, crude extraction kept crude, all matching the file's existing check style. |
-| Assumptions & docs | ×1 | The crudeness of path extraction is left unstated. | Noted somewhere. | The advisory-not-a-gate intent, the crude extraction, and the print-before-exit ordering are each recorded as *why* comments next to the code. |
+| Dimension               | Weight | 0–1                                                                                                     | 2–3                                                                                             | 4–5                                                                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The report changes the exit code, is swallowed on a failing tree, or prints for a single-file argument. | Prints correctly on a clean tree but mishandles the failing-tree or argument-less-command case. | Report content, stdout placement, both exit codes, and the `(all)` case all behave as specified.                                               |
+| Test coverage           | ×2     | No test, or tests that would pass without the change.                                                   | Builder tested in isolation only, so exit-code neutrality is unproven.                          | Builder and formatter unit-tested, plus subprocess checks pinning exit 0 and exit 1 with the report present in both.                           |
+| Interface & readability | ×1     | Report building and formatting tangled together, or path extraction reaching for the filesystem.        | Works but drifts from the file's existing style.                                                | Pure builder, pure formatter, crude extraction kept crude, all matching the file's existing check style.                                       |
+| Assumptions & docs      | ×1     | The crudeness of path extraction is left unstated.                                                      | Noted somewhere.                                                                                | The advisory-not-a-gate intent, the crude extraction, and the print-before-exit ordering are each recorded as _why_ comments next to the code. |

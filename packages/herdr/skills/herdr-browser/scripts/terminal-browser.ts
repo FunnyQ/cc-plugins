@@ -45,7 +45,8 @@ export function requireExecutable(
   platform: NodeJS.Platform = process.platform,
   which: (executable: string) => string | null = Bun.which,
 ): void {
-  if (!which(executable)) throw new Error(prerequisiteHint(dependency, platform));
+  if (!which(executable))
+    throw new Error(prerequisiteHint(dependency, platform));
 }
 
 export function cdpBase(port: number): string {

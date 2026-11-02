@@ -1,6 +1,7 @@
 # BACKENDS-02: Codex backend
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -29,12 +30,17 @@ export const codexBackend: Backend = {
   supports: new Set(["delegate", "review", "image"]),
   strategy(mode, opts) {
     // review is native unless a custom file scope was requested (then "prompt")
-    if (mode === "review") return opts.scope === "custom-files" ? "prompt" : "native";
+    if (mode === "review")
+      return opts.scope === "custom-files" ? "prompt" : "native";
     if (mode === "delegate") return "prompt";
     return "native"; // image
   },
-  invoke(mode, opts) { /* returns { argv, stdin? } per cli-reference.md */ },
-  parseOutput(raw) { return raw; },
+  invoke(mode, opts) {
+    /* returns { argv, stdin? } per cli-reference.md */
+  },
+  parseOutput(raw) {
+    return raw;
+  },
   postRun(mode, parsed, opts) {
     if (mode !== "image") return parsed;
     // locate the generated PNG (extractGeneratedPngPath(parsed) ?? findNewestPng(...)),
@@ -46,6 +52,7 @@ export const codexBackend: Backend = {
 The `postRun` hook is how the codex-only image copy happens without `relay.ts` branching on backend name — `relay.ts` calls `postRun` generically for every backend; only codex defines it.
 
 argv per mode (see `cli-reference.md`). The prompt body always arrives as `opts.promptText` (relay.ts reads the prompt file); the backend never reads files itself:
+
 - **delegate** (strategy=prompt): `codex exec -s workspace-write -a never -o <opts.lastFile> -`, `stdin = opts.promptText`. `opts.dangerous` → `codex exec --dangerously-bypass-approvals-and-sandbox -o <opts.lastFile> -`.
 - **review native**: `codex review` + scope flag — `--uncommitted` | `--base <ref>` | `--commit <sha>` parsed from `opts.scope`.
 - **review prompt fallback** (custom files): `codex exec -s read-only -o <opts.lastFile> -`, `stdin = opts.promptText`.
@@ -53,12 +60,14 @@ argv per mode (see `cli-reference.md`). The prompt body always arrives as `opts.
 - **model**: never pass `-m` (codex unset).
 
 Image PNG handling (port the helpers):
+
 ```ts
 export function buildImagePrompt(prompt: string): string;
 export function extractGeneratedPngPath(output: string): string | null; // scan output for an existing *.png
 // baseDir is injectable so tests point it at a fixture dir, not the real home.
 export function findNewestPng(after: Date, baseDir?: string): string | null; // default baseDir = join(homedir(), ".codex/generated_images")
 ```
+
 After an image run, resolve the source PNG (extract-from-output → fallback newest) and copy to `opts.out` via `addTimestampSuffix` from `../shared`. Tests pass a temp `baseDir` containing PNG files with controlled mtimes to verify the newest-after-`after` selection deterministically.
 
 `invoke` stays pure (returns argv/stdin); `relay.ts` owns the spawn + `-o <lastFile>` capture, then calls `postRun`. The image PNG copy lives in `codexBackend.postRun` (the generic seam). Keep `buildImagePrompt` and the PNG-path-resolution functions **pure and unit-tested**; the `cp`/copy side effect is the only impurity, isolated inside `postRun`.
@@ -82,12 +91,12 @@ After an image run, resolve the source PNG (extract-from-output → fallback new
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | argv wrong or image path broken | core modes ok but a branch (dangerous/scope/fallback) drifts | every mode argv + strategy + image resolution matches the spec; all five superset behaviours present |
-| Test coverage | ×2 | no tests | argv happy path only | all modes + scope mapping + image path hit/miss |
-| Interface & readability | ×1 | spawn baked into pure argv builder | usable but I/O leaks | argv + PNG-resolution pure; spawn/copy isolated |
-| Assumptions & docs | ×1 | image dir/CLI assumptions unstated | present | `~/.codex/generated_images`, `CODEX_BIN`, gpt-image-2 noted |
+| Dimension               | Weight | 0–1 (fail)                         | 2–3 (below bar)                                              | 4–5 (pass)                                                                                           |
+| ----------------------- | ------ | ---------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | argv wrong or image path broken    | core modes ok but a branch (dangerous/scope/fallback) drifts | every mode argv + strategy + image resolution matches the spec; all five superset behaviours present |
+| Test coverage           | ×2     | no tests                           | argv happy path only                                         | all modes + scope mapping + image path hit/miss                                                      |
+| Interface & readability | ×1     | spawn baked into pure argv builder | usable but I/O leaks                                         | argv + PNG-resolution pure; spawn/copy isolated                                                      |
+| Assumptions & docs      | ×1     | image dir/CLI assumptions unstated | present                                                      | `~/.codex/generated_images`, `CODEX_BIN`, gpt-image-2 noted                                          |
 
 ## Out of scope
 

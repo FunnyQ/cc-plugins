@@ -26,15 +26,15 @@ They are not alternatives; they are the same panel at rest and under focus.
 
 ## The mapping
 
-| Signalling | Flightplan |
-| --- | --- |
-| running road (a named horizontal line) | bucket |
-| berth segment on a road | task |
-| diagonal crossover between roads | a dependency that leaves its own bucket |
-| the road continuing | a dependency inside one bucket |
-| signal aspect head | the gate between two tasks |
-| cleared / occupied / unset / at danger | done / in-flight / ready / blocked |
-| set route lit end to end | the hovered task's lineage |
+| Signalling                             | Flightplan                              |
+| -------------------------------------- | --------------------------------------- |
+| running road (a named horizontal line) | bucket                                  |
+| berth segment on a road                | task                                    |
+| diagonal crossover between roads       | a dependency that leaves its own bucket |
+| the road continuing                    | a dependency inside one bucket          |
+| signal aspect head                     | the gate between two tasks              |
+| cleared / occupied / unset / at danger | done / in-flight / ready / blocked      |
+| set route lit end to end               | the hovered task's lineage              |
 
 Horizontal position along a road stays dependency depth, exactly as `layoutGraph` computes it now. Vertical position becomes bucket, not barycentre rank.
 
@@ -53,16 +53,16 @@ Hover a berth and the whole panel goes dark except one route, lit end to end fro
 
 Sampled from the approved comps, not estimated.
 
-| Ingredient | Medium | Note |
-| --- | --- | --- |
-| roads, berths, crossovers, signal heads | authored SVG | countable elements, exact geometry — code, never raster |
-| lit / unlit state ramp | CSS custom properties | see below |
-| berth ref + token label | SVG text, monospace | as today |
-| route lighting on hover | CSS class swap on the existing SVG | no re-layout; `paintLineage` already has the hook |
-| agent fleet table | existing HTML | untouched |
-| road name labels | SVG text | left and right gutters, mirrored, as in both comps |
+| Ingredient                              | Medium                             | Note                                                    |
+| --------------------------------------- | ---------------------------------- | ------------------------------------------------------- |
+| roads, berths, crossovers, signal heads | authored SVG                       | countable elements, exact geometry — code, never raster |
+| lit / unlit state ramp                  | CSS custom properties              | see below                                               |
+| berth ref + token label                 | SVG text, monospace                | as today                                                |
+| route lighting on hover                 | CSS class swap on the existing SVG | no re-layout; `paintLineage` already has the hook       |
+| agent fleet table                       | existing HTML                      | untouched                                               |
+| road name labels                        | SVG text                           | left and right gutters, mirrored, as in both comps      |
 
-**The lit ramp is the finding.** Comp pixels light at `#4dc74c` (b-throat) and `#0fa804` (c-route); the pinned `--state-done` is `#5fa249`. The panel does not *fill* a segment, it *lights* one. Each state therefore needs three steps on one hue — lit, base, unlit — reachable with value alone, so no gradient and no shadow is required and none is permitted. The pinned tokens stay the base step; PRODUCT.md outranks the comp on hue because the user pinned it deliberately.
+**The lit ramp is the finding.** Comp pixels light at `#4dc74c` (b-throat) and `#0fa804` (c-route); the pinned `--state-done` is `#5fa249`. The panel does not _fill_ a segment, it _lights_ one. Each state therefore needs three steps on one hue — lit, base, unlit — reachable with value alone, so no gradient and no shadow is required and none is permitted. The pinned tokens stay the base step; PRODUCT.md outranks the comp on hue because the user pinned it deliberately.
 
 Sampled grounds: `#01080d` (b-throat), `#0a0b0b` (c-route) against the pinned `--ground: #0e1114`. Keep the token.
 

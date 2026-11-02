@@ -1,6 +1,7 @@
 # TRIAGE-05: Ship the Codex half of the ADR roles
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -76,12 +77,12 @@ The Codex instruction blocks are compressed rewrites, not copies. Where a Claude
 
 **Refusals compress but never drop.** Prose gets shorter; the list of things a role will not do stays the same length. Aim for field-for-field parity with the Claude definitions — every refusal in a `.md` file appears in its `.toml` counterpart, in fewer words. The enumeration, so nothing is quietly lost:
 
-| Role | Refusals that must appear |
-|---|---|
-| `lorekeeper` | Holds no confirmation gate — it orchestrates and returns; the human gates live one layer up in the skill file, and an orchestrator that stops to ask will hang. Runs one phase per invocation. A phase arriving without its carry-over stops and reports rather than re-running the previous phase. |
-| `gleaner` | Runs the trail collector and nothing else — no redirection, no `mv`, no `mkdir`, no `--apply`. Never opens entry bodies. Returns `hasTrail: false` and stops when there is no trail, rather than erroring. |
-| `reckoner` | Runs the body fetch and the archiver in planning mode only — **never** `--apply`. Nothing else. Surfaces conflicting evidence rather than resolving it by taking the newest entry. |
-| `codifier` | Runs no mutating command at all. Returns draft text; does not save it. Never invokes the archiver. Sets status from implementation state, not from its own confidence. Evidence never cites a `.cockpit` path, and excludes secrets, credentials, personal data, and raw transcript text. |
+| Role           | Refusals that must appear                                                                                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `lorekeeper`   | Holds no confirmation gate — it orchestrates and returns; the human gates live one layer up in the skill file, and an orchestrator that stops to ask will hang. Runs one phase per invocation. A phase arriving without its carry-over stops and reports rather than re-running the previous phase.          |
+| `gleaner`      | Runs the trail collector and nothing else — no redirection, no `mv`, no `mkdir`, no `--apply`. Never opens entry bodies. Returns `hasTrail: false` and stops when there is no trail, rather than erroring.                                                                                                   |
+| `reckoner`     | Runs the body fetch and the archiver in planning mode only — **never** `--apply`. Nothing else. Surfaces conflicting evidence rather than resolving it by taking the newest entry.                                                                                                                           |
+| `codifier`     | Runs no mutating command at all. Returns draft text; does not save it. Never invokes the archiver. Sets status from implementation state, not from its own confidence. Evidence never cites a `.cockpit` path, and excludes secrets, credentials, personal data, and raw transcript text.                    |
 | `barrowkeeper` | Never deletes. Refuses a new-record target path that already exists rather than overwriting. Requires an existing target for a lifecycle-metadata update and touches only lifecycle fields. Takes an approved plan path, never raw assignments. On partial failure: does not roll back, and skips archiving. |
 
 A role whose `.toml` carries the happy path but drops a refusal will pass this task's own checks and then fail the closing review, which requires the two harnesses to agree field for field. Catch it here.
@@ -121,12 +122,12 @@ Applying the config does not affect a thread that is already running. The setup 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Fewer than five role files written, or the setup script no longer runs | The `.toml` files exist but the registry array or the descriptions map was not updated, so nothing installs; or a model tier contradicts the role's Claude definition | Sixteen roles install cleanly from a temporary Codex home, every tier mirrors its Claude counterpart, and the missing-source-file guard still exits non-zero |
-| Test coverage | ×2 | No new assertions added to the install test | The new roles are asserted in the config block only, or only as copied files — one half of the pair | Both halves asserted for all five roles, matching how the existing eleven are covered, plus the idempotency case still passing |
-| Interface & readability | ×1 | Instructions copied verbatim from the Claude definitions, or left as placeholders | Compressed but a stated refusal was lost — the never-delete rule, the refuse-on-existing-target rule, or the no-gate rule | Two or three dense paragraphs per role in the house style, with every refusal and the output shape intact |
-| Assumptions & docs | ×1 | Model strings invented rather than read from the existing role files | Tiers chosen without stating why, or the new-thread requirement omitted from the install skill's guidance | Tier choices traceable to the Claude definitions, and the "start a new Codex thread" requirement stated where a reader will hit it |
+| Dimension               | Weight | 0–1 (fail)                                                                        | 2–3 (below bar)                                                                                                                                                       | 4–5 (pass)                                                                                                                                                   |
+| ----------------------- | ------ | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Fewer than five role files written, or the setup script no longer runs            | The `.toml` files exist but the registry array or the descriptions map was not updated, so nothing installs; or a model tier contradicts the role's Claude definition | Sixteen roles install cleanly from a temporary Codex home, every tier mirrors its Claude counterpart, and the missing-source-file guard still exits non-zero |
+| Test coverage           | ×2     | No new assertions added to the install test                                       | The new roles are asserted in the config block only, or only as copied files — one half of the pair                                                                   | Both halves asserted for all five roles, matching how the existing eleven are covered, plus the idempotency case still passing                               |
+| Interface & readability | ×1     | Instructions copied verbatim from the Claude definitions, or left as placeholders | Compressed but a stated refusal was lost — the never-delete rule, the refuse-on-existing-target rule, or the no-gate rule                                             | Two or three dense paragraphs per role in the house style, with every refusal and the output shape intact                                                    |
+| Assumptions & docs      | ×1     | Model strings invented rather than read from the existing role files              | Tiers chosen without stating why, or the new-thread requirement omitted from the install skill's guidance                                                             | Tier choices traceable to the Claude definitions, and the "start a new Codex thread" requirement stated where a reader will hit it                           |
 
 ## Out of scope
 

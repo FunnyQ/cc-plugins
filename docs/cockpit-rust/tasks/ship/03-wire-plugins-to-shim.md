@@ -1,6 +1,7 @@
 # SHIP-03: Wire plugins to the shim
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -69,6 +70,7 @@ Make the same two replacements with `${PLUGIN_ROOT}`. Keep the `setup.ts` line.
   - never reads a harness env var
 
   Passing no extra env is the right call: the shim derives `COCKPIT_PLUGIN_ROOT` from its own path.
+
 - The shim path is a string literal. Do not add a copy of the shim's logic.
 - `COMMENT_GUARD` and the guard spawn are unrelated. Leave them alone.
 - Update `plugin.test.ts` wherever it asserts the spawned argv or the script constant. Any test that actually spawns the hook must set `COCKPIT_BIN` to a built or stub binary, so the test never downloads.
@@ -90,7 +92,7 @@ It finds orphaned channels and daemons by matching `ps` command lines. Two regex
 - `SCRIPT_PERMISSIONS` pre-approves `Bash(bun **/q-lab-marketplace/*/skills/*/scripts/*.ts)` and `… *)`. Skills will now run `<shim> log …` from Bash, and an un-allowlisted call deadlocks a nested sub-agent. Add:
   - `Bash(**/q-lab-marketplace/*/skills/cockpit/bin/cockpit *)`
   - `Bash(~/.config/opencode/skills/cockpit/bin/cockpit *)` — only if setup.ts already writes OpenCode-path patterns; otherwise skip it and note why.
-  Keep the existing bun patterns, because other skills still use them. The drift watch reports missing `permissions.allow` patterns, so the new pattern must also be in whatever list the drift check compares against. Find that list by grepping `SCRIPT_PERMISSIONS` usages.
+    Keep the existing bun patterns, because other skills still use them. The drift watch reports missing `permissions.allow` patterns, so the new pattern must also be in whatever list the drift check compares against. Find that list by grepping `SCRIPT_PERMISSIONS` usages.
 - Update `setup.test.ts` fixtures and expectations for both changes.
 
 ### Guardrails
@@ -121,12 +123,12 @@ It finds orphaned channels and daemons by matching `ps` command lines. Two regex
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A manifest still launches TS, JSON is invalid, or the install hook got moved | Manifests right, but reap-stale misses the exec'd binary or the permission pattern is absent from the drift set | Every launch goes through the shim; reaper covers old and new forms; setup check plus allow pattern consistent |
-| Test coverage | ×2 | Tests not updated or failing | Manifests checked, reap-stale rows missing | Reap-stale rows for all 5 forms plus the negative, setup and opencode tests updated, no test downloads |
-| Interface & readability | ×1 | Shim logic duplicated into plugin.ts | Constants left dangling | One shim constant, and the module rules of plugin.ts intact |
-| Assumptions & docs | ×1 | Silent removal of the `.ts` patterns | Kept, but unexplained | One-line why for keeping `.ts` patterns (5.x orphans) and for the allow pattern (nested sub-agents) |
+| Dimension               | Weight | 0–1 (fail)                                                                   | 2–3 (below bar)                                                                                                 | 4–5 (pass)                                                                                                     |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A manifest still launches TS, JSON is invalid, or the install hook got moved | Manifests right, but reap-stale misses the exec'd binary or the permission pattern is absent from the drift set | Every launch goes through the shim; reaper covers old and new forms; setup check plus allow pattern consistent |
+| Test coverage           | ×2     | Tests not updated or failing                                                 | Manifests checked, reap-stale rows missing                                                                      | Reap-stale rows for all 5 forms plus the negative, setup and opencode tests updated, no test downloads         |
+| Interface & readability | ×1     | Shim logic duplicated into plugin.ts                                         | Constants left dangling                                                                                         | One shim constant, and the module rules of plugin.ts intact                                                    |
+| Assumptions & docs      | ×1     | Silent removal of the `.ts` patterns                                         | Kept, but unexplained                                                                                           | One-line why for keeping `.ts` patterns (5.x orphans) and for the allow pattern (nested sub-agents)            |
 
 ## Out of scope
 

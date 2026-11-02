@@ -47,9 +47,9 @@ test("the inventory sees a card comparison, single-quoted too, but not one quote
     '<div class="cards"><article class="card pick"><h3>LRU</h3></article></div>';
   expect(themeInventory("T", cards).cards).toBe(true);
   expect(themeInventory("T", "<div class='cards'></div>").cards).toBe(true);
-  expect(
-    themeInventory("T", `<pre class="code">${cards}</pre>`).cards,
-  ).toBe(false);
+  expect(themeInventory("T", `<pre class="code">${cards}</pre>`).cards).toBe(
+    false,
+  );
 });
 
 test("the inventory sees a procedure's steps, single-quoted too, but not steps quoted in code", () => {
@@ -83,7 +83,12 @@ test("the flags read single-quoted classes and ignore a block quoted inside a co
     '<pre class="code" data-lang="html">&lt;figure class="diff"&gt;<figure class="diff"></figure><ol class="timeline"></ol><table></table></pre>',
   );
   expect(inCode).toEqual(
-    expect.objectContaining({ code: true, diff: false, timeline: false, table: false }),
+    expect.objectContaining({
+      code: true,
+      diff: false,
+      timeline: false,
+      table: false,
+    }),
   );
 });
 
@@ -118,7 +123,14 @@ test("jevTheme sends the inventory as state and takes Jev's likeliest theme", as
     Object.keys(
       (bodies[0]!.questions as { theme: { criteria: object } }).theme.criteria,
     ),
-  ).toEqual(["picture-book", "blueprint", "lab-notebook", "editorial", "card-table", "guide-map"]);
+  ).toEqual([
+    "picture-book",
+    "blueprint",
+    "lab-notebook",
+    "editorial",
+    "card-table",
+    "guide-map",
+  ]);
 });
 
 test("jevTheme answers nothing when Jev throws, refuses, or names no theme", async () => {

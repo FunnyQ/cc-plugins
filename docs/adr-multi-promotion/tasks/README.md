@@ -43,6 +43,7 @@ is the closing review.
 Every task edits instruction text only. No task changes a script, and no task commits.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -54,17 +55,17 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| agents | 01 | Codifier drafts N records | todo | > 4 | — |
-| agents | 02 | Lorekeeper batch phase contracts | todo | > 4 | — |
-| agents | 03 | Barrowkeeper batch write | todo | > 4 | — |
-| codex | 01 | Codifier TOML mirror | todo | > 4 | agents/01 |
-| codex | 02 | Lorekeeper TOML mirror | todo | > 4 | agents/02 |
-| codex | 03 | Barrowkeeper TOML mirror | todo | > 4 | agents/03 |
-| contract | 01 | Gate protocols for a batch of drafts | todo | > 4 | — |
-| contract | 02 | Batch mechanics and failed-batch recovery | todo | > 4 | contract/01 |
-| review | 01 | Final review 🏁 | todo | > 4 | contract/02, codex/01, codex/02, codex/03 |
+| Bucket   | NN  | Title                                     | Status | Pass line | Depends on                                |
+| -------- | --- | ----------------------------------------- | ------ | --------- | ----------------------------------------- |
+| agents   | 01  | Codifier drafts N records                 | todo   | > 4       | —                                         |
+| agents   | 02  | Lorekeeper batch phase contracts          | todo   | > 4       | —                                         |
+| agents   | 03  | Barrowkeeper batch write                  | todo   | > 4       | —                                         |
+| codex    | 01  | Codifier TOML mirror                      | todo   | > 4       | agents/01                                 |
+| codex    | 02  | Lorekeeper TOML mirror                    | todo   | > 4       | agents/02                                 |
+| codex    | 03  | Barrowkeeper TOML mirror                  | todo   | > 4       | agents/03                                 |
+| contract | 01  | Gate protocols for a batch of drafts      | todo   | > 4       | —                                         |
+| contract | 02  | Batch mechanics and failed-batch recovery | todo   | > 4       | contract/01                               |
+| review   | 01  | Final review 🏁                           | todo   | > 4       | contract/02, codex/01, codex/02, codex/03 |
 
 ## Dependency graph
 
@@ -86,12 +87,13 @@ contract/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| codex/03 | agents/03 |
-| codex/01 | agents/01 |
-| codex/02 | agents/02 |
+| Task      | Depends on                                |
+| --------- | ----------------------------------------- |
+| codex/03  | agents/03                                 |
+| codex/01  | agents/01                                 |
+| codex/02  | agents/02                                 |
 | review/01 | contract/02, codex/01, codex/02, codex/03 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

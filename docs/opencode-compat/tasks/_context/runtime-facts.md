@@ -22,7 +22,7 @@ Answer **S7 and S8 first** — both can invalidate the tree's shape rather than 
 
 ---
 
-## S7 — Do cross-directory imports survive the skill symlink? *(answer first)*
+## S7 — Do cross-directory imports survive the skill symlink? _(answer first)_
 
 **Question**: with `~/.config/opencode/skills/cockpit` symlinked to `packages/monitor/skills/cockpit`, does `bun ~/.config/opencode/skills/cockpit/scripts/find-session.ts` resolve its `../../shared/scripts/opencode` import? That is, does the runtime resolve an entry symlink to its realpath?
 
@@ -34,7 +34,7 @@ Answer **S7 and S8 first** — both can invalidate the tree's shape rather than 
 
 ---
 
-## S8 — What is `import.meta.dir` inside a symlink-loaded plugin? *(answer second)*
+## S8 — What is `import.meta.dir` inside a symlink-loaded plugin? _(answer second)_
 
 **Question**: OpenCode loads `~/.config/opencode/plugin/q-lab.ts`, which is a symlink into this repo. Inside that module, does `import.meta.dir` give the realpath (`<repo>/opencode`) or the link path (`~/.config/opencode/plugin`)?
 
@@ -52,11 +52,11 @@ Answer **S7 and S8 first** — both can invalidate the tree's shape rather than 
 
 The plan originally recorded "a file plugin **must export `id`**". The opposite is true on opencode 1.18.18. Three runs, same probe, one variable:
 
-| Module exports | `module.evaluated` logged | plugin function called |
-|---|---|---|
-| `export const id` + a named async function | yes | **no** |
-| a named async function only | yes | **yes** |
-| `export default` async function only | yes | **yes** |
+| Module exports                             | `module.evaluated` logged | plugin function called |
+| ------------------------------------------ | ------------------------- | ---------------------- |
+| `export const id` + a named async function | yes                       | **no**                 |
+| a named async function only                | yes                       | **yes**                |
+| `export default` async function only       | yes                       | **yes**                |
 
 The loader iterates the module's exported values and calls each one. A string export poisons that loop, so the module is evaluated, no error surfaces, and **every hook silently does nothing**.
 
@@ -90,7 +90,7 @@ The loader iterates the module's exported values and calls each one. A string ex
 
 **Decision it drives**: whether the branch guard can ask, or must hard-block.
 
-**Status**: **RESOLVED — throw works, and works well.** A handler that throws inside `tool.execute.before` **prevents the command from running at all**, marks the tool call failed, and surfaces the thrown message **verbatim** to both the user and the agent. Observed: the agent reported back *"It was blocked — the tool returned: ⚠️ PROBE GUARD: this command is blocked by the probe plugin. So nothing was echoed to the terminal."*
+**Status**: **RESOLVED — throw works, and works well.** A handler that throws inside `tool.execute.before` **prevents the command from running at all**, marks the tool call failed, and surfaces the thrown message **verbatim** to both the user and the agent. Observed: the agent reported back _"It was blocked — the tool returned: ⚠️ PROBE GUARD: this command is blocked by the probe plugin. So nothing was echoed to the terminal."_
 
 **Decision**: the branch guard throws `check-branch.sh`'s `systemMessage` verbatim. No permission mutation needed.
 
@@ -102,7 +102,7 @@ The loader iterates the module's exported values and calls each one. A string ex
 
 **Decision it drives**: how the flightplan lint reports; worst case it degrades to throw-on-violation after the write has landed.
 
-**Status**: **RESOLVED — mutate `output.output`.** The hook fires for both `write` and `bash`. `output` carries `{ title, metadata, output, attachments }`. Appending to `output.output` surfaces the text to the user's transcript **and** to the agent's view of the tool result; the write still lands. Observed: the agent quoted back *"Wrote file successfully. / [PROBE LINT] violation surfaced via output mutation"*.
+**Status**: **RESOLVED — mutate `output.output`.** The hook fires for both `write` and `bash`. `output` carries `{ title, metadata, output, attachments }`. Appending to `output.output` surfaces the text to the user's transcript **and** to the agent's view of the tool result; the write still lands. Observed: the agent quoted back _"Wrote file successfully. / [PROBE LINT] violation surfaced via output mutation"_.
 
 **Correction (post-spike, from a live failure)**: the **after-hook argument path differs from the before-hook**. `tool.execute.after` receives the arguments on the **first** parameter — `input.args = { filePath, content }` — and the tool result on the second. The S5a shape (`output.args`) is before-hook-only; reading `output.args.filePath` in the after-hook throws `undefined is not an object`, which fails the write/edit call after the file has already landed. The flightplan lint gate must read `input.args.filePath`.
 
@@ -187,7 +187,7 @@ Shell-level detachment does survive. `nohup bash -c "sleep 200; …" … &` retu
 
 ---
 
-## S12 — Duplicate skill names across scan roots *(not a gate)*
+## S12 — Duplicate skill names across scan roots _(not a gate)_
 
 **Question**: when the same skill name exists in both `~/.claude/skills/` and `~/.config/opencode/skills/`, which wins? Is there a warning?
 
@@ -205,18 +205,18 @@ Shell-level detachment does survive. `nohup bash -c "sleep 200; …" … &` retu
 
 **Status**: **RESOLVED — all three legs work, with one trap.** Against `opencode serve --port 4097` on 1.18.18:
 
-| Leg | Result |
-|---|---|
-| `GET /global/health` | `{"healthy":true,"version":"1.18.18"}` — exactly what the bridge's `isOpenCodeServer()` checks |
-| `GET /session` | lists sessions; ids match the bridge's `^ses_[A-Za-z0-9_-]{8,160}$` regex |
-| `GET /session/<id>` | `200`, carrying the `directory` field the bridge reads as `sessionDirectory` |
-| `POST /tui/append-prompt?directory=…` | `200`, body `true` |
+| Leg                                   | Result                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET /global/health`                  | `{"healthy":true,"version":"1.18.18"}` — exactly what the bridge's `isOpenCodeServer()` checks |
+| `GET /session`                        | lists sessions; ids match the bridge's `^ses_[A-Za-z0-9_-]{8,160}$` regex                      |
+| `GET /session/<id>`                   | `200`, carrying the `directory` field the bridge reads as `sessionDirectory`                   |
+| `POST /tui/append-prompt?directory=…` | `200`, body `true`                                                                             |
 
 **The trap: `/tui/append-prompt` returned `200 true` with no TUI attached at all.** The endpoint does not report delivery, so the bridge's `delivered: true` is not proof the prompt reached a human's screen. Document the send as best-effort; do not promise delivery.
 
 **Second trap: `opencode serve` is invisible to the bridge's discovery.** `discoverOpenCodeTuiProcessUrls()` scans `ps` for `opencode` while explicitly excluding `opencode serve|web|attach`. So a `serve` process is never auto-discovered — the user must either run the **TUI** as `opencode --port <n>`, or set `OPENCODE_TUI_SERVER_URL` before cockpit starts.
 
-**Decision**: the cockpit skill and the README state the precondition as *"run the TUI with `opencode --port <n>`, or set `OPENCODE_TUI_SERVER_URL`"* — and note that a `serve` process does not count, and that a successful send is not a delivery receipt.
+**Decision**: the cockpit skill and the README state the precondition as _"run the TUI with `opencode --port <n>`, or set `OPENCODE_TUI_SERVER_URL`"_ — and note that a `serve` process does not count, and that a successful send is not a delivery receipt.
 
 ---
 
@@ -228,7 +228,7 @@ Shell-level detachment does survive. `nohup bash -c "sleep 200; …" … &` retu
 
 **Why it matters**: below the required depth an orchestrator simply stops, with no error naming the config — it reads as a plugin bug. This is the same failure Claude Code shipped in 2.1.217.
 
-**Status**: **PARTIALLY RESOLVED — the default is 1.** The published config schema (`https://opencode.ai/config.json`, `$defs/Config/properties/subagent_depth`) states: *"Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents."* So chronicle's orchestrators are broken on a fresh install, silently — the Claude Code 2.1.217 situation verbatim.
+**Status**: **PARTIALLY RESOLVED — the default is 1.** The published config schema (`https://opencode.ai/config.json`, `$defs/Config/properties/subagent_depth`) states: _"Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents."_ So chronicle's orchestrators are broken on a fresh install, silently — the Claude Code 2.1.217 situation verbatim.
 
 **Decision**: the installer's `subagent_depth` write is mandatory for every user, which is why it belongs in `--apply` rather than behind a separate flag.
 
@@ -249,7 +249,12 @@ Still UNRESOLVED: read timing (startup vs live), which config file supplied the 
 1. **It usually prints nothing at all.** `decideNudge()` gates on a throttle and a change signature and returns early, so a bare invocation exits 0 with empty stdout. Verified by running it with `CLAUDE_PLUGIN_ROOT`, `PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA` all unset.
 2. **When it does print**, with `PLUGIN_ROOT` unset it emits the Claude shape:
    ```json
-   {"hookSpecificOutput":{"hookEventName":"Stop","additionalContext":"<reminder>"}}
+   {
+     "hookSpecificOutput": {
+       "hookEventName": "Stop",
+       "additionalContext": "<reminder>"
+     }
+   }
    ```
    (with `PLUGIN_ROOT` set it would emit `{"systemMessage":"<reminder>"}` instead).
 
@@ -259,7 +264,7 @@ Still UNRESOLVED: read timing (startup vs live), which config file supplied the 
 
 ## S16 — Does OpenCode print a skill base-directory banner?
 
-**Question**: when a skill loads, Claude Code prints a *"Base directory for this skill"* banner, and several skills instruct the reader to take `$SKILL_DIR` from it. Does OpenCode print an equivalent? If so, what does it resolve to for a symlinked skill — the link path or the realpath?
+**Question**: when a skill loads, Claude Code prints a _"Base directory for this skill"_ banner, and several skills instruct the reader to take `$SKILL_DIR` from it. Does OpenCode print an equivalent? If so, what does it resolve to for a symlinked skill — the link path or the realpath?
 
 **Why it matters**: at least six skills resolve their scripts through that banner rather than through `CLAUDE_PLUGIN_ROOT`, so a skill can be Claude-bound without ever naming the variable. If there is no banner, every OpenCode branch must supply the literal `~/.config/opencode/skills/<name>/` path instead of a rule that reads one.
 
@@ -279,11 +284,12 @@ Still UNRESOLVED: read timing (startup vs live), which config file supplied the 
 
 **Decision**: the wave loop spawns `general` for both roles, carrying an inline role prompt. **No new agent definitions are needed**, so the installer's 13-agent / 32-target count stands and nothing ripples into its tests or the README.
 
-**The built-in `general` subagent has no `task` tool and cannot spawn.** Tested at `subagent_depth` 2, 3 and 4: a `general` subagent asked to call `task` got the runtime error *"Model tried to call unavailable tool 'task'. Available tools: bash, edit, glob, grep, read, skill, todowrite, webfetch, write."* Raising the depth does not grant it.
+**The built-in `general` subagent has no `task` tool and cannot spawn.** Tested at `subagent_depth` 2, 3 and 4: a `general` subagent asked to call `task` got the runtime error _"Model tried to call unavailable tool 'task'. Available tools: bash, edit, glob, grep, read, skill, todowrite, webfetch, write."_ Raising the depth does not grant it.
 
 **A custom agent declaring `permission.task: allow` CAN spawn.** A probe agent with that permission spawned a child and received its reply. So `permission.task: allow` is load-bearing, exactly as specified for the three chronicle orchestrators — without it they are silently unable to spawn.
 
 **Decisions**:
+
 - Chronicle's converted agents work as specified. Keep `task: allow` on lawspeaker, lorekeeper and storykeeper.
 - Autopilot's wave loop spawns `general` for the dev and judge roles with an inline prompt. Both are leaves — they never spawn — so `general`'s missing `task` tool does not affect them. No new agent definitions are needed and the installer's 32-target count stands.
 - **Custom agents are discovered from `.opencode/agents/`** (plural), confirmed by listing with only that directory present.

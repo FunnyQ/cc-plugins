@@ -3,7 +3,7 @@
 Everything the `orchestrator/` tasks need about the canonical Workflow script and its fixture. Read with
 `shared.md`.
 
-Script: `packages/dispatch/skills/autopilot/references/orchestrator.md` — one fenced ```` ```javascript ````
+Script: `packages/dispatch/skills/autopilot/references/orchestrator.md` — one fenced ` ```javascript `
 block, ~700 lines of it.
 Fixture: `packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` (~539 lines).
 Dashboard consumer: `packages/dispatch/skills/autopilot/scripts/fleet.ts` + `fleet.test.ts`.
@@ -13,12 +13,12 @@ Dashboard consumer: `packages/dispatch/skills/autopilot/scripts/fleet.ts` + `fle
 The Workflow runtime takes the script as **source text**; it cannot import a module. So the canonical
 script is a fenced block inside a `.md` file, and the fixture pulls it out by string search:
 
-```ts
+````ts
 const start = doc.indexOf("```javascript");
 const bodyStart = doc.indexOf("\n", start) + 1;
 const end = doc.indexOf("\n```", bodyStart);
 return doc.slice(bodyStart, end).replace(/^export const meta/m, "const meta");
-```
+````
 
 It then runs it through `new Function("agent", "parallel", "log", "phase", ...)`.
 
@@ -75,8 +75,8 @@ return { slug, completed, escalations }
 Three properties are non-negotiable and no task in this plan may weaken them:
 
 1. **Completion lives on disk.** `counts.done === counts.total`, never `completed.length`. `completed`
-   holds only *this invocation's* finishes, so a resumed run would false-stall.
-2. **`counts` describes what parsed, not the tree.** That is why `scout.errors` is checked *before* the
+   holds only _this invocation's_ finishes, so a resumed run would false-stall.
+2. **`counts` describes what parsed, not the tree.** That is why `scout.errors` is checked _before_ the
    completion test.
 3. **Reconciliation is by index, and every task lands in `completed` XOR `escalations`.** A dropped task
    would stay `in-progress` on disk, which `next-ready` never re-offers.
@@ -84,7 +84,7 @@ Three properties are non-negotiable and no task in this plan may weaken them:
 ## Escalation shape
 
 ```js
-escalations.push({ task, attempt, infrastructure, parked, reason })
+escalations.push({ task, attempt, infrastructure, parked, reason });
 ```
 
 - `task` — a task ref, or a synthetic `'(scout)'` / `'(tree)'`.
@@ -146,15 +146,15 @@ Keep the stubs faithful to the runtime:
 
 The stub `agent` dispatches on `opts.label`:
 
-| Label prefix | Returns |
-|---|---|
-| `scout-wave-` | the next entry of `scenario.scouts` (or `null` when the queue is empty) |
-| `verify:` | `scenario.gate[ref]` queue, default `{ passed: true, summary: "green" }` |
-| `judge:` | `scenario.judge[ref]` queue, default `{ verdict: pass, rationale: "solid" }` |
-| `done:` | `scenario.markDone[ref]` queue, default `{ ok: true, status: "done" }` |
-| `block:` | `scenario.park[ref]` queue, default `{ ok: true, status: "blocked" }` |
-| `dev:` / `dev-` | throws when the ref is in `scenario.devThrows`, else `"implemented"` |
-| anything else | the string `"ok"` |
+| Label prefix    | Returns                                                                      |
+| --------------- | ---------------------------------------------------------------------------- |
+| `scout-wave-`   | the next entry of `scenario.scouts` (or `null` when the queue is empty)      |
+| `verify:`       | `scenario.gate[ref]` queue, default `{ passed: true, summary: "green" }`     |
+| `judge:`        | `scenario.judge[ref]` queue, default `{ verdict: pass, rationale: "solid" }` |
+| `done:`         | `scenario.markDone[ref]` queue, default `{ ok: true, status: "done" }`       |
+| `block:`        | `scenario.park[ref]` queue, default `{ ok: true, status: "blocked" }`        |
+| `dev:` / `dev-` | throws when the ref is in `scenario.devThrows`, else `"implemented"`         |
+| anything else   | the string `"ok"`                                                            |
 
 `runOrchestrator(scenario)` returns `{ result, labels }` where `labels` is every `opts.label` in call
 order. **Prompts are not captured** — only labels. `accountsForEveryTask(result, refs)` asserts the

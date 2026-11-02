@@ -90,12 +90,7 @@ describe("opencodeBackend", () => {
       const opts: InvokeOpts = { promptText: "test prompt" };
       const result = opencodeBackend.invoke("delegate", opts);
 
-      expect(result.argv).toEqual([
-        "opencode",
-        "run",
-        "--format",
-        "json",
-      ]);
+      expect(result.argv).toEqual(["opencode", "run", "--format", "json"]);
       expect(result.stdin).toBe("test prompt");
     });
 

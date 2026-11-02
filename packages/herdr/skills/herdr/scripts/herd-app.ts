@@ -143,16 +143,18 @@ export function createHerdApp(
 
   async function spawn(opts: SpawnOpts): Promise<SpawnResult> {
     const name = opts.tabLabel ?? opts.role;
-    const created = (await openWithLayout(name, opts)) ?? await call([
-      "herdr-app",
-      "do",
-      "space.new",
-      JSON.stringify({
-        name,
-        folder: opts.cwd,
-        argv: harnessArgv(opts.agent, opts.argv, opts.task),
-      }),
-    ]);
+    const created =
+      (await openWithLayout(name, opts)) ??
+      (await call([
+        "herdr-app",
+        "do",
+        "space.new",
+        JSON.stringify({
+          name,
+          folder: opts.cwd,
+          argv: harnessArgv(opts.agent, opts.argv, opts.task),
+        }),
+      ]));
     if (!created.terminal) {
       throw new HerdrError("space.new did not return a terminal");
     }

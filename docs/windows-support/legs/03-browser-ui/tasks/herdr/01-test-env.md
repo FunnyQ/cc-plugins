@@ -1,6 +1,7 @@
 # HERDR-01: Repair Windows test path assumptions.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -69,12 +70,12 @@ Do not add broad Windows skips or import helpers from the browsers or relay plug
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Windows source discovery or collect-path expectations still fail, or product behavior changes to hide the failure. | Main path comparisons work but empty scans, exact overrides or cleanup semantics drift. | Source scanning, native URL conversion and current-root expectations preserve the original behavior across host path spellings. |
-| Test coverage | ×2 | Assertions are removed, callers are hardcoded or Windows tests are broadly skipped. | Happy-path assertions survive but discovery emptiness, failure cleanup or environment isolation remain unchecked. | Existing source-boundary and CLI assertions remain effective, with touched resource fixtures covering cleanup and host assumptions. |
-| Interface & readability | ×1 | A new fixture framework obscures small path corrections. | Repairs work but normalize protocol strings indiscriminately or leave path intent unclear. | Small local changes distinguish host resources from protocol data and follow surrounding test style. |
-| Assumptions & docs | ×1 | A local pass is claimed as real Windows or WSL pane proof. | Execution notes mention portability without separating fixture and product defects. | Execution evidence names the host and distinguishes repaired fixture assumptions, remaining product limits and owed real-platform checks. |
+| Dimension               | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                                                   | 4–5 (pass)                                                                                                                                |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Windows source discovery or collect-path expectations still fail, or product behavior changes to hide the failure. | Main path comparisons work but empty scans, exact overrides or cleanup semantics drift.                           | Source scanning, native URL conversion and current-root expectations preserve the original behavior across host path spellings.           |
+| Test coverage           | ×2     | Assertions are removed, callers are hardcoded or Windows tests are broadly skipped.                                | Happy-path assertions survive but discovery emptiness, failure cleanup or environment isolation remain unchecked. | Existing source-boundary and CLI assertions remain effective, with touched resource fixtures covering cleanup and host assumptions.       |
+| Interface & readability | ×1     | A new fixture framework obscures small path corrections.                                                           | Repairs work but normalize protocol strings indiscriminately or leave path intent unclear.                        | Small local changes distinguish host resources from protocol data and follow surrounding test style.                                      |
+| Assumptions & docs      | ×1     | A local pass is claimed as real Windows or WSL pane proof.                                                         | Execution notes mention portability without separating fixture and product defects.                               | Execution evidence names the host and distinguishes repaired fixture assumptions, remaining product limits and owed real-platform checks. |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # CLI-01: Trail and config subcommands
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -49,7 +50,8 @@ usage: cockpit <log|scribe|prep|config|wait|send|restart|nudge> [args]
   cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]
 ```
 
-  Keep the first line byte-identical to the TS; contract tests may compare it. Only `find-session` and `hook` are extra subcommands; neither appears in `USAGE`.
+Keep the first line byte-identical to the TS; contract tests may compare it. Only `find-session` and `hook` are extra subcommands; neither appears in `USAGE`.
+
 - Hand-roll the parser (clap's error text and exit codes do not match). Rules, for `log`, `scribe`, `prep`:
   - Single-value flags: `provider session log-language answer-here decision reason tradeoff call type text title diagram` — take the next token.
   - Repeated flags: `file option facet` — each occurrence appends the next token.
@@ -227,12 +229,12 @@ Lookup is the crate's `find_session` module: `pub fn find_session(provider: Prov
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A subcommand is missing, or it writes a malformed record or registry | Happy paths match, but an error string, exit code, key order, or trailing-newline detail drifts from TS | All three contract groups pass against Rust and TS; every stderr line and exit code matches |
-| Test coverage | ×2 | No cargo tests | Tests cover the happy path only | cargo tests pin the parser edge cases, facet split, nudge argv parsing, and reap window |
-| Interface & readability | ×1 | Logic duplicated from the core modules; `unwrap` on file or JSON reads | Works, but `cli/` re-implements a path or config helper | `cli/` calls the shared `nudge_toggle` and `find_session` modules and only orchestrates |
-| Assumptions & docs | ×1 | New crates with no justification | Deviations from TS unexplained | Every new dependency is justified, and the "bun missing ⇒ clean" choice is commented |
+| Dimension               | Weight | 0–1 (fail)                                                             | 2–3 (below bar)                                                                                         | 4–5 (pass)                                                                                  |
+| ----------------------- | ------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A subcommand is missing, or it writes a malformed record or registry   | Happy paths match, but an error string, exit code, key order, or trailing-newline detail drifts from TS | All three contract groups pass against Rust and TS; every stderr line and exit code matches |
+| Test coverage           | ×2     | No cargo tests                                                         | Tests cover the happy path only                                                                         | cargo tests pin the parser edge cases, facet split, nudge argv parsing, and reap window     |
+| Interface & readability | ×1     | Logic duplicated from the core modules; `unwrap` on file or JSON reads | Works, but `cli/` re-implements a path or config helper                                                 | `cli/` calls the shared `nudge_toggle` and `find_session` modules and only orchestrates     |
+| Assumptions & docs      | ×1     | New crates with no justification                                       | Deviations from TS unexplained                                                                          | Every new dependency is justified, and the "bun missing ⇒ clean" choice is commented        |
 
 ## Out of scope
 

@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,14 +48,14 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| backend | 01 | Scribe CLI and schema | todo | > 4 | — |
-| release | 01 | Version bump and changelog | todo | > 4 | backend/01, skills/02, ui/01 |
-| release | 02 | Final review | todo | > 4 | release/01 |
-| skills | 01 | cockpit-scribe skill | todo | > 4 | backend/01 |
-| skills | 02 | thoughtful skill | todo | > 4 | skills/01 |
-| ui | 01 | Dashboard kind, source, and empty-state | todo | > 4 | backend/01 |
+| Bucket  | NN  | Title                                   | Status | Pass line | Depends on                   |
+| ------- | --- | --------------------------------------- | ------ | --------- | ---------------------------- |
+| backend | 01  | Scribe CLI and schema                   | todo   | > 4       | —                            |
+| release | 01  | Version bump and changelog              | todo   | > 4       | backend/01, skills/02, ui/01 |
+| release | 02  | Final review                            | todo   | > 4       | release/01                   |
+| skills  | 01  | cockpit-scribe skill                    | todo   | > 4       | backend/01                   |
+| skills  | 02  | thoughtful skill                        | todo   | > 4       | skills/01                    |
+| ui      | 01  | Dashboard kind, source, and empty-state | todo   | > 4       | backend/01                   |
 
 ## Dependency graph
 
@@ -73,11 +74,12 @@ backend/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| ui/01 | backend/01 |
+| Task       | Depends on                   |
+| ---------- | ---------------------------- |
+| ui/01      | backend/01                   |
 | release/01 | backend/01, skills/02, ui/01 |
-| skills/01 | backend/01 |
+| skills/01  | backend/01                   |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

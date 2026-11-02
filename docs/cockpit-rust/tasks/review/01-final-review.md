@@ -1,6 +1,7 @@
 # REVIEW-01: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -62,13 +63,13 @@ Fix integration defects in place. Do not re-score or rewrite a port that its own
 
 > Scale 0–5 (see `../_context/rubric.md`); weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | a harness still launches Bun cockpit code, or the contract suite fails against Rust | suite green but an outside consumer (usage-dashboard, reap-stale, chronicle trail reader) breaks or the mixed-fleet root rule drifts | all five review areas verified with evidence |
-| Meets the PLAN goal | ×2 | RSS not measured | measured but a miss is unexplained | both targets met, or a miss is reported with the number and the cause |
-| No regressions | ×2 | monitor or opencode tests fail | tests pass but typecheck reports new errors in touched paths | tests and typecheck clean for every touched path |
-| Consistency | ×1 | Cargo, plugin.json, release.json, CI asset names, and shim disagree | one naming or version drift | every name and version agrees |
-| Leanness | ×1 | forwarding-only modules, unused config, unjustified crates throughout | a few pieces with one caller or no justification | no abstraction without a second caller; every crate justified |
+| Dimension           | Weight | 0–1 (fail)                                                                          | 2–3 (below bar)                                                                                                                      | 4–5 (pass)                                                            |
+| ------------------- | ------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Correctness         | ×3     | a harness still launches Bun cockpit code, or the contract suite fails against Rust | suite green but an outside consumer (usage-dashboard, reap-stale, chronicle trail reader) breaks or the mixed-fleet root rule drifts | all five review areas verified with evidence                          |
+| Meets the PLAN goal | ×2     | RSS not measured                                                                    | measured but a miss is unexplained                                                                                                   | both targets met, or a miss is reported with the number and the cause |
+| No regressions      | ×2     | monitor or opencode tests fail                                                      | tests pass but typecheck reports new errors in touched paths                                                                         | tests and typecheck clean for every touched path                      |
+| Consistency         | ×1     | Cargo, plugin.json, release.json, CI asset names, and shim disagree                 | one naming or version drift                                                                                                          | every name and version agrees                                         |
+| Leanness            | ×1     | forwarding-only modules, unused config, unjustified crates throughout               | a few pieces with one caller or no justification                                                                                     | no abstraction without a second caller; every crate justified         |
 
 ## Out of scope
 

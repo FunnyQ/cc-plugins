@@ -48,7 +48,8 @@ export function outputValue(p: Param, value: Value): unknown {
   }
 }
 
-const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+const isNum = (v: unknown): v is number =>
+  typeof v === "number" && Number.isFinite(v);
 
 export function fits(p: Param, value: unknown): boolean {
   switch (p.type) {
@@ -57,16 +58,32 @@ export function fits(p: Param, value: unknown): boolean {
     case "duration":
       return isNum(value) && value >= p.min && value <= p.max;
     case "color":
-      return typeof value === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+      return (
+        typeof value === "string" && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value)
+      );
     case "select":
       return typeof value === "string" && p.options.includes(value);
     case "toggle":
       return typeof value === "boolean";
     case "bezier":
-      return Array.isArray(value) && value.length === 4 && value.every(isNum) && value[0] >= 0 && value[0] <= 1 && value[2] >= 0 && value[2] <= 1;
+      return (
+        Array.isArray(value) &&
+        value.length === 4 &&
+        value.every(isNum) &&
+        value[0] >= 0 &&
+        value[0] <= 1 &&
+        value[2] >= 0 &&
+        value[2] <= 1
+      );
     case "spring": {
       const v = value as Record<string, unknown> | null;
-      return typeof v === "object" && v !== null && ["stiffness", "damping", "mass"].every((k) => isNum(v[k]) && (v[k] as number) > 0);
+      return (
+        typeof v === "object" &&
+        v !== null &&
+        ["stiffness", "damping", "mass"].every(
+          (k) => isNum(v[k]) && (v[k] as number) > 0,
+        )
+      );
     }
   }
 }

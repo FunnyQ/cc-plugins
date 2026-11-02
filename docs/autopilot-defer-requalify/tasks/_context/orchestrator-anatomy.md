@@ -58,17 +58,17 @@ they are permitted.
 
 The builders, in file order:
 
-| Builder | ~line | Agent holds Bash | Writes source | Gets `NO_COMMIT_RULE` today |
-|---|---|---|---|---|
-| `devPrompt` | 246 | yes | yes | yes |
-| `devExternalPrompt` | 270 | yes | via the CLI it drives | yes, twice — its own prompt and the instruction it writes for the CLI |
-| `reviewPrompt` | 330 | yes — runs two `git diff`s | no | no |
-| `fixPrompt` | 353 | yes | yes | yes |
-| `verifyPrompt` | 380 | yes — runs the task's own commands | no | no |
-| `judgePrompt` | 395 | yes | no | no |
-| `markDonePrompt` | 411 | runs one script | task file only | no |
-| `markBlockedPrompt` | 420 | edits one line | task file only | no |
-| `commitInstructions` | 616 | yes — plain git | stages and commits | no |
+| Builder              | ~line | Agent holds Bash                   | Writes source         | Gets `NO_COMMIT_RULE` today                                           |
+| -------------------- | ----- | ---------------------------------- | --------------------- | --------------------------------------------------------------------- |
+| `devPrompt`          | 246   | yes                                | yes                   | yes                                                                   |
+| `devExternalPrompt`  | 270   | yes                                | via the CLI it drives | yes, twice — its own prompt and the instruction it writes for the CLI |
+| `reviewPrompt`       | 330   | yes — runs two `git diff`s         | no                    | no                                                                    |
+| `fixPrompt`          | 353   | yes                                | yes                   | yes                                                                   |
+| `verifyPrompt`       | 380   | yes — runs the task's own commands | no                    | no                                                                    |
+| `judgePrompt`        | 395   | yes                                | no                    | no                                                                    |
+| `markDonePrompt`     | 411   | runs one script                    | task file only        | no                                                                    |
+| `markBlockedPrompt`  | 420   | edits one line                     | task file only        | no                                                                    |
+| `commitInstructions` | 616   | yes — plain git                    | stages and commits    | no                                                                    |
 
 `commitInstructions` is a builder shared by **two** call sites — the inter-wave commit agent
 (~:855) and the post-loop commit agent (~:922) — so one edit covers both.
@@ -85,8 +85,8 @@ final-review task uses its own smaller cap):
    last-shot rung), or, for the final-review task, `runFinalReview()`, which fans out review
    lenses in parallel and then runs a single fixer.
 2. **Binary gate** — `agent(verifyPrompt(...), { label: `verify:${ref}#${attempt}`, schema:
-   GATE_SCHEMA })` (~:528). `GATE_SCHEMA` (~:203) is `{ passed: boolean, summary: string }`,
-   both required. A `null` result is treated as *infrastructure failure*, which is deliberately
+GATE_SCHEMA })` (~:528). `GATE_SCHEMA` (~:203) is `{ passed: boolean, summary: string }`,
+   both required. A `null` result is treated as _infrastructure failure_, which is deliberately
    not the same as `passed: false`: it parks the task instead of retrying against an unknown
    state. On `passed: false` the attempt is pushed onto `attempts[]` (~:536) and the loop
    `continue`s to the next dev attempt.
@@ -132,7 +132,7 @@ Reconciliation is by index on purpose: a `null` result must land on its own task
 disappear. A task that neither passes nor is escalated would vanish — its dev step already set
 `Status: in-progress`, and `next-ready` only offers `todo`, so nothing would ever re-offer it.
 
-`settled(call)` (~:680) wraps the calls that sit *outside* `runTaskGuarded` — the scout and both
+`settled(call)` (~:680) wraps the calls that sit _outside_ `runTaskGuarded` — the scout and both
 commit agents — turning either a `null` or a throw into one reportable shape.
 
 ## Rules the script already lives by

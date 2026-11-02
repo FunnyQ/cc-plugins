@@ -1,6 +1,7 @@
 # WORK-06: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/orchestrator-anatomy.md`
@@ -113,18 +114,18 @@ waits forever — a hang, not an error.
 
 **The complete set to inspect**, so this review does not depend on reading another task file:
 
-| Must be counted | Note |
-|---|---|
-| Each of the three dev-agent branches in the attempt ladder | the external-engine rung, the configured external engine, and the Claude dev agent |
-| The final-review round | wrapped as one window around the whole awaited call, which legitimately encloses its read-only lenses |
-| The mark-done transition | it rewrites the task file's status and gate boxes |
-| Every park path | five call sites, wrapped inside the park helper itself — including the one in the guarded wrapper's catch, which sits outside the per-task pipeline, so anything scoped inside the pipeline misses it |
+| Must be counted                                            | Note                                                                                                                                                                                                  |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Each of the three dev-agent branches in the attempt ladder | the external-engine rung, the configured external engine, and the Claude dev agent                                                                                                                    |
+| The final-review round                                     | wrapped as one window around the whole awaited call, which legitimately encloses its read-only lenses                                                                                                 |
+| The mark-done transition                                   | it rewrites the task file's status and gate boxes                                                                                                                                                     |
+| Every park path                                            | five call sites, wrapped inside the park helper itself — including the one in the guarded wrapper's catch, which sits outside the per-task pipeline, so anything scoped inside the pipeline misses it |
 
-| Must **not** be counted | Note |
-|---|---|
-| The rubric judge | its scorer only reads the task file and appends to the self-gitignored flightlog; counting it would delay the quiet signal for nothing |
-| The verifier | it must not write at all |
-| Each individual review-lens call | no wrapper of its own; being enclosed by the final-review window is expected |
+| Must **not** be counted          | Note                                                                                                                                   |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| The rubric judge                 | its scorer only reads the task file and appends to the self-gitignored flightlog; counting it would delay the quiet signal for nothing |
+| The verifier                     | it must not write at all                                                                                                               |
+| Each individual review-lens call | no wrapper of its own; being enclosed by the final-review window is expected                                                           |
 
 Confirm each release is unconditional — reached through a `finally`, so a throwing writer still
 decrements.
@@ -244,12 +245,12 @@ than leaving it silently unaddressed.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration | ×3 | the halves conflict — the ban was dropped from a prompt a later edit rewrote, or the deferral state escapes the per-task pipeline | it composes, but a seam was confirmed by reading alone where a test could have proved it | every seam holds and the deterministic fixture proves the ones that can be proved; the ban reaches each intended prompt and a postponement stays inside its task |
-| Meets the plan goal | ×2 | a command-discretion prompt is missing the ban, some instruction still authorises destructive git, or a postponement can waive a non-zero exit | the mechanism is present but at least one refusal condition is prose-only | every command-discretion prompt carries the ban with nothing contradicting it, and a postponement is bounded by conditions the script enforces |
-| Consistency | ×1 | a document contradicts the shipped contract — for example a comment or note implying the trail carries a third verdict word | mostly consistent; one document lags the shipped behaviour | every document draws the same line: a postponement is an internal request the script may refuse, while the persisted trail and the dashboard stay strictly binary, with the follow-up row's presence as the only outward signal |
-| No regressions | ×1 | a suite is red, or untouched machinery changed shape | suites green, but the untouched machinery was assumed rather than checked | both suites green at or above baseline, and reconciliation, held-back paths, commit agents and divergence detection verified unchanged |
+| Dimension           | Weight | 0–1 (fail)                                                                                                                                     | 2–3 (below bar)                                                                          | 4–5 (pass)                                                                                                                                                                                                                      |
+| ------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integration         | ×3     | the halves conflict — the ban was dropped from a prompt a later edit rewrote, or the deferral state escapes the per-task pipeline              | it composes, but a seam was confirmed by reading alone where a test could have proved it | every seam holds and the deterministic fixture proves the ones that can be proved; the ban reaches each intended prompt and a postponement stays inside its task                                                                |
+| Meets the plan goal | ×2     | a command-discretion prompt is missing the ban, some instruction still authorises destructive git, or a postponement can waive a non-zero exit | the mechanism is present but at least one refusal condition is prose-only                | every command-discretion prompt carries the ban with nothing contradicting it, and a postponement is bounded by conditions the script enforces                                                                                  |
+| Consistency         | ×1     | a document contradicts the shipped contract — for example a comment or note implying the trail carries a third verdict word                    | mostly consistent; one document lags the shipped behaviour                               | every document draws the same line: a postponement is an internal request the script may refuse, while the persisted trail and the dashboard stay strictly binary, with the follow-up row's presence as the only outward signal |
+| No regressions      | ×1     | a suite is red, or untouched machinery changed shape                                                                                           | suites green, but the untouched machinery was assumed rather than checked                | both suites green at or above baseline, and reconciliation, held-back paths, commit agents and divergence detection verified unchanged                                                                                          |
 
 ## Out of scope
 

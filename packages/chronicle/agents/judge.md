@@ -117,14 +117,14 @@ stays in the watched bucket instead of archiving to `done`.
 
 Hold your line to these cases. Every sibling batch reads the same table:
 
-| Material | Disposition | Why |
-| --- | --- | --- |
-| An external API's field spans three endpoint groups, so a checker must read all three. | `skip` | A fact about an external system. |
-| Two config modes set TLS verification opposite ways on purpose, and a comment at the site says why. | `skip` | Already written down. |
-| A write that returns 5xx is treated as "outcome unknown", and a reference doc states the rule. | `skip` | Already written down. |
-| A list projection dropped fields and caused 86 follow-up requests. | `skip` | A bug's post-mortem: a caveat for code. |
-| Cost is computed on read instead of stored, so a price correction applies retroactively; storing cost was rejected, and nothing in the repo records why. | `promote` | Reversing needs a data migration, and the alternative is not recoverable from the repo. |
-| The records disagree on whether an earlier choice still holds. | `watch` | Unresolved; raise a conflict. |
+| Material                                                                                                                                                 | Disposition | Why                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------- |
+| An external API's field spans three endpoint groups, so a checker must read all three.                                                                   | `skip`      | A fact about an external system.                                                        |
+| Two config modes set TLS verification opposite ways on purpose, and a comment at the site says why.                                                      | `skip`      | Already written down.                                                                   |
+| A write that returns 5xx is treated as "outcome unknown", and a reference doc states the rule.                                                           | `skip`      | Already written down.                                                                   |
+| A list projection dropped fields and caused 86 follow-up requests.                                                                                       | `skip`      | A bug's post-mortem: a caveat for code.                                                 |
+| Cost is computed on read instead of stored, so a price correction applies retroactively; storing cost was rejected, and nothing in the repo records why. | `promote`   | Reversing needs a data migration, and the alternative is not recoverable from the repo. |
+| The records disagree on whether an earlier choice still holds.                                                                                           | `watch`     | Unresolved; raise a conflict.                                                           |
 
 1. Set `promote` only when the full evidence clearly confirms at least one mandatory
    criterion and at least one relevance criterion, and you are confident in the read.

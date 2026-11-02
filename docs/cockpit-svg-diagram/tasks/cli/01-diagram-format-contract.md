@@ -1,6 +1,7 @@
 # CLI-01: Diagram format contract and @path input
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -52,7 +53,7 @@ Record that reasoning as a comment in the module. It is the justification for re
 
 `readDiagramArg("@docs/flow.svg")` returns that file's contents. Any value not starting with `@` is returned unchanged.
 
-Resolution happens **before** detection. That ordering is the whole point of the design: `@` decides *where the argument comes from*, the content decides *what format it is*. So `@flow.mmd` and `@flow.svg` both work and there is no extension rule to write, maintain, or document.
+Resolution happens **before** detection. That ordering is the whole point of the design: `@` decides _where the argument comes from_, the content decides _what format it is_. So `@flow.mmd` and `@flow.svg` both work and there is no extension rule to write, maintain, or document.
 
 `@` collides with nothing. No Mermaid source and no SVG document begins with `@`, so the prefix needs no escape hatch.
 
@@ -148,12 +149,12 @@ Order inside it:
 
 > Each dimension is scored 0–5. Weighted average >= 4.0 to pass. `Correctness < 4` is an automatic veto. Scale and dimension definitions: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | detection uses a rule other than the first non-whitespace character, or `@path` resolves after detection | the happy path works but a leading prolog, comment, indentation, or frontmatter case misfires | every listed opening form routes correctly, `@path` resolves first, and an unreadable path exits non-zero naming the path |
-| Backward compatibility | ×2 | a Mermaid record's JSON key set or key order changed, or a diagram-free call now pays a resolution cost | a Mermaid record survives but the early-return guard or the existing lint messages were reworded | a Mermaid record is byte-identical, the absent-value early return is intact, and `lintDiagram`'s output is untouched |
-| Test coverage | ×2 | no tests, or tests only assert the two obvious cases | happy paths covered, but the missing-file exit and the `DIAGRAM_TYPES` sweep are absent | both functions covered including the unreadable-path failure, and the Mermaid sweep iterates `DIAGRAM_TYPES` rather than hand-listing keywords |
-| Interface & readability | ×1 | detection and file reading are fused, or `process.exit` is buried in the pure function | usable but the resolved value is threaded back through a mutable or implicit channel | `detectDiagramFormat` is pure, I/O is confined to `readDiagramArg`, the gate returns its resolved value explicitly, and `type` is used over `interface` |
+| Dimension               | Weight | 0–1 (fail)                                                                                               | 2–3 (below bar)                                                                                  | 4–5 (pass)                                                                                                                                              |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | detection uses a rule other than the first non-whitespace character, or `@path` resolves after detection | the happy path works but a leading prolog, comment, indentation, or frontmatter case misfires    | every listed opening form routes correctly, `@path` resolves first, and an unreadable path exits non-zero naming the path                               |
+| Backward compatibility  | ×2     | a Mermaid record's JSON key set or key order changed, or a diagram-free call now pays a resolution cost  | a Mermaid record survives but the early-return guard or the existing lint messages were reworded | a Mermaid record is byte-identical, the absent-value early return is intact, and `lintDiagram`'s output is untouched                                    |
+| Test coverage           | ×2     | no tests, or tests only assert the two obvious cases                                                     | happy paths covered, but the missing-file exit and the `DIAGRAM_TYPES` sweep are absent          | both functions covered including the unreadable-path failure, and the Mermaid sweep iterates `DIAGRAM_TYPES` rather than hand-listing keywords          |
+| Interface & readability | ×1     | detection and file reading are fused, or `process.exit` is buried in the pure function                   | usable but the resolved value is threaded back through a mutable or implicit channel             | `detectDiagramFormat` is pure, I/O is confined to `readDiagramArg`, the gate returns its resolved value explicitly, and `type` is used over `interface` |
 
 ## Out of scope
 

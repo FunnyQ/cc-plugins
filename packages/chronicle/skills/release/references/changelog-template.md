@@ -10,12 +10,15 @@ file is new. A rendered entry looks like this:
 _tracks tag `<tagName>`_
 
 ### Added
+
 - New capability a reader gains, in plain language.
 
 ### Changed
+
 - Behaviour that now works differently, and why it matters.
 
 ### Fixed
+
 - The bug, described by its user-visible symptom.
 ```
 
@@ -28,5 +31,5 @@ Security.
 - User-facing, not a commit dump. A reader skims to learn what's new.
 - Write one line per change. Lead with the outcome, not the mechanism.
 - Fold a pure chore away — for example a lockfile bump, a formatting pass, or an
-  internal refactor with no visible effect. Keep it only when it is the *only*
+  internal refactor with no visible effect. Keep it only when it is the _only_
   change in the release.

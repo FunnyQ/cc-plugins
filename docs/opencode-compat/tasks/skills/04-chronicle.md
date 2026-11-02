@@ -1,6 +1,7 @@
 # SKILLS-04: Chronicle skills — OpenCode branches
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -48,27 +49,27 @@ Apply the rule quoted in `../_context/shared.md` wherever a skill currently warn
 
 This is the detail most likely to be got wrong. The existing skills spawn `subagent_type: "chronicle:lawspeaker"` — plugin-namespaced. OpenCode resolves an agent by its **filename**, so the converted files register under bare names:
 
-| Claude Code | OpenCode |
-|---|---|
-| `chronicle:lawspeaker` | `lawspeaker` |
-| `chronicle:watcher` | `watcher` |
-| `chronicle:runesmith` | `runesmith` |
-| `chronicle:storykeeper` | `storykeeper` |
-| `chronicle:skald` | `skald` |
-| `chronicle:messenger` | `messenger` |
-| `chronicle:lorekeeper` | `lorekeeper` |
-| `chronicle:gleaner` | `gleaner` |
-| `chronicle:reckoner` | `reckoner` |
-| `chronicle:codifier` | `codifier` |
+| Claude Code              | OpenCode       |
+| ------------------------ | -------------- |
+| `chronicle:lawspeaker`   | `lawspeaker`   |
+| `chronicle:watcher`      | `watcher`      |
+| `chronicle:runesmith`    | `runesmith`    |
+| `chronicle:storykeeper`  | `storykeeper`  |
+| `chronicle:skald`        | `skald`        |
+| `chronicle:messenger`    | `messenger`    |
+| `chronicle:lorekeeper`   | `lorekeeper`   |
+| `chronicle:gleaner`      | `gleaner`      |
+| `chronicle:reckoner`     | `reckoner`     |
+| `chronicle:codifier`     | `codifier`     |
 | `chronicle:barrowkeeper` | `barrowkeeper` |
-| `chronicle:skirnir` | `skirnir` |
-| `chronicle:annalist` | `annalist` |
+| `chronicle:skirnir`      | `skirnir`      |
+| `chronicle:annalist`     | `annalist`     |
 
 Write the bare name in every OpenCode line. Verify each one against the converted OpenCode agent files on disk before writing it — a name that does not resolve produces a spawn failure at runtime with nothing pointing back here.
 
 ### Spawn points to annotate
 
-Each site gets one added line of the form: *under OpenCode, spawn via the task tool with `subagent_type: <bare-name>`*.
+Each site gets one added line of the form: _under OpenCode, spawn via the task tool with `subagent_type: <bare-name>`_.
 
 - **commit** — the topology block (around lines 30–43) and the spawn step (around line 56). The chain is: the skill spawns the Lawspeaker, which itself spawns the watcher and the runesmith. Two levels of nesting.
 - **pr** — the topology block (around lines 23–41) and the spawn step (around line 92). The skill spawns the Storykeeper, which spawns the skald and then the messenger. Two levels.
@@ -81,7 +82,7 @@ An earlier draft of this work claimed OpenCode has no spawn-depth gate. That was
 
 OpenCode gates nested spawning with `subagent_depth`, a plain number in `~/.config/opencode/opencode.json`. Chronicle needs **at least 2**, for the same reason it needs `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=2` on Claude Code: its deepest chain is skill → orchestrator → child.
 
-The difference is *who sets it*. On Claude Code a `SessionStart` hook self-heals it. OpenCode has no session-start hook, so the repo's OpenCode installer raises the value under its apply flag instead — raise-only, preserving every other key. Point the reader at that installer.
+The difference is _who sets it_. On Claude Code a `SessionStart` hook self-heals it. OpenCode has no session-start hook, so the repo's OpenCode installer raises the value under its apply flag instead — raise-only, preserving every other key. Point the reader at that installer.
 
 State the failure signature explicitly, because it is the reason this section exists: **below the required depth the orchestrator simply stops.** No error names the config. It reads as a plugin bug, exactly as Claude Code 2.1.217 behaved when it shipped nested spawning off by default.
 
@@ -123,12 +124,12 @@ The branch guard exempts a commit whose subject contains `🔧 release:` on the 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Denies the `subagent_depth` prerequisite, or writes namespaced names into OpenCode lines | All five files touched but a spawn point missed, or the depth failure signature left unstated | Every spawn point annotated with a resolving bare name; the depth prerequisite, its owner, and its silent failure signature all stated |
-| Non-regression | ×2 | A `.ts`, a hook script, an agent file, or a manifest under `packages/` changed | Only `.md` changed, but an existing sentence was reworded or a section reordered | Diff is purely additive; every Claude Code and Codex instruction byte-identical |
-| Spawn-map accuracy | ×1 | A child attributed to the wrong orchestrator | Map correct but nesting depth per skill unstated | Every parent-child edge correct, and release identified as flat rather than nested |
-| Assumptions & docs | ×1 | Guesses an unresolved runtime fact | Cites the fact but hedges the instruction both ways | Blocks on an unresolved fact, or cites the resolved value and writes one unambiguous instruction |
+| Dimension          | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                                               | 4–5 (pass)                                                                                                                             |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness        | ×3     | Denies the `subagent_depth` prerequisite, or writes namespaced names into OpenCode lines | All five files touched but a spawn point missed, or the depth failure signature left unstated | Every spawn point annotated with a resolving bare name; the depth prerequisite, its owner, and its silent failure signature all stated |
+| Non-regression     | ×2     | A `.ts`, a hook script, an agent file, or a manifest under `packages/` changed           | Only `.md` changed, but an existing sentence was reworded or a section reordered              | Diff is purely additive; every Claude Code and Codex instruction byte-identical                                                        |
+| Spawn-map accuracy | ×1     | A child attributed to the wrong orchestrator                                             | Map correct but nesting depth per skill unstated                                              | Every parent-child edge correct, and release identified as flat rather than nested                                                     |
+| Assumptions & docs | ×1     | Guesses an unresolved runtime fact                                                       | Cites the fact but hedges the instruction both ways                                           | Blocks on an unresolved fact, or cites the resolved value and writes one unambiguous instruction                                       |
 
 ## Out of scope
 

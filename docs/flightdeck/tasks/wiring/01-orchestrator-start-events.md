@@ -1,6 +1,7 @@
 # WIRING-01: orchestrator start events
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -36,15 +37,15 @@ Three of these agents already log a completion note today. For those, **add `--p
 existing line**; do not add a second log call. The other four have no completion note at all, so they
 need one written.
 
-| Agent | Role | Start line | End line |
-|---|---|---|---|
-| the Claude dev agent | `dev` | add | already exists — add the flag |
-| the external dev driver | `dev` | add | already exists — add the flag |
-| the final-review fixer | `fix` | add | already exists as a `final-review` note — change its role to `fix` and add the flag |
-| the independent verifier | `verify` | add | add |
-| the rubric judge | `judge` | add | add |
-| each final-review lens, external and Claude alike | `review` | add | add |
-| the per-wave scout | `scout` | add | add |
+| Agent                                             | Role     | Start line | End line                                                                            |
+| ------------------------------------------------- | -------- | ---------- | ----------------------------------------------------------------------------------- |
+| the Claude dev agent                              | `dev`    | add        | already exists — add the flag                                                       |
+| the external dev driver                           | `dev`    | add        | already exists — add the flag                                                       |
+| the final-review fixer                            | `fix`    | add        | already exists as a `final-review` note — change its role to `fix` and add the flag |
+| the independent verifier                          | `verify` | add        | add                                                                                 |
+| the rubric judge                                  | `judge`  | add        | add                                                                                 |
+| each final-review lens, external and Claude alike | `review` | add        | add                                                                                 |
+| the per-wave scout                                | `scout`  | add        | add                                                                                 |
 
 Do **not** touch the done-transition agent, the blocked-transition agent, or the post-loop commit agent.
 They are single-command agents that finish in seconds, so a marker pair for them would be noise.
@@ -156,12 +157,12 @@ modified — so review the diff against this list rather than against a blanket 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A relative log path is introduced, or control flow changed | Starts added without matching ends, or a pair's role and label disagree | Seven matched pairs, correct roles, existing completion lines extended not duplicated, baked absolute paths, excluded agents untouched |
-| Test coverage | ×2 | No checks run | Counted the additions only | Every Verification command run, including the relative-path and diff-scope checks |
-| Interface & readability | ×1 | Added lines break the surrounding prompt's voice or numbering | Consistent but placed mid-prompt | Uniform wording, start first and end last in every prompt, matching the file's existing instruction style |
-| Assumptions & docs | ×1 | No note on why paths must stay baked | Mentions it without the reason | The reason is carried where an editor will see it: a relative path splits the trail across agent directories |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                                                         | 4–5 (pass)                                                                                                                             |
+| ----------------------- | ------ | ------------------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A relative log path is introduced, or control flow changed    | Starts added without matching ends, or a pair's role and label disagree | Seven matched pairs, correct roles, existing completion lines extended not duplicated, baked absolute paths, excluded agents untouched |
+| Test coverage           | ×2     | No checks run                                                 | Counted the additions only                                              | Every Verification command run, including the relative-path and diff-scope checks                                                      |
+| Interface & readability | ×1     | Added lines break the surrounding prompt's voice or numbering | Consistent but placed mid-prompt                                        | Uniform wording, start first and end last in every prompt, matching the file's existing instruction style                              |
+| Assumptions & docs      | ×1     | No note on why paths must stay baked                          | Mentions it without the reason                                          | The reason is carried where an editor will see it: a relative path splits the trail across agent directories                           |
 
 ## Out of scope
 

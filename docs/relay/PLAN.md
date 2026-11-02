@@ -87,11 +87,11 @@ relay <backend> <mode> [args]
 
 ### Capability matrix
 
-| Mode | codex | opencode | claude |
-|---|---|---|---|
-| delegate | ✓ prompt | ✓ prompt | ✓ prompt |
-| review | ✓ native (custom-file scope → prompt) | ⚠ emulated → prompt | ✓ native |
-| image | ✓ | ✗ | ✗ |
+| Mode     | codex                                 | opencode            | claude   |
+| -------- | ------------------------------------- | ------------------- | -------- |
+| delegate | ✓ prompt                              | ✓ prompt            | ✓ prompt |
+| review   | ✓ native (custom-file scope → prompt) | ⚠ emulated → prompt | ✓ native |
+| image    | ✓                                     | ✗                   | ✗        |
 
 ## Bucketing
 
@@ -106,21 +106,21 @@ relay <backend> <mode> [args]
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| core | 01 | types-and-shared | todo | > 4.0 | — |
-| core | 02 | context-collector | todo | > 4.0 | — |
-| core | 03 | relay-prompt-builder | todo | > 4.0 | core/01, core/02 |
-| backends | 01 | capability-gate | todo | > 4.0 | core/01 |
-| backends | 02 | codex-backend | todo | > 4.0 | core/01 |
-| backends | 03 | opencode-backend | todo | > 4.0 | core/01 |
-| backends | 04 | claude-backend | todo | > 4.0 | core/01 |
-| backends | 05 | relay-entry | todo | > 4.0 | backends/01, backends/02, backends/03, backends/04, core/03 |
-| package | 01 | skill-md-and-references | todo | > 4.0 | backends/05 |
-| package | 02 | manifests-and-marketplace | todo | > 4.0 | backends/05 |
-| package | 03 | changelog-and-repo-docs | todo | > 4.0 | package/02 |
-| package | 04 | backend-alias-commands | todo | > 4.0 | package/01 |
-| package | 99 | final-review | todo | > 4.0 | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05, package/01, package/02, package/03, package/04 |
+| Bucket   | NN  | Title                     | Status | Pass line | Depends on                                                                                                                                 |
+| -------- | --- | ------------------------- | ------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| core     | 01  | types-and-shared          | todo   | > 4.0     | —                                                                                                                                          |
+| core     | 02  | context-collector         | todo   | > 4.0     | —                                                                                                                                          |
+| core     | 03  | relay-prompt-builder      | todo   | > 4.0     | core/01, core/02                                                                                                                           |
+| backends | 01  | capability-gate           | todo   | > 4.0     | core/01                                                                                                                                    |
+| backends | 02  | codex-backend             | todo   | > 4.0     | core/01                                                                                                                                    |
+| backends | 03  | opencode-backend          | todo   | > 4.0     | core/01                                                                                                                                    |
+| backends | 04  | claude-backend            | todo   | > 4.0     | core/01                                                                                                                                    |
+| backends | 05  | relay-entry               | todo   | > 4.0     | backends/01, backends/02, backends/03, backends/04, core/03                                                                                |
+| package  | 01  | skill-md-and-references   | todo   | > 4.0     | backends/05                                                                                                                                |
+| package  | 02  | manifests-and-marketplace | todo   | > 4.0     | backends/05                                                                                                                                |
+| package  | 03  | changelog-and-repo-docs   | todo   | > 4.0     | package/02                                                                                                                                 |
+| package  | 04  | backend-alias-commands    | todo   | > 4.0     | package/01                                                                                                                                 |
+| package  | 99  | final-review              | todo   | > 4.0     | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05, package/01, package/02, package/03, package/04 |
 
 ## Cross-bucket dependencies
 

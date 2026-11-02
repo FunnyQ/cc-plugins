@@ -1,6 +1,7 @@
 # CONTRACT-02: Daemon HTTP contract
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -23,9 +24,11 @@ A black-box bun suite that pins every observable behavior of `cockpit server` (s
 ### Harness you build on (already exists)
 
 `contract/launcher.ts` exports:
+
 - `command(proc, argv)`, `underTest`, `SCRIPTS_DIR`, `PLUGIN_ROOT`.
 
 `contract/fixtures.ts` exports:
+
 - `makeHomes()`, `freePort()`, `baseEnv(h, extra)`
 - `makeProviderFixtures(h)`, `fixtureEnv(f)`
 - `startDaemon(env, {port})` → `{proc, port, token, base, info}`, `stopDaemon(d)`
@@ -38,11 +41,18 @@ In Rust mode `run("cli", …)` executes the Rust CLI, which may still be a stub 
 
 ```ts
 // Writes <projectDir>/.cockpit/logs/<sid>.jsonl (one JSON object per line) and returns its path.
-export function seedTrail(projectDir: string, sid: string, records: object[]): string;
+export function seedTrail(
+  projectDir: string,
+  sid: string,
+  records: object[],
+): string;
 // Appends one record line to an existing trail.
 export function appendTrail(path: string, record: object): void;
 // Writes $COCKPIT_HOME/registry.json as {"sessions":[...]}, 2-space indent, no trailing newline.
-export function seedRegistry(cockpitHome: string, entries: RegistryEntry[]): void;
+export function seedRegistry(
+  cockpitHome: string,
+  entries: RegistryEntry[],
+): void;
 ```
 
 - Copy record shapes from real TS output: run `bun packages/monitor/skills/cockpit/scripts/cockpit.ts log …` once by hand against a temp `COCKPIT_HOME`, read the resulting line and registry entry, and freeze them as literals in `fixtures.ts`. A `needs_your_call` record carries `type: "decision"`, `needs_your_call: true`, and an `id`.
@@ -161,12 +171,12 @@ export function seedRegistry(cockpitHome: string, entries: RegistryEntry[]): voi
 
 > Scale 0–5 (see `../_context/rubric.md`); weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Suite fails against TS, or asserts behavior TS does not have | Green, but some assertions are so loose (status-only) that a wrong Rust body would pass | Green against TS; assertions pin status, headers, and body shape tightly enough that a divergent reimplementation fails |
-| Test coverage | ×2 | Only happy paths for a few routes | Every route touched, but failure paths or SSE follow-up events are missing | Every route plus every sentinel, auth failure, static edge, and startup branch covered |
-| Interface & readability | ×1 | One giant test with shared mutable state across groups | Groups exist but depend on each other's state | Each group is self-contained, filterable with `-t`, and reads as a spec of the route |
-| Assumptions & docs | ×1 | Quirks pinned silently | Some quirks commented | Every pinned TS quirk carries a `// pins TS quirk:` line; env shrink values are explained |
+| Dimension               | Weight | 0–1 (fail)                                                   | 2–3 (below bar)                                                                         | 4–5 (pass)                                                                                                              |
+| ----------------------- | ------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Suite fails against TS, or asserts behavior TS does not have | Green, but some assertions are so loose (status-only) that a wrong Rust body would pass | Green against TS; assertions pin status, headers, and body shape tightly enough that a divergent reimplementation fails |
+| Test coverage           | ×2     | Only happy paths for a few routes                            | Every route touched, but failure paths or SSE follow-up events are missing              | Every route plus every sentinel, auth failure, static edge, and startup branch covered                                  |
+| Interface & readability | ×1     | One giant test with shared mutable state across groups       | Groups exist but depend on each other's state                                           | Each group is self-contained, filterable with `-t`, and reads as a spec of the route                                    |
+| Assumptions & docs      | ×1     | Quirks pinned silently                                       | Some quirks commented                                                                   | Every pinned TS quirk carries a `// pins TS quirk:` line; env shrink values are explained                               |
 
 ## Out of scope
 

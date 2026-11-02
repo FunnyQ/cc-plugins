@@ -1,6 +1,7 @@
 # WORK-01: Transcript Source
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/types.md`
@@ -39,7 +40,7 @@ Copy `TokenCounts`, `AgentUsage`, and `UsageRollup` verbatim from `../_context/t
 
 ```ts
 /** Read a byte range out of a file. Returns fewer bytes than asked when the file shrank mid-read. */
-export function readRange(path: string, from: number, size: number): Uint8Array
+export function readRange(path: string, from: number, size: number): Uint8Array;
 ```
 
 The body is the existing `openSync` / `readSync` / `closeSync` loop with the captured path replaced by the `path` parameter, and is otherwise unchanged: allocate `size - from` bytes, loop `readSync` until the buffer fills or a read returns `0`, close the descriptor in a `finally`, and return `bytes.subarray(0, offset)` so a short read yields a short result rather than a buffer padded with garbage.
@@ -53,20 +54,20 @@ In `events-api.ts`, delete the local function, add `readRange` to the existing `
 All exported and individually testable, with no filesystem access inside any of them.
 
 ```ts
-export function projectSlug(absPath: string): string
+export function projectSlug(absPath: string): string;
 ```
 
 Claude Code names its per-project directory after the session's absolute cwd with every non-alphanumeric character replaced by `-`: `absPath.replace(/[^A-Za-z0-9]/g, "-")`. Uppercase survives. Two verified anchors to assert on:
 
-| input | output |
-|---|---|
+| input                                     | output                                    |
+| ----------------------------------------- | ----------------------------------------- |
 | `/Users/funnyq/Projects/q-lab/cc-plugins` | `-Users-funnyq-Projects-q-lab-cc-plugins` |
-| `/Users/funnyq/.claude` | `-Users-funnyq--claude` |
+| `/Users/funnyq/.claude`                   | `-Users-funnyq--claude`                   |
 
 The leading `-` comes from the leading slash, and the doubled `--` in the second row comes from the dot. Both are load-bearing; a rule that trims or collapses dashes produces a directory name that does not exist.
 
 ```ts
-export function repoRootOf(planDir: string): string | null
+export function repoRootOf(planDir: string): string | null;
 ```
 
 Walk up from `planDir` until a `.git` entry exists, and return that directory. Test for **existence, not directory-ness**: a git worktree's `.git` is a regular file, and a check that insists on a directory silently fails inside every worktree. Return `null` on reaching the filesystem root without a hit.
@@ -76,7 +77,7 @@ export function parseAgentPrompt(content: unknown): {
   task: string | null;
   role: string | null;
   attempt: number | undefined;
-}
+};
 ```
 
 Accepts whatever sits at `message.content`, which is usually a string but may be an array of content blocks. Stringify anything that is not already a string before matching, rather than assuming a shape.
@@ -92,17 +93,17 @@ Try the announce line first; fall through to the finalize pattern. Matching neit
 Do not attempt to recover the identity from any agent label. Agents choose their own labels and the real ones are free-form English (`Independent Verifier`, `altitude-reviewer`) mixed with structured ones in the same run, so no parser is reliable.
 
 ```ts
-export function emptyCounts(): TokenCounts
-export function addUsage(into: TokenCounts, raw: unknown): void
+export function emptyCounts(): TokenCounts;
+export function addUsage(into: TokenCounts, raw: unknown): void;
 ```
 
 `addUsage` maps the four wire keys onto the repo's camelCase names and mutates `into` in place:
 
-| wire key | field |
-|---|---|
-| `input_tokens` | `input` |
-| `output_tokens` | `output` |
-| `cache_read_input_tokens` | `cacheRead` |
+| wire key                      | field        |
+| ----------------------------- | ------------ |
+| `input_tokens`                | `input`      |
+| `output_tokens`               | `output`     |
+| `cache_read_input_tokens`     | `cacheRead`  |
 | `cache_creation_input_tokens` | `cacheWrite` |
 
 Add a value only when it is a finite integer. Ignore every other key in the object — future versions may add nested or non-numeric fields, and a blind `Object.values().reduce()` would either crash or invent tokens. A `raw` that is not an object is a no-op.
@@ -117,7 +118,7 @@ The signature is frozen in `../_context/types.md`. Construction does no I/O; eve
 
 Resolve the repo root above `planDir`, slug it, and form `<projectsRoot>/<slug>/`. Autopilot's agents run with cwd set to the repo root, which is why the slug comes from the root and not from `planDir`. Those two derivations depend only on constructor arguments and immutable filesystem structure, so compute them once, lazily, on the first `read()` and cache them.
 
-**Do not cache a negative existence verdict.** A missing repo root or a missing `<projectsRoot>/<slug>/` yields an empty result for *this* call only; the next `read()` must check again. Flightdeck is routinely opened before the run starts, so that directory frequently does not exist yet and is created moments later by the first Workflow agent. Caching "not there" would mean the token panel stays empty for the entire run and only works if the browser happened to open second — the exact opposite of the live behaviour this feature is for.
+**Do not cache a negative existence verdict.** A missing repo root or a missing `<projectsRoot>/<slug>/` yields an empty result for _this_ call only; the next `read()` must check again. Flightdeck is routinely opened before the run starts, so that directory frequently does not exist yet and is created moments later by the first Workflow agent. Caching "not there" would mean the token panel stays empty for the entire run and only works if the browser happened to open second — the exact opposite of the live behaviour this feature is for.
 
 **Enumeration, on every `read()`.** New agents appear mid-run, so the directory listing cannot be cached either. Collect files matching:
 
@@ -152,7 +153,7 @@ Take the model from `message.model` when present; it is absent on some assistant
 
 **Membership is three-state, not two.** Every enumerated file is `pending`, `included`, or `excluded`:
 
-- `pending` — the file has been seen but its first *complete* line has not been read yet. A brand-new transcript is often zero bytes, or holds a partial line the tail is still holding back. Nothing is known about which plan it belongs to.
+- `pending` — the file has been seen but its first _complete_ line has not been read yet. A brand-new transcript is often zero bytes, or holds a partial line the tail is still holding back. Nothing is known about which plan it belongs to.
 - `included` — its first complete line's prompt names `planDir`.
 - `excluded` — its first complete line's prompt does not. Permanent; never reopened.
 
@@ -160,7 +161,7 @@ Take the model from `message.model` when present; it is absent on some assistant
 
 `file` is the absolute path.
 
-**Every failure is non-fatal, never a throw.** A missing projects directory, a vanished file, a malformed JSON line, an empty file, or no repo root all degrade to less data. A run whose transcripts are gone must show no tokens, not a broken dashboard. A file that exists but cannot be read is the one case that does *not* reduce the result — see the rule immediately below.
+**Every failure is non-fatal, never a throw.** A missing projects directory, a vanished file, a malformed JSON line, an empty file, or no repo root all degrade to less data. A run whose transcripts are gone must show no tokens, not a broken dashboard. A file that exists but cannot be read is the one case that does _not_ reduce the result — see the rule immediately below.
 
 **Vanished and unreadable are different, and the difference is the plan total.**
 
@@ -223,12 +224,12 @@ dashboard and nothing in the runtime imports it.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Throws on a line without `message`, or the slug rule collapses dashes so no directory is ever found | Happy path reads correctly, but a truncated file double-counts or a reset leaves stale counts behind | Cursor, reset, decoder, and exclusion all behave; a second pass reads zero bytes and returns identical counts |
-| Test coverage | ×2 | No tests, or only `projectSlug` is tested | Happy-path parsing only, no filesystem fixtures, no malformed input | Temp-dir fixtures cover unchanged rescan, truncation, exclusion, missing `message`, malformed JSON, and both prompt shapes |
-| Interface & readability | ×1 | Parsing and filesystem access tangled into one function that cannot be tested without a temp dir | Helpers exported but I/O leaks into one or two of them | Every parser is a pure exported function; only the source object touches the disk |
-| Assumptions & docs | ×1 | Magic regexes and the slug rule appear with no explanation of where they came from | The undocumented-format risk is noted somewhere but not at the code that depends on it | Each on-disk assumption carries a one-line comment naming what was observed, so a future reader knows what to re-verify |
+| Dimension               | Weight | 0–1 (fail)                                                                                          | 2–3 (below bar)                                                                                      | 4–5 (pass)                                                                                                                 |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Throws on a line without `message`, or the slug rule collapses dashes so no directory is ever found | Happy path reads correctly, but a truncated file double-counts or a reset leaves stale counts behind | Cursor, reset, decoder, and exclusion all behave; a second pass reads zero bytes and returns identical counts              |
+| Test coverage           | ×2     | No tests, or only `projectSlug` is tested                                                           | Happy-path parsing only, no filesystem fixtures, no malformed input                                  | Temp-dir fixtures cover unchanged rescan, truncation, exclusion, missing `message`, malformed JSON, and both prompt shapes |
+| Interface & readability | ×1     | Parsing and filesystem access tangled into one function that cannot be tested without a temp dir    | Helpers exported but I/O leaks into one or two of them                                               | Every parser is a pure exported function; only the source object touches the disk                                          |
+| Assumptions & docs      | ×1     | Magic regexes and the slug rule appear with no explanation of where they came from                  | The undocumented-format risk is noted somewhere but not at the code that depends on it               | Each on-disk assumption carries a one-line comment naming what was observed, so a future reader knows what to re-verify    |
 
 ## Out of scope
 

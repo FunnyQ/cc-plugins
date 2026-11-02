@@ -1,6 +1,7 @@
 # INTEGRATION-01: flightplan waypoint mode + lint-hook widen
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -90,12 +91,12 @@ that keeps the looser path regex from linting unrelated markdown.
 
 > Scale and shared dimensions: see `../_context/rubric.md` (dimension set B — docs/integration tasks). Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | regex still misses nested paths, or waypoint-mode steps are wrong | regex works but a mode step drifts from the CLI, or content sniff weakened | regex matches both shapes with sniff intact; mode steps match the CLI exactly |
-| Completeness | ×2 | missing the mode section or the regex change | one of the two edits incomplete | both edits done, version bumped, autopilot note included |
-| Clarity & consistency | ×1 | mode section clashes with flightplan's structure | readable but bolted-on | reads as a natural additive branch in flightplan |
-| Conventions | ×1 | breaks the existing flow or hook contract | minor deviation | additive only, hook contract (path + sniff) preserved |
+| Dimension             | Weight | 0–1 (fail)                                                        | 2–3 (below bar)                                                            | 4–5 (pass)                                                                    |
+| --------------------- | ------ | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Correctness           | ×3     | regex still misses nested paths, or waypoint-mode steps are wrong | regex works but a mode step drifts from the CLI, or content sniff weakened | regex matches both shapes with sniff intact; mode steps match the CLI exactly |
+| Completeness          | ×2     | missing the mode section or the regex change                      | one of the two edits incomplete                                            | both edits done, version bumped, autopilot note included                      |
+| Clarity & consistency | ×1     | mode section clashes with flightplan's structure                  | readable but bolted-on                                                     | reads as a natural additive branch in flightplan                              |
+| Conventions           | ×1     | breaks the existing flow or hook contract                         | minor deviation                                                            | additive only, hook contract (path + sniff) preserved                         |
 
 ## Out of scope
 

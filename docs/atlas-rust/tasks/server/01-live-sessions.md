@@ -1,6 +1,7 @@
 # SERVER-01: Live sessions module and the live subcommand
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -124,12 +125,12 @@ Every "now" goes through `model::now_ms()` so `TOKEN_ATLAS_NOW_MS` pins ages and
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Differential test fails, or a status/sort/field differs from TS | Differential test passes on the happy fixture, but an edge drifts: falsy-zero timestamp fallback, `cockpit` omitted instead of `false` for an unregistered session, 5858 fallback, trailing newline, cache not honoring the TTL | Rust output deep-equals TS across every status, provider, and registry tag; `cockpitPort` rules and output bytes match exactly |
-| Test coverage | ×2 | No cargo tests or no differential test | Some `live-sessions.test.ts` cases ported; cache and daemon-port failure paths untested | All TS cases ported; cache TTL, dead pid, corrupt registry/daemon.json, missing DBs, archived and missing-rollout rows all exercised |
-| Interface & readability | ×1 | `unwrap` on file/DB reads; signatures differ from engine-api.md | Works but builders and I/O tangled, or caches duplicated ad hoc | Pure builders separate from I/O as in TS; one small cache pattern reused for the three caches; clippy clean |
-| Assumptions & docs | ×1 | Deviations from TS unexplained | Walk-order or ISO-format choices made silently | Any deliberate difference (e.g. walk sort for stable "first stem") has a one-line why comment |
+| Dimension               | Weight | 0–1 (fail)                                                      | 2–3 (below bar)                                                                                                                                                                                                                 | 4–5 (pass)                                                                                                                           |
+| ----------------------- | ------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Differential test fails, or a status/sort/field differs from TS | Differential test passes on the happy fixture, but an edge drifts: falsy-zero timestamp fallback, `cockpit` omitted instead of `false` for an unregistered session, 5858 fallback, trailing newline, cache not honoring the TTL | Rust output deep-equals TS across every status, provider, and registry tag; `cockpitPort` rules and output bytes match exactly       |
+| Test coverage           | ×2     | No cargo tests or no differential test                          | Some `live-sessions.test.ts` cases ported; cache and daemon-port failure paths untested                                                                                                                                         | All TS cases ported; cache TTL, dead pid, corrupt registry/daemon.json, missing DBs, archived and missing-rollout rows all exercised |
+| Interface & readability | ×1     | `unwrap` on file/DB reads; signatures differ from engine-api.md | Works but builders and I/O tangled, or caches duplicated ad hoc                                                                                                                                                                 | Pure builders separate from I/O as in TS; one small cache pattern reused for the three caches; clippy clean                          |
+| Assumptions & docs      | ×1     | Deviations from TS unexplained                                  | Walk-order or ISO-format choices made silently                                                                                                                                                                                  | Any deliberate difference (e.g. walk sort for stable "first stem") has a one-line why comment                                        |
 
 ## Out of scope
 

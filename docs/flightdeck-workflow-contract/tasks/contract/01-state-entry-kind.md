@@ -1,6 +1,7 @@
 # CONTRACT-01: Add the state entry kind to the flightlog
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -73,7 +74,7 @@ export function buildStateEntry(meta: {
   ts: string;
   agentLabel?: string;
   message?: string;
-}): StateEntry
+}): StateEntry;
 ```
 
 Put it beside `buildNoteEntry` in `scripts/flightlog.ts`, not in the lib — that
@@ -215,13 +216,13 @@ Worth asserting specifically, because each one is a silent failure if wrong:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The union or the parse rule is wrong, or the CLI accepts an invalid state | The happy path works but a required-flag rule is missing, or an unknown state value is dropped by the parser instead of kept | Type, parser, and CLI all match the spec, including the `--message` rule and the keep-unknown-state-value behaviour |
-| Backward compatibility | ×2 | An existing test fails, or a consumer was silenced with a cast | Consumers compile but a `state` entry leaks into the fleet table or moves `attempts` | Every consumer narrows deliberately, the autopilot suite passes untouched, and note-and-score render output is byte-identical |
-| Test coverage | ×2 | No tests for the new kind | Round-trip only; the consumer-inertness cases are unasserted | Round-trip, unknown-kind drop, unknown-state-value keep, CLI flag rejections, and fleet/attempts inertness all asserted |
-| Interface & readability | ×1 | The builder is impure or lives apart from its sibling | Works, but the parse-rule asymmetry and the `state`-is-not-an-attempt decision are uncommented | Builder mirrors the existing one, the two-way back-compat guarantee is stated in one comment, the module header lists three kinds |
-| Assumptions & docs | ×1 | The CLI usage text and module header still describe two subcommands | Header updated but the aggregate-creation choice is undocumented | Usage text, module header, and the one genuinely ambiguous choice — whether a lone `state` entry creates a by-task aggregate — are all written down |
+| Dimension               | Weight | 0–1 (fail)                                                                | 2–3 (below bar)                                                                                                              | 4–5 (pass)                                                                                                                                          |
+| ----------------------- | ------ | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The union or the parse rule is wrong, or the CLI accepts an invalid state | The happy path works but a required-flag rule is missing, or an unknown state value is dropped by the parser instead of kept | Type, parser, and CLI all match the spec, including the `--message` rule and the keep-unknown-state-value behaviour                                 |
+| Backward compatibility  | ×2     | An existing test fails, or a consumer was silenced with a cast            | Consumers compile but a `state` entry leaks into the fleet table or moves `attempts`                                         | Every consumer narrows deliberately, the autopilot suite passes untouched, and note-and-score render output is byte-identical                       |
+| Test coverage           | ×2     | No tests for the new kind                                                 | Round-trip only; the consumer-inertness cases are unasserted                                                                 | Round-trip, unknown-kind drop, unknown-state-value keep, CLI flag rejections, and fleet/attempts inertness all asserted                             |
+| Interface & readability | ×1     | The builder is impure or lives apart from its sibling                     | Works, but the parse-rule asymmetry and the `state`-is-not-an-attempt decision are uncommented                               | Builder mirrors the existing one, the two-way back-compat guarantee is stated in one comment, the module header lists three kinds                   |
+| Assumptions & docs      | ×1     | The CLI usage text and module header still describe two subcommands       | Header updated but the aggregate-creation choice is undocumented                                                             | Usage text, module header, and the one genuinely ambiguous choice — whether a lone `state` entry creates a by-task aggregate — are all written down |
 
 ## Out of scope
 

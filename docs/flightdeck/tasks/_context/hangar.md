@@ -17,22 +17,22 @@ daylight glare. Do not add one.
 ```css
 :root {
   /* ground */
-  --ground:    #0E1114;   /* page background — graphite, not black */
-  --surface:   #171B20;   /* cards, table rows, panels */
-  --surface-2: #1E242B;   /* hover, nested surface, table header */
-  --rule:      #262C33;   /* hairline borders and dividers */
+  --ground: #0E1114; /* page background — graphite, not black */
+  --surface: #171B20; /* cards, table rows, panels */
+  --surface-2: #1E242B; /* hover, nested surface, table header */
+  --rule: #262C33; /* hairline borders and dividers */
 
   /* type */
-  --text:      #D6DCE2;   /* primary */
-  --muted:     #7C8794;   /* labels, secondary metadata */
-  --faint:     #4C555F;   /* timestamps, disabled */
+  --text: #D6DCE2; /* primary */
+  --muted: #7C8794; /* labels, secondary metadata */
+  --faint: #4C555F; /* timestamps, disabled */
 
   /* state — semantic, never decorative */
-  --state-flight:  #F0A830;  /* amber  — in flight, the only animated state */
-  --state-done:    #4FB6C4;  /* cyan   — done, passed */
-  --state-ready:   #6E8CA0;  /* steel  — ready to pick up, present but quiet */
-  --state-blocked: #414A55;  /* dim    — blocked, deliberately recessive */
-  --state-alert:   #E05B4A;  /* ember  — hard-fail, escalation, parse error */
+  --state-flight: #F0A830; /* amber  — in flight, the only animated state */
+  --state-done: #4FB6C4; /* cyan   — done, passed */
+  --state-ready: #6E8CA0; /* steel  — ready to pick up, present but quiet */
+  --state-blocked: #414A55; /* dim    — blocked, deliberately recessive */
+  --state-alert: #E05B4A; /* ember  — hard-fail, escalation, parse error */
 }
 ```
 
@@ -52,7 +52,8 @@ The SPA's `vendor/` directory holds exactly one file, petite-vue, and nothing ma
 no font files, no icon set, no chart or diagram library.
 
 ```css
---font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+--font-mono:
+  ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 ```
 
@@ -61,11 +62,11 @@ timestamps, and table data are all monospace — they align into columns, which 
 an instrument panel. Sans is reserved for section headings and the page title.
 
 ```css
---text-xs:  11px;   /* timestamps, unit suffixes */
---text-sm:  12px;   /* table body, badges */
---text-md:  13px;   /* default body */
---text-lg:  16px;   /* card titles */
---text-xl:  22px;   /* section headings — sans */
+--text-xs: 11px; /* timestamps, unit suffixes */
+--text-sm: 12px; /* table body, badges */
+--text-md: 13px; /* default body */
+--text-lg: 16px; /* card titles */
+--text-xl: 22px; /* section headings — sans */
 ```
 
 Line height `1.45` for prose, `1.2` for tabular rows. Letter-spacing `0.02em` on all-caps labels,
@@ -76,8 +77,8 @@ Line height `1.45` for prose, `1.2` for tabular rows. Letter-spacing `0.02em` on
 4px base unit. Use only these steps: `4 · 8 · 12 · 16 · 24 · 32`.
 
 ```css
---radius-sm: 2px;   /* badges, meters */
---radius-md: 4px;   /* cards, panels */
+--radius-sm: 2px; /* badges, meters */
+--radius-md: 4px; /* cards, panels */
 ```
 
 Nothing is rounder than 4px. Soft, pill-shaped surfaces read as consumer software and fight the
@@ -123,7 +124,15 @@ The page is a two-row grid, both rows visible at once. Not tabs.
 One animation only: an in-flight row or node pulses its amber accent.
 
 ```css
-@keyframes flight-pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+@keyframes flight-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
 ```
 
 2s ease-in-out, infinite, applied to the status dot alone — never to text or a whole row, which makes
@@ -133,7 +142,10 @@ State transitions get a 150ms colour fade. Nothing slides, nothing scales, nothi
 
 ```css
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 ```
 

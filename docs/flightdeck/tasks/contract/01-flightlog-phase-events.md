@@ -1,6 +1,7 @@
 # CONTRACT-01: flightlog phase events
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -11,7 +12,7 @@
 
 ## Goal
 
-The flightlog can record that an agent has *started*, not only that it finished — so a live viewer can
+The flightlog can record that an agent has _started_, not only that it finished — so a live viewer can
 tell which agents are in flight, without breaking any log already on disk.
 
 ## Files to create / modify
@@ -65,7 +66,7 @@ const sorted = [...entries]
   .sort((a, b) => a.ts.localeCompare(b.ts));
 ```
 
-A task whose *only* entries are start entries then produces no section at all. That is correct — there
+A task whose _only_ entries are start entries then produces no section at all. That is correct — there
 is nothing finished to report.
 
 ### The CLI flag
@@ -128,13 +129,13 @@ exactly.
       then confirm the line contains `"phase":"start"` and `"message":""`.
 - [x] Re-render **every** committed trail and diff each against its committed run log. Loop over all
       four rather than spot-checking one:
-      ```bash
-      for d in chronicle cockpit-autolog cockpit-thoughtful relay; do
-        bun packages/dispatch/skills/flightplan/scripts/flightlog.ts report \
-          "docs/$d/.flightlog/run.jsonl" --out "/tmp/fd-$d.md" >/dev/null
-        diff "/tmp/fd-$d.md" "docs/$d/.flightlog/RUNLOG.md" && echo "$d ok"
-      done
-      ```
+      `bash
+    for d in chronicle cockpit-autolog cockpit-thoughtful relay; do
+      bun packages/dispatch/skills/flightplan/scripts/flightlog.ts report \
+        "docs/$d/.flightlog/run.jsonl" --out "/tmp/fd-$d.md" >/dev/null
+      diff "/tmp/fd-$d.md" "docs/$d/.flightlog/RUNLOG.md" && echo "$d ok"
+    done
+    `
       All four must print `ok` with no diff output.
 - [x] Confirm the bad-value path: the `--phase bogus` call above exits non-zero.
 
@@ -142,12 +143,12 @@ exactly.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | An existing trail fails to parse, or a re-rendered RUNLOG differs from the committed one | Start entries are recorded but still appear in RUNLOG, or a bad `--phase` value is silently accepted | Field is additive, start entries are filtered from RUNLOG, all four existing trails re-render identically, bad values exit 2 |
-| Test coverage | ×2 | No new tests | Only the happy path — a start entry is written and read back | Covers the render skip, the absent-phase default, the invalid-value exit, and a regression test rendering a real trail |
-| Interface & readability | ×1 | `phase` leaks into `ScoreEntry` or a new `kind` is invented | Field added but the filter is buried in the render loop | One optional field, filter applied once before grouping, `buildNoteEntry` stays pure |
-| Assumptions & docs | ×1 | No comment on why absent means "end" | Comment states the rule but not the reason | The comment explains that absent means end *because* pre-existing entries lack the field |
+| Dimension               | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                                                      | 4–5 (pass)                                                                                                                   |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | An existing trail fails to parse, or a re-rendered RUNLOG differs from the committed one | Start entries are recorded but still appear in RUNLOG, or a bad `--phase` value is silently accepted | Field is additive, start entries are filtered from RUNLOG, all four existing trails re-render identically, bad values exit 2 |
+| Test coverage           | ×2     | No new tests                                                                             | Only the happy path — a start entry is written and read back                                         | Covers the render skip, the absent-phase default, the invalid-value exit, and a regression test rendering a real trail       |
+| Interface & readability | ×1     | `phase` leaks into `ScoreEntry` or a new `kind` is invented                              | Field added but the filter is buried in the render loop                                              | One optional field, filter applied once before grouping, `buildNoteEntry` stays pure                                         |
+| Assumptions & docs      | ×1     | No comment on why absent means "end"                                                     | Comment states the rule but not the reason                                                           | The comment explains that absent means end _because_ pre-existing entries lack the field                                     |
 
 ## Out of scope
 

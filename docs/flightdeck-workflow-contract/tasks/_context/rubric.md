@@ -44,7 +44,7 @@ a new event kind degrades by dropping the line, never by throwing; no existing
 exported signature changes meaning without every caller being updated in the
 same task.
 
-A task that touches no shared code scores this on whether it *avoided* touching
+A task that touches no shared code scores this on whether it _avoided_ touching
 shared code unnecessarily — a needless edit to a stable file is not a 5.
 
 ### Test coverage
@@ -86,13 +86,13 @@ Weighted average = `Σ(weight × score) / Σ(weight)`, computed by
 The weights are per task, and every task in this plan uses the same set — with
 one deliberate exception, below.
 
-| Dimension | Weight |
-|---|---|
-| Correctness | 3 |
-| Backward compatibility | 2 |
-| Test coverage | 2 |
-| Interface & readability | 1 |
-| Assumptions & docs | 1 |
+| Dimension               | Weight |
+| ----------------------- | ------ |
+| Correctness             | 3      |
+| Backward compatibility  | 2      |
+| Test coverage           | 2      |
+| Interface & readability | 1      |
+| Assumptions & docs      | 1      |
 
 ## The closing review is scored on different axes
 
@@ -103,13 +103,13 @@ own rubric already gated.
 
 Its table is:
 
-| Dimension | Weight |
-|---|---|
-| Integration — does it compose | 3 |
-| Meets the goal | 3 |
-| No regressions | 2 |
-| Consistency | 2 |
-| Leanness | 1 |
+| Dimension                     | Weight |
+| ----------------------------- | ------ |
+| Integration — does it compose | 3      |
+| Meets the goal                | 3      |
+| No regressions                | 2      |
+| Consistency                   | 2      |
+| Leanness                      | 1      |
 
 Its veto is `Meets the goal < 4`. Its threshold stays `> 4.0` on the same 0–5
 scale, and the scale and the general meaning of a band are unchanged.

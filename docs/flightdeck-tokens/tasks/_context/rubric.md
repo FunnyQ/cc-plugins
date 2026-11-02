@@ -6,12 +6,12 @@ Every task in this plan is scored on this bar unless its own file states otherwi
 - **Pass**: weighted average `> 4.0`.
 - **Veto**: `Correctness < 4` is an automatic fail regardless of the average.
 
-| Dimension | Weight |
-|---|---|
-| Correctness | ×3 |
-| Test coverage | ×2 |
-| Interface & readability | ×1 |
-| Assumptions & docs | ×1 |
+| Dimension               | Weight |
+| ----------------------- | ------ |
+| Correctness             | ×3     |
+| Test coverage           | ×2     |
+| Interface & readability | ×1     |
+| Assumptions & docs      | ×1     |
 
 Weighted average = Σ(score × weight) ÷ Σ(weight).
 
@@ -30,7 +30,7 @@ timestamp tie, a group whose two sides have different lengths.
 
 **Interface & readability** — keep I/O at the edges. Parsing, pairing, and summing are
 pure functions taking data and returning data. A function that reads the filesystem
-*and* decides something is the shape to avoid.
+_and_ decides something is the shape to avoid.
 
 **Assumptions & docs** — every fact this feature relies on about Claude Code's on-disk
 layout is an assumption about someone else's undocumented format. Where the code

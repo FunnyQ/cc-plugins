@@ -1,6 +1,7 @@
 # SKILLS-01: Thin SKILL.md router + pilot reference
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -72,12 +73,12 @@ Net effect: `/cockpit` opens the cockpit and (optionally) sets language; it neve
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | router missing a branch or goals remain | routes but pilot still references start/goals | clean router; pilot has no goals/start; bridge + language-via-config intact |
-| Test coverage | ×2 | no verification | grep only | grep + manual dispatch check for both modes |
-| Interface & readability | ×1 | bloated router | acceptable | router < ~40 lines, procedures fully in references |
-| Assumptions & docs | ×1 | path resolution unclear | partial | base-dir CLI path + provider Step 0 documented |
+| Dimension               | Weight | 0–1 (fail)                              | 2–3 (below bar)                               | 4–5 (pass)                                                                  |
+| ----------------------- | ------ | --------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------- |
+| Correctness             | ×3     | router missing a branch or goals remain | routes but pilot still references start/goals | clean router; pilot has no goals/start; bridge + language-via-config intact |
+| Test coverage           | ×2     | no verification                         | grep only                                     | grep + manual dispatch check for both modes                                 |
+| Interface & readability | ×1     | bloated router                          | acceptable                                    | router < ~40 lines, procedures fully in references                          |
+| Assumptions & docs      | ×1     | path resolution unclear                 | partial                                       | base-dir CLI path + provider Step 0 documented                              |
 
 ## Out of scope
 

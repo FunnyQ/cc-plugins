@@ -1,6 +1,7 @@
 # DECK-01: Read and validate graph.json
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -198,13 +199,13 @@ still appears in the returned array.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A malformed file throws, or validation returns partial nodes | Rules fire but the two asymmetric cases are conflated, or `nn` comes from somewhere other than the ref | Every rule returns data, all-or-nothing holds for the file, dangling refs are removed and reported, nothing is coerced, field mapping exact |
-| Backward compatibility | ×2 | Edits the task-file loader or the shared library | Adds an unnecessary import or export that the existing path now depends on | New module only; the existing task-file path imports nothing from it and is not touched |
-| Test coverage | ×2 | No tests, or tests that pass with the implementation deleted | Happy path plus a couple of rules | Every validation rule, both asymmetric cases, missing file, empty lane, and the full field mapping asserted |
-| Interface & readability | ×1 | I/O smuggled into the parser | Split exists but types are loose or the error shape drifts from the payload's | Pure parser and thin reader, narrow types, error shape identical to what the payload already carries |
-| Assumptions & docs | ×1 | The `bucket` value for whole-file errors is unexplained | Choices made but reasons absent | The asymmetry, the `nn` source, and the whole-file `bucket` value each carry a one-line reason in the source |
+| Dimension               | Weight | 0–1 (fail)                                                   | 2–3 (below bar)                                                                                        | 4–5 (pass)                                                                                                                                  |
+| ----------------------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A malformed file throws, or validation returns partial nodes | Rules fire but the two asymmetric cases are conflated, or `nn` comes from somewhere other than the ref | Every rule returns data, all-or-nothing holds for the file, dangling refs are removed and reported, nothing is coerced, field mapping exact |
+| Backward compatibility  | ×2     | Edits the task-file loader or the shared library             | Adds an unnecessary import or export that the existing path now depends on                             | New module only; the existing task-file path imports nothing from it and is not touched                                                     |
+| Test coverage           | ×2     | No tests, or tests that pass with the implementation deleted | Happy path plus a couple of rules                                                                      | Every validation rule, both asymmetric cases, missing file, empty lane, and the full field mapping asserted                                 |
+| Interface & readability | ×1     | I/O smuggled into the parser                                 | Split exists but types are loose or the error shape drifts from the payload's                          | Pure parser and thin reader, narrow types, error shape identical to what the payload already carries                                        |
+| Assumptions & docs      | ×1     | The `bucket` value for whole-file errors is unexplained      | Choices made but reasons absent                                                                        | The asymmetry, the `nn` source, and the whole-file `bucket` value each carry a one-line reason in the source                                |
 
 ## Out of scope
 

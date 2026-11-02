@@ -1,6 +1,7 @@
 # WORK-03: SSE Wiring
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/types.md`
 > - `../_context/data-model.md`
@@ -68,7 +69,7 @@ export function formatFleetFrame(
   entries: FlightlogEntry[],
   logPresent: boolean,
   agents: AgentUsage[],
-): string
+): string;
 ```
 
 Inside, aggregate the rows exactly as today, then hand those rows and the agents to the
@@ -109,7 +110,7 @@ export function eventsHandler(
   request: Request,
   logPath: string,
   planDir: string,
-): Response
+): Response;
 ```
 
 The single call site is the server's route for the events endpoint, in
@@ -183,7 +184,8 @@ export function eventsHandler(
 Inside, build the source exactly once per stream:
 
 ```ts
-const usageSource = options?.source ?? createTranscriptSource(planDir, options?.projectsRoot);
+const usageSource =
+  options?.source ?? createTranscriptSource(planDir, options?.projectsRoot);
 ```
 
 `source` is the unit-test seam: a stub whose `read()` throws, or one returning fixed
@@ -287,12 +289,12 @@ nothing else.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The rollup is missing from the payload, or a throwing source kills the stream | Populated frames are right, but an empty agent list omits the field instead of zeroing it, or a throwing source drops the frame | Every frame carries a rollup; all-zero when nothing is found; a throwing source degrades to an empty rollup; the frame prefix and terminator are byte-identical to before |
-| Test coverage | ×2 | No test asserts the new field | Only the populated case is covered | Empty list, populated list with paired rows, a throwing source, and the unchanged frame envelope are each covered |
-| Interface & readability | ×1 | Attribution is inlined into the stream closure and cannot be tested without a server | The formatter is exported but takes the source object, so testing it needs a stub with I/O | The formatter stays exported and pure over its three plain-data inputs; all I/O stays in the stream closure |
-| Assumptions & docs | ×1 | No comment explains why a per-snapshot read is affordable | The cadence is mentioned but not what would make it unaffordable | A one-line comment states the read is affordable only because it is incremental, and names the change that would break that |
+| Dimension               | Weight | 0–1 (fail)                                                                           | 2–3 (below bar)                                                                                                                 | 4–5 (pass)                                                                                                                                                                |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The rollup is missing from the payload, or a throwing source kills the stream        | Populated frames are right, but an empty agent list omits the field instead of zeroing it, or a throwing source drops the frame | Every frame carries a rollup; all-zero when nothing is found; a throwing source degrades to an empty rollup; the frame prefix and terminator are byte-identical to before |
+| Test coverage           | ×2     | No test asserts the new field                                                        | Only the populated case is covered                                                                                              | Empty list, populated list with paired rows, a throwing source, and the unchanged frame envelope are each covered                                                         |
+| Interface & readability | ×1     | Attribution is inlined into the stream closure and cannot be tested without a server | The formatter is exported but takes the source object, so testing it needs a stub with I/O                                      | The formatter stays exported and pure over its three plain-data inputs; all I/O stays in the stream closure                                                               |
+| Assumptions & docs      | ×1     | No comment explains why a per-snapshot read is affordable                            | The cadence is mentioned but not what would make it unaffordable                                                                | A one-line comment states the read is affordable only because it is incremental, and names the change that would break that                                               |
 
 ## Out of scope
 

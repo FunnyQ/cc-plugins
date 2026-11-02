@@ -5,6 +5,7 @@
 _tracks tag `atelier-v0.1.0`_
 
 ### Added
+
 - New atelier plugin with a `tune` skill: the agent writes a small JSON spec of tunable parameters, and you adjust them in a ready-made control panel and press Apply to hand the values back as one JSON line, with no need for the model to write a whole HTML playground each time.
 - Tune components either in an isolated iframe stage or in place in a running dev server, so `.vue` and Tailwind components can be adjusted where they actually render.
 - An Apply pressed while no agent is waiting is kept and delivered to the next wait instead of being lost.
@@ -14,6 +15,7 @@ _tracks tag `atelier-v0.1.0`_
 _tracks tag `dispatch-v5.8.6`_
 
 ### Changed
+
 - The Codex autopilot guide now correctly says relay is available, so final review's external lens can run Claude through relay as the cross-vendor option, with an optional visible live pane, up to 3 collect rounds, and a clear `CLAUDE UNREACHABLE` result on failure.
 
 ## [dispatch 5.8.5] - 2026-11-01
@@ -21,11 +23,13 @@ _tracks tag `dispatch-v5.8.6`_
 _tracks tag `dispatch-v5.8.5`_
 
 ### Added
+
 - A flightplan rubric can now declare several vetoes, so a task scoring too low on any named dimension (not just one) fails regardless of its weighted total.
 - Flightdeck and the Claude Code pane now show which dimensions triggered a veto, with a shortened label on narrow cards.
 - Autopilot can fly a task tree under Codex, which has no Workflow tool: the primary agent schedules each wave and runs its roles as parallel native subagents, and stays silent during the flight.
 
 ### Fixed
+
 - Multi-word rubric dimensions now fire their veto, and flightplan lint rejects a veto that names no rubric row.
 
 ## [monitor 8.4.2] - 2026-10-31
@@ -33,6 +37,7 @@ _tracks tag `dispatch-v5.8.5`_
 _tracks tag `monitor-v8.4.2`_
 
 ### Fixed
+
 - The headless scribe no longer takes over its parent session's work: it is limited to Bash and Read, denied anything not allowed, and capped at a $2 budget, after one runaway run cost $14.08.
 
 ## [herdr 0.9.0] - 2026-10-31
@@ -40,9 +45,11 @@ _tracks tag `monitor-v8.4.2`_
 _tracks tag `herdr-v0.9.0`_
 
 ### Added
+
 - New herdr-app skill teaches agents to manage agents and programs with `hc`, control herdr-app windows, and customize layout, keys, and mods under `~/.config/herdr-app`.
 
 ### Changed
+
 - The herdr skill now covers only the multiplexer, with herdr-app guidance moved into its own skill so the two no longer compete for the same triggers.
 
 ## [herdr 0.8.1] - 2026-10-31
@@ -50,12 +57,15 @@ _tracks tag `herdr-v0.9.0`_
 _tracks tag `herdr-v0.8.1`_
 
 ### Added
+
 - herdr-browser now opens the browser as a tab (or split pane) under herdr-app, so the tab belongs to you rather than the agent; `--split left|up` is no longer supported.
 
 ### Changed
+
 - The herdr skill now tells agents to run long jobs with `hc run --bg`, so progress shows in the herdr-app panel, and documents the exit note and cleanup behaviour.
 
 ### Fixed
+
 - Opening herdr-browser no longer steals focus: your current tab is restored right after the new one is created.
 
 ## [herdr 0.8.0] - 2026-10-30
@@ -63,12 +73,14 @@ _tracks tag `herdr-v0.8.1`_
 _tracks tag `herdr-v0.8.0`_
 
 ### Added
+
 - herd tell, ask and collect now run inside herdr-app as well as the original Herdr multiplexer, so agent hand-offs work in either runtime.
 - herdr-browser opens in herdr-app, as its own terminal tab that closes when the browser exits.
 - tell and ask open a new project with your q-saddle tab layout under herdr-app, falling back to a single pane when q-saddle is missing.
 - tell accepts an absolute path to an existing folder, and under herdr-app a one-line message starting with / is typed as a slash command instead of arriving as plain text.
 
 ### Fixed
+
 - tell now picks an exact project path or name first, so a project nested in a same-named parent folder can be selected instead of matching several projects.
 
 ## [relay 0.10.0] - 2026-10-30
@@ -76,6 +88,7 @@ _tracks tag `herdr-v0.8.0`_
 _tracks tag `relay-v0.10.0`_
 
 ### Added
+
 - relay delegate and review now open a live pane under herdr-app, as a new tab in the caller's own space, instead of silently running headless.
 
 ## [runes 0.13.3] - 2026-10-30
@@ -83,6 +96,7 @@ _tracks tag `relay-v0.10.0`_
 _tracks tag `runes-v0.13.3`_
 
 ### Fixed
+
 - With Clawd turned off, the explain buttons now sit flush at the right edge of the minimap row instead of standing off the edge by Clawd's width.
 
 ## [dispatch 5.8.4] - 2026-10-30
@@ -90,6 +104,7 @@ _tracks tag `runes-v0.13.3`_
 _tracks tag `dispatch-v5.8.4`_
 
 ### Fixed
+
 - A task rescored within the same attempt now shows the later score instead of the earlier incomplete 0-point FAIL.
 
 ## [browsers 0.1.4] - 2026-10-30
@@ -97,9 +112,11 @@ _tracks tag `dispatch-v5.8.4`_
 _tracks tag `browsers-v0.1.4`_
 
 ### Added
+
 - The chrome, firefox and safari skills now run natively across platforms, with a shared platform module for browser discovery and clear refusals where a browser is unsupported.
 
 ### Fixed
+
 - Snap-packaged Firefox and Chromium on Linux, including the Ubuntu wrapper scripts that exec into Snap, are detected and reported as unsupported instead of waiting for a launch timeout.
 - On Windows, Chrome's locked port file no longer orphans the browser, and clicks that navigate are no longer missed under load.
 - The Windows process ownership check now allows 10 seconds, so a slow PowerShell start no longer leaves an owned browser running.
@@ -110,6 +127,7 @@ _tracks tag `browsers-v0.1.4`_
 _tracks tag `herdr-v0.7.15`_
 
 ### Added
+
 - herdr-browser, terminal-browser, ask and the project registry are now host-aware, so they work across platforms.
 
 ## [monitor 8.4.1] - 2026-10-30
@@ -117,6 +135,7 @@ _tracks tag `herdr-v0.7.15`_
 _tracks tag `monitor-v8.4.1`_
 
 ### Fixed
+
 - First-time setup no longer fails with ENOENT on a machine without a ~/.claude directory.
 
 ## [runes 0.13.2] - 2026-10-30
@@ -124,10 +143,12 @@ _tracks tag `monitor-v8.4.1`_
 _tracks tag `runes-v0.13.2`_
 
 ### Added
+
 - Runes now handle opening files, glow, Quick Look, explain and lessons through a platform layer that works across operating systems.
 - The explain checker finds Chrome per platform and builds correct file URLs for Windows paths.
 
 ### Fixed
+
 - On Linux, the Chrome probe now skips Snap builds and Snap wrapper scripts that could be picked but never start.
 
 ## [chronicle 0.22.7] - 2026-10-29
@@ -135,6 +156,7 @@ _tracks tag `runes-v0.13.2`_
 _tracks tag `chronicle-v0.22.7`_
 
 ### Fixed
+
 - Chronicle commit, adr, install and release scripts now handle Windows paths, temp payloads and the Codex home fallback correctly.
 
 ## [dispatch 5.8.3] - 2026-10-29
@@ -142,6 +164,7 @@ _tracks tag `chronicle-v0.22.7`_
 _tracks tag `dispatch-v5.8.3`_
 
 ### Fixed
+
 - Removing a worktree on Windows now also removes the plan link, so the next create no longer fails with "already exists" and remove no longer falsely reports success.
 - Dispatch spawning, worktree seeding and browser opening work on Windows and WSL, including line-ending handling, a copy fallback, and opencode prompts that keep shell metacharacters intact.
 - Dispatch task-path checks and the flightplan lint now accept Windows backslash paths.
@@ -151,6 +174,7 @@ _tracks tag `dispatch-v5.8.3`_
 _tracks tag `guard-v0.9.3`_
 
 ### Fixed
+
 - Guard comment hooks and the comments-reaper scan now resolve Windows paths, file names and state directories correctly.
 
 ## [relay 0.9.5] - 2026-10-29
@@ -158,6 +182,7 @@ _tracks tag `guard-v0.9.3`_
 _tracks tag `relay-v0.9.5`_
 
 ### Fixed
+
 - Relay's codex and opencode backends now start correctly on Windows.
 
 ## [browsers 0.1.3] - 2026-10-29
@@ -165,6 +190,7 @@ _tracks tag `relay-v0.9.5`_
 _tracks tag `browsers-v0.1.3`_
 
 ### Fixed
+
 - Chrome click and press now reliably wait for the new page to finish loading, instead of sometimes returning while it was still loading on slower machines.
 
 ## [monitor 8.4.0] - 2026-10-29
@@ -172,6 +198,7 @@ _tracks tag `browsers-v0.1.3`_
 _tracks tag `monitor-v8.4.0`_
 
 ### Added
+
 - Monitor hooks now run through a bun entry, so they load on native Windows, where the cockpit binary is skipped and the hook exits cleanly.
 
 ## [dispatch 5.8.2] - 2026-10-29
@@ -179,6 +206,7 @@ _tracks tag `monitor-v8.4.0`_
 _tracks tag `dispatch-v5.8.2`_
 
 ### Changed
+
 - Autopilot's scout now finds relay.ts through the stable marketplace checkout before falling back to the versioned cache, so exact-path permission rules no longer break on every relay version bump.
 
 ## [runes 0.13.1] - 2026-10-29
@@ -186,6 +214,7 @@ _tracks tag `dispatch-v5.8.2`_
 _tracks tag `runes-v0.13.1`_
 
 ### Fixed
+
 - Explain timeline entries in the Editorial and Card Table themes no longer spill prose and code into the time column.
 
 ## [runes 0.13.0] - 2026-10-28
@@ -193,15 +222,18 @@ _tracks tag `runes-v0.13.1`_
 _tracks tag `runes-v0.13.0`_
 
 ### Added
+
 - The English teacher rune now shows a lesson card under the prompt on the desktop, with a smoking Clawd, the quip, the struck-out original over the rewrite, and the reason.
 - The minimap and Explain buttons now work on the Claude Code desktop app, using native buttons and a block-bar minimap.
 - The explain pane on desktop is polished with better text sizes, card backgrounds, hover highlights, a theme colour swatch for HTML entries, and a clearer message when a resumed session has nothing to fork yet.
 - Explain answers render through the desktop's native Markdown element instead of glow, so text answers display correctly there.
 
 ### Changed
+
 - The desktop minimap is now a single compact block graphic that shrinks to fit, so it no longer pushes Clawd and the buttons out of the band; click-to-jump is no longer available on desktop.
 
 ### Fixed
+
 - The desktop band no longer repeats the English teacher notice already shown in the lesson card.
 
 ## [dispatch 5.8.1] - 2026-10-28
@@ -209,6 +241,7 @@ _tracks tag `runes-v0.13.0`_
 _tracks tag `dispatch-v5.8.1`_
 
 ### Changed
+
 - flightplan's grep-after-fix rule now applies whenever a rule, value, or name is added, changed, or removed (including P2 fixes), and covers PLAN.md, _context/, and tasks/; a new rule greps for what it forbids or requires, so an added rule is checked against the tasks it contradicts.
 
 ## [runes 0.12.2] - 2026-10-27
@@ -216,9 +249,11 @@ _tracks tag `dispatch-v5.8.1`_
 _tracks tag `runes-v0.12.2`_
 
 ### Added
+
 - The explain pane's question box now grows with each line you type, up to 6 lines, so a multi-line question stays readable; a single line too long for the box still ends in "…".
 
 ### Changed
+
 - The guide-map explain theme now shows asides and analogies as soft colour boards with a capsule label on the top edge, and uses rounded Chiron GoRound TC and Nunito fonts.
 
 ## [runes 0.12.1] - 2026-10-27
@@ -226,11 +261,13 @@ _tracks tag `runes-v0.12.2`_
 _tracks tag `runes-v0.12.1`_
 
 ### Added
+
 - Explain pages can now be drawn in five more themes: Blueprint, Lab Notebook, Editorial, Card Table for weighing options as trading cards, and Guide Map for step-by-step procedures, selected per page with the new explain.theme setting.
 - The default explain.theme is now auto: TypeSafe's Jev picks a theme from the page's title and headings when a key is set, otherwise the model's own pick or a random one is used.
 - Existing config.yaml files gain the theme line and a current options list when upgraded, leaving your chosen theme and your own notes alone.
 
 ### Fixed
+
 - The English teacher rune now gives the rewrite first and the reason after it, so the reason no longer contradicts the rewrite, and it ignores pasted content so only what you typed is taught.
 
 ## [runes 0.12.0] - 2026-10-27
@@ -238,10 +275,12 @@ _tracks tag `runes-v0.12.1`_
 _tracks tag `runes-v0.12.0`_
 
 ### Added
+
 - The English teacher rune now rewrites your prompt the way a native speaker would type it, and adds a dim "why" line under the rewrite explaining the rule behind the main fix, written in your Claude Code settings language.
 - The English teacher rune now uses a stronger model (sonnet at low effort instead of haiku), because haiku taught a wrong rule in 2 of 6 sampled explanations.
 
 ### Fixed
+
 - The teacher lesson no longer fails in a very narrow terminal, and a multi-line why or quip no longer leaks raw tag text into the rewrite.
 
 ## [runes 0.11.3] - 2026-10-27
@@ -249,10 +288,12 @@ _tracks tag `runes-v0.12.0`_
 _tracks tag `runes-v0.11.3`_
 
 ### Added
+
 - The teacher rune now records each lesson attempt in a local SQLite lessons database, giving you a history of your practice.
 - A new lessons CLI can record attempts, label them, and show stats over your lesson history.
 
 ### Fixed
+
 - Pressing q now quits at every label prompt, and an empty model reply is recorded as empty instead of as no reply.
 
 ## [dispatch 5.8.0] - 2026-10-27
@@ -260,9 +301,11 @@ _tracks tag `runes-v0.11.3`_
 _tracks tag `dispatch-v5.8.0`_
 
 ### Added
+
 - Flightplan reviews now run as two gates of persona lenses (Sim Instructor, Navigator, Check Airman, Tower) in place of one broad reviewer: the lenses split the review criteria and run in parallel, the design gate checks PLAN.md and _context/ before the task files are written (Light skips it), and Navigator, Check Airman and Tower run on sonnet subagents while Sim Instructor uses the picked engine.
 
 ### Fixed
+
 - The plan reviewer no longer files a false P1 claiming `<baseRef>` is undefined, because its prompt now says autopilot substitutes the run's starting commit.
 
 ## [runes 0.11.2] - 2026-10-27
@@ -270,6 +313,7 @@ _tracks tag `dispatch-v5.8.0`_
 _tracks tag `runes-v0.11.2`_
 
 ### Added
+
 - Pressing [Tell me…] now focuses the question box in the explain pane, so you can type straight away; [Explain plz!] still leaves the keyboard on your prompt.
 
 ## [runes 0.11.1] - 2026-10-26
@@ -277,9 +321,11 @@ _tracks tag `runes-v0.11.2`_
 _tracks tag `runes-v0.11.1`_
 
 ### Added
+
 - Explain pages now load fixed web fonts, so they look the same on every device, and fall back to system fonts offline.
 
 ### Fixed
+
 - The explain page's analogy brief now reliably wins over the "analogy only when clearer" rule, so requested analogies are drawn instead of a mechanism diagram.
 - The explain page's layout check waits for web fonts to load before measuring, so labels that only overlap after the font swap are no longer passed as fine.
 
@@ -288,6 +334,7 @@ _tracks tag `runes-v0.11.1`_
 _tracks tag `guard-v0.9.2`_
 
 ### Fixed
+
 - guard's hooks now load on Codex, which previously ignored them; the no-op comment-guard hook is removed and the Stop sweep covers Codex edits a turn later.
 
 ## [monitor 8.3.3] - 2026-10-26
@@ -295,6 +342,7 @@ _tracks tag `guard-v0.9.2`_
 _tracks tag `monitor-v8.3.3`_
 
 ### Fixed
+
 - Default pricing now includes the Claude 5 models, so they are no longer billed at the fallback rate when the live price fetch fails.
 
 ## [runes 0.11.0] - 2026-10-26
@@ -302,9 +350,11 @@ _tracks tag `monitor-v8.3.3`_
 _tracks tag `runes-v0.11.0`_
 
 ### Added
+
 - Each Explain press now draws a random page brief covering opening, analogy, first section and ending, so generated pages stop all coming out in the same layout.
 
 ### Changed
+
 - Explain summaries are now written to read well in the narrow side pane, and the teacher quip prompt states its goal positively instead of listing banned words.
 
 ## [chronicle 0.22.6] - 2026-10-26
@@ -312,9 +362,11 @@ _tracks tag `runes-v0.11.0`_
 _tracks tag `chronicle-v0.22.6`_
 
 ### Changed
+
 - Corrected stale details in chronicle docs and prompts: a wrong script name, when barrowkeeper runs, and which branch guard applies on Claude Code.
 
 ### Fixed
+
 - Chronicle scripts now typecheck cleanly, with no change to their runtime behaviour.
 
 ## [dispatch 5.7.7] - 2026-10-26
@@ -322,6 +374,7 @@ _tracks tag `chronicle-v0.22.6`_
 _tracks tag `dispatch-v5.7.7`_
 
 ### Changed
+
 - Fixed dispatch docs that contradicted current behaviour, and made the flightplan review prompt plainer so the model stops inventing P1 defects.
 
 ## [browsers 0.1.2] - 2026-10-26
@@ -329,6 +382,7 @@ _tracks tag `dispatch-v5.7.7`_
 _tracks tag `browsers-v0.1.2`_
 
 ### Changed
+
 - Reformatted the browsers code with the repo formatter; behaviour is unchanged.
 
 ## [guard 0.9.1] - 2026-10-26
@@ -336,6 +390,7 @@ _tracks tag `browsers-v0.1.2`_
 _tracks tag `guard-v0.9.1`_
 
 ### Changed
+
 - The comments-reaper description now says it never edits code and writes only the verdicts file its task names, instead of calling itself read-only.
 
 ## [herdr 0.7.14] - 2026-10-26
@@ -343,6 +398,7 @@ _tracks tag `guard-v0.9.1`_
 _tracks tag `herdr-v0.7.14`_
 
 ### Changed
+
 - Reformatted the herdr code with the repo formatter; behaviour is unchanged.
 
 ## [monitor 8.3.2] - 2026-10-26
@@ -350,6 +406,7 @@ _tracks tag `herdr-v0.7.14`_
 _tracks tag `monitor-v8.3.2`_
 
 ### Changed
+
 - Removed references to the retired `cockpit start` and `atlas statusline` commands from monitor docs and prompts, and documented `push-usage`.
 
 ## [relay 0.9.4] - 2026-10-26
@@ -357,6 +414,7 @@ _tracks tag `monitor-v8.3.2`_
 _tracks tag `relay-v0.9.4`_
 
 ### Changed
+
 - Relay command prompts now state their constraints in plain language instead of capitalised shouting, with the same meaning.
 
 ## [runes 0.10.2] - 2026-10-25
@@ -364,6 +422,7 @@ _tracks tag `relay-v0.9.4`_
 _tracks tag `runes-v0.10.2`_
 
 ### Changed
+
 - Explain now writes for a high-school reader instead of a five-year-old: it keeps the one-sentence answer first, defines the real technical term the first time it appears, and uses an analogy only when it explains the mechanism better than describing it directly.
 
 ## [runes 0.10.1] - 2026-10-25
@@ -371,10 +430,12 @@ _tracks tag `runes-v0.10.2`_
 _tracks tag `runes-v0.10.1`_
 
 ### Added
+
 - Explain pages can now show tables, code samples, before/after diffs, callouts, and Mermaid diagrams; a diagram that fails to parse falls back to its escaped source with a note.
 - A new [Tell me…] button opens the explain pane for a typed question without forking right away, and the two buttons now stack left of Clawd without taking an extra line.
 
 ### Fixed
+
 - The explain pane's question box now clears after you submit a question.
 
 ## [runes 0.10.0] - 2026-10-25
@@ -382,11 +443,13 @@ _tracks tag `runes-v0.10.1`_
 _tracks tag `runes-v0.10.0`_
 
 ### Added
+
 - Explain pages are checked for layout faults by a fast geometry measurement in headless Chrome (about 0.7s) that finds overlapping, clipped or out-of-bounds labels, and a clean page opens at once without spawning the checker subagent.
 - The explain pane shows a running placeholder and a new-explanation row while an answer is being produced, so the previous answer is not mistaken for the result, and the follow-up box is now a labelled ASK box with a spinner in the status banners.
 - Explain pages are filed in per-session folders (project/date-session/time-title.html), keeping one session's pages together and still sorted by time.
 
 ### Fixed
+
 - The check's screenshot files are deleted after each run instead of piling up beside the explain pages.
 - The Explain button sits inside the Clawd column, so the minimap no longer has an empty line beneath it.
 
@@ -395,13 +458,16 @@ _tracks tag `runes-v0.10.0`_
 _tracks tag `runes-v0.9.1`_
 
 ### Added
+
 - The Explain pane shows its status in a banner at the top, so a short docked pane no longer clips it, and you can now delete or clear explanation history, with pages moved to the Trash so a slip stays recoverable.
 - Explanations are written in the language set in your Claude Code settings.
 
 ### Changed
+
 - The Explain button is now a visible [Explain plz!] button centred under Clawd, with a more playful tone in the docs.
 
 ### Fixed
+
 - The Explain pane is easier to read, split into a history box, an answer box and hotkey options, and the layout checker is no longer denied in auto mode.
 - Numbered steps on the explanation page no longer push inline code into the number column and overlap the text.
 
@@ -410,6 +476,7 @@ _tracks tag `runes-v0.9.1`_
 _tracks tag `runes-v0.9.0`_
 
 ### Added
+
 - Add an explain rune: a "hey mate, explain please" button below the map and Clawd row asks the model to explain the current work, and it shows "explaining…" while that runs instead of forking twice.
 - Add an explain pane that shows the history of explanations, including text, questions and HTML pages, with usage and errors, and takes follow-up questions through its input.
 - Render each explanation as an HTML page, and check its layout with a restricted hidden checker agent whose Chrome access is limited to known flags, one page and one screenshot inside the explainer folder.
@@ -420,10 +487,12 @@ _tracks tag `runes-v0.9.0`_
 _tracks tag `guard-v0.9.0`_
 
 ### Added
+
 - The comment sweep now asks TypeSafe's Jev for a KEEP / DELETE verdict on each added comment line before involving the reviewer, settling a report only when Jev is sure of every block (DELETE at 0.6, KEEP at 0.8, MUST KILL never).
 - A report Jev settles now delivers its DELETE lines straight to the main agent with no reviewer subagent, skipping a wait of about 26 seconds per report and the agent card in the TUI; without TYPESAFE_API_KEY, or if Jev fails, the reviewer runs as before.
 
 ### Security
+
 - Privacy change: when TYPESAFE_API_KEY is set, what guard sends to TypeSafe grows from the comment text alone to the comment plus 40 lines of code around it, in every repo.
 
 ## [relay 0.9.3] - 2026-10-24
@@ -431,6 +500,7 @@ _tracks tag `guard-v0.9.0`_
 _tracks tag `relay-v0.9.3`_
 
 ### Fixed
+
 - Delegating to codex in a live herdr pane no longer stalls on codex's startup "Update available" prompt, which had blocked the pane before the task arrived.
 
 ## [dispatch 5.7.6] - 2026-10-22
@@ -438,9 +508,11 @@ _tracks tag `relay-v0.9.3`_
 _tracks tag `dispatch-v5.7.6`_
 
 ### Added
+
 - Press the Total Cost heading in the flightdeck pane to switch between fresh and billed tokens, without re-reading transcripts.
 
 ### Fixed
+
 - The flightdeck pane now shows fresh tokens instead of counting cache reads, so its total matches the web dashboard and Claude Code's Execute panel.
 - flightplan, preflight, and waypoints no longer use plan mode, so choosing "clear context and implement" can no longer make the agent build the plan as code instead of writing its files; approval is now an Approve / Revise question.
 
@@ -449,6 +521,7 @@ _tracks tag `dispatch-v5.7.6`_
 _tracks tag `guard-v0.8.9`_
 
 ### Fixed
+
 - Finished comments-reaper runs no longer look stuck in Flightdeck: shards with open MUST KILL items are now marked done (with the open count in the message) instead of blocked, and the open items still appear in the final report.
 
 ## [guard 0.8.8] - 2026-10-21
@@ -456,6 +529,7 @@ _tracks tag `guard-v0.8.9`_
 _tracks tag `guard-v0.8.8`_
 
 ### Fixed
+
 - The comments-reaper workflow run starts again on Claude Code, because the workflow script is now passed inline instead of by a path the Workflow tool refuses outside the working directory.
 
 ## [monitor 8.3.1] - 2026-10-21
@@ -463,6 +537,7 @@ _tracks tag `guard-v0.8.8`_
 _tracks tag `monitor-v8.3.1`_
 
 ### Fixed
+
 - The cockpit decision log now shows each session's decisions instead of "No decisions logged yet.", after selecting a session threw an error.
 
 ## [guard 0.8.7] - 2026-10-21
@@ -470,6 +545,7 @@ _tracks tag `monitor-v8.3.1`_
 _tracks tag `guard-v0.8.7`_
 
 ### Added
+
 - A wide comments-reaper scan no longer stops to ask permission: it runs in ordered waves, and on Claude Code reviews and applies each shard through a Workflow with a flightdeck progress view.
 
 ## [guard 0.8.6] - 2026-10-21
@@ -477,6 +553,7 @@ _tracks tag `guard-v0.8.7`_
 _tracks tag `guard-v0.8.6`_
 
 ### Fixed
+
 - comments-reaper applies more MUST KILL verdicts on its own: a test, type, lint rule, or assertion is written even in a test file the scan did not list, and a rename or extract is applied when every caller sits in the scanned files. Fixes that change runtime behaviour still wait for you, and on OpenCode a second round reviews the comments the fixes added.
 
 ## [monitor 8.3.0] - 2026-10-21
@@ -484,9 +561,11 @@ _tracks tag `guard-v0.8.6`_
 _tracks tag `monitor-v8.3.0`_
 
 ### Added
+
 - A dashboard that cannot read the newer usage database now warns you, once at session start and in the data-health panel, instead of silently showing zero Claude usage.
 
 ### Fixed
+
 - Claude output tokens are no longer undercounted by about 15.6%: usage is now billed from the largest snapshot of each request, and the rollup database upgrades to schema v4 (older monitor builds refuse a v4 database).
 - Opening a deep-linked session no longer leaks a second permission stream connection.
 - The usage trend reference label now uses a defined text colour instead of silently inheriting one.
@@ -496,6 +575,7 @@ _tracks tag `monitor-v8.3.0`_
 _tracks tag `dispatch-v5.7.5`_
 
 ### Changed
+
 - Pinned the delegation-marker contract with relay and monitor in tests, so a shape drift now fails loudly instead of silently.
 
 ## [guard 0.8.5] - 2026-10-20
@@ -503,6 +583,7 @@ _tracks tag `dispatch-v5.7.5`_
 _tracks tag `guard-v0.8.5`_
 
 ### Changed
+
 - Moved guard's comment claims into tests and clearer names, with no change in behaviour.
 
 ## [herdr 0.7.13] - 2026-10-20
@@ -510,6 +591,7 @@ _tracks tag `guard-v0.8.5`_
 _tracks tag `herdr-v0.7.13`_
 
 ### Changed
+
 - Moved herdr-browser, herd.ts, and the protocol and ask checks' claims from comments into tests, with a small dependency seam and a flag parser extracted; behaviour is unchanged.
 
 ## [monitor 8.2.1] - 2026-10-20
@@ -517,6 +599,7 @@ _tracks tag `herdr-v0.7.13`_
 _tracks tag `monitor-v8.2.1`_
 
 ### Changed
+
 - The Rust delegation-marker reader is now tested against relay's shared fixture, so the cross-plugin shape cannot drift unnoticed.
 
 ## [relay 0.9.2] - 2026-10-20
@@ -524,6 +607,7 @@ _tracks tag `monitor-v8.2.1`_
 _tracks tag `relay-v0.9.2`_
 
 ### Changed
+
 - Replaced about 280 explanatory comments in relay with tests, and added a shared delegation-marker fixture; behaviour is unchanged.
 
 ## [runes 0.8.8] - 2026-10-20
@@ -531,9 +615,11 @@ _tracks tag `relay-v0.9.2`_
 _tracks tag `runes-v0.8.8`_
 
 ### Changed
+
 - Moved runes' comment claims into tests and clearer names across Clawd, minimap, teacher, config and the transcript cards; behaviour is unchanged.
 
 ### Fixed
+
 - Fixed a flaky Clawd animation test that missed the short 100ms frame, which made the director's random pick fail intermittently.
 
 ## [dispatch 5.7.4] - 2026-10-20
@@ -541,6 +627,7 @@ _tracks tag `runes-v0.8.8`_
 _tracks tag `dispatch-v5.7.4`_
 
 ### Fixed
+
 - Relaunching the autopilot dashboard on a different port now waits for the old daemon to actually shut down before starting the new one.
 
 ## [chronicle 0.22.5] - 2026-10-20
@@ -548,6 +635,7 @@ _tracks tag `dispatch-v5.7.4`_
 _tracks tag `chronicle-v0.22.5`_
 
 ### Changed
+
 - The adr trail root is now a branded type and all bucket paths derive from one function, and Cluster.watched is renamed pulledFromWatch to describe both cases that set it.
 
 ## [guard 0.8.4] - 2026-10-19
@@ -555,6 +643,7 @@ _tracks tag `chronicle-v0.22.5`_
 _tracks tag `guard-v0.8.4`_
 
 ### Added
+
 - comments-reaper writes its verdicts to files, one applier per file, so a large sweep no longer floods the main conversation with hundreds of verdict lines.
 - comments-reaper splits its report into shards of 60 comment blocks and reviews them in parallel, refusing only past 480 blocks instead of 50 files; reviewers must now name a concrete replacement for every MUST KILL and read the code before judging.
 
@@ -563,9 +652,11 @@ _tracks tag `guard-v0.8.4`_
 _tracks tag `chronicle-v0.22.4`_
 
 ### Changed
+
 - PR creation no longer asks git for the head remote on non-GitHub providers.
 
 ### Fixed
+
 - A failed commit now keeps its message file and reports its messagePath, so the message can be recovered instead of lost.
 - Temp payload files written within the same millisecond no longer collide.
 
@@ -574,6 +665,7 @@ _tracks tag `chronicle-v0.22.4`_
 _tracks tag `browsers-v0.1.1`_
 
 ### Changed
+
 - Trimmed comments that only narrated the code, keeping the notes on external browser constraints; behaviour is unchanged.
 
 ## [guard 0.8.3] - 2026-10-19
@@ -581,9 +673,11 @@ _tracks tag `browsers-v0.1.1`_
 _tracks tag `guard-v0.8.3`_
 
 ### Added
+
 - Run /guard:comments-reaper to review comments on demand over given paths, or over the changes since HEAD with untracked files read whole; it refuses past 50 files and writes its report to a file so only a path reaches the conversation.
 
 ### Changed
+
 - The turn-end reviewer and the comments-reaper skill now share one reviewer prompt, so their verdicts no longer drift apart.
 
 ## [guard 0.8.2] - 2026-10-19
@@ -591,6 +685,7 @@ _tracks tag `guard-v0.8.3`_
 _tracks tag `guard-v0.8.2`_
 
 ### Added
+
 - A one-line status now stays pinned under the prompt while the comment reviewer runs, so you no longer have to catch a brief toast, and it clears when the review finishes or after ten minutes of silence.
 
 ## [guard 0.8.1] - 2026-10-19
@@ -598,6 +693,7 @@ _tracks tag `guard-v0.8.2`_
 _tracks tag `guard-v0.8.1`_
 
 ### Fixed
+
 - The comment reviewer no longer gives a verdict on added lines that are not comments, and can no longer hand its answer back twice, so the main agent stops receiving duplicate or false DELETE verdicts.
 - Suppression and constraint tags such as `# noqa` are ignored inside quoted text, which cuts needless reviewer runs on test fixtures and comments that merely mention them.
 
@@ -606,6 +702,7 @@ _tracks tag `guard-v0.8.1`_
 _tracks tag `guard-v0.8.0`_
 
 ### Added
+
 - On Claude Code, comments are now reviewed at turn end by a separate guard:comment-reviewer subagent instead of asking the author mid-edit, and the sweep also covers sed -i and heredoc edits that bypass Edit and Write.
 - Added suppressions (@ts-expect-error, eslint-disable, # noqa) and constraint comments (IMPORTANT, DO NOT) are now reported at any size, with a tag-specific question and a reworded prompt that favours refactoring over excusing a workaround.
 - Jev screening gained an excuse criterion so comments that justify a workaround are no longer waved through as a good why, and tagged blocks skip Jev.
@@ -615,6 +712,7 @@ _tracks tag `guard-v0.8.0`_
 _tracks tag `chronicle-v0.22.3`_
 
 ### Fixed
+
 - Opening a PR from Codex no longer fails: the storykeeper now runs its scripts through bun, and a stale Mermaid themeCSS reference is gone.
 
 ## [dispatch 5.7.3] - 2026-10-19
@@ -622,6 +720,7 @@ _tracks tag `chronicle-v0.22.3`_
 _tracks tag `dispatch-v5.7.3`_
 
 ### Fixed
+
 - Autopilot now enforces its cross-vendor final review: an unreachable reviewer records a failed gate and retries instead of letting an unreviewed deliverable pass, and two misleading prompt statements were corrected.
 
 ## [herdr 0.7.12] - 2026-10-19
@@ -629,6 +728,7 @@ _tracks tag `dispatch-v5.7.3`_
 _tracks tag `herdr-v0.7.12`_
 
 ### Changed
+
 - The herdr skill is now the source of truth over `herdr --skill`, and the herdr-browser usage notes correctly say `open` creates its own Herdr tab.
 
 ## [monitor 8.2.0] - 2026-10-19
@@ -636,9 +736,11 @@ _tracks tag `herdr-v0.7.12`_
 _tracks tag `monitor-v8.2.0`_
 
 ### Added
+
 - Cockpit diagrams document every pele diagram type with an example, and eight series color variables keep colors in downloaded SVGs; every documented Mermaid example is now linted.
 
 ### Fixed
+
 - Cockpit tests no longer leave scratch directories (once a full binary) in the repo when a run is killed.
 - The OpenCode thoughtful command now matches the Claude version, and usage-dashboard docs point to the real OpenCode reader file.
 
@@ -647,6 +749,7 @@ _tracks tag `monitor-v8.2.0`_
 _tracks tag `dispatch-v5.7.2`_
 
 ### Changed
+
 - Autopilot now delegates to newer default models: Codex uses gpt-6.1-sol, and OpenCode uses deepseek-v4.1-flash for delegation and gpt-6-luna for review.
 
 ## [monitor 8.1.0] - 2026-10-18
@@ -654,6 +757,7 @@ _tracks tag `dispatch-v5.7.2`_
 _tracks tag `monitor-v8.1.0`_
 
 ### Changed
+
 - Cockpit dashboard diagrams now render with pele instead of Mermaid, cutting the bundled renderer from 3.3MB to 677KB while keeping the same Mermaid diagram syntax; node positions may differ slightly because pele uses its own layout.
 
 ## [runes 0.8.7] - 2026-10-16
@@ -661,6 +765,7 @@ _tracks tag `monitor-v8.1.0`_
 _tracks tag `runes-v0.8.7`_
 
 ### Fixed
+
 - Clawd now animates in the Claude desktop app instead of staying on its first frame; headless runs still start no animation timer.
 
 ## [runes 0.8.6] - 2026-10-14
@@ -668,6 +773,7 @@ _tracks tag `runes-v0.8.7`_
 _tracks tag `runes-v0.8.6`_
 
 ### Added
+
 - Unfolded fold cards now draw under a dim left rail with a ▾ marker on the title, so an opened call reads as a child of its title row.
 
 ## [runes 0.8.5] - 2026-10-10
@@ -675,14 +781,17 @@ _tracks tag `runes-v0.8.6`_
 _tracks tag `runes-v0.8.5`_
 
 ### Added
+
 - Folded runs now show one clickable title per call, and clicking one unfolds just that call's card; the "▸ N calls" summary moves under the last call and unfolds or folds the whole run.
 - AskUserQuestion titles show the question and the answers picked.
 - Running calls show a braille spinner left of the tool icon, and idle calls show a dim dot so titles line up in one column.
 
 ### Changed
+
 - fold.keep now defaults to empty, so Edit and Write calls fold too; set keep: "Edit,Write" in config.yaml to keep their diffs on screen.
 
 ### Fixed
+
 - The fold spinner no longer lags or freezes while Claude is working, because it now animates on the drawing thread's own frame clock.
 
 ## [runes 0.8.4] - 2026-10-10
@@ -690,6 +799,7 @@ _tracks tag `runes-v0.8.5`_
 _tracks tag `runes-v0.8.4`_
 
 ### Added
+
 - A new fold rune collapses the tool calls between two replies into one pressable summary row, keeping the transcript clean while Edit and Write calls stay visible by default.
 - Running tool calls in a folded summary now shimmer, and single calls fold by default (fold.min_calls is 1), so a lone call no longer jumps from folded to a card when the turn ends.
 
@@ -698,6 +808,7 @@ _tracks tag `runes-v0.8.4`_
 _tracks tag `runes-v0.8.3`_
 
 ### Changed
+
 - The English teacher's roast quip drops the "X called, it wants Y back" joke and no longer bans "close" or "nice try", and its improvement check now asks whether a native speaker would phrase the prompt differently while skipping terse shorthand such as "ur" and "pls".
 
 ## [runes 0.8.2] - 2026-10-06
@@ -705,6 +816,7 @@ _tracks tag `runes-v0.8.3`_
 _tracks tag `runes-v0.8.2`_
 
 ### Added
+
 - The teacher bubble now gets a short haiku-written roast of your specific prompt mistake as its title, falling back to the stock title when the quip is missing or too long, and the band notice shows the quip too.
 
 ## [runes 0.8.1] - 2026-10-05
@@ -712,6 +824,7 @@ _tracks tag `runes-v0.8.2`_
 _tracks tag `runes-v0.8.1`_
 
 ### Added
+
 - Reply bubbles now have a raw button that opens the original markdown in Quick Look, so you can select and copy text without picking up the bubble's box-drawing borders.
 
 ## [runes 0.8.0] - 2026-10-05
@@ -719,6 +832,7 @@ _tracks tag `runes-v0.8.1`_
 _tracks tag `runes-v0.8.0`_
 
 ### Added
+
 - New teacher rune rewrites your English prompts in your own tone and shows the lesson beside a smoking Clawd and in a clickable band above the prompt, without touching the transcript or Claude's context (it stays silent without TYPESAFE_API_KEY).
 
 ## [runes 0.7.9] - 2026-10-05
@@ -726,6 +840,7 @@ _tracks tag `runes-v0.8.0`_
 _tracks tag `runes-v0.7.9`_
 
 ### Fixed
+
 - Folded errored or interrupted Bash output now keeps its tail, so the failures and summary a failing run prints at the end stay visible; successful output still folds to its head only, and unfolded sections show in full color instead of dimmed.
 
 ## [runes 0.7.8] - 2026-10-04
@@ -733,6 +848,7 @@ _tracks tag `runes-v0.7.9`_
 _tracks tag `runes-v0.7.8`_
 
 ### Added
+
 - Bash output that the built-in sniffer cannot recognise, such as Markdown, JSON, diffs and code from `gh pr view` or `git show`, now renders through glow when TypeSafe's Jev judges it worth rendering. It is on by default and does nothing without `TYPESAFE_API_KEY`; with a key set, the command (secrets masked) and, when the command alone does not settle it, the first 800 characters of its output are sent to TypeSafe, except for commands that print secrets, such as `env` or `cat .env`. Set `transcript.bash.jev: false` in config.yaml to turn it off.
 
 ## [runes 0.7.7] - 2026-10-04
@@ -740,12 +856,15 @@ _tracks tag `runes-v0.7.8`_
 _tracks tag `runes-v0.7.7`_
 
 ### Added
+
 - The minimap's bar height, its gap from Clawd, and its current-position marker colour can now be set in the `minimap` section of config.yaml, with an invalid value falling back alone and showing a toast.
 
 ### Changed
+
 - An idle session no longer starts a background process every 3 seconds for the minimap, which now re-reads the transcript only when its size or modification time changes, and retries after a failed read.
 
 ### Fixed
+
 - The minimap now loads the new conversation after a session restarts, for example after /resume, instead of showing stale content.
 - The minimap keeps drawing when the Clawd mascot is switched off.
 
@@ -754,10 +873,12 @@ _tracks tag `runes-v0.7.7`_
 _tracks tag `runes-v0.7.6`_
 
 ### Changed
+
 - The minimap now streams the transcript line by line, cutting peak memory on a 35.8 MB transcript from 185 MB to 75 MB with identical output.
 - Minimap bars now read upward in time, with the earliest message on the bottom row and the newest on top.
 
 ### Fixed
+
 - The Claude desktop app no longer shows garbled glyphs and cut-off lines from runes transcript bubbles, because they now draw only in the terminal.
 
 ## [runes 0.7.5] - 2026-10-04
@@ -765,10 +886,12 @@ _tracks tag `runes-v0.7.6`_
 _tracks tag `runes-v0.7.5`_
 
 ### Added
+
 - The minimap now draws inside Clawd's band, left of the mascot, as a 3-block-tall track ending in an arrow, and clicking the track jumps to that message.
 - The minimap's separate pane and its `/runes minimap open|close|<columns>` commands are gone, so `/runes minimap on|off` is now a plain switch (default still off).
 
 ### Fixed
+
 - The minimap shows only in the terminal, so the desktop band shows Clawd alone, and it leaves enough room for Clawd so the arrow no longer touches the mascot in herdr or Ghostty.
 
 ## [dispatch 5.7.1] - 2026-10-04
@@ -776,9 +899,11 @@ _tracks tag `runes-v0.7.5`_
 _tracks tag `dispatch-v5.7.1`_
 
 ### Added
+
 - The Flightdeck pane's Open flightdeck button now opens the web dashboard on demand, and the launcher gains an --open flag to opt back in to opening the browser.
 
 ### Changed
+
 - Under Claude Code the Flightdeck launcher no longer opens the browser by default, since the pane is already open; Codex and OpenCode behave as before, and the docs now say so.
 
 ## [dispatch 5.7.0] - 2026-10-04
@@ -786,11 +911,13 @@ _tracks tag `dispatch-v5.7.1`_
 _tracks tag `dispatch-v5.7.0`_
 
 ### Added
+
 - Flightdeck now runs as a Claude Code pane: `/flightdeck [planDir|close]` toggles it, and it opens itself after an autopilot launch, with a toast when the terminal is too narrow to place it.
 - Flightdeck shows each task as a bordered card with its in-flight agents inside, plus a crew box listing the latest scout and commit agents.
 - Flightdeck shows run time and a token total in a "Total Cost" block, with a centred plan title and state chips placed directly above the task grid.
 
 ### Fixed
+
 - Flightdeck now auto-opens when autopilot is launched with a shell variable for `--plan`, because it reads the plan path from the launcher's output.
 - Autopilot parks a task as an infrastructure failure when worktree creation returns an empty path, instead of running it in the main tree and aborting the whole run.
 - Flightdeck skips redundant redraws when nothing changed and keeps clipped cards pressable.
@@ -800,9 +927,11 @@ _tracks tag `dispatch-v5.7.0`_
 _tracks tag `runes-v0.7.4`_
 
 ### Added
+
 - The minimap rune gains a compact inline layout, a sideways strip of fixed-width bars with an orange marker on the active row.
 
 ### Changed
+
 - /minimap is now part of /runes: use `/runes minimap` with open, close, on or off, bare `/runes` toggles all runes, and the old status view moved to `/runes status`.
 
 ## [runes 0.7.3] - 2026-10-03
@@ -810,6 +939,7 @@ _tracks tag `runes-v0.7.4`_
 _tracks tag `runes-v0.7.3`_
 
 ### Added
+
 - A new /minimap command opens a 24-column side pane that shows the whole session as coloured bars; press Enter or click a bar to scroll the transcript there.
 - The minimap rune is switchable from config.yaml and off by default, since it opens a pane; /runes on still turns it on with the rest.
 
@@ -818,6 +948,7 @@ _tracks tag `runes-v0.7.3`_
 _tracks tag `runes-v0.7.2`_
 
 ### Fixed
+
 - Other plugins that render user and assistant messages now keep working alongside runes, because the prompt and reply bubbles no longer cut off the render chain.
 
 ## [runes 0.7.1] - 2026-10-03
@@ -825,6 +956,7 @@ _tracks tag `runes-v0.7.2`_
 _tracks tag `runes-v0.7.1`_
 
 ### Added
+
 - Pasted images can now be opened in Quick Look: the prompt bubble draws a button for each `[Image #N]`, and pressing it previews the matching image.
 
 ## [runes 0.7.0] - 2026-10-03
@@ -832,6 +964,7 @@ _tracks tag `runes-v0.7.1`_
 _tracks tag `runes-v0.7.0`_
 
 ### Added
+
 - Skill tool calls now get their own transcript card showing the skill's args and a plain success or failed status, with a forked skill's result folded, plus an expandable SKILL.md block read only on first press and an arm_flex icon by default.
 - Agent cards show the model and effort in the title, such as `sonnet/low`, so you can see how each subagent is running at a glance.
 - The Write card now shows the first 12 rows of a newly created file with a "more lines" fold, instead of hiding the whole file.
@@ -841,6 +974,7 @@ _tracks tag `runes-v0.7.0`_
 _tracks tag `runes-v0.6.0`_
 
 ### Added
+
 - Transcript now shows Read, Edit, Write and Agent cards, each with its own on/off switch under `transcript:` in config.yaml (older configs are backfilled automatically), with Read and Write-create folded by default and Edit drawing a diff.
 
 ## [runes 0.5.1] - 2026-10-03
@@ -848,6 +982,7 @@ _tracks tag `runes-v0.6.0`_
 _tracks tag `runes-v0.5.1`_
 
 ### Changed
+
 - In config.yaml, prompt, reply, bash, peer and glow now sit under `transcript:`, next to the switch that already controls those bubbles; a 0.5.0 file (and the older top-level `enabled:` layout) is moved over automatically at session start, keeping your own values and comments.
 
 ## [runes 0.5.0] - 2026-10-03
@@ -855,18 +990,21 @@ _tracks tag `runes-v0.5.1`_
 _tracks tag `runes-v0.5.0`_
 
 ### Added
+
 - A new bash rune redraws Bash tool calls as linked command and output cards, with hover highlighting and folding of long output, plus a matching `bash` section in config.yaml.
 - Shell commands are now syntax-highlighted, and command output goes through glow only when its type (JSON, diff, single file) is recognised, so plain text is no longer turned into headings and bullets.
 - A new peer rune draws subagent hand-backs as a card titled with the agent name and folds the harness's long frame behind a toggle; display only, the model still reads the full text. It is enabled by default.
 - Older config.yaml files are backfilled with sections for runes added since they were written.
 
 ### Changed
+
 - config.yaml changed format: each rune's switch now lives in its own section (`bash:\n  enabled: true`) instead of a top-level `enabled:` block. An older file is migrated automatically at session start; a comment on an old switch line does not move with it.
 - New config files set only the switches and write every other field as a commented default, so a changed default reaches them instead of being frozen in.
 - Clawd animation no longer redraws the whole transcript on every frame, only the band above the prompt, so idle sessions stay light.
 - Transcript rendering is faster through shared wrapping helpers and per-card caching, with no change in how it looks.
 
 ### Fixed
+
 - Bash cards are readable on light terminals: they pick a light or dark palette from the glow style setting.
 - Right-side bubbles no longer show an extra column of gap before the bar, and icons are padded consistently.
 - The prompt bubble's "more lines" fold now matches the Bash cards and no longer lights up every card at once.
@@ -876,9 +1014,11 @@ _tracks tag `runes-v0.5.0`_
 _tracks tag `runes-v0.4.0`_
 
 ### Added
+
 - Edit runes bubble colours, icons, sides, prompt fold height, glow style and on/off switches by hand in ~/.config/q-lab/cc-plugins/runes/config.yaml, with /runes writing switch changes back to that file and /runes reload re-reading it (bun must now be on the PATH).
 
 ### Fixed
+
 - Folded system-reminder heads with CJK or emoji text no longer overflow the row and break the side borders, because they are now cut by display width.
 
 ## [runes 0.3.0] - 2026-10-03
@@ -886,12 +1026,14 @@ _tracks tag `runes-v0.4.0`_
 _tracks tag `runes-v0.3.0`_
 
 ### Added
+
 - New transcript rune redraws your own prompts as a rounded bubble with a blue bar and icon, with long prompts and system reminders foldable; turn it off with `/runes transcript off`.
 - Claude's replies now appear as an orange bubble, with markdown rendered through glow.
 - Prompt bubbles render markdown through glow, which fixes mid-word line breaks and falls back to plain wrapping when glow is unavailable.
 - Both bubbles still draw without glow installed, using wrapped raw text and a one-time install hint, and one aborted glow run no longer turns glow off for the session.
 
 ### Fixed
+
 - Transcript glow rendering now runs in a background worker, so a redraw no longer aborts it; a message's first draw shows raw text for about 30 ms.
 - Glow no longer creates a literal `~` folder in your working directory, and the bubble sides are swapped so your prompt sits on the right and Claude's reply on the left.
 
@@ -900,6 +1042,7 @@ _tracks tag `runes-v0.3.0`_
 _tracks tag `chronicle-v0.22.2`_
 
 ### Changed
+
 - Commit and branch checks respond faster because two independent git lookups now run in parallel.
 
 ## [guard 0.7.3] - 2026-10-03
@@ -907,6 +1050,7 @@ _tracks tag `chronicle-v0.22.2`_
 _tracks tag `guard-v0.7.3`_
 
 ### Changed
+
 - Comment checks behave the same across Claude Code, Codex, and OpenCode because they now share one block-detection pipeline instead of two hand-synced copies.
 
 ## [monitor 8.0.1] - 2026-10-03
@@ -914,6 +1058,7 @@ _tracks tag `guard-v0.7.3`_
 _tracks tag `monitor-v8.0.1`_
 
 ### Changed
+
 - Tool calls do less work and concurrent requests share a single daemon spawn instead of starting duplicates.
 
 ## [runes 0.2.1] - 2026-10-03
@@ -921,6 +1066,7 @@ _tracks tag `monitor-v8.0.1`_
 _tracks tag `runes-v0.2.1`_
 
 ### Changed
+
 - The mascot redraws with less per-frame work, and the runes on/off switches are loaded once at session start.
 
 ## [runes 0.2.0] - 2026-10-03
@@ -928,6 +1074,7 @@ _tracks tag `runes-v0.2.1`_
 _tracks tag `runes-v0.2.0`_
 
 ### Added
+
 - The clawd plugin is now runes, a home for switchable Claude Code UI mods, with the Clawd mascot as its first rune and `/runes on|off|status` plus `/runes clawd on|off` to turn them on or off; the choice is remembered across sessions, and a rune never switched off stays on. Uninstall the old clawd plugin when you install runes, or two mascots will draw.
 
 ## [monitor 8.0.0] - 2026-10-03
@@ -935,13 +1082,16 @@ _tracks tag `runes-v0.2.0`_
 _tracks tag `monitor-v8.0.0`_
 
 ### Added
+
 - A plain `claude` session now receives cockpit dashboard messages and the permission relay through the monitor mod, with no `--dangerously-load-development-channels` flag needed, and a dashboard answer can close the terminal permission dialog.
 
 ### Changed
+
 - Breaking: `cockpit channel` is removed and `cockpit ensure-daemon` takes over starting or superseding the daemon; sessions started before the upgrade keep the old behaviour until they restart.
 - The install flow no longer prompts for the dev flag or checks the claude channels version, and still cleans up a leftover hand-wired cockpit-channel entry.
 
 ### Fixed
+
 - The dashboard relaunch hint no longer asks for the dev flag; it says the session is not polling and suggests `claude --resume <sessionId>`.
 
 ## [chronicle 0.22.1] - 2026-10-03
@@ -949,6 +1099,7 @@ _tracks tag `monitor-v8.0.0`_
 _tracks tag `chronicle-v0.22.1`_
 
 ### Changed
+
 - The `git commit` gate regex now lives in one shared file, with a test that fails if the shell, OpenCode and mod copies drift apart; behaviour is unchanged.
 
 ## [guard 0.7.2] - 2026-10-03
@@ -956,6 +1107,7 @@ _tracks tag `chronicle-v0.22.1`_
 _tracks tag `guard-v0.7.2`_
 
 ### Changed
+
 - Added a tsconfig so `tsc -p packages/guard` can typecheck the guard mod; no runtime change.
 
 ## [clawd 0.1.4] - 2026-10-03
@@ -963,6 +1115,7 @@ _tracks tag `guard-v0.7.2`_
 _tracks tag `clawd-v0.1.4`_
 
 ### Fixed
+
 - Fixed six type errors in the clawd mod that surfaced under mod typechecking, with no change in behaviour.
 
 ## [chronicle 0.22.0] - 2026-10-03
@@ -970,6 +1123,7 @@ _tracks tag `clawd-v0.1.4`_
 _tracks tag `chronicle-v0.22.0`_
 
 ### Added
+
 - The branch guard now runs as a Claude Code mod that fires only on `git commit`, so other Bash calls no longer pay a shell start-up cost, while the branch rules and messages stay the same.
 
 ## [dispatch 5.6.0] - 2026-10-03
@@ -977,9 +1131,11 @@ _tracks tag `chronicle-v0.22.0`_
 _tracks tag `dispatch-v5.6.0`_
 
 ### Added
+
 - flightplan-lint now runs as a Claude Code mod that matches the task path first, so unrelated Edit and Write calls no longer spawn a shell, and violations reach the model through the result context.
 
 ### Changed
+
 - The Required-reading header check behind flightplan-lint now lives in lint-task.ts alone, and a test fails if the three copies of the task-path pattern drift apart.
 
 ## [guard 0.7.1] - 2026-10-03
@@ -987,6 +1143,7 @@ _tracks tag `dispatch-v5.6.0`_
 _tracks tag `guard-v0.7.1`_
 
 ### Fixed
+
 - comment-sweep no longer re-asks about comment blocks you moved from one file to another, including blocks moved out of a file deleted in the same turn; a reworded line is still asked.
 - comment-guard no longer asks about an edit Claude Code held for review instead of writing, which could previously flag an untouched block that repeated the same text.
 
@@ -995,6 +1152,7 @@ _tracks tag `guard-v0.7.1`_
 _tracks tag `monitor-v7.2.0`_
 
 ### Removed
+
 - The retired `cockpit atlas statusline` subcommand is gone, since rate limits have come from the monitor mod via `cockpit atlas measure` since 7.1.0; if you skipped 7.1.0 and still have the old statusline wiring, your statusline stays blank until your next session start, when the automatic unwrap restores your original command.
 
 ## [clawd 0.1.3] - 2026-10-03
@@ -1002,6 +1160,7 @@ _tracks tag `monitor-v7.2.0`_
 _tracks tag `clawd-v0.1.3`_
 
 ### Fixed
+
 - The mascot now sits at the right edge of the band above the prompt, sized to the conversation body's width so a docked pane no longer pushes it off.
 
 ## [guard 0.7.0] - 2026-10-03
@@ -1009,9 +1168,11 @@ _tracks tag `clawd-v0.1.3`_
 _tracks tag `guard-v0.7.0`_
 
 ### Added
+
 - On Claude Code, comment-guard now runs in-process as a mod on every Edit/Write instead of spawning bun each time, so edits are no longer slowed by a process launch.
 
 ### Changed
+
 - When TYPESAFE_API_KEY is set and Jev withdraws every flagged block, Claude Code now shows a toast instead of a system message; Codex and OpenCode behave as before.
 
 ## [monitor 7.1.0] - 2026-10-03
@@ -1019,10 +1180,12 @@ _tracks tag `guard-v0.7.0`_
 _tracks tag `monitor-v7.1.0`_
 
 ### Added
+
 - The monitor mod now feeds your rate-limit usage to the cockpit cache on every session measure, so limits stay current without a statusLine wrapper, and API-key users still get the rollup nudge.
 - New `cockpit atlas measure` subcommand writes the rate-limit cache and throttle markers directly, sharing one cache format with the statusline.
 
 ### Changed
+
 - `monitor:install` no longer wires the statusline collector into settings.json, and existing setups running the retired collector are migrated back to the command they originally forwarded to, so updating breaks nothing.
 
 ## [clawd 0.1.2] - 2026-10-02
@@ -1030,6 +1193,7 @@ _tracks tag `monitor-v7.1.0`_
 _tracks tag `clawd-v0.1.2`_
 
 ### Fixed
+
 - Clawd no longer replays the done animation when a subagent's turn ends, and the celebration now lasts 5 seconds instead of 60.
 - Clawd stays in the working state for as long as subagents are running, even after the main turn has ended.
 
@@ -1038,6 +1202,7 @@ _tracks tag `clawd-v0.1.2`_
 _tracks tag `clawd-v0.1.1`_
 
 ### Fixed
+
 - The clawd mascot no longer looks blurry or oversized in Kitty and Ghostty, because its sprite is now scaled with nearest-neighbour filtering before display.
 - In herdr, which lacks Kitty placeholders, the mascot now renders with sharper octant glyphs drawn as coloured text instead of the old half-block fallback.
 
@@ -1046,6 +1211,7 @@ _tracks tag `clawd-v0.1.1`_
 _tracks tag `clawd-v0.1.0`_
 
 ### Added
+
 - New clawd plugin animates Clawd, hey-clawd's pixel crab, in the band above the Claude Code prompt: it works while a turn runs, calls for attention on a permission prompt, celebrates when a turn ends, and yawns and sleeps when idle, picking from 35 clips by mood.
 - Clawd renders in real pixels through kitty graphics in terminals that support Unicode placeholders, falls back to half-block characters elsewhere (such as inside herdr), and draws a crisp pixel SVG on desktop.
 - Clawd works with Claude Code only (no Codex) and requires Claude Code's function hooks, which are in early access.
@@ -1055,6 +1221,7 @@ _tracks tag `clawd-v0.1.0`_
 _tracks tag `browsers-v0.1.0`_
 
 ### Added
+
 - New browsers plugin with three skills that share one command surface, where each parallel agent gets its own throwaway profile, process, and port so agents never share a browser.
 - Drive an isolated headless Chrome over CDP when Herdr is not running, with navigations that wait for load so clicks and key presses no longer race page loads.
 - Drive the installed Firefox and Zen through Marionette, so bugs that only reproduce on Gecko can be investigated.
@@ -1065,6 +1232,7 @@ _tracks tag `browsers-v0.1.0`_
 _tracks tag `dispatch-v5.5.1`_
 
 ### Changed
+
 - The flightdeck fleet stream no longer resends unchanged frames and sends each rationale once per stream, cutting a steady frame from about 398KB to 96KB and stopping the browser memory creep.
 
 ## [herdr 0.7.11] - 2026-10-01
@@ -1072,6 +1240,7 @@ _tracks tag `dispatch-v5.5.1`_
 _tracks tag `herdr-v0.7.11`_
 
 ### Changed
+
 - Refreshed the herdr references for herdr 0.9.3, covering the removal of pane.graphics.*, the events_lost resync via session.snapshot, new config keys, TERM_PROGRAM=herdr in new panes, and the machine status/reconnect subcommands.
 
 ## [monitor 7.0.0] - 2026-10-01
@@ -1079,14 +1248,17 @@ _tracks tag `herdr-v0.7.11`_
 _tracks tag `monitor-v7.0.0`_
 
 ### Added
+
 - The usage dashboard (token atlas) now runs inside the cockpit Rust binary as `cockpit atlas serve|stats|live|rollup-update|statusline|push-usage`, keeping port 5938, the same SPA, and the same rollup.db schema v3; serving RSS drops from about 600 MB to 77.8 MB on a real home.
 - rollup.db is backed up once to `<db>.pre-rust.bak` before the Rust engine first writes it, so history stays recoverable.
 - The statusline command migrates automatically at session start from `bun …/statusline-collector.ts` to `…/cockpit atlas statusline`, keeping any wrapper command you put around it, and the drift watch reports a leftover old-form collector.
 
 ### Removed
+
 - The Bun/TypeScript atlas scripts under usage-dashboard are deleted; the Rust binary is now the only engine.
 
 ### Fixed
+
 - Migrating the statusline no longer strips quotes from your own wrapper command, so commands like `hud statusline 'bun …collector.ts'` keep working, and quoted paths and absolute `bun` paths are now recognised.
 - Live sessions pass unknown session-file fields through unchanged, and the statusline inner command no longer inherits `TOKEN_ATLAS_STATUSLINE_COMMAND`, after a final review pass over the Rust atlas.
 
@@ -1095,6 +1267,7 @@ _tracks tag `monitor-v7.0.0`_
 _tracks tag `monitor-v6.0.1`_
 
 ### Fixed
+
 - The cockpit binary download now resumes after an interruption and the hook's background fetch gets 10 minutes instead of 30 seconds, so on a slow GitHub link hooks and the channel no longer stay silently off after updating to 6.0.0; the first session after updating may still start without the channel, and a later session picks up the finished binary.
 
 ## [monitor 6.0.0] - 2026-09-30
@@ -1102,17 +1275,21 @@ _tracks tag `monitor-v6.0.1`_
 _tracks tag `monitor-v6.0.0`_
 
 ### Added
+
 - Every cockpit process (daemon, per-session channel MCP server, CLI, and hooks) is now a single Rust binary, cutting idle memory from about 55 MB to 8.8 MiB for the channel and from about 86 MB to 11.7 MiB for the server.
 - A POSIX sh shim (skills/cockpit/bin/cockpit) fetches the prebuilt binary on darwin-arm64, darwin-x64, linux-x64, and linux-arm64; set COCKPIT_BIN to use a local build instead.
 - The Claude and Codex manifests, the OpenCode plugin, and the setup check now launch the cockpit through the shim, and setup pre-approves it in permissions.allow. A newer channel still supersedes an older running daemon, so existing sessions share the new one.
 
 ### Changed
+
 - The cockpit binary cache now lives under q-lab/cockpit-bin, outside the cockpit home, so a legacy ~/.cockpit still migrates.
 
 ### Removed
+
 - The TypeScript cockpit is deleted; the Rust binary replaces it, and the docs now point at it. usage-dashboard is unchanged and stays on Bun.
 
 ### Fixed
+
 - Dashboard messages and permission relay no longer silently fail to reach a session: the channel refuses MCP server/discover so Claude Code falls back to protocol 2025-11-25, which keeps channel notifications working after Claude Code drops them on 2026-07-28.
 - Usage stats now count sessions per provider activity shape correctly and typecheck cleanly.
 
@@ -1121,6 +1298,7 @@ _tracks tag `monitor-v6.0.0`_
 _tracks tag `dispatch-v5.5.0`_
 
 ### Added
+
 - Autopilot parks a task at once when the dev or verifier reports a plan defect, instead of burning retry attempts on it.
 - The land step now runs on opus and resolves rebase conflicts itself, parking unresolvable ones as infrastructure; touching <planDir>/.flightlog/drain stops new dispatch while in-flight tasks finish and land.
 - resume-point suggests restarting from dev after a land that ended in a conflict, and the fleet view recognises the land role.
@@ -1128,6 +1306,7 @@ _tracks tag `dispatch-v5.5.0`_
 - worktree gains a reset command that restores a recorded rebase, so a land retry starts clean rather than on top of a half-finished conflict resolution.
 
 ### Changed
+
 - Autopilot worktree calls run on haiku.
 
 ## [chronicle 0.21.1] - 2026-09-30
@@ -1135,6 +1314,7 @@ _tracks tag `dispatch-v5.5.0`_
 _tracks tag `chronicle-v0.21.1`_
 
 ### Removed
+
 - Code comments now point at the Rust cockpit sources that replaced the deleted TypeScript scripts.
 
 ## [relay 0.9.1] - 2026-09-30
@@ -1142,9 +1322,11 @@ _tracks tag `chronicle-v0.21.1`_
 _tracks tag `relay-v0.9.1`_
 
 ### Added
+
 - Headless codex-run and opencode-run now follow your relay config (--model, then CODEX_MODEL/OPENCODE_MODEL, then models.<backend>.<mode>), so headless and live runs pick the same model; editing the config between waves can change the model mid-flight.
 
 ### Removed
+
 - Code comments now point at the Rust cockpit sources that replaced the deleted TypeScript scripts.
 
 ## [dispatch 5.4.0] - 2026-09-30
@@ -1152,9 +1334,11 @@ _tracks tag `relay-v0.9.1`_
 _tracks tag `dispatch-v5.4.0`_
 
 ### Added
+
 - Headless codex-run and opencode-run now follow your relay config for model choice, so a flight picks the same model headless as it does in a live pane; note the model can change mid-flight if you edit relay config between waves.
 
 ### Changed
+
 - Autopilot's codex model question now defaults to "Relay config", showing the resolved model in the label, so you no longer have to pick one by hand.
 
 ## [chronicle 0.21.0] - 2026-09-30
@@ -1162,6 +1346,7 @@ _tracks tag `dispatch-v5.4.0`_
 _tracks tag `chronicle-v0.21.0`_
 
 ### Added
+
 - Commit `exclude` now accepts a directory (an entry ending in `/`), expanded at apply time to every changed path under it, so exclude lists no longer go stale and get refused as `missing` when files change between planning and apply.
 
 ## [monitor 5.2.4] - 2026-09-30
@@ -1169,9 +1354,11 @@ _tracks tag `chronicle-v0.21.0`_
 _tracks tag `monitor-v5.2.4`_
 
 ### Changed
+
 - Cockpit prompts (pilot, scribe, thoughtful) and the monitor install prompt were audited for stale facts, cutting about 14% of the words, listing every scribe spawn path, and giving /thoughtful a concrete find-session command.
 
 ### Fixed
+
 - The usage-dashboard prompt no longer contradicts monitor:install: statusline wiring goes through install, the misleading "restart Claude Code" advice is gone, and the plugin root resolves from the base-directory banner.
 
 ## [dispatch 5.3.9] - 2026-09-30
@@ -1179,6 +1366,7 @@ _tracks tag `monitor-v5.2.4`_
 _tracks tag `dispatch-v5.3.9`_
 
 ### Changed
+
 - Corrected the autopilot, flightplan, hop, preflight, waypoints, and deckplan prompts where they contradicted the code (for example, a bare waypoints `advance` only previews and `--outcome` is what writes), so agents follow behaviour that actually exists.
 - Trimmed stale model names, misleading examples, and repeated rules from dispatch prompts, so each skill loads with fewer tokens and hop no longer pins outdated model or relay versions.
 
@@ -1187,6 +1375,7 @@ _tracks tag `dispatch-v5.3.9`_
 _tracks tag `herdr-v0.7.10`_
 
 ### Changed
+
 - Trimmed the herdr skill docs to drop notes an agent cannot act on and version-history phrasing, so the skill loads with fewer tokens.
 
 ## [chronicle 0.20.2] - 2026-09-30
@@ -1194,6 +1383,7 @@ _tracks tag `herdr-v0.7.10`_
 _tracks tag `chronicle-v0.20.2`_
 
 ### Changed
+
 - Chronicle prompts are cleaned of stale and contradictory guidance, and the codifier now writes Supersedes: in replacement ADR drafts so supersede runs no longer fail on non-mutual links.
 - The release skill now saves its first-run interview to .chronicle/release.json, so a fresh repo no longer stalls on release.ts exiting with an error.
 
@@ -1202,6 +1392,7 @@ _tracks tag `chronicle-v0.20.2`_
 _tracks tag `guard-v0.6.2`_
 
 ### Fixed
+
 - comment-sweep now asks its "answer for every line marked +" question once per sweep instead of once per file, cutting repeated noise.
 - Manifest descriptions now match actual behaviour: comment-sweep is named, file-header blocks are exempt, and Jev can withdraw a block.
 
@@ -1210,6 +1401,7 @@ _tracks tag `guard-v0.6.2`_
 _tracks tag `monitor-v5.2.3`_
 
 ### Removed
+
 - Cockpit no longer sends to OpenCode 2.x services, and the "run opencode upgrade" notice is gone from warnings, the send button, and the TUI toast; sends use the supported 1.x TUI bridge only.
 
 ## [dispatch 5.3.8] - 2026-09-30
@@ -1217,6 +1409,7 @@ _tracks tag `monitor-v5.2.3`_
 _tracks tag `dispatch-v5.3.8`_
 
 ### Changed
+
 - The flightplan linter now rejects Final review gates that run `git status` (which misses earlier waves' already-committed edits) and asks for `git diff --name-only <baseRef>` instead.
 - The linter also flags Final review gate items that cite "the report" without naming its file path in backticks, so verifiers know where to look.
 
@@ -1225,14 +1418,17 @@ _tracks tag `dispatch-v5.3.8`_
 _tracks tag `relay-v0.9.0`_
 
 ### Added
+
 - Relay ships a versioned suggested opencode model config, with `config check` to see whether yours is current, outdated, or malformed, and `config apply --merge|--overwrite` to keep your picks or take the suggestions.
 - Failed opencode and claude runs now report the real cause, such as an unrecognized model, instead of an empty or bare error code.
 
 ### Changed
+
 - The suggested opencode delegate and review models are refreshed to current ids.
 - Relay's skill text is trimmed and now documents model precedence and how failures surface, so the agent loads fewer tokens each run.
 
 ### Fixed
+
 - `/relay:opencode delegate` no longer fails out of the box: relay stops pinning an opencode model that upstream had removed, and uses your flag, then your config, then the CLI default.
 - Relay now targets opencode 1.x only, restoring live-mode model selection and warning 2.x users to downgrade.
 - Merging the suggested config now replaces models that were withdrawn upstream while keeping the ones you changed, and the config check runs only for the opencode backend.
@@ -1242,6 +1438,7 @@ _tracks tag `relay-v0.9.0`_
 _tracks tag `dispatch-v5.3.7`_
 
 ### Fixed
+
 - Autopilot legs in nested plan directories can now read their task inputs (such as design mockups and assets) inside their worktree, because the plan directory is linked in from the main tree instead of being dropped.
 
 ## [dispatch 5.3.6] - 2026-09-29
@@ -1249,6 +1446,7 @@ _tracks tag `dispatch-v5.3.7`_
 _tracks tag `dispatch-v5.3.6`_
 
 ### Fixed
+
 - Autopilot now runs plans that live deeper than `docs/<slug>/`, such as a waypoints leg, instead of aborting every land with a false main-tree leak report.
 
 ## [monitor 5.2.2] - 2026-09-29
@@ -1256,6 +1454,7 @@ _tracks tag `dispatch-v5.3.6`_
 _tracks tag `monitor-v5.2.2`_
 
 ### Fixed
+
 - The cockpit session list no longer shows ended sessions that never wrote a log, which used to linger for up to 14 days as rows with an empty trail.
 
 ## [chronicle 0.20.1] - 2026-09-29
@@ -1263,6 +1462,7 @@ _tracks tag `monitor-v5.2.2`_
 _tracks tag `chronicle-v0.20.1`_
 
 ### Fixed
+
 - ADR triage source no longer looks like a binary file to git and grep, so diffs and searches stop silently skipping it.
 
 ## [guard 0.6.1] - 2026-09-29
@@ -1270,6 +1470,7 @@ _tracks tag `chronicle-v0.20.1`_
 _tracks tag `guard-v0.6.1`_
 
 ### Added
+
 - Comment hooks now show a visible note with the count and time whenever Jev withdraws a flagged comment block, instead of dropping it silently.
 
 ## [chronicle 0.20.0] - 2026-09-29
@@ -1277,9 +1478,11 @@ _tracks tag `guard-v0.6.1`_
 _tracks tag `chronicle-v0.20.0`_
 
 ### Added
+
 - ADR triage now pre-screens clusters with Jev and skips those it is highly confident are not worth judging, so fewer clusters reach the sonnet judge; watched clusters and --evidence runs are never screened.
 
 ### Fixed
+
 - Fixed pre-existing type errors in the adr scripts so the typecheck is cleaner, with no change in behaviour.
 
 ## [guard 0.6.0] - 2026-09-29
@@ -1287,6 +1490,7 @@ _tracks tag `chronicle-v0.20.0`_
 _tracks tag `guard-v0.6.0`_
 
 ### Added
+
 - Comment reports are now screened through Jev first, so blocks that clearly explain why are no longer sent back to the model, saving an extra turn; this only runs with TYPESAFE_API_KEY and any failure keeps the original behaviour.
 
 ## [monitor 5.2.1] - 2026-09-29
@@ -1294,9 +1498,11 @@ _tracks tag `guard-v0.6.0`_
 _tracks tag `monitor-v5.2.1`_
 
 ### Added
+
 - On Claude Code with `claude` on PATH, the Stop hook now launches the decision-log scribe as a detached headless fork, so it no longer wakes the main agent; in a live run it took 3 turns and 20.6 s (397k cache-read tokens), against a 14-day median of 34.7 s, 10 turns and 1.48M cache-read tokens for in-session forks. The trade-off is that every Stop passing the signature and 8-minute gate now spends one headless run, and Codex, OpenCode and setups without `claude` keep the reminder.
 
 ### Fixed
+
 - The SessionStart guidance no longer tells the agent to spawn a scribe fork when the Stop hook already launches one, so decisions are not recorded twice.
 
 ## [chronicle 0.19.1] - 2026-09-29
@@ -1304,12 +1510,15 @@ _tracks tag `monitor-v5.2.1`_
 _tracks tag `chronicle-v0.19.1`_
 
 ### Added
+
 - The adr skill now applies gate 2 verdicts through a new adr-commit engine, so drafts are no longer retyped by the main agent and partial, unknown, or duplicate verdict sets are refused.
 
 ### Changed
+
 - The adr flow is shorter: the main agent now spawns the codifier and barrowkeeper directly, the codifier writes the gate 2 payload itself, and the lorekeeper agent is retired.
 
 ### Removed
+
 - Chronicle no longer installs a spawn-depth setting or its SessionStart hook, because no chronicle agent spawns a child anymore; a value written earlier is harmless and left alone.
 
 ## [chronicle 0.19.0] - 2026-09-29
@@ -1317,12 +1526,15 @@ _tracks tag `chronicle-v0.19.1`_
 _tracks tag `chronicle-v0.19.0`_
 
 ### Added
+
 - The PR creator now reads its material and body text from files and refuses to open a PR with a not-pushed result when the exact branch is not on a remote, so an unpushed branch prompts you instead of failing mid-creation.
 
 ### Changed
+
 - PR creation is faster and simpler: the skald and messenger agents are retired in favour of a single storykeeper that writes the PR body once and creates the PR, and the first live run took 38s against a 187s median for the old three-agent flow.
 
 ### Fixed
+
 - The TypeSafe grouping line now always appears, showing either Jev's time or the reason it was skipped, including for fewer than 2 or more than 20 files and in simple mode.
 - The storykeeper no longer runs the PR creator before the body file exists, which could make the creator read a missing file.
 
@@ -1331,6 +1543,7 @@ _tracks tag `chronicle-v0.19.0`_
 _tracks tag `chronicle-v0.18.2`_
 
 ### Fixed
+
 - The release changelog writer now knows its entries file must be an array with one entry per release, so it no longer has to guess the shape, including when there is only one release.
 
 ## [chronicle 0.18.1] - 2026-09-29
@@ -1338,15 +1551,18 @@ _tracks tag `chronicle-v0.18.2`_
 _tracks tag `chronicle-v0.18.1`_
 
 ### Added
+
 - Release now asks TypeSafe's Jev to suggest a changelog section for commits whose type cannot decide it, and prints a `[TypeSafe classify ...]` line with the round-trip time; without a key nothing changes.
 - Commit's grouping plan now carries mandatory rules derived from paths, such as keeping a test with its implementation and a lock file with its manifest.
 - Commit now reports every TypeSafe grouping outcome: the round-trip time on success, the wait and reason on failure, and a hint when no API key is set.
 
 ### Changed
+
 - The release agent treats a Jev-suggested section as a hint it can overrule, and the release skill relays the TypeSafe classify line to you.
 - The commit agent understands the new digest rules and final splits, and the commit skill relays every TypeSafe grouping line.
 
 ### Fixed
+
 - Release now errors when a tag is drafted twice or a git range is invalid, instead of skipping coverage checks or passing an empty changelog.
 - When a file is excluded from a commit, its must-share partner is now committed alone rather than leaving no valid plan.
 - Commit plans no longer require a fallback simple message for final splits of more than five files, which never used it.
@@ -1356,10 +1572,12 @@ _tracks tag `chronicle-v0.18.1`_
 _tracks tag `chronicle-v0.18.0`_
 
 ### Added
+
 - Commit digests can now include grouping suggestions from TypeSafe's Jev model when TYPESAFE_API_KEY is set, and the commit flow is unchanged when the key is unset or the call fails.
 - Release changelogs are now built from a complete commit list, so a release can no longer silently miss a commit and existing changelog headings can never be renamed.
 
 ### Changed
+
 - A configured TYPESAFE_API_KEY that fails is now reported in the commit result instead of being skipped silently.
 - The Codex and OpenCode versions of lawspeaker now follow the same commit rules as the Claude one, including suggested groups, --simple, and the skip notice.
 
@@ -1368,6 +1586,7 @@ _tracks tag `chronicle-v0.18.0`_
 _tracks tag `dispatch-v5.3.5`_
 
 ### Fixed
+
 - Autopilot no longer stops mid-setup to ask whether it may commit between waves. A PLAN.md line such as "user commits after the run" was being read as conflicting with wave commits, but it only binds task agents, which never commit. Autopilot now keeps each wave as one revertable checkpoint, and the pre-flight brief says so up front. You can squash after `CFG.baseRef` if you want a single commit.
 
 ## [monitor 5.2.0] - 2026-09-29
@@ -1375,14 +1594,17 @@ _tracks tag `dispatch-v5.3.5`_
 _tracks tag `monitor-v5.2.0`_
 
 ### Added
+
 - Cockpit sends to OpenCode 2.x now land. Prompts go through the background service's session prompt endpoint, discovered via its service file and authenticated with Basic auth.
 - When only the legacy 1.x TUI bridge is available, cockpit still sends through it and shows an `opencode upgrade` notice in warnings, the send button title, and a TUI toast.
 
 ### Fixed
+
 - Cockpit sends to OpenCode 2.x previously never arrived because the 1.x TUI bridge no longer exists there.
 - A service URL is paired only with its own password, and 401/403 responses are reported instead of falling back, so one service's password is never sent to another.
 
 ### Changed
+
 - Reworded the cockpit scribe references to state current rules and tone down emphasis.
 
 ## [chronicle 0.17.4] - 2026-09-29
@@ -1390,6 +1612,7 @@ _tracks tag `monitor-v5.2.0`_
 _tracks tag `chronicle-v0.17.4`_
 
 ### Changed
+
 - Reworded chronicle and OpenCode agent prompts as current rules with less stacked emphasis, and re-synced the Claude, Codex and OpenCode versions of lorekeeper and skald.
 - The Codex skald agent now follows the same Mermaid diagram rule as the Claude skald.
 - The OpenCode spawn note now covers any form of the fork-subagent instruction.
@@ -1399,6 +1622,7 @@ _tracks tag `chronicle-v0.17.4`_
 _tracks tag `dispatch-v5.3.4`_
 
 ### Changed
+
 - Reworded dispatch skill and reference prompts as current rules. Autopilot's OpenCode reference now lists the SKILL.md sections that do not apply under OpenCode.
 - Removed a false comment in `opencode-run.ts` claiming its defaults match relay's.
 
@@ -1407,6 +1631,7 @@ _tracks tag `dispatch-v5.3.4`_
 _tracks tag `herdr-v0.7.9`_
 
 ### Changed
+
 - Reworded the herdr references as current rules with less stacked emphasis.
 
 ## [relay 0.8.3] - 2026-09-29
@@ -1414,6 +1639,7 @@ _tracks tag `herdr-v0.7.9`_
 _tracks tag `relay-v0.8.3`_
 
 ### Changed
+
 - Softened the result-file contract wording ("FULL" is now lower-case); the test matches.
 
 ## [chronicle 0.17.3] - 2026-09-29
@@ -1421,10 +1647,12 @@ _tracks tag `relay-v0.8.3`_
 _tracks tag `chronicle-v0.17.3`_
 
 ### Fixed
+
 - The Codex storykeeper agent no longer defaults to draft PRs, matching the Claude version.
 - The OpenCode lorekeeper agent no longer tries to spawn prefixed agent names that do not exist there, and its wording is tightened.
 
 ### Changed
+
 - Corrected stale facts in chronicle prompts: wrong step numbers, nonexistent agent names and a wrong SessionStart matcher. Release wording now follows the terminal-default asking rule.
 
 ## [dispatch 5.3.3] - 2026-09-29
@@ -1432,6 +1660,7 @@ _tracks tag `chronicle-v0.17.3`_
 _tracks tag `dispatch-v5.3.3`_
 
 ### Changed
+
 - Autopilot's cheap roles (external review, scout, markDone, park) now default to sonnet/low instead of haiku. The fixer prompt no longer hard-codes "on Opus", since a task's Models header can override the fix model. The SKILL.md model table and orchestrator docs match.
 - Fixed stale facts in dispatch docs: a commit instruction that contradicted autopilot's no-commit rule, removed flags and wrong step numbers.
 - The flightplan example hand-off note now points at `/autopilot <slug>` and says autopilot derives the first ready task from the tree.
@@ -1442,6 +1671,7 @@ _tracks tag `dispatch-v5.3.3`_
 _tracks tag `herdr-v0.7.8`_
 
 ### Changed
+
 - Herdr docs now say `tell` defers to `ask`, since pane reads cannot prove a job completed.
 
 ## [monitor 5.1.1] - 2026-09-29
@@ -1449,10 +1679,12 @@ _tracks tag `herdr-v0.7.8`_
 _tracks tag `monitor-v5.1.1`_
 
 ### Fixed
+
 - Codex sessions now receive the decision-log instructions in Codex's own shape (with `--provider codex`) instead of the Claude-only fork Agent format.
 - The Stop nudge no longer re-appends the silence rule on every fire, and pressure language was removed from the thoughtful and scribe prompts. Claude output is unchanged.
 
 ### Changed
+
 - Removed a cockpit doc claim that contradicted the terminal-as-default asking rule, keeping the real reason: an unlogged ask leaves a gap in the decision trail.
 - Corrected renamed functions and outdated pricing and step references in monitor docs.
 
@@ -1461,9 +1693,11 @@ _tracks tag `monitor-v5.1.1`_
 _tracks tag `relay-v0.8.2`_
 
 ### Fixed
+
 - The relay prompt now states the file scope as a requirement rather than "if possible, stay within", which some models read as permission to leave scope.
 
 ### Changed
+
 - Corrected outdated references in relay docs.
 
 ## [relay 0.8.1] - 2026-09-29
@@ -1471,6 +1705,7 @@ _tracks tag `relay-v0.8.2`_
 _tracks tag `relay-v0.8.1`_
 
 ### Fixed
+
 - Codex image prompts no longer name `gpt-image-2`. Codex routes image requests to its own built-in imagegen skill, so naming a model was unnecessary and could steer it wrong.
 
 ## [dispatch 5.3.2] - 2026-09-29
@@ -1478,6 +1713,7 @@ _tracks tag `relay-v0.8.1`_
 _tracks tag `dispatch-v5.3.2`_
 
 ### Changed
+
 - Clarified when waypoint mode's leg planning asks about an impeccable visual-design pass and when it runs it, closing a gap where the timing depended on how the reviewing model read an earlier reference to another step. The design phase always runs right after the leg's directory is scaffolded, never before, avoiding a directory-already-exists error.
 
 ## [dispatch 5.3.1] - 2026-09-29
@@ -1485,6 +1721,7 @@ _tracks tag `dispatch-v5.3.2`_
 _tracks tag `dispatch-v5.3.1`_
 
 ### Added
+
 - `hop` gained an optional visual-design step, mirroring flightplan's: when the work touches UI, the interview now asks whether to run an impeccable design pass before execution, recommended for a new screen or layout change and skippable for a small tweak.
 
 ## [relay 0.8.0] - 2026-09-28
@@ -1492,6 +1729,7 @@ _tracks tag `dispatch-v5.3.1`_
 _tracks tag `relay-v0.8.0`_
 
 ### Fixed
+
 - Headless Codex delegate and review calls now actually honor a chosen model. Previously `--model` was silently dropped outside live mode, so a request for a specific model quietly ran on the default one instead.
 
 ## [dispatch 5.3.0] - 2026-09-28
@@ -1499,6 +1737,7 @@ _tracks tag `relay-v0.8.0`_
 _tracks tag `dispatch-v5.3.0`_
 
 ### Changed
+
 - `hop`'s review step now asks which harness (Claude, Codex, or OpenCode) and which model should perform the review, instead of always reviewing with Claude's opus at high effort. Picking a Codex model requires relay 0.8.0 or later.
 
 ## [monitor 5.1.0] - 2026-09-28
@@ -1506,9 +1745,11 @@ _tracks tag `dispatch-v5.3.0`_
 _tracks tag `monitor-v5.1.0`_
 
 ### Fixed
+
 - `/monitor:install` no longer churns `settings.json` on every plugin update: the statusline collector path now wires from the version-less marketplace clone instead of a version-pinned cache path, so a wired path stays valid across updates instead of going stale.
 
 ### Changed
+
 - Session-start migration no longer re-points or reports the statusline collector path — it now only cleans up a stale cockpit-channel entry.
 
 ## [dispatch 5.2.3] - 2026-09-27
@@ -1516,6 +1757,7 @@ _tracks tag `monitor-v5.1.0`_
 _tracks tag `dispatch-v5.2.3`_
 
 ### Fixed
+
 - Fixed autopilot's orchestrator failing to load on large plans: handing the ~1,500-line orchestrator script inline could get garbled in transcription. It's now baked to a file inside the plan's working directory before autopilot runs it, which also lets the script carry its explanatory comments without any transcription cost.
 
 ## [chronicle 0.17.2] - 2026-09-27
@@ -1523,6 +1765,7 @@ _tracks tag `dispatch-v5.2.3`_
 _tracks tag `chronicle-v0.17.2`_
 
 ### Changed
+
 - Chronicle's scratch files (commit-message temp files and other transient state) now live under `/tmp/q-lab/chronicle` instead of `/tmp/chronicle`, avoiding collisions with any other tool using that shared root.
 
 ## [dispatch 5.2.2] - 2026-09-27
@@ -1530,9 +1773,11 @@ _tracks tag `chronicle-v0.17.2`_
 _tracks tag `dispatch-v5.2.2`_
 
 ### Fixed
+
 - Fixed a bug where autopilot's judge could pick up a stale rationale or score file left over from a previous run on the same plan, because those scratch files used a predictable, reused path. Judge notes, the external driver's instructions, and cross-vendor review files now each get a freshly created, unique temp directory, so a rerun of the same plan can no longer collide with leftovers from an earlier run.
 
 ### Changed
+
 - Autopilot and flightplan scratch now lives under `/tmp/q-lab/dispatch/<skill>/<project>/<slug>/` instead of loose `/tmp/rationale-*`, `/tmp/scores-*`, and `/tmp/flightplan-*` paths.
 
 ## [guard 0.5.2] - 2026-09-27
@@ -1540,6 +1785,7 @@ _tracks tag `dispatch-v5.2.2`_
 _tracks tag `guard-v0.5.2`_
 
 ### Changed
+
 - Guard's state directory now lives under `/tmp/q-lab/guard` instead of `$TMPDIR/q-lab-guard`, matching the shared repo-wide scratch convention.
 
 ## [herdr 0.7.7] - 2026-09-27
@@ -1547,6 +1793,7 @@ _tracks tag `guard-v0.5.2`_
 _tracks tag `herdr-v0.7.7`_
 
 ### Changed
+
 - Herdr's `ask` scratch directory now lives under `/tmp/q-lab/herdr/ask` instead of `$TMPDIR/herd-ask`, matching the shared repo-wide scratch convention.
 
 ## [relay 0.7.2] - 2026-09-27
@@ -1554,6 +1801,7 @@ _tracks tag `herdr-v0.7.7`_
 _tracks tag `relay-v0.7.2`_
 
 ### Changed
+
 - Relay's scratch root now lives under `/tmp/q-lab/relay/relay` instead of `/tmp/relay`, so a different tool sharing that name can no longer collide with relay's temp files.
 
 ## [chronicle 0.17.1] - 2026-09-27
@@ -1561,9 +1809,11 @@ _tracks tag `relay-v0.7.2`_
 _tracks tag `chronicle-v0.17.1`_
 
 ### Added
+
 - `chronicle:commit` now accepts an opt-in `exclude` list, so pre-existing modified files unrelated to the current work can be left out of a run instead of forcing you to stash or commit them anyway. Excluded paths are reported separately as `excluded` (not lumped in with `leftover`), and every run that excludes files warns that HEAD may not build if the committed code depends on one of them. Exclude is refused while a merge or cherry-pick is in progress, since that would risk smuggling a staged excluded file into the merge commit.
 
 ### Changed
+
 - Raised the Lawspeaker agent's turn budget from 12 to 20 (Claude Code `maxTurns` and OpenCode `steps`) after a real run hit the old cap while hunting for an exclude option that didn't exist yet.
 
 ## [chronicle 0.17.0] - 2026-09-26
@@ -1571,6 +1821,7 @@ _tracks tag `chronicle-v0.17.1`_
 _tracks tag `chronicle-v0.17.0`_
 
 ### Changed
+
 - `chronicle:pr` now opens pull requests ready for review by default instead of as a draft, so reviewers are notified and CI starts immediately. Pass `draft:true` when you actually want a draft.
 
 ## [dispatch 5.2.1] - 2026-09-26
@@ -1578,6 +1829,7 @@ _tracks tag `chronicle-v0.17.0`_
 _tracks tag `dispatch-v5.2.1`_
 
 ### Fixed
+
 - Autopilot's external-CLI driver (`devExternal`) moves from a cheap, no-effort model to opus at low effort. It doesn't write code itself, but it turns a task file into the instruction file that codex or opencode implement from — a judgment call, not a translation — and the Haiku driver had been caught paraphrasing a critical rule out of the instructions it produced. The review-relay driver is unaffected.
 
 ## [dispatch 5.2.0] - 2026-09-26
@@ -1585,11 +1837,13 @@ _tracks tag `dispatch-v5.2.1`_
 _tracks tag `dispatch-v5.2.0`_
 
 ### Changed
+
 - Retuned autopilot's default model/effort split per Terminal-Bench 3.0 data showing effort buys verification and edge-case hunting, not a fix for a wrong approach: implementation dev rungs now default to opus/low instead of opus/medium, with a fixed opus/high last Claude dev rung (`MODEL.devLast`) so the final pass doesn't quietly lose rigor now that earlier rungs run cheaper — a task's own `Models` `dev=` header still raises one step above that rung. Final review's quality lenses (reuse, leanness, efficiency) now run at high effort, including when `reviewLensModel` is `fable`, while the final review fixer drops from opus/high to opus/medium since the lenses now do the hunting and the fixer just applies it.
 - flightplan Step 7's Opus review pass now runs through `/relay:claude-cli review --model opus --effort high` instead of an Agent spawn, since Agent has no effort parameter. This requires relay 0.7.1 or newer.
 - Rewrote the per-task `Models` header guidance to pick effort by where a task would fail rather than how hard it looks: dense hidden edge cases (sanitizers, parsers, concurrency, numerical code, storage migrations, brownfield fixes, behaviour-preserving refactors) now call for `dev=opus/high`, while an ambiguous approach should be resolved by pinning the intended reading in the task's notes or acceptance criteria instead of raising effort, since higher effort was measured to make a wrong reading worse.
 
 ### Added
+
 - hop gains an optional Step 6: a high-effort relay review of `git diff <base>` against the plan, run once the user has confirmed the direction is right. Step 5 now records the base commit up front so this diff is available even when work was committed in stages.
 
 ## [relay 0.7.1] - 2026-09-26
@@ -1597,9 +1851,11 @@ _tracks tag `dispatch-v5.2.0`_
 _tracks tag `relay-v0.7.1`_
 
 ### Added
+
 - New `--effort <low|medium|high|xhigh|max>` flag, passed through to the claude backend on both its headless and live-pane paths. The codex and opencode backends reject it with an explicit error instead of silently dropping it.
 
 ### Fixed
+
 - The claude backend's headless invocation now passes `--model`. Previously only the live-pane path did, so a headless call requesting a specific model silently ran on the CLI's default instead.
 
 ## [dispatch 5.1.1] - 2026-09-26
@@ -1607,6 +1863,7 @@ _tracks tag `relay-v0.7.1`_
 _tracks tag `dispatch-v5.1.1`_
 
 ### Changed
+
 - Flightplan's design phase grounds each mock in the project's real UI (a screenshot, its real colours and assets) and loads impeccable's `craft-floor.md` before drawing. Every page is rendered in a browser and its screenshot inspected before you see it, and again after each revision.
 - The impeccable engine is pre-warmed with one run at the maximum Bash timeout before the skill starts, so a slow first download can finish. If it still fails, the phase follows impeccable's "Launcher unavailable" path instead of retrying in a loop.
 - The design phase passes the interview summary into `shape`, so it confirms purpose, users, and states instead of asking them again.
@@ -1621,11 +1878,13 @@ _tracks tag `dispatch-v5.1.1`_
 _tracks tag `dispatch-v5.1.0`_
 
 ### Added
+
 - Flightplan's interview can now offer an optional visual-design phase, powered by impeccable, when the plan touches UI and impeccable is available. It's asked as part of Step 3, right alongside the other planning questions.
 - When enabled, the design phase runs after scaffolding and before the plan and context files are written, producing an approved `mock.html` that `_context/design.md` is derived from (in impeccable's DESIGN.md format, with layout and component states spelled out).
 - Every UI task lists `_context/design.md` as required reading, and the task that first makes the UI visible carries a human side-by-side check against `mock.html`.
 
 ### Changed
+
 - Fork-join revert no longer deletes `PRODUCT.md` or `.impeccable/`, since impeccable writes those outside `docs/<slug>/` and an undo shouldn't touch them.
 
 ## [dispatch 5.0.0] - 2026-09-25
@@ -1633,17 +1892,20 @@ _tracks tag `dispatch-v5.1.0`_
 _tracks tag `dispatch-v5.0.0`_
 
 ### Added
+
 - Autopilot now runs each non-final task in its own git worktree, so parallel tasks no longer share a working tree and can no longer step on each other's uncommitted edits. `worktree.ts` creates, lands, rebases, unlands, fingerprints, and removes these worktrees automatically as a wave progresses, and sweeps stale ones left behind by an interrupted run.
 - When the main tree changed after a task's worktree was created, autopilot re-runs that task's Verification in the main tree right after landing it ("reverify"). A reverify failure unlands the change, rebases the worktree, and retries with dev instead of letting a stale pass stand.
 - A task file can now declare a `> **Models**:` header to override which model and effort level run its dev, verify, judge, or fix step, on top of the plugin's own defaults (dev: Opus/medium, verify: Opus/low, and so on for every other role).
 
 ### Changed
+
 - Landing a task's worktree into the main tree is now serialized under a lock. A land conflict rebases the worktree onto the current main tree and retries (counted as one attempt) instead of failing the task outright.
 - A run now halts as an infrastructure failure when the main tree changes outside a land (an agent writing through a main-tree path instead of its worktree). It lists the changed paths and reverts nothing.
 - The old shared-tree sibling-interference machinery (`SUSPECTED SIBLING INTERFERENCE` deferral and requalification) is gone now that per-task worktrees make that kind of cross-task interference impossible. OpenCode's hand-driven loop still runs on a shared tree and is unaffected.
 - Serializing on "max parallel" now only applies to external live resources shared across tasks (a shared dev server, for example); tasks isolated in their own worktrees no longer need to queue behind it.
 
 ### Fixed
+
 - Autopilot's live dev delegate command silently dropped the model flag, so a dev model chosen at the flight brief was ignored in favor of the relay engine's own config default. It now passes the model through, matching the headless and live-review delegate paths.
 
 ## [dispatch 4.3.2] - 2026-09-19
@@ -1651,6 +1913,7 @@ _tracks tag `dispatch-v5.0.0`_
 _tracks tag `dispatch-v4.3.2`_
 
 ### Fixed
+
 - Autopilot no longer dies in a wave with `"maxParallel" is not null or a positive integer (got undefined)` when its Haiku scout drops the trailing `maxParallel` field while transcribing `next-ready.ts`'s summary. The scout now returns `maxParallel` as its own structured field, and the orchestrator reads the cap from it. A missing structured value, or one that contradicts stdout, still escalates as a scout failure rather than being read as "no cap".
 
 ## [guard 0.5.1] - 2026-09-18
@@ -1658,6 +1921,7 @@ _tracks tag `dispatch-v4.3.2`_
 _tracks tag `guard-v0.5.1`_
 
 ### Fixed
+
 - comment-sweep's Stop-hook report was labeled identically to comment-guard's own, so a user couldn't tell which hook had flagged a comment block. Sweep reports now carry their own "🧹 comment-sweep" label, distinct from comment-guard's "💬 comment-guard".
 
 ## [guard 0.5.0] - 2026-09-18
@@ -1665,6 +1929,7 @@ _tracks tag `guard-v0.5.1`_
 _tracks tag `guard-v0.5.0`_
 
 ### Added
+
 - A new turn-level comment-sweep hook now catches comment blocks written through `Bash` (`sed -i`, heredocs, codegen) — previously only `Edit`/`Write` calls were checked, so a comment slipped in through a shell command went unreviewed. The sweep shares comment-guard's own rules (re-indenting isn't an addition, a 3-line threshold, the file header is exempt) and tracks what's already been asked so a block edited then swept isn't asked twice. A turn touching more than 20 guarded files is skipped, since that pattern is a checkout, pull, or formatter rather than authored comments.
 
 ## [dispatch 4.3.1] - 2026-09-18
@@ -1672,6 +1937,7 @@ _tracks tag `guard-v0.5.0`_
 _tracks tag `dispatch-v4.3.1`_
 
 ### Added
+
 - A new `flightlog.ts progress` command derives where a parked autopilot task should resume from — the step, the attempt, and the evidence behind that choice — instead of requiring a hand count of attempts from the raw JSONL trail. Autopilot's single-task resume and escalation-resume flows now both use it. It never proposes resuming at the judge step, since skipping the gate is a human sign-off no trail can substitute for.
 
 ## [dispatch 4.3.0] - 2026-09-18
@@ -1679,10 +1945,12 @@ _tracks tag `dispatch-v4.3.1`_
 _tracks tag `dispatch-v4.3.0`_
 
 ### Added
+
 - A flightplan gate item can now be tagged `- [ ] (human) ...` to declare that no command can check it. Autopilot's verifier skips a tagged item instead of failing the task for it, and reports it as still owed once the run ends — so a correct task with one real-person check (a pointer sweep, a toggle click) no longer burns every attempt and parks the whole tree. A new `human-gate` lint rule rejects a gate section where every item is tagged, so a binary gate always keeps at least one machine-checkable item.
 - `/autopilot <slug> --task <ref> --from dev|verify|judge` re-enters a single parked task's pipeline at a named step, skipping the scout and the wave loop over the rest of the tree. A `judge` re-entry requires `--attest <file>` naming which gate items a person actually performed, quoted verbatim from the task file — a free-text evidence string is rejected, since once any wording can stand in for the gate, no later reader can tell an honest attestation from a convenient one.
 
 ### Fixed
+
 - A resumed task's attempt counting now keys off the ladder's actual last attempt instead of its cap, so a resumed run's retry loop executes instead of silently reading as "tried again, still failed," and a resumed Claude ladder no longer skips straight to Opus and triples cost.
 
 ## [dispatch 4.2.1] - 2026-09-18
@@ -1690,6 +1958,7 @@ _tracks tag `dispatch-v4.3.0`_
 _tracks tag `dispatch-v4.2.1`_
 
 ### Fixed
+
 - Autopilot's no-ask rule for external engines (codex, and the cross-vendor review lens) now actually reaches every run. It previously traveled through a paraphrasing instruction-writer, which could drop or reword it away. The live path now passes it as relay's own `--no-ask` flag instead of asking a driver to relay it in its own words, and the headless path prepends a fixed, unconditional contract to every codex and opencode spawn.
 
 ## [relay 0.7.0] - 2026-09-18
@@ -1697,6 +1966,7 @@ _tracks tag `dispatch-v4.2.1`_
 _tracks tag `relay-v0.7.0`_
 
 ### Added
+
 - New `--no-ask` flag for live delegates appends an unattended contract to the prompt, so a delegate can't stall a run waiting on a question nobody is there to answer. It's off by default, since a human watching a live pane may want to field a real question.
 
 ## [dispatch 4.2.0] - 2026-09-18
@@ -1704,12 +1974,15 @@ _tracks tag `relay-v0.7.0`_
 _tracks tag `dispatch-v4.2.0`_
 
 ### Added
+
 - `codex-run.ts` now accepts a pinnable, per-mode model: a `--model` flag or `CODEX_MODEL` env var overrides the default, and delegate and review runs get different defaults out of the box (the cheap model writes, the strong one reviews). Previously every codex delegate and review silently ran on whatever `~/.codex/config.toml` happened to say.
 
 ### Changed
+
 - Autopilot's ask flow now asks about the codex model choice too, mirroring the existing opencode model question, and only when a role actually resolves to codex — splitting the questions across two rounds so dependent choices are never asked blind and the four-question cap still holds.
 
 ### Fixed
+
 - External engines delegated to by autopilot (codex, and the cross-vendor review lens) can no longer ask the user a question or wait on a reply mid-flight; a banned-tool rule now travels with their prompts, closing a gap where an engine could hang forever waiting for input that never comes in an unattended run.
 - Autopilot's per-agent usage reporting no longer reads N/A starting from the second wave. Claude Code 2.1.274 splits a workflow agent's opening prompt across two turns, which made membership detection miss every agent after the first wave; detection now waits for the first assistant reply before deciding.
 
@@ -1718,9 +1991,11 @@ _tracks tag `dispatch-v4.2.0`_
 _tracks tag `dispatch-v4.1.0`_
 
 ### Added
+
 - PLAN.md now supports a `> **Max parallel**: N | unlimited` header, so a plan whose tasks share a resource the working tree can't isolate (for example, a SwiftPM target that compiles every file together) can declare a serial cap. `next-ready`'s `--summary` output and the tree linter both read it, flag a malformed or unreadable header as a violation, and raise a `[serial-undeclared]` advisory when serial-sounding prose has no header backing it up.
 
 ### Changed
+
 - Autopilot's wave loop now caps concurrent task pipelines at the plan's declared max parallel, scoped to the whole pipeline — dev, verify, requalify, and judge — instead of just writer windows. This fixes a race where a verifier ran build or test commands against a sibling task's tree while that sibling was still mid-edit. A parked or failed task always releases its slot, and a scout snapshot missing the cap value is now treated as a scout failure rather than silently running a serial plan unbounded.
 - The autopilot pre-flight checklist, flightplan's tree-lint instructions, and the opencode manual loop now document and honor the new header, including acting on a `[serial-undeclared]` advisory before flying.
 
@@ -1729,6 +2004,7 @@ _tracks tag `dispatch-v4.1.0`_
 _tracks tag `herdr-v0.7.6`_
 
 ### Fixed
+
 - Fixed a gap in `protocol-check` where responses decoded straight into a typed struct went untracked because their type string never appeared as a literal in source. The baseline now also credits a response when it's the result of a method the client actually sends, so coverage no longer depends on incidental literal usage — herdr-workbench's tracked responses went from 8 to 17 with no code changes of its own.
 
 ## [herdr 0.7.5] - 2026-09-17
@@ -1736,6 +2012,7 @@ _tracks tag `herdr-v0.7.6`_
 _tracks tag `herdr-v0.7.5`_
 
 ### Changed
+
 - Updated the herdr skill's reference docs to track herdr 0.9.1: the new global `--machine` prefix, `pane split`'s calling-pane default (and its exception to the UI-focused-pane rule), the `letta` agent kind, the Claude integration's narrower SessionStart matcher, the 30s observer disconnect, and case-sensitive `session delete` are now documented. The socket API reference reflects the new `pane.link.resolve` method and `pane.focused` firing on manual selection, and config docs note that sidebar token rules accept `hide = true`.
 
 ## [guard 0.4.0] - 2026-09-12
@@ -1743,6 +2020,7 @@ _tracks tag `herdr-v0.7.5`_
 _tracks tag `guard-v0.4.0`_
 
 ### Changed
+
 - `comment-guard` now judges a Claude Code edit by the actual diff (`structuredPatch`) instead of the raw tool input, fixing several false positives: rewriting a whole file with `Write` no longer re-asks about every existing comment, a `replace_all` Edit that lands in several places is counted once instead of once per hit, and lines are no longer mismarked when two comments share the same text. Re-indenting code (wrapping it in an `if`/`try`/loop) no longer flags every comment inside as newly added.
 - A no-op `Write` over an unchanged file no longer re-reports every comment block in it.
 - A blank line inside a comment run no longer splits one authored block into two smaller pieces that each fall under the reporting threshold.
@@ -1754,13 +2032,16 @@ _tracks tag `guard-v0.4.0`_
 _tracks tag `chronicle-v0.16.3`_
 
 ### Changed
+
 - ADR triage now runs as a deterministic script (`triage.ts`) instead of the `gleaner` and `reckoner` agents, across Claude Code, Codex, and OpenCode — clustering, batching, and merging happen in-process, and batches are fanned out to `judge` directly, cutting agent round-trips out of the curation flow.
 - `judge` now screens candidates from lightweight skeletons itself, and `lorekeeper` drops its `collect` phase, matching the new triage topology.
 
 ### Removed
+
 - The `gleaner` and `reckoner` agents are gone from all three runtimes (Claude Code, Codex, and OpenCode), replaced by `triage.ts` and `archive-stale.ts`.
 
 ### Fixed
+
 - `archive-plan`'s CLI now refuses to run when the cwd has no `.cockpit` trail or every session comes back missing, instead of silently producing an empty "all missing" plan and exiting successfully.
 
 ## [chronicle 0.16.2] - 2026-09-10
@@ -1768,9 +2049,11 @@ _tracks tag `chronicle-v0.16.3`_
 _tracks tag `chronicle-v0.16.2`_
 
 ### Added
+
 - New `judge` agent dispositions ADR candidate batches (promote/watch/skip) from full record content, biased toward `watch` since a wrong watch only costs a re-review while a wrong promote becomes a permanent ADR.
 
 ### Changed
+
 - `reckoner` now only screens clusters from lightweight skeleton evidence and hands its shortlist to parallel `judge` batches for the real disposition call, instead of fetching full bodies and deciding by itself — so ADR curation scales past what one agent can read serially.
 
 ## [chronicle 0.16.1] - 2026-09-10
@@ -1778,9 +2061,11 @@ _tracks tag `chronicle-v0.16.2`_
 _tracks tag `chronicle-v0.16.1`_
 
 ### Added
+
 - `release` now flags when a run is standing off the branch it's about to commit to, so a feature-branch run can't strand the version bump on the wrong branch while the actual work stays behind.
 
 ### Changed
+
 - `release`'s version, branch-handling, and push-confirmation questions now surface together in one prompt instead of three separate interruptions, so an unattended run stalls once instead of three times.
 
 ## [chronicle 0.16.0] - 2026-09-10
@@ -1788,12 +2073,14 @@ _tracks tag `chronicle-v0.16.1`_
 _tracks tag `chronicle-v0.16.0`_
 
 ### Changed
+
 - A bare `/chronicle:release` now pushes by default instead of stopping after the changelog entry — `local` stops before push, `prepare` keeps the old default of stopping at the entry, and `auto`/`auto push` remain aliases for the new default.
 - Release now asks for an explicit go-ahead before it pushes, on every run — no version or component token skips this question anymore. Declining downgrades the run to stop at the tag instead.
 - Release's own scripts now print a short digest (4-5 lines) instead of a wall of JSON, so a version gate no longer buries the one or two facts it needs in a ~100-line blob; the full JSON is still available with `--full`/`--json`.
 - Commit's three-agent flow (an orchestrator plus two workers) collapsed into a single agent that runs the analysis and commit scripts itself, cutting the cold-start and round-trip cost of every commit; commit no longer needs a raised subagent-spawn-depth setting.
 
 ### Removed
+
 - Skirnir, release's relay agent, is retired — release now runs its three scripts directly instead of spawning a separate agent just to shuttle their output back.
 
 ## [monitor 5.0.2] - 2026-09-10
@@ -1801,6 +2088,7 @@ _tracks tag `chronicle-v0.16.0`_
 _tracks tag `monitor-v5.0.2`_
 
 ### Changed
+
 - Cockpit's SessionStart and Stop hooks now resolve the parent session id themselves and bake the literal id into the scribe-fork spawn instructions they print, so the agent no longer has to run a separate lookup command before forking a scribe session.
 - The scribe-fork spawn prompt shrank to a single line (`Run /cockpit scribe --session <id>`), since the fork already inherits the full conversation and no longer needs the work re-described to it.
 - Hook guidance now explicitly tells the agent to stay silent about the scribe flow — no announcing before a spawn, no announcing a skip, and no relaying what the fork wrote back.
@@ -1810,6 +2098,7 @@ _tracks tag `monitor-v5.0.2`_
 _tracks tag `monitor-v5.0.1`_
 
 ### Fixed
+
 - Fixed a false "install source drifted" warning that appeared every session when both Claude Code and Codex had the same monitor release cached under their own separate cache roots — the two harnesses were repeatedly overwriting each other's statusline path in the shared settings file. A genuine version mismatch is still detected and reported.
 
 ## [herdr 0.7.4] - 2026-09-09
@@ -1817,6 +2106,7 @@ _tracks tag `monitor-v5.0.1`_
 _tracks tag `herdr-v0.7.4`_
 
 ### Fixed
+
 - Corrected the herdr CLI reference to note that neither CLI discovery surface (the `herdr pane` group listing or a subcommand's own `--help`) is complete, and that each truncates different options.
 - Documented that `workspace close` refuses on a primary workspace with `workspace_group_close_required`, and that passing `--group` is the caller's decision, not an automatic fix.
 - Documented the same discovery caveat for `worktree remove --trust-repository`, plus the `pane read --source detection` and `pane report-agent-session --session-start-source` options.
@@ -1826,6 +2116,7 @@ _tracks tag `herdr-v0.7.4`_
 _tracks tag `herdr-v0.7.3`_
 
 ### Changed
+
 - The herdr skill's reference docs now track herdr 0.9.0 instead of 0.8.2, verified against the running 0.9.0 CLI rather than copied from release notes. Socket API reference moves from protocol 20 to 22.
 - Documents the new `herdr machine *` command family for remote installations.
 - Documents that `workspace close` no longer implicitly closes linked worktree workspaces: `--group` (CLI) or `close_group` (socket) is now required, and the socket call rejects with `workspace_group_close_required` without it. Also documents the new `--trust-repository` flag on every `worktree` verb.
@@ -1834,6 +2125,7 @@ _tracks tag `herdr-v0.7.3`_
 - Removes documentation for `--no-session` and the CLI-level `detection` pane-read source, both dropped in 0.9.0 (`detection` survives only on `agent read`).
 
 ### Fixed
+
 - Corrected a stale internal comment describing `agent prompt --wait`: it does not settle on every lifecycle state as previously noted, only on observed `working` or `blocked` activity, matching herdr 0.9.0's actual behavior. No runtime behavior changed.
 
 ## [relay 0.6.10] - 2026-09-09
@@ -1841,6 +2133,7 @@ _tracks tag `herdr-v0.7.3`_
 _tracks tag `relay-v0.6.10`_
 
 ### Fixed
+
 - Corrected a stale comment describing `--until`'s wait semantics: the list is a ceiling, not a floor. An agent that reaches `done` without a visible `working` phase still reports `agent_prompt_stalled`, regardless of how wide the `--until` list is. No runtime behavior changed.
 
 ## [guard 0.3.0] - 2026-09-09
@@ -1848,11 +2141,13 @@ _tracks tag `relay-v0.6.10`_
 _tracks tag `guard-v0.3.0`_
 
 ### Added
+
 - `comment-guard` now covers 75+ file extensions, up from about 25 — including the C++ family, C#, PHP, Swift, Kotlin, Scala, Dart, Zig, Elixir, Perl, Haskell, Proto, the JS/TS variants (`.mjs`/`.cjs`/`.mts`/`.cts`), CSS preprocessors, Terraform/HCL, and the shell and config families.
 - Extensionless build files are guarded too: `Rakefile`, `Gemfile`, `Makefile`, `Dockerfile`, `Procfile`, and friends now match by filename, with a stem fallback so `Dockerfile.dev` is caught as well. Previously a file needed an extension to be considered at all.
 - The OpenCode-side prefilter regex was synced to the same expanded language list, so OpenCode users get the same coverage instead of silently missing the hook on every newly supported language.
 
 ### Changed
+
 - Multi-line comment blocks are now counted correctly for every language that uses paired open/close markers, not just `/* */`. An HTML `<!-- ... -->` block or a Lua `--[[ ... ]]` block previously counted as a single line no matter how long it ran; both now count their full height.
 - ERB's `<%# ... %>` comment is now treated as a full block, so a multi-line ERB comment no longer under-reports its size.
 - `.vue`, `.svelte`, and `.astro` files now also recognize `<!-- -->` comments in their template markup — previously only script-style comments (`//`, `/* */`) were seen, so template comments were invisible to the guard.
@@ -1864,6 +2159,7 @@ _tracks tag `guard-v0.3.0`_
 _tracks tag `guard-v0.2.0`_
 
 ### Changed
+
 - `comment-guard` no longer flags every added comment line — too noisy to live with. It now reports a comment only when it sits inside a block of 3 or more contiguous comment lines that this edit actually touched, and the block isn't a file header, cutting flags to the cases worth a second look.
 - Detection now reads the block from the file on disk instead of the edit fragment, so a block that gets cut across the edge of an `Edit` is judged whole rather than truncated — and an unreadable file quietly reports nothing instead of showing misleading `?` line numbers.
 - `/** ... */` docblocks now count at their full height. Previously only the opening `/**` line registered as a comment, so a JSDoc block was invisible to the guard no matter how long it ran. A stateful open/close scan handles the continuation lines, which is what lets them count without treating a bare `*` as a comment marker and misreading `*ptr = 0` or a wrapped multiplication.
@@ -1874,6 +2170,7 @@ _tracks tag `guard-v0.2.0`_
 _tracks tag `guard-v0.1.0`_
 
 ### Added
+
 - New `guard` plugin, its first release. It enforces the "comment why, never what" rule automatically instead of leaving it to review: the `comment-guard` hook fires after every `Edit` or `Write`, finds the comment lines the change added, and hands each one back to the model with one question — does this say why, or does it say what? It never judges the answer itself, so it can't be gamed by rephrasing around a fixed heuristic.
 - Detection is precise about what counts as "added": it diffs comment lines as a multiset, so moving an existing comment elsewhere in the file is never flagged, while rewording one is. Only line-leading comment markers trigger it, so a marker sequence sitting inside a string (like a URL) is left alone.
 - Ships for both Claude Code and Codex with matching `PostToolUse` hook wiring.
@@ -1885,11 +2182,13 @@ _tracks tag `dispatch-v4.0.0`_
 **Breaking:** `/preflight` no longer does what it used to. If you want the old behaviour, it's still there under a new name: `/hop`.
 
 ### Changed
+
 - `preflight` — interview, plan, and execute now, in one conversation — is renamed to `hop`. Its behaviour is unchanged, only the name moved.
 - The name `preflight` now belongs to a new, different skill: a short interview that captures what you want as `docs/<slug>/INTENT.md`, then stops. It refuses to answer "how", writes that one file, and never executes — so typing `/preflight` out of habit no longer plans or builds anything. Its SKILL.md opens with a "Route first" section that hands off by name to `hop`, `flightplan`, or `waypoints`, so the change surfaces as a redirect instead of a silent no-op.
 - The tier ladder is now `preflight` → `hop` → `flightplan` → `autopilot`, with `waypoints` still sitting above `flightplan`. The `dispatch-flow.svg` diagram was redrawn for the five-card ladder.
 
 ### Added
+
 - `flightplan`'s interview step now reads an existing `INTENT.md` first: it pre-fills whatever dimensions INTENT.md already answers and interviews only the gaps. INTENT.md stays the frozen baseline — flightplan never generates the task tree from it alone, and never edits it to match a later plan; contradictions go into PLAN.md's `## Context` section instead.
 - `scaffold.ts --check` now recognizes a directory holding only an `INTENT.md` as safe to merge into (reported as `INTENT: <path>`) instead of flagging it as a collision, so running `preflight` and then `flightplan` on the same slug no longer trips the collision guard.
 
@@ -1898,6 +2197,7 @@ _tracks tag `dispatch-v4.0.0`_
 _tracks tag `monitor-v5.0.0`_
 
 ### Changed
+
 - The dashboard's `/api/stats` request dropped from 17.1s to about 550ms. It used to re-read all 12,643 Claude transcripts (2.2GB) and 1.4GB of Codex rollouts on every load; a session ledger now lives in the existing rollup database, filled by the tail-parse that already runs, so the request path only lists directories. Codex rollouts get their own summary cache.
 - A cold dashboard load now transfers 996KB instead of 8,593KB, and a warm reload just 12.8KB. This comes from gzip and ETag/304 revalidation on `/api/stats` and static assets, direct CSS links instead of a 12-deep chained `@import` chain, parallel loading of dashboard partials that used to fetch one at a time, and recompressed images (3.8MB down to 184KB — two of which turned out to be PNGs wearing a `.jpg` extension).
 - Tool-call counts in the rollup are now deduplicated per session instead of per file or globally, correcting both an over-count and an under-count present in 4.1.0.
@@ -1910,10 +2210,12 @@ _tracks tag `monitor-v5.0.0`_
 _tracks tag `monitor-v4.1.0`_
 
 ### Changed
+
 - `rollup-update.ts --rebuild` no longer wipes your usage rollup. The rollup is the only surviving record of token history once Claude Code deletes a transcript past `cleanupPeriodDays`, and a rebuild — or a routine schema upgrade on a plugin update — used to erase it outright (one real-world case went from 18.95B tokens across 47 projects down to 7.83B across 29). A rebuild now rewinds read cursors and replays instead of resetting, keeping everything already counted; the trade-off is that a rebuild can no longer be used to correct a prior over-count.
 - Opening a rollup database written by a newer plugin version than the one currently running now refuses instead of silently mis-migrating it, and an old (v1) database upgrades in place instead of being dropped and rebuilt.
 
 ### Fixed
+
 - usage-dashboard no longer crashes about 30 seconds after startup when reading a multi-gigabyte session transcript; large transcripts (verified up to 2.4 GB, 6.1 GB total across projects) now stream instead of loading whole into memory.
 - Cockpit no longer shows a session with a blank title when its transcript is large — finding the first message now streams instead of silently failing and returning nothing.
 - Cockpit's live transcript view no longer loses the start of a rotated or truncated transcript, and no longer floods the client by replaying a rotated file's entire history at once.
@@ -1923,6 +2225,7 @@ _tracks tag `monitor-v4.1.0`_
 _tracks tag `dispatch-v3.26.2`_
 
 ### Fixed
+
 - Autopilot no longer silently loses token totals for long-running agents. Reading a large agent transcript or flightlog in one allocation could decode to an empty string, so the run counted zero lines for that agent and moved its cursor past the file with no error — the token figure just vanished. Reads are now chunked, so long-running agents keep their token totals.
 
 ## [dispatch 3.26.1] - 2026-09-06
@@ -1930,9 +2233,11 @@ _tracks tag `dispatch-v3.26.2`_
 _tracks tag `dispatch-v3.26.1`_
 
 ### Added
+
 - Flightdeck's fleet panel now shows which model produced each agent row: a Claude row shows the family name (opus, sonnet, haiku), and a codex row shows its engine id with dashes turned to spaces (e.g. `gpt 6 astra`). Previously a row showed only a token figure, so an expensive row gave no clue which engine burned it.
 
 ### Changed
+
 - The fleet panel's role cell is now a two-column table pairing each engine with its own spend, instead of a single stack of lines — a Claude row shrinks from three lines to two, a codex row from five to three, and the redundant `cdx` prefix is gone since the engine name now sits right beside its figure. A codex run whose rollout reports no model now labels that line `codex` instead of leaving the figure unattributed.
 
 ## [dispatch 3.26.0] - 2026-09-06
@@ -1940,12 +2245,14 @@ _tracks tag `dispatch-v3.26.1`_
 _tracks tag `dispatch-v3.26.0`_
 
 ### Added
+
 - New `deckplan` skill: a reference-only guide for authoring flightdeck Workflow scripts, including nine authoring rules, a normative graph-contract spec, and a five-task example walkthrough covering all task states.
 - flightdeck now accepts graph-based Workflow plans (`graph.json`) alongside the existing task-tree layout, auto-detecting which shape a given run uses.
 - flightlog gained a `state` command to declare a task's final state (done/blocked/failed) directly, independent of score/note tracking.
 - Autopilot's dashboard now preserves your declared lane order for graph-based plans instead of always sorting lanes alphabetically.
 
 ### Fixed
+
 - Autopilot's transcript-based token attribution now correctly matches transcripts stored outside the git repo (e.g. under `~/.local/share/q-lab`), and updates live when a run's graph changes.
 
 ## [herdr 0.7.2] - 2026-09-05
@@ -1953,6 +2260,7 @@ _tracks tag `dispatch-v3.26.0`_
 _tracks tag `herdr-v0.7.2`_
 
 ### Added
+
 - `herd` now has built-in help: run `herd help`, `herd --help`, or `herd <verb> --help` to see usage for any command instead of having to read the source.
 
 ## [herdr 0.7.1] - 2026-09-05
@@ -1960,6 +2268,7 @@ _tracks tag `herdr-v0.7.2`_
 _tracks tag `herdr-v0.7.1`_
 
 ### Changed
+
 - Simplified and de-duplicated the `herdr`, `tell`, and `ask` skill docs — cross-file repetition (like `$SKILL_DIR` resolution, the flag-before-fragment rule, and `tell`'s fallback chain) now lives in one canonical place, and the flag-placement requirement (flags must come before the fragment or they're silently swallowed) is now documented up front to prevent that failure mode. No behavior changed.
 
 ## [herdr 0.7.0] - 2026-09-05
@@ -1967,10 +2276,12 @@ _tracks tag `herdr-v0.7.1`_
 _tracks tag `herdr-v0.7.0`_
 
 ### Added
+
 - New `ask`/`collect` skill lets one agent hand a question to another and get an answer back, instead of only firing one-way messages with `tell`. `ask` addresses a target the same way `tell` does, waits for the reply (default 10 minutes), and spawns a fresh pane automatically if no live agent matches. If it times out, it returns a `collect` command to redeem the answer later instead of failing outright.
 - `tell` now finds a target project even when no agent is open for it: it falls back to herdr-workbench's project registry, then to zoxide's frecency index, and can auto-spawn a new workspace with an agent already running there. A new `--new-workspace` flag opens the agent in that fresh workspace instead of the caller's.
 
 ### Fixed
+
 - `tell` no longer silently picks the wrong agent when two live agents are open at the same resolved directory — it now refuses with the same ambiguity error used elsewhere, listing every matching pane.
 - The recovery command printed after an `ask` times out now uses an absolute path, so it actually works when run from a different project's directory instead of only resolving from herd.ts's own script location.
 
@@ -1979,6 +2290,7 @@ _tracks tag `herdr-v0.7.0`_
 _tracks tag `chronicle-v0.15.1`_
 
 ### Changed
+
 - Chronicle's agent instructions (messenger, runesmith, skald, watcher) no longer run a preflight `test -f` guard before reading a referenced file. Bun's own "Module not found" error is clearer and, unlike the guard, it surfaces an unsubstituted `{SKILL_DIR}` placeholder instead of masking it as a generic missing-file failure.
 
 ## [herdr 0.6.1] - 2026-09-04
@@ -1986,6 +2298,7 @@ _tracks tag `chronicle-v0.15.1`_
 _tracks tag `herdr-v0.6.1`_
 
 ### Changed
+
 - The `tell` skill no longer requires checking for `HERDR_ENV` up front — `tell` validates itself and its own error message now guides you instead. "No Herdr means stop" guidance moved into the skill's Rules section, `list` is called out as needed only when you explicitly ask for it, and the advice on resolving address fragments is streamlined to prefer the fullest fragment and let errors correct a bad guess.
 
 ## [monitor 4.0.9] - 2026-09-04
@@ -1993,6 +2306,7 @@ _tracks tag `herdr-v0.6.1`_
 _tracks tag `monitor-v4.0.9`_
 
 ### Changed
+
 - Cockpit's opencode and scribe reference docs no longer carry a preflight file-existence guard — the same simplification applied across chronicle's agent instructions, relying on the underlying error message instead.
 
 ## [relay 0.6.9] - 2026-09-04
@@ -2000,6 +2314,7 @@ _tracks tag `monitor-v4.0.9`_
 _tracks tag `relay-v0.6.9`_
 
 ### Changed
+
 - **Breaking:** `relay codex image` now requires `--out`. A call without it used to silently write `relay-image.png` into the current directory; it now exits with an error instead. Any script or habit relying on the old default output path needs an explicit `--out <path>` added.
 
 ## [herdr 0.6.0] - 2026-09-04
@@ -2007,14 +2322,17 @@ _tracks tag `relay-v0.6.9`_
 _tracks tag `herdr-v0.6.0`_
 
 ### Added
+
 - New `tell` command hands a prompt off to an agent running in a different project, fire-and-forget — address it by workspace (project name) and tab label, narrow with a `/` when needed, and it refuses to guess on an ambiguous match.
 - Ambiguous agent addresses can now be resolved precisely by pane ID: it's listed alongside every candidate in the error message and in `list` output as the guaranteed-unique fallback.
 - Agent disambiguation now shows each candidate's status and cwd, so a full match is possible without a follow-up round trip.
 
 ### Fixed
+
 - Pane-ID matching no longer produces false positives from substring matches — addressing `w6:p1` could previously match `w6:p10` too.
 
 ### Changed
+
 - Clarified the `herdr` and `tell` skill docs and tightened the cross-references between them.
 
 ## [dispatch 3.25.3] - 2026-09-04
@@ -2022,6 +2340,7 @@ _tracks tag `herdr-v0.6.0`_
 _tracks tag `dispatch-v3.25.3`_
 
 ### Changed
+
 - Internal test-fixture cleanup only (anonymized a sample path, clarified a code comment) — no user-facing change.
 
 ## [dispatch 3.25.2] - 2026-09-04
@@ -2029,10 +2348,12 @@ _tracks tag `dispatch-v3.25.3`_
 _tracks tag `dispatch-v3.25.2`_
 
 ### Changed
+
 - Autopilot's dashboard now renders a judge's rationale as formatted markdown instead of raw plaintext, so headings and bold text read as intended rather than showing `##`/`**` noise — worthwhile now that a rationale can run to hundreds of words. It also gets its own reading typography (larger text, looser leading, a comfortable line measure) instead of the small caption style used elsewhere.
 - Both the fleet and lanes panels now preserve your scroll position across their 2-second auto-refresh, instead of resetting to the top on every tick.
 
 ### Fixed
+
 - Numbered step lists in a judge's rationale that started at a number other than 1 now keep that starting number, instead of always restarting at 1.
 - Continuation lines that wrapped onto a new paragraph no longer split a single numbered list into several lists that each restart from 1.
 
@@ -2041,6 +2362,7 @@ _tracks tag `dispatch-v3.25.2`_
 _tracks tag `dispatch-v3.25.1`_
 
 ### Added
+
 - Autopilot's flightdeck dashboard now shows a "Waves left" readout in the header, so you can see at a glance how many dispatch rounds remain instead of reading the task tree by hand. The count includes the wave already in flight, and a task with a dependency cycle or a `Depends on` naming a task not in the tree paints in the alert colour rather than silently vanishing from the total.
 
 ## [herdr 0.5.4] - 2026-09-04
@@ -2048,6 +2370,7 @@ _tracks tag `dispatch-v3.25.1`_
 _tracks tag `herdr-v0.5.4`_
 
 ### Fixed
+
 - Corrected `herdr-browser`'s documentation on viewport and zoom: a pane that rendered noticeably oversized was caused by the terminal's own cell-zoom scaling, not by the skill or the `emulate` override, and the fix is a terminal key command rather than anything over CDP. Also fixed a false claim that the `emulate` override was permanent — it outlives the command that set it, but any navigation drops it, and setting the pane's own size back undoes one.
 
 ## [chronicle 0.15.0] - 2026-09-03
@@ -2055,6 +2378,7 @@ _tracks tag `herdr-v0.5.4`_
 _tracks tag `chronicle-v0.15.0`_
 
 ### Added
+
 - `chronicle:pr` now asks whether the pull request needs review before it opens one, and passes the answer down through the Storykeeper to the Messenger. When review is waived, `request-creator.ts` appends a `[skip-review]` marker to the title — the stamp lives in the script rather than in the drafting agent's prose, so review automation can rely on a fixed string appearing exactly once.
 
 ## [dispatch 3.25.0] - 2026-09-02
@@ -2062,10 +2386,12 @@ _tracks tag `chronicle-v0.15.0`_
 _tracks tag `dispatch-v3.25.0`_
 
 ### Added
+
 - Autopilot now records the rubric judge's full reasoning for every task, not just the ones that fail. The judge's prose already fed retry feedback and the attempt-cap escalation, but a passing attempt used to leave no trace of why it passed — `RUNLOG.md` now folds that rationale into a collapsed details block under the verdict, so the audit trail is no longer thinnest exactly where an auditor looks first.
 - The flightdeck dashboard surfaces the same rationale: expanding a task card's or a fleet row's rubric now shows the judge's write-up beneath the dimension meters, in a capped, scrollable panel so a long rationale doesn't stretch the layout.
 
 ### Changed
+
 - `score-task.ts` takes the rationale through a new `--rationale-file <path>` flag instead of an inline argument, since a rationale can run to hundreds of words of markdown. A missing or unreadable file only logs a warning — it never blocks a passing task from being recorded.
 
 ## [dispatch 3.24.0] - 2026-09-02
@@ -2073,9 +2399,11 @@ _tracks tag `dispatch-v3.25.0`_
 _tracks tag `dispatch-v3.24.0`_
 
 ### Added
+
 - Flightplan's plan review no longer ends at its round cap. A review still finding blockers there switches to a narrow phase for up to five more passes, which reports only what would actually stall an executor — at most five findings, with a clean verdict treated as a legitimate result. A long review is usually the broad prompt manufacturing findings against an already-revised plan, not a broken plan, and the narrow phase is what lets one finish instead of being handed back unresolved.
 
 ### Changed
+
 - A plan review that stops converging before the cap now enters the same narrow phase, rather than stopping and handing the open findings back.
 
 ## [monitor 4.0.8] - 2026-08-31
@@ -2083,6 +2411,7 @@ _tracks tag `dispatch-v3.24.0`_
 _tracks tag `monitor-v4.0.8`_
 
 ### Added
+
 - Decision-log hooks now recognize when a session is a Codex delegate nobody is watching and quietly skip their SessionStart guidance and Stop nudge, so an unattended delegate no longer pollutes the shared decision trail or spends tokens scribing itself.
 
 ## [relay 0.6.8] - 2026-08-31
@@ -2090,6 +2419,7 @@ _tracks tag `monitor-v4.0.8`_
 _tracks tag `relay-v0.6.8`_
 
 ### Added
+
 - Relay's live Codex pane now marks itself as a delegation for the whole time it runs, closing the gap where Codex's interactive TUI (which never sees the `RELAY_DELEGATED` env var) could still get nudged and re-prompted by monitor as if a person were watching.
 
 ## [dispatch 3.23.1] - 2026-08-31
@@ -2097,6 +2427,7 @@ _tracks tag `relay-v0.6.8`_
 _tracks tag `dispatch-v3.23.1`_
 
 ### Changed
+
 - Autopilot's headless Codex and OpenCode dev wrappers now flag their own sessions as delegated, so monitor's session hooks correctly treat them as unattended instead of nudging them like an interactive session.
 
 ## [dispatch 3.23.0] - 2026-08-30
@@ -2104,9 +2435,11 @@ _tracks tag `dispatch-v3.23.1`_
 _tracks tag `dispatch-v3.23.0`_
 
 ### Added
+
 - Flightplan lint now flags oversized tasks during authoring — a task declaring more than 11 files gets an advisory, since field data shows tasks that large retry 70-89% of the time versus 43% for smaller ones. Autopilot's own lint calls stay unaffected, so existing plans keep flying as before.
 
 ### Fixed
+
 - Autopilot's external dev delegates now receive and run the task's fixed verification commands and keep working until they pass, instead of skipping verification entirely.
 
 ## [dispatch 3.22.6] - 2026-08-29
@@ -2114,6 +2447,7 @@ _tracks tag `dispatch-v3.23.0`_
 _tracks tag `dispatch-v3.22.6`_
 
 ### Fixed
+
 - Codex usage tracking no longer drops or double-counts token usage for drivers still waiting on their rollout, including when multiple drivers run concurrently.
 
 ## [dispatch 3.22.5] - 2026-08-29
@@ -2121,6 +2455,7 @@ _tracks tag `dispatch-v3.22.6`_
 _tracks tag `dispatch-v3.22.5`_
 
 ### Fixed
+
 - The flightplan graph panel no longer loses hover highlighting during polling refreshes — the hovered dependency route now stays visible and the graph no longer dims unexpectedly while a route is highlighted.
 
 ## [dispatch 3.22.4] - 2026-08-29
@@ -2128,9 +2463,11 @@ _tracks tag `dispatch-v3.22.5`_
 _tracks tag `dispatch-v3.22.4`_
 
 ### Added
+
 - Each berth on the dependency graph now shows its wall-clock elapsed time, updating live once a second while the task runs, so you can see how long a task has been going without leaving the panel.
 
 ### Fixed
+
 - The dependency graph no longer draws backwards or zero-length crossovers — a berth now always sits past every task it depends on, so a dependency line reads left-to-right instead of doubling back on itself. The panel runs slightly wider as a result, which is the tradeoff for edges that read correctly.
 
 ## [dispatch 3.22.3] - 2026-08-29
@@ -2138,6 +2475,7 @@ _tracks tag `dispatch-v3.22.4`_
 _tracks tag `dispatch-v3.22.3`_
 
 ### Fixed
+
 - Autopilot's external dev driver no longer runs its own verification pass alongside the independent verifier — it now only lints the task and reports which files changed, so a task's pass/fail verdict comes from one source instead of two agents potentially disagreeing.
 
 ## [dispatch 3.22.2] - 2026-08-29
@@ -2145,10 +2483,12 @@ _tracks tag `dispatch-v3.22.3`_
 _tracks tag `dispatch-v3.22.2`_
 
 ### Added
+
 - Hovering a berth on the dependency graph now also lights a travelling pulse that runs downstream along its route, the way a real interlocking panel shows a live route rather than just the track's lineage.
 - Autopilot now folds Codex spend into its usage accounting, so dev steps that delegate to Codex no longer vanish from the plan's cost picture. Codex figures show separately from Claude token counts wherever a surface answers "which side spent what" (the fleet table, lane cards), and combine with them wherever it answers "what did this cost" (the header stat, graph berth plates).
 
 ### Fixed
+
 - Flightdeck's headline token metric switched from raw output tokens to fresh (cache-creation) tokens, the only formula that matched a live 11-agent run to the digit on 9 of 11 panel rows; the old metric ran at 0.6-1.1% of the actual billed spend.
 - Budget-tier thresholds are recalibrated to the new metric so a plan's colour coding reflects real usage again — the old thresholds, inherited from the output-token era, flagged over 90% of agents as warn-or-worse with no real signal.
 - The fleet table's message column now renders full PASS/FAIL verdict text instead of truncating it, with commit SHAs, timestamps, and other bare identifiers tinted for readability.
@@ -2158,11 +2498,13 @@ _tracks tag `dispatch-v3.22.2`_
 _tracks tag `dispatch-v3.22.1`_
 
 ### Changed
-- A task on the dependency graph now carries its ref and token count *inside* its berth, on one line, instead of hanging them beneath as two floating labels — the state colour and the task's identity no longer have to be paired up by eye before a berth can be read. Berths are taller and sized to the longest ref in the plan, and state is now lit down a berth's leading edge rather than filling it, so the text inside stays legible.
+
+- A task on the dependency graph now carries its ref and token count _inside_ its berth, on one line, instead of hanging them beneath as two floating labels — the state colour and the task's identity no longer have to be paired up by eye before a berth can be read. Berths are taller and sized to the longest ref in the plan, and state is now lit down a berth's leading edge rather than filling it, so the text inside stays legible.
 - Cross-bucket dependencies are now drawn as curves rather than 45-degree diagonals. A curve changes road inside the single gap reserved for it, whatever the distance between the two tracks; the diagonal had to spend its own vertical drop in horizontal reach, so on a tall plan most dependencies could not fit and fell back to a straight line.
 - Berths sit further apart, which gives each crossover room to read as a curve. A dense plan therefore reaches the graph panel's horizontal scroll sooner than it used to.
 
 ### Fixed
+
 - The fleet table's column header no longer leaves a blank band under the title bar in a narrow pane.
 
 ## [dispatch 3.22.0] - 2026-08-29
@@ -2170,13 +2512,16 @@ _tracks tag `dispatch-v3.22.1`_
 _tracks tag `dispatch-v3.22.0`_
 
 ### Added
+
 - Autopilot's flightdeck dashboard now tracks token usage: per-agent counts in the fleet panel, per-task and plan-wide totals on the lane, graph, and header panels, and warn/danger coloring in the fleet once one agent crosses a budget threshold. Task and plan totals stay uncolored — they sum several agents, so per-agent thresholds would light them on any real run.
 
 ### Changed
+
 - The dependency graph is now flightdeck's default view, redesigned as a railway-signalling interlocking panel: buckets read as tracks, tasks as berth segments, cross-bucket dependencies as diagonal crossovers, and gates as signal heads, replacing the previous flat node-graph look.
 - In the fleet view, each agent's token count now sits under its role chip instead of occupying its own column.
 
 ### Fixed
+
 - The graph panel no longer overflows or clips content at wide viewports — it now sizes itself to the pane's actual space instead of a fixed band.
 - A lit route on the graph now stays lit end to end instead of breaking at every berth boundary, and a blocked berth is now visually distinct from open track.
 - Streamed token usage is no longer double-counted across incremental transcript reads, and aggregate multi-agent token totals no longer get colored as if a single agent had used them.
@@ -2187,6 +2532,7 @@ _tracks tag `dispatch-v3.22.0`_
 _tracks tag `dispatch-v3.21.2`_
 
 ### Fixed
+
 - An abandoned `commit` or `scout` agent that died before finishing stayed pinned atop the Agent Fleet panel forever, its timer still running. These two roles share one reference with no attempt count, so the existing stale-row cleanup silently skipped them; a second pass now closes them out based on start order.
 
 ## [dispatch 3.21.1] - 2026-08-27
@@ -2194,6 +2540,7 @@ _tracks tag `dispatch-v3.21.2`_
 _tracks tag `dispatch-v3.21.1`_
 
 ### Changed
+
 - Autopilot's external dev-driver instructions can no longer paste ready-to-run code for a task, wave away a failed acceptance check by adding staging steps around it, or assert a prior attempt was already correct without re-checking it. Retry feedback may now only add requirements — it can no longer drop a verification command or excuse a rejected attempt.
 
 ## [chronicle 0.14.3] - 2026-08-27
@@ -2201,6 +2548,7 @@ _tracks tag `dispatch-v3.21.1`_
 _tracks tag `chronicle-v0.14.3`_
 
 ### Changed
+
 - `chronicle:commit`'s simple-mode path no longer runs a full atomic-split analysis just to throw it away. The watcher now stops right after reading the diff, writing one group covering every path plus a `changeSummary`, so the commit message is written from that summary instead of blind.
 
 ## [dispatch 3.21.0] - 2026-08-27
@@ -2208,9 +2556,11 @@ _tracks tag `chronicle-v0.14.3`_
 _tracks tag `dispatch-v3.21.0`_
 
 ### Fixed
+
 - The flightplan review loop could spin past 19 rounds without converging. Findings already banked as "Known gaps" in `tasks/README.md` were excluded from the review bundle, so the reviewer kept re-reporting them as new P1s every pass; non-convergence detection also compared P1 wording, which never matched across rounds because the plan text changes each pass.
 
 ### Added
+
 - A `--prior-findings <file>` flag lets a review pass carry forward the previous round's findings, so a reviewer only re-reports something if the current files still show the defect.
 - Review depth tiers (Light/Standard/Deep) now cap at 4/8/12 rounds; any P1 still open when the cap is hit is banked into Known gaps and called out in the closing recap, instead of the loop running unbounded.
 
@@ -2219,6 +2569,7 @@ _tracks tag `dispatch-v3.21.0`_
 _tracks tag `chronicle-v0.14.2`_
 
 ### Fixed
+
 - Codex setup no longer leaves obsolete Chronicle release-role files installed, eliminating malformed-role warnings while preserving unrelated custom roles.
 
 ## [dispatch 3.20.2] - 2026-08-24
@@ -2226,9 +2577,11 @@ _tracks tag `chronicle-v0.14.2`_
 _tracks tag `dispatch-v3.20.2`_
 
 ### Fixed
+
 - The flightplan CLIs that take flag values (`score-task`, `flightlog`, `codex-run`, `opencode-run`) now reject a malformed invocation like `--log --attempt 3` instead of silently treating the next flag as the value.
 
 ### Changed
+
 - The lint hook that runs on every Edit/Write now filters non-task-file calls in bash before spawning `jq`, cutting its overhead on those calls.
 
 ## [chronicle 0.14.1] - 2026-08-24
@@ -2236,6 +2589,7 @@ _tracks tag `dispatch-v3.20.2`_
 _tracks tag `chronicle-v0.14.1`_
 
 ### Changed
+
 - The branch-check hook that runs before every Bash call now skips its JSON parsing for commands other than `git commit`, cutting its per-call overhead from about 18ms to about 14ms.
 - Release remote checks (tag-on-remote lookups and the behind-remote fetch) are now batched and run concurrently, cutting a 5-component coordinated release's remote-checking time from about 14s to about 3s.
 
@@ -2244,6 +2598,7 @@ _tracks tag `chronicle-v0.14.1`_
 _tracks tag `herdr-v0.5.3`_
 
 ### Fixed
+
 - The CDP transport no longer mistakes a protocol error for a result: a failed `eval` used to print an empty line as if it had succeeded, and `screenshot` / `click-ref` blamed the wrong cause when the browser itself reported the failure. These now surface as real errors.
 - A socket that dropped mid-command no longer hangs the CLI forever — a pending call now fails instead of waiting on a connection that's already gone.
 - Commands now carry a send deadline: 30s normally, 120s for calls whose cost scales with page size (full-page screenshot, whole accessibility tree, large response bodies). A renderer stuck behind a modal dialog now times out instead of hanging. `eval` with an awaited promise is exempt, since its duration is the caller's own expression to decide.
@@ -2253,6 +2608,7 @@ _tracks tag `herdr-v0.5.3`_
 _tracks tag `monitor-v4.0.7`_
 
 ### Changed
+
 - `/api/stats` now caches its result and reuses one file walk across the stats build and the rollup update, cutting a warm dashboard load from about 6 seconds to 0.14-0.19 seconds. Two tabs opening at once share the same in-flight rebuild instead of each triggering their own.
 - `rollup-update.ts` now reads only the bytes appended to a transcript since the last ingest instead of re-reading the whole file, which matters most for long-running sessions whose transcripts reach tens of MB.
 - The Codex live-sessions query gained a time floor that cuts its per-call cost roughly 20x, with no change to which sessions show up in the live panel.
@@ -2261,6 +2617,7 @@ _tracks tag `monitor-v4.0.7`_
 - `scribe-nudge.ts` checks its throttle before doing any work, removing four `git` calls and four file reads from the common no-op path on every turn end.
 
 ### Fixed
+
 - Hourly usage payloads no longer carry three always-zero fields (`messages`, `sessions`, `toolCalls`) that the frontend never read and that were always overwritten anyway.
 
 ## [relay 0.6.7] - 2026-08-24
@@ -2268,9 +2625,11 @@ _tracks tag `monitor-v4.0.7`_
 _tracks tag `relay-v0.6.7`_
 
 ### Fixed
+
 - Image generation now prefers the PNG actually produced by the current run over a path merely mentioned in the tool's output, so a stale or unrelated image can no longer get copied out by mistake. Falls back to the parsed path only when no freshly generated file is found.
 
 ### Changed
+
 - Removed a dead decision point (`Backend.strategy()`) that always returned the same value per mode across all three backends; call sites now branch directly on mode.
 - The Codex backend now uses standard library calls (`mkdirSync`, `copyFileSync`, `readdirSync({recursive: true})`) instead of subprocess calls and a hand-rolled recursive directory walk.
 - A live-pane pre-spawn failure that falls back to the headless path now reuses the already-built prompt instead of re-running git and file reads a second time.
@@ -2280,9 +2639,11 @@ _tracks tag `relay-v0.6.7`_
 _tracks tag `herdr-v0.5.2`_
 
 ### Added
+
 - `screenshot --full` captures the entire page height instead of just the visible viewport, using Chrome DevTools Protocol's `captureBeyondViewport`.
 
 ### Changed
+
 - SKILL.md now warns that `--full` can fail silently on pages with scroll-triggered content, returning blank bands or double-composited output, and recommends viewport-by-viewport shots instead. It also notes Chromium's 16384px cap on full-page captures and that an emulated viewport override stays sticky afterward.
 
 ## [herdr 0.5.1] - 2026-08-21
@@ -2290,9 +2651,11 @@ _tracks tag `herdr-v0.5.2`_
 _tracks tag `herdr-v0.5.1`_
 
 ### Added
+
 - New `references/auth.md` guide for herdr-browser: how login persistence works through terminal-browser's shared Chromium profile, and how to snapshot and restore authenticated state.
 
 ### Changed
+
 - SKILL.md now warns that `cookies clear` wipes cookies for every open pane, not just the site you're working on — the browser profile is shared, not per-site.
 
 ## [herdr 0.5.0] - 2026-08-21
@@ -2300,11 +2663,13 @@ _tracks tag `herdr-v0.5.1`_
 _tracks tag `herdr-v0.5.0`_
 
 ### Added
+
 - `open` now gives a new browser its own Herdr tab instead of splitting the pane you are working in. `--split` becomes an opt-in flag for the old behaviour, and closing the browser removes only a tab the skill created itself.
 - New `raw -- <agent-browser command>` escape hatch, forwarding straight to terminal-browser's full surface: network route, HAR, traces, video, Core Web Vitals, and axe-core accessibility checks. Anything this skill does not expose natively is still one command away. PDF is the one exception neither path can reach — Electron's Chromium does not implement `Page.printToPDF`.
 - Native `cookies` (get/set/clear) and `headers` commands over CDP, closing a gap `eval` couldn't reach — `document.cookie` never sees an httpOnly cookie and can't write one either. A cookie rejected for the wrong domain now throws instead of silently doing nothing.
 
 ### Changed
+
 - `raw` errors no longer echo the whole forwarded command line back, which on a wrong selector was most of the message.
 - `--ratio` without `--split` now fails instead of being silently ignored.
 
@@ -2313,9 +2678,11 @@ _tracks tag `herdr-v0.5.0`_
 _tracks tag `herdr-v0.4.0`_
 
 ### Added
+
 - New `--split right|left|down|up` and `--ratio` flags for `open`, plus `--output` for `screenshot`.
 
 ### Changed
+
 - Every page operation (`snapshot`, `goto`, `click`, `eval`, `console`, and the rest) now runs over the Chrome DevTools Protocol directly instead of forwarding to a CLI. Output shrinks sharply as a result — a page snapshot now runs 5-18x smaller than the equivalent `agent-browser snapshot` on the same page.
 - `console` now reports uncaught exceptions, which it previously could not: a fresh CDP attach replays the page's whole console buffer, including `Runtime.exceptionThrown`.
 - `snapshot` now lists elements in document order instead of Chromium's internal serialization order, so a link-dense page no longer buries the first real item under the footer.
@@ -2323,10 +2690,12 @@ _tracks tag `herdr-v0.4.0`_
 - Any command that changes a tab (`open`, `new-tab`, `activate`, `close`) now re-reads the tab strip after acting, instead of printing a snapshot taken before the change — `open` on an already-live browser no longer reports the new page while still showing the old URL in the active row.
 
 ### Removed
-- **Breaking:** the herdr-browser plugin backend is gone; terminal-browser is now the only backend. It was kept on the belief that it spawned the *system* Chrome and so carried real profiles, extensions, and logged-in sessions — its own source in fact launches Chrome with `--headless=new`, a throwaway per-session `--user-data-dir`, and `--disable-extensions`, borrowing only the Chrome binary, never its state.
+
+- **Breaking:** the herdr-browser plugin backend is gone; terminal-browser is now the only backend. It was kept on the belief that it spawned the _system_ Chrome and so carried real profiles, extensions, and logged-in sessions — its own source in fact launches Chrome with `--headless=new`, a throwaway per-session `--user-data-dir`, and `--disable-extensions`, borrowing only the Chrome binary, never its state.
 - **Breaking:** the `--placement tab|split|overlay|zoomed` flag (added in 0.3.1) is gone with the plugin backend. Use `--split right|left|down|up` and `--ratio` instead.
 
 ### Fixed
+
 - A `goto` to an unresolvable host used to report success while loading an error page; it now fails loudly.
 - `activate` was a silent no-op, `new-tab` returned a 500 on Electron, and `open --new` could report the wrong browser when two panes held the same URL. All three are fixed.
 - Closing the last tab closes its pane, which used to surface as an error; it now reports `closed <view>`.
@@ -2337,6 +2706,7 @@ _tracks tag `herdr-v0.4.0`_
 _tracks tag `monitor-v4.0.6`_
 
 ### Fixed
+
 - Codex's rate-limit windows now slot by their actual duration instead of position, so a dropped 5-hour window no longer causes the weekly window to be mislabeled as "5hr." The usage-limit grid also switches to `auto-fit` columns so a single remaining window no longer gets stranded at 25% width.
 - Rate-limit window labels are now derived from each window's real duration rather than a hardcoded slot name, fixing mislabeled windows and giving non-canonical lengths (like 30d, 4hr, 15m) a sensible display name.
 
@@ -2345,12 +2715,15 @@ _tracks tag `monitor-v4.0.6`_
 _tracks tag `herdr-v0.3.1`_
 
 ### Added
+
 - `herd.ts`'s `send()` gained an optional third argument (`{wait, status, timeoutMs}`) that confirms a prompt actually landed, driven by Herdr 0.8.2's `agent prompt --wait`. A prompt that was accepted but never acted on now surfaces as its own stalled state instead of looking identical to an agent that's simply still idle.
 
 ### Fixed
+
 - `spawn --task` and `agent start` could both strand a pane the caller had no handle to close: `spawn --task` threw after already creating the pane if a blocked screen was detected on the initial send, and `agent start` rethrew on a not-ready signal even when the agent was actually live. Both paths now always hand the pane's name back to the caller, even when a downstream step errors.
 
 ### Changed
+
 - All five `herdr` reference docs and the skill's own guidance are refreshed for Herdr 0.8.2: the updated socket protocol (19 to 20) and its new `pane.input.set` method, new CLI surface (`pane input --right-click`, `api snapshot`, `server reload-agent-manifests`, the renamed `antigravity-cli` agent kind), the full current config surface, and corrected agent-orchestration guidance now that 0.8.2 waits internally after `agent start` instead of needing a manual settle wait.
 
 ## [relay 0.6.6] - 2026-08-21
@@ -2358,6 +2731,7 @@ _tracks tag `herdr-v0.3.1`_
 _tracks tag `relay-v0.6.6`_
 
 ### Changed
+
 - relay's initial bootstrap send now confirms the prompt actually landed before proceeding, using Herdr's new wait/confirm support — a stalled send is caught immediately at submit time instead of surfacing later through a delayed poll. A failed confirmation is logged and passed over rather than treated as fatal, so the existing nudge/self-heal retry still catches a genuine miss; only a fully blocked send (nothing delivered) stops the bootstrap outright.
 
 ## [chronicle 0.14.0] - 2026-08-19
@@ -2365,10 +2739,12 @@ _tracks tag `relay-v0.6.6`_
 _tracks tag `chronicle-v0.14.0`_
 
 ### Added
+
 - `chronicle:release` gained an optional `artifacts` stage that runs between the version bump and the changelog entry. It checks each configured artifact's `--version` output against the target version and rebuilds it when a `build` command is configured, so a committed binary (or similar build output) can no longer drift out of sync with the version you just bumped.
 - The version gate now surfaces version-file drift up front: if a unit's bumped manifest has a companion file (like a lockfile) missing from its `versionFiles`, the release reports it at the version gate and offers the edit, instead of leaving it for you to notice later — the kind of gap that once forced a commit amend and a force-pushed tag on a peer repo.
 
 ### Changed
+
 - `versionInOutput()` now matches on digit/dot boundaries, so checking for `0.8.0` in an artifact's version output no longer false-matches inside `0.8.01` or `10.8.0`.
 
 ## [monitor 4.0.5] - 2026-08-19
@@ -2376,9 +2752,11 @@ _tracks tag `chronicle-v0.14.0`_
 _tracks tag `monitor-v4.0.5`_
 
 ### Added
+
 - monitor now watches for configuration drift on every session start: another install claiming the statusline, a stale hand-wired cockpit channel entry, missing q-lab permission patterns, or an unparseable `settings.json`. It reports what it finds instead of silently staying broken.
 
 ### Changed
+
 - The `SessionStart` hook now runs in two clearly separated phases: a repair phase (still marker-gated, still auto-fixes on a version bump) and a read-only drift watch that always runs afterward. Drift caused by an upgrade is fixed automatically; drift you caused yourself is only reported, never silently changed for you. Repeated notices for the same unresolved drift are throttled so you aren't nagged every session.
 
 ## [herdr 0.3.0] - 2026-08-17
@@ -2386,6 +2764,7 @@ _tracks tag `monitor-v4.0.5`_
 _tracks tag `herdr-v0.3.0`_
 
 ### Added
+
 - New `herdr:herdr-browser` skill drives Herdr's browser/CDP plugin from inside a live Herdr session — open pages, read text/snapshots, click by reference, watch, and emulate — migrated in from a personal skill so it ships with the plugin instead of living outside it.
 - Both plugin manifests and the marketplace registry now advertise the browser/CDP capability, so Claude Code and Codex can discover and load `herdr-browser`.
 
@@ -2394,6 +2773,7 @@ _tracks tag `herdr-v0.3.0`_
 _tracks tag `chronicle-v0.13.4`_
 
 ### Fixed
+
 - Subagent prompts that referenced skill paths with `$VAR`-style tokens could silently expand to an empty string in a child's shell — a child pasting `$SKILL_DIR` into Bash would run against an unintended path, which had already caused `/chronicle:commit` runs to complete with zero commits staged. All agent and skill docs now hand children literal absolute paths through `{VAR}`-style placeholders instead, so a missed substitution fails loudly with the token name intact rather than silently expanding to nothing.
 
 ## [chronicle 0.13.3] - 2026-08-16
@@ -2401,9 +2781,11 @@ _tracks tag `chronicle-v0.13.4`_
 _tracks tag `chronicle-v0.13.3`_
 
 ### Added
+
 - adr, commit, install, pr, and release gained OpenCode compatibility documentation, so an OpenCode session can resolve chronicle's own scripts and agents.
 
 ### Changed
+
 - OpenCode-only instructions for commit, pr, release, and adr moved out of each skill's main SKILL.md into a dedicated `references/opencode.md`, so Claude Code and Codex sessions no longer load OpenCode-specific behavior they never use.
 - Normalized OpenCode-only section wording and headings, replacing several copy-pasted phrasings with one canonical line.
 
@@ -2412,9 +2794,11 @@ _tracks tag `chronicle-v0.13.3`_
 _tracks tag `dispatch-v3.20.1`_
 
 ### Added
+
 - autopilot gained OpenCode compatibility documentation, so an OpenCode session can drive the same dev/verify/judge loop.
 
 ### Changed
+
 - autopilot's OpenCode-only instructions moved out of SKILL.md into a dedicated `references/opencode.md`.
 - Normalized OpenCode-only section wording and headings across the skill's docs.
 
@@ -2423,9 +2807,11 @@ _tracks tag `dispatch-v3.20.1`_
 _tracks tag `herdr-v0.2.5`_
 
 ### Added
+
 - herdr and herdr-protocol-upgrade gained OpenCode-facing documentation, clarifying how scripts resolve under OpenCode.
 
 ### Changed
+
 - Normalized OpenCode-only section wording and headings across the skill's docs.
 
 ## [monitor 4.0.4] - 2026-08-16
@@ -2433,10 +2819,12 @@ _tracks tag `herdr-v0.2.5`_
 _tracks tag `monitor-v4.0.4`_
 
 ### Added
+
 - cockpit, install, and usage-dashboard gained OpenCode compatibility documentation, so an OpenCode session can resolve monitor's scripts and agents.
 - cockpit gained a `references/opencode.md`, filling the missing third provider reference alongside `claude-cli.md` and `codex.md`.
 
 ### Changed
+
 - cockpit's OpenCode-only behavioral sections moved out of SKILL.md into `references/opencode.md`, and the OpenCode notes scattered through `claude-cli.md`, `pilot.md`, `restart.md`, and `scribe.md` were folded into it — cockpit's SKILL.md is a thin router and is now half its former size.
 - Normalized OpenCode-only section wording and headings across the skill's docs.
 
@@ -2445,6 +2833,7 @@ _tracks tag `monitor-v4.0.4`_
 _tracks tag `relay-v0.6.5`_
 
 ### Changed
+
 - OpenCode's default models moved to the Deepseek v4 family: delegate now defaults to `opencode-go/deepseek-v4-light` and review to `opencode-go/deepseek-v4-pro`; delegate also now passes `--variant max` on both headless and live-pane invocations, running the lighter default model at its maximum reasoning setting to offset the change.
 - `relay/backends.md` was shortened, consolidating outdated manual-install instructions now that `opencode/install.ts` is the install method.
 - Normalized OpenCode-only section wording and headings across the skill's docs.
@@ -2454,13 +2843,16 @@ _tracks tag `relay-v0.6.5`_
 _tracks tag `relay-v0.6.4`_
 
 ### Added
+
 - The opencode backend now supports opencode 1.18.18, both live and headless.
 
 ### Fixed
+
 - Headless opencode runs (`opencode run`) no longer silently drop approval-gated operations. `--dangerous` now maps to opencode's `--auto` flag on the headless path too, not just the live TUI, so unattended runs don't auto-reject prompts that need approval.
 - A task prompt containing flag-like text (leading `-`/`--`) no longer gets misparsed as a CLI option; the prompt is now appended after a `--` separator so opencode's own parser stops treating it as flags.
 
 ### Changed
+
 - Corrected the relay docs' description of opencode's `--auto`: it is not a full permission bypass like Codex's equivalent flag, since explicit deny rules still apply. Also documented that `-m/--model` is optional and that the hidden `--yolo`/`--dangerously-skip-permissions` aliases collapse to the same boolean, and replaced the stale "`--agent` deferred" note with the real reason it stays unwired — the referenced profile would need to exist in every machine's opencode config.
 
 ## [dispatch 3.20.0] - 2026-08-14
@@ -2468,9 +2860,11 @@ _tracks tag `relay-v0.6.4`_
 _tracks tag `dispatch-v3.20.0`_
 
 ### Added
+
 - Flightplan now asks for the review engine and review depth up front, in one question alongside the interview's other run options, instead of leaving them buried later in the flow.
 
 ### Changed
+
 - Flightplan's approval step (ExitPlanMode) now restates the chosen review options next to the finished task index, so approving the plan also confirms those choices and nothing asks about them again afterward.
 - The review loop's stopping rule no longer relies on a fixed round limit. Findings are now labelled by severity, and the loop keeps going as long as a P1 issue is open; the previous round cap becomes a checkpoint that escalates fix tactics instead of cutting the review short.
 - The reviewer only declares a plan unable to converge after two consecutive checkpoint passes repeat fixes it already tried, and that verdict is now surfaced in the run's closing recap.
@@ -2480,12 +2874,15 @@ _tracks tag `dispatch-v3.20.0`_
 _tracks tag `chronicle-v0.13.2`_
 
 ### Added
+
 - `commit.ts` gained a `propose --file <path>` command: the watcher now writes its proposed commit groups straight to a file the Lawspeaker names, instead of relying on its final chat reply. A watcher that answers in prose no longer strands the commit flow.
 
 ### Fixed
-- Fixed a macOS-only bug where the outside-repo guard could be fooled by the `/var` ↔ `/private/var` symlink, letting a hand-off file *inside* the repo pass as if it were outside.
+
+- Fixed a macOS-only bug where the outside-repo guard could be fooled by the `/var` ↔ `/private/var` symlink, letting a hand-off file _inside_ the repo pass as if it were outside.
 
 ### Changed
+
 - The old `shape` subcommand is gone, replaced end to end by the file-backed `propose` hand-off; the Lawspeaker and watcher agents (both Claude and Codex configs) and the commit skill docs now describe this protocol instead.
 
 ## [chronicle 0.13.1] - 2026-08-10
@@ -2493,9 +2890,11 @@ _tracks tag `chronicle-v0.13.2`_
 _tracks tag `chronicle-v0.13.1`_
 
 ### Added
+
 - The ADR validator now catches a body's `ADR-NNNN` citations in ordinary prose, not just its `Supersedes:` / `Superseded by:` lines. Deleting a referenced record now surfaces a warning on every draft still citing it, instead of leaving a dangling pointer with no signal.
 
 ### Changed
+
 - ADR drafting now follows a restate-then-cite rule: a citation should point to a source, not carry the fact itself, so a draft's argument still stands even if the cited record is later removed. The template, the codifier's drafting guidance, and ADR-0003 were all updated to this pattern.
 
 ## [chronicle 0.13.0] - 2026-08-10
@@ -2503,9 +2902,11 @@ _tracks tag `chronicle-v0.13.1`_
 _tracks tag `chronicle-v0.13.0`_
 
 ### Added
+
 - The ADR gate page can now run as a background command with `--serve --open`: the browser page posts its answer straight back to a one-shot local loopback server, so submitting no longer needs a manual copy-paste. The command exits on submission (or on usage error, missing browser, or a 30-minute timeout by default), and `SKILL.md` documents the exit codes so the agent resumes correctly. The copy-button fallback still works when `--serve` isn't used or the published page's send button is unreachable.
 
 ### Fixed
+
 - A placeholder-substitution bug in the gate page's client script could leak the placeholder name into a submit URL that happened to contain `$&`; substitution now uses a function replacer instead of a plain string replace.
 
 ## [chronicle 0.12.1] - 2026-08-09
@@ -2513,25 +2914,30 @@ _tracks tag `chronicle-v0.13.0`_
 _tracks tag `chronicle-v0.12.1`_
 
 ### Changed
+
 - The commit flow's grouping check now catches a case the ordering rule alone missed: a file and the file that imports from it, both changed together, where neither commit order leaves a codebase that builds in between. Those files are now merged into one commit instead of being split across two, in both the watcher and the Lawspeaker's own review pass.
 
 ### Fixed
-- `git status` parsing could misread a real filename as two entries, or as part of a rename, whenever that filename happened to contain a newline or the literal text ` -> `. Every path-reading git call now uses the `-z` stream format, which cannot be confused this way, so the commit plan's file coverage check no longer rejects a correct plan.
+
+- `git status` parsing could misread a real filename as two entries, or as part of a rename, whenever that filename happened to contain a newline or the literal text `->`. Every path-reading git call now uses the `-z` stream format, which cannot be confused this way, so the commit plan's file coverage check no longer rejects a correct plan.
 
 ## [chronicle 0.12.0] - 2026-08-09
 
 _tracks tag `chronicle-v0.12.0`_
 
 ### Added
+
 - The commit skill's mechanical steps — deciding simple vs. atomic, staging, committing, and verifying — now run through a single tested script (`commit.ts`) instead of agent prose. An interrupted commit run resumes from wherever it actually left off, read straight from the git log, instead of re-doing or skipping work.
 - A commit's emoji is now derived automatically from its type when the plan doesn't supply one, so a missing emoji is no longer possible.
 - The Lawspeaker returns as the commit flow's orchestrator: it orders the commits and writes the plan file's prose, while the script still owns shape, staging, and verification.
 
 ### Changed
+
 - The watcher agent now hands back commits already in the order they should land, with reasons — including the rule that removing a reference must land before removing what it references.
 - The runesmith agent is now a thin errand-runner that only executes the plan; it no longer writes commit prose.
 
 ### Fixed
+
 - Non-ASCII filenames could be silently mangled when read from `git status`; the commit script now reads paths with `core.quotePath=false` so they parse correctly.
 - A rename staged as a split commit (add and delete separated across commits) is now rejected before it lands, instead of producing a broken commit only caught after the fact.
 
@@ -2540,6 +2946,7 @@ _tracks tag `chronicle-v0.12.0`_
 _tracks tag `chronicle-v0.11.2`_
 
 ### Fixed
+
 - Releasing a Rust crate left `Cargo.lock` behind: the commit bumped `Cargo.toml` alone, so the tag pointed at a tree whose manifest and lockfile disagreed. Both now move together, including in Cargo workspaces where one lockfile tracks several crates. The lock update is anchored to the crate's own package name, so a bump can never rewrite another dependency's version.
 - A config written before this fix lists only `Cargo.toml`. Detection runs once, so add the `Cargo.lock` entry to `.chronicle/release.json` by hand — the format is in `references/release-config.md`.
 
@@ -2548,9 +2955,11 @@ _tracks tag `chronicle-v0.11.2`_
 _tracks tag `chronicle-v0.11.1`_
 
 ### Added
+
 - A new `skirnir` agent now runs the release scripts on the main agent's behalf, so their raw output — including the repo's full tag list, git logs, and stack traces — no longer floods the conversation. Skirnir decides nothing; it just runs the script and hands back the distilled result.
 
 ### Changed
+
 - The release plan now carries the CHANGELOG path directly instead of the raw release config, an internal cleanup with no visible effect.
 
 ## [chronicle 0.11.0] - 2026-08-09
@@ -2558,11 +2967,13 @@ _tracks tag `chronicle-v0.11.1`_
 _tracks tag `chronicle-v0.11.0`_
 
 ### Changed
+
 - The release skill's five-agent orchestration (seer, oathkeeper, smith, hammerbearer, annalist) is replaced by a script that drives an ordered list of stages — bump, entry, commit, merge, tag, back-merge, push. Each stage decides whether it has already happened by reading the repo, so a run resumes wherever the last one stopped, and re-running a release that already finished now does nothing instead of erroring or duplicating work. Only the annalist remains, since turning commits into user-facing prose is the one judgment a script can't make.
 - A release now blocks instead of proceeding when a tag already points at a different commit, or when local `main` is behind its remote — matching the refusal the other release paths already had.
 - One release run now loads about a quarter of the instructions it used to, and spawns at most one agent instead of four.
 
 ### Fixed
+
 - A release stopped after prepare mode (version bumped, CHANGELOG entry written, nothing committed) had no correct way to finish: the internal "prepared" state could only ever be recorded in a way that either wrote a duplicate CHANGELOG heading on finish, or cut a tag on a commit that didn't actually contain the version it claimed. `/chronicle:release auto` now finishes a stopped prepare run correctly.
 
 ## [monitor 4.0.3] - 2026-08-08
@@ -2570,6 +2981,7 @@ _tracks tag `chronicle-v0.11.0`_
 _tracks tag `monitor-v4.0.3`_
 
 ### Fixed
+
 - `cockpit log --help` used to silently write a blank decision record instead of printing usage: the argument parser's catch-all for unrecognized flags treated `--help` as an ordinary flag and swallowed the next token as its value. Unrecognized flags on `log` and other writing subcommands now fail with an error instead of being written into the trail.
 - `--help` / `-h` now short-circuits before any subcommand runs and prints a usage block, so a mistyped invocation is caught before it can touch the decision log.
 - `cockpit config --answer-here on|off` kept working after the flag-parsing tightened; `--answer-here` is now a declared flag rather than reaching the command only through the old loose catch-all.
@@ -2579,14 +2991,17 @@ _tracks tag `monitor-v4.0.3`_
 _tracks tag `chronicle-v0.10.6`_
 
 ### Added
+
 - The release skill now recognizes a release already prepared on the feature branch: version bumps and CHANGELOG entries landed, only the tag is missing. It resolves the version gate at the existing bump without asking for a new one, verifies the bump instead of reapplying it, and cuts the tag directly, skipping a duplicate CHANGELOG entry.
 - A repo whose version files were bumped with no CHANGELOG entry behind them is now caught and stopped rather than guessed at, so the release doesn't silently pick the wrong half to finish. A repo with no prior tag is never treated this way, since a missing entry there is just the normal first-release state.
 
 ### Fixed
+
 - Re-running a release at a version whose tag already exists now fails before the commit and merge happen, instead of after — matching the other release paths, which already refused to touch the repo in that case.
 - The Codex side of the release orchestrator now returns the same field names as the Claude side, fixing a mismatch that could point Codex-side callers at the wrong data.
 
 ### Changed
+
 - Agent instructions were trimmed of about 260 restated words, so each rule now lives in exactly one place instead of being repeated across prompts.
 
 ## [relay 0.6.3] - 2026-08-07
@@ -2594,6 +3009,7 @@ _tracks tag `chronicle-v0.10.6`_
 _tracks tag `relay-v0.6.3`_
 
 ### Fixed
+
 - The codex backend's `workspace-write` sandbox was blocking relay's routine delegated writes and network fetches. Both the headless delegate and the live-pane invocation now request `-s danger-full-access` instead, so delegated work no longer stalls on sandbox denials. This only lifts the sandbox restriction — approval prompts are unaffected, and the live TUI still surfaces its usual approval prompts in the pane. The opt-in `--dangerous` (YOLO) switch is unchanged, and `codex review` is untouched since it accepts no `-s` flag.
 
 ## [chronicle 0.10.5] - 2026-08-07
@@ -2601,6 +3017,7 @@ _tracks tag `relay-v0.6.3`_
 _tracks tag `chronicle-v0.10.5`_
 
 ### Changed
+
 - Depersonalized shipped plugin documentation, replacing the repo owner's name with generic "the user" phrasing in the `adr` skill guide and its codifier agent specs. No behaviour change.
 
 ## [monitor 4.0.2] - 2026-08-07
@@ -2608,6 +3025,7 @@ _tracks tag `chronicle-v0.10.5`_
 _tracks tag `monitor-v4.0.2`_
 
 ### Changed
+
 - Depersonalized a code comment in the cockpit dashboard's permission modal to use generic user phrasing. No behaviour change.
 
 ## [chronicle 0.10.4] - 2026-08-07
@@ -2615,6 +3033,7 @@ _tracks tag `monitor-v4.0.2`_
 _tracks tag `chronicle-v0.10.4`_
 
 ### Changed
+
 - ADR's two human review gates now render a fixed, purpose-built local page instead of markup the main agent hand-assembled each run. The main agent now supplies only the review data; the page's layout, wording, and consistency checks stay stable across runs instead of drifting between them.
 - The gate page is written to a local temp file and opened with the platform's default browser rather than hosted anywhere, since the page is fully self-contained and review data never needs to leave the machine.
 - When no browser is available, the gate falls back to the Artifact tool, then to structured markdown in the transcript. This cascade is chosen by whether a browser is present, not by which harness is running — Codex goes through the same script as Claude.
@@ -2625,6 +3044,7 @@ _tracks tag `chronicle-v0.10.4`_
 _tracks tag `chronicle-v0.10.3`_
 
 ### Changed
+
 - ADR promotion now handles a whole batch of decisions in one run instead of one at a time: the codifier drafts every record in a single pass, the lorekeeper runs its phases across the batch, and the barrowkeeper writes the full batch behind the existing two-gate confirmation.
 - The `adr` skill's collect phase gained a documented contract, including gate-1 fallback behavior and automatic re-planning when a decision's disposition changes mid-flow.
 - The reckoner's shortlist logic now accounts for batch promotion.
@@ -2636,7 +3056,7 @@ _tracks tag `dispatch-v3.19.0`_
 
 ### Changed
 
-- Autopilot's closing Final review now runs a different set of Claude quality lenses. `simplification` and `altitude` are gone; `reuse` and a new `leanness` lens take their place, alongside the existing cross-vendor engine lens (codex/opencode) and `efficiency`. `altitude` used to flag both over-engineering and under-engineering on the same span of code, so it could ask the fixer to inline an abstraction and extract a helper at once — the fixer reads every findings file with no arbitration rule, so a self-contradicting lens left it guessing. The new split gives each direction its own lens: `reuse` owns "needs more structure" and is the only lens that may ask for more code, while `leanness` is cut-only, tagging findings `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` and closing with a `net: -N lines possible.` summary. `leanness` also covers ground neither predecessor did — `reuse` searches for reuse only *inside* the codebase, so nothing used to catch a hand-rolled standard-library function or a dependency doing what the platform already ships. That is what its `stdlib:` and `native:` tags are for. This is visible under `.flightlog/review/attempt-N/<lens>.md` (renamed files) and in `CFG.reviewLensModel`, which now governs three lenses instead of four — one fewer parallel Opus agent per Final review attempt.
+- Autopilot's closing Final review now runs a different set of Claude quality lenses. `simplification` and `altitude` are gone; `reuse` and a new `leanness` lens take their place, alongside the existing cross-vendor engine lens (codex/opencode) and `efficiency`. `altitude` used to flag both over-engineering and under-engineering on the same span of code, so it could ask the fixer to inline an abstraction and extract a helper at once — the fixer reads every findings file with no arbitration rule, so a self-contradicting lens left it guessing. The new split gives each direction its own lens: `reuse` owns "needs more structure" and is the only lens that may ask for more code, while `leanness` is cut-only, tagging findings `delete:` / `stdlib:` / `native:` / `yagni:` / `shrink:` and closing with a `net: -N lines possible.` summary. `leanness` also covers ground neither predecessor did — `reuse` searches for reuse only _inside_ the codebase, so nothing used to catch a hand-rolled standard-library function or a dependency doing what the platform already ships. That is what its `stdlib:` and `native:` tags are for. This is visible under `.flightlog/review/attempt-N/<lens>.md` (renamed files) and in `CFG.reviewLensModel`, which now governs three lenses instead of four — one fewer parallel Opus agent per Final review attempt.
 - Flightplan now reserves a `review` bucket for the closing Final review task, fixed at `tasks/review/01-<slug>.md`. `lint-task.ts` enforces the location with a new `final-review-location` violation.
 - **Upgrade note:** any existing plan tree whose Final review task lives in a feature bucket (for example `ui/05`) now fails the whole-tree lint, and autopilot's Step 1 runs that lint before flying. Move the closing task to `tasks/review/01-<slug>.md` before flying an older plan.
 
@@ -2717,6 +3137,7 @@ _tracks tag `relay-v0.6.2`_
 ### Changed
 
 - Relay documentation now makes clear that a marker-terminated result file remains the authoritative completion signal: Herdr pane reads can be unavailable, visible, or truncated and cannot prove a delegate's final answer is complete.
+
 ## [dispatch 3.18.8] - 2026-08-03
 
 _tracks tag `dispatch-v3.18.8`_
@@ -2929,7 +3350,7 @@ _tracks tag `monitor-v3.21.0`_
 
 ### Changed
 
-- **`needs_your_call` now only parks an agent on the cockpit dashboard when someone is actually there to answer.** Previously, `cockpit wait` blocked the agent for up to 240 seconds per question regardless of whether the dashboard was open. Now it only waits there if "Ask me here" is on *and* a cockpit tab has that session selected; otherwise the agent asks in your terminal instead and the answer still gets recorded into the decision trail. The decision card is logged either way, so the trail stays complete.
+- **`needs_your_call` now only parks an agent on the cockpit dashboard when someone is actually there to answer.** Previously, `cockpit wait` blocked the agent for up to 240 seconds per question regardless of whether the dashboard was open. Now it only waits there if "Ask me here" is on _and_ a cockpit tab has that session selected; otherwise the agent asks in your terminal instead and the answer still gets recorded into the decision trail. The decision card is logged either way, so the trail stays complete.
 
 ### Fixed
 
@@ -3028,7 +3449,7 @@ _tracks tag `relay-v0.5.8`_
 
 ### Changed
 
-- **A killed live run can now be reattached and recovered.** relay prints the `result.md` path and the `herd read <agent>` recovery command to stderr *before* the long poll begins, instead of only after it completes. If the foreground process gets cut off mid-run (e.g. by an exec time cap) rather than exiting cleanly, those recovery handles are already on screen — and, thanks to the herdr 0.2.1 fix above, `herd read` against the now-settled pane actually works.
+- **A killed live run can now be reattached and recovered.** relay prints the `result.md` path and the `herd read <agent>` recovery command to stderr _before_ the long poll begins, instead of only after it completes. If the foreground process gets cut off mid-run (e.g. by an exec time cap) rather than exiting cleanly, those recovery handles are already on screen — and, thanks to the herdr 0.2.1 fix above, `herd read` against the now-settled pane actually works.
 
 ## [herdr 0.2.0] - 2026-07-22
 
@@ -3117,7 +3538,7 @@ _tracks tag `relay-v0.5.6`_
 
 ### Fixed
 
-- **`/relay` no longer fails to spawn a live Herdr pane when invoked from a nested working directory.** Herdr reports the *pane's* cwd (where it was opened), while relay runs from wherever the agent actually is — often a subdirectory or sub-agent cwd underneath it. Caller resolution previously required an exact cwd match and rejected these valid nested cases, including ones with a perfectly good inherited pane ID; it now matches "pane cwd is an ancestor of (or equal to) the caller cwd," picking the deepest containing pane, while still hard-failing on genuine equal-depth ambiguity.
+- **`/relay` no longer fails to spawn a live Herdr pane when invoked from a nested working directory.** Herdr reports the _pane's_ cwd (where it was opened), while relay runs from wherever the agent actually is — often a subdirectory or sub-agent cwd underneath it. Caller resolution previously required an exact cwd match and rejected these valid nested cases, including ones with a perfectly good inherited pane ID; it now matches "pane cwd is an ancestor of (or equal to) the caller cwd," picking the deepest containing pane, while still hard-failing on genuine equal-depth ambiguity.
 
 ## [monitor 3.19.4] - 2026-07-17
 
@@ -3442,7 +3863,7 @@ _herdr is independently versioned; this entry tracks the `herdr-v0.1.4` tag._
 
 ### 🔧 Changed
 
-- **New agent tabs now open in the caller's workspace, not the focused one.** `herd.ts`'s new-tab spawn (`startInNewTab`) defaults `tab create --workspace` to the caller's `HERDR_WORKSPACE_ID` when no explicit `workspace` is given. Previously a tab spawned while you were viewing a *different* herdr workspace landed in that workspace; now it stays pinned to where the delegating agent lives (fixes relay live-pane delegations opening in the wrong workspace). An explicit `opts.workspace` still wins.
+- **New agent tabs now open in the caller's workspace, not the focused one.** `herd.ts`'s new-tab spawn (`startInNewTab`) defaults `tab create --workspace` to the caller's `HERDR_WORKSPACE_ID` when no explicit `workspace` is given. Previously a tab spawned while you were viewing a _different_ herdr workspace landed in that workspace; now it stays pinned to where the delegating agent lives (fixes relay live-pane delegations opening in the wrong workspace). An explicit `opts.workspace` still wins.
 
 ## [dispatch 3.15.1] - 2026-07-07
 
@@ -3615,7 +4036,7 @@ _relay is independently versioned; this entry tracks the `relay-v0.3.0` tag._
 
 ### ✨ Added
 
-- **Live-pane execution inside herdr — delegates and reviews you can watch and take over.** When relay runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` now spawn the backend's **interactive TUI** (`codex` / `claude` / `opencode`) in a visible sibling pane instead of a blocking headless spawn, driven through the herdr plugin's `herd.ts` wrapper. The full prompt rides a `live-prompt.md` file (a one-line bootstrap is all the pane receives — multi-line TUI sends submit prematurely), and the answer comes back via a result-file contract: the delegate writes its complete final markdown to `result.md` ending with an exact end-marker line, and relay polls for agent-**settled** (`idle` *or* `done` — codex parks at `done` after answering) + marker, and self-heals a lost bootstrap delivery (pane never leaves idle, no result file → re-send the whole bootstrap line, at most twice; covers both a swallowed Enter and text the TUI dropped while starting up). stdout stays the clean answer; live metadata (agent name, keep/close hint) rides stderr. In live mode, review always uses the prompt strategy — a git-ref scope becomes a produce-the-diff-yourself instruction (`git diff <ref>...` / `git show <sha>`). `image` stays headless/native.
+- **Live-pane execution inside herdr — delegates and reviews you can watch and take over.** When relay runs inside herdr (`HERDR_ENV=1`), `delegate` and `review` now spawn the backend's **interactive TUI** (`codex` / `claude` / `opencode`) in a visible sibling pane instead of a blocking headless spawn, driven through the herdr plugin's `herd.ts` wrapper. The full prompt rides a `live-prompt.md` file (a one-line bootstrap is all the pane receives — multi-line TUI sends submit prematurely), and the answer comes back via a result-file contract: the delegate writes its complete final markdown to `result.md` ending with an exact end-marker line, and relay polls for agent-**settled** (`idle` _or_ `done` — codex parks at `done` after answering) + marker, and self-heals a lost bootstrap delivery (pane never leaves idle, no result file → re-send the whole bootstrap line, at most twice; covers both a swallowed Enter and text the TUI dropped while starting up). stdout stays the clean answer; live metadata (agent name, keep/close hint) rides stderr. In live mode, review always uses the prompt strategy — a git-ref scope becomes a produce-the-diff-yourself instruction (`git diff <ref>...` / `git show <sha>`). `image` stays headless/native.
 - **`--headless` and `--wait-timeout <ms>` flags.** `--headless` forces the classic flow even inside herdr (essential for nested delegation — a live-delegated agent inherits `HERDR_ENV=1`); `--wait-timeout` bounds the live poll (default 10 min). A run that outlives the timeout is **not a failure**: relay exits 0 with a `pending` report of copy-pasteable follow-ups (`herd wait/read/close` + `cat result.md`) and never kills or closes the pane. Pane lifecycle after success is the calling agent's call (AskUserQuestion close-or-keep, per SKILL.md).
 - **No hard herdr dependency.** `herd.ts` is resolved at runtime (`HERD_SCRIPT_PATH` override → repo-sibling checkout → both harnesses' plugin caches, newest version first) and dynamically imported only when the live path is taken; anything unresolvable degrades to one stderr note + the unchanged headless flow, so relay stays portable to machines without the herdr plugin. Headless fallback is double-run-safe: a spawn that throws after partially creating its pane is detected via an agent-list diff (new `relay-<backend>-<mode>-*` name), and relay then reports the error instead of re-running the task headless (found by a codex live review of this very change).
 - **Live runs open their own tab, not a split.** The live pane now spawns via `herd.spawn({ newTab: true })`, so your working pane keeps its full size instead of being halved by a `--split down`. (`split: "down"` is still passed as a graceful fallback for an older `herd.ts` that predates `newTab`.)
@@ -3624,7 +4045,7 @@ _relay is independently versioned; this entry tracks the `relay-v0.3.0` tag._
 ### 🔧 Changed
 
 - `executeRelay` is now async (the headless runner stays sync internally); backends gained a pure optional `invokeLive` seam describing their TUI launch (model/dangerous flag mapping).
-- **Input-state-aware bootstrap nudge.** When the pane never leaves idle and no result file appears, relay no longer blindly re-sends the whole bootstrap (which could submit the read-this-file instruction *twice*). It now reads the pane's visible input box first: full line present but unsubmitted → press **Enter only**; line lost entirely → **re-send**; partial paste → **clear the line (`ctrl+a ctrl+k`) then re-send**. Uses herdr 0.1.1's new `keys` verb.
+- **Input-state-aware bootstrap nudge.** When the pane never leaves idle and no result file appears, relay no longer blindly re-sends the whole bootstrap (which could submit the read-this-file instruction _twice_). It now reads the pane's visible input box first: full line present but unsubmitted → press **Enter only**; line lost entirely → **re-send**; partial paste → **clear the line (`ctrl+a ctrl+k`) then re-send**. Uses herdr 0.1.1's new `keys` verb.
 
 ## [herdr 0.1.0] - 2026-07-02
 
@@ -3632,7 +4053,7 @@ _herdr is independently versioned; this entry tracks the `herdr-v0.1.0` tag._
 
 ### ✨ Added
 
-- **New `herdr` plugin — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager.** Migrated the standalone `/herdr` reference skill (config, CLI, plugin development, live pane/agent recipes) into its own marketplace package rather than folding it into `relay` — the reference is *knowledge*, distinct from relay's *executor* role. Ships to both the Claude and Codex marketplaces at `0.1.0`.
+- **New `herdr` plugin — reference + in-session agent orchestration for the [Herdr](https://herdr.dev) terminal workspace manager.** Migrated the standalone `/herdr` reference skill (config, CLI, plugin development, live pane/agent recipes) into its own marketplace package rather than folding it into `relay` — the reference is _knowledge_, distinct from relay's _executor_ role. Ships to both the Claude and Codex marketplaces at `0.1.0`.
 - **`herd` wrapper (`scripts/herd.ts`) — a typed Bun layer over the raw `herdr` CLI.** Collapses herdr's multi-step recipes into five verbs — `spawn` / `send` / `wait` / `read` / `list` / `close` — for driving agents in sibling panes when running inside herdr (`HERDR_ENV=1`). Handles the CLI's sharp edges, all verified live against herdr 0.7.1: addresses agents by a collision-resistant generated **name** (pane ids renumber and aren't durable), `send` writes literal text **and presses Enter** to submit (raw `agent send` doesn't), `read` defaults to `--source visible` because agent TUIs render into the alternate screen and leave scrollback empty, and the runner honors `HERDR_BIN_PATH`. Exposed as a `createHerd(run)` factory so `relay` can consume the same layer for a future live-pane strategy. Backed by 15 unit tests (mocked runner) plus a codex-reviewed argument parser.
 
 ## [monitor 3.16.2] - 2026-07-02
@@ -3661,7 +4082,7 @@ _monitor is independently versioned; this entry tracks the `monitor-v3.16.0` tag
 
 ### ✨ Added
 
-- **`/monitor:nudge` — a multi-scope kill switch for the scribe auto-log reminders.** The 💭 "spawn a fork to run /cockpit scribe" nudge that the `Stop` hook re-surfaces at the end of each turn can now be silenced (or re-enabled) at three scopes — `session` (TTL-pruned file, one week idle), `project` (keyed by git root), and `user` (global default) — via `cockpit nudge [on|off|toggle|clear|status] [--scope session|project|user]`. The most-specific *defined* scope wins (`session → project → user → default: on`), so a broad `off` can be re-enabled at a narrower scope — e.g. mute everywhere with `nudge off --scope user`, then hear them in just one session with `nudge on`. Project and user opinions persist in the one global cockpit config (the project opinion is keyed by its git root, never a repo dotfile); `status` prints the effective result plus the per-scope breakdown. The `Stop` hook consults this toggle before nudging, so an all-unset setup stays enabled (unchanged behaviour).
+- **`/monitor:nudge` — a multi-scope kill switch for the scribe auto-log reminders.** The 💭 "spawn a fork to run /cockpit scribe" nudge that the `Stop` hook re-surfaces at the end of each turn can now be silenced (or re-enabled) at three scopes — `session` (TTL-pruned file, one week idle), `project` (keyed by git root), and `user` (global default) — via `cockpit nudge [on|off|toggle|clear|status] [--scope session|project|user]`. The most-specific _defined_ scope wins (`session → project → user → default: on`), so a broad `off` can be re-enabled at a narrower scope — e.g. mute everywhere with `nudge off --scope user`, then hear them in just one session with `nudge on`. Project and user opinions persist in the one global cockpit config (the project opinion is keyed by its git root, never a repo dotfile); `status` prints the effective result plus the per-scope breakdown. The `Stop` hook consults this toggle before nudging, so an all-unset setup stays enabled (unchanged behaviour).
 
 ## [monitor 3.15.2] - 2026-06-21
 
@@ -3693,7 +4114,7 @@ _chronicle is independently versioned; this entry tracks the `chronicle-v0.3.1` 
 
 ### 🐛 Fixed
 
-- **`chronicle:commit` no longer launches its writer before the analyst returns.** The Commit Manager was emitting the `chronicle:analyst` and `chronicle:writer` spawns in the *same* turn, so the writer ran in parallel and received an empty plan — the manager builds the `CommitPlan` from the analyst's facts, a hard data dependency. `manager.md` described a sequential flow but never forbade same-turn batching, so the model followed the harness's default "batch independent tool calls" guidance. It now states the two `Agent()` calls are strictly sequential and must never be batched in one turn (the batch-parallel guidance doesn't apply to dependent calls), with a reminder at the writer step to spawn only after the analyst returns.
+- **`chronicle:commit` no longer launches its writer before the analyst returns.** The Commit Manager was emitting the `chronicle:analyst` and `chronicle:writer` spawns in the _same_ turn, so the writer ran in parallel and received an empty plan — the manager builds the `CommitPlan` from the analyst's facts, a hard data dependency. `manager.md` described a sequential flow but never forbade same-turn batching, so the model followed the harness's default "batch independent tool calls" guidance. It now states the two `Agent()` calls are strictly sequential and must never be batched in one turn (the batch-parallel guidance doesn't apply to dependent calls), with a reminder at the writer step to spawn only after the analyst returns.
 
 ## [chronicle 0.3.0] - 2026-06-18
 
@@ -3701,7 +4122,7 @@ _chronicle is independently versioned; this entry tracks the `chronicle-v0.3.0` 
 
 ### 🔧 Changed
 
-- **Both the commit and PR flows were rebuilt onto a nested-manager topology.** They previously ran as context-inheriting `fork`s, but a fork is a leaf the harness forbids from spawning subagents — so `chronicle:commit` silently never delegated to its Haiku analyst/writer (it ran git inline), and `chronicle:pr`'s fork could open a PR on its own. Both are now driven by nested custom orchestrators that hold `Agent` + `Read` but **no `Bash`/`gh`**, so they *must* delegate: `chronicle:commit` → `chronicle:manager` → `chronicle:analyst` + `chronicle:writer`; `chronicle:pr` → `chronicle:editor` → `chronicle:drafter` (bun-only, no `gh` — structurally can't create) + `chronicle:publisher` (the only agent that opens the request, auto-creating as a draft by default). Orchestrators run on Sonnet (Haiku mishandles the synchronous spawn loop); the leaf workers stay on Haiku.
+- **Both the commit and PR flows were rebuilt onto a nested-manager topology.** They previously ran as context-inheriting `fork`s, but a fork is a leaf the harness forbids from spawning subagents — so `chronicle:commit` silently never delegated to its Haiku analyst/writer (it ran git inline), and `chronicle:pr`'s fork could open a PR on its own. Both are now driven by nested custom orchestrators that hold `Agent` + `Read` but **no `Bash`/`gh`**, so they _must_ delegate: `chronicle:commit` → `chronicle:manager` → `chronicle:analyst` + `chronicle:writer`; `chronicle:pr` → `chronicle:editor` → `chronicle:drafter` (bun-only, no `gh` — structurally can't create) + `chronicle:publisher` (the only agent that opens the request, auto-creating as a draft by default). Orchestrators run on Sonnet (Haiku mishandles the synchronous spawn loop); the leaf workers stay on Haiku.
 
 ### ✨ Added
 
@@ -3967,7 +4388,7 @@ _relay is independently versioned; this entry tracks the `relay-v0.2.0` tag._
 
 ### 💄 Polish
 
-- **flightplan self-containment guidance**: lint violations now spell out how to fix them (it's a dependency → `Depends on`; the executor needs it → inline or move to `_context/`), and the task template gains a sharp ❌/✅ on naming the *thing* (the API client, the schema) instead of a sibling task id like `frontend/01`.
+- **flightplan self-containment guidance**: lint violations now spell out how to fix them (it's a dependency → `Depends on`; the executor needs it → inline or move to `_context/`), and the task template gains a sharp ❌/✅ on naming the _thing_ (the API client, the schema) instead of a sibling task id like `frontend/01`.
 
 ## [3.7.3] - 2026-06-09
 
@@ -4164,7 +4585,7 @@ _relay is independently versioned; this entry tracks the `relay-v0.2.0` tag._
 
 - **Send cockpit messages to Codex sessions, not just Claude**: the cockpit send box now works for Codex too — messages start a real Codex turn through the managed remote-control socket (falling back to direct app-server mode when needed), so Codex is no longer observe-only. The box is gated on a real resume-readiness probe, so it only lights up when the session can actually receive a message.
 - **Relaunch hint for sessions missing a live channel**: when a Claude session lacks a cockpit channel attachment, the dashboard now shows a copyable relaunch command (with the right channel flags) in place of the send form — one click to copy, with a brief "Copied" confirmation — so you can reconnect a stranded session.
-- **Self-healing install paths**: `monitor:install` now treats a config as "wired" only when it points at the *exact* current plugin version path, so version drift (old cache dirs like `monitor/3.1.0/…` lingering after an update) is detected and re-pointed. A `SessionStart` hook runs a marker-gated `--session-check` once per version to silently re-point drift, or nudge a fresh install to run `/monitor:install` — it never fresh-wires, so initial opt-in stays manual. Adds `setup.ts --migrate` to re-point drift on demand.
+- **Self-healing install paths**: `monitor:install` now treats a config as "wired" only when it points at the _exact_ current plugin version path, so version drift (old cache dirs like `monitor/3.1.0/…` lingering after an update) is detected and re-pointed. A `SessionStart` hook runs a marker-gated `--session-check` once per version to silently re-point drift, or nudge a fresh install to run `/monitor:install` — it never fresh-wires, so initial opt-in stays manual. Adds `setup.ts --migrate` to re-point drift on demand.
 
 ### 🐛 Bug Fixes
 
@@ -4217,7 +4638,7 @@ _relay is independently versioned; this entry tracks the `relay-v0.2.0` tag._
 
 ### ✨ New Features
 
-- **Decision cards now carry self-labeled reasoning "facets"**: A new repeatable `--facet "LABEL: text"` flag on `cockpit log` lets you attach distinct reasoning dimensions to a decision (e.g. `REJECTED`, `CONSTRAINT`, `ASSUMPTION`, `RISK`, `PRIOR-ART`). Each facet renders in the dashboard as a labeled instrument chip with a type glyph, so the *why* behind a call is captured alongside the call itself.
+- **Decision cards now carry self-labeled reasoning "facets"**: A new repeatable `--facet "LABEL: text"` flag on `cockpit log` lets you attach distinct reasoning dimensions to a decision (e.g. `REJECTED`, `CONSTRAINT`, `ASSUMPTION`, `RISK`, `PRIOR-ART`). Each facet renders in the dashboard as a labeled instrument chip with a type glyph, so the _why_ behind a call is captured alongside the call itself.
 
 ### 💄 Polish
 

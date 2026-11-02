@@ -63,7 +63,7 @@ A `waypoints` roadmap is one markdown file at `docs/<proj>/WAYPOINTS.md`. Canoni
 - [x] 1. Auth foundation — users can sign up / sign in with email
       → legs/01-auth/ · landed 2026-07-01 · outcome: also added rate-limiting
 - [~] 2. Session & profile — a logged-in user has a profile page
-      → legs/02-profile/
+  → legs/02-profile/
 - [ ] 3. Billing — paid plans via Stripe
       → legs/03-billing/
 - [ ] 4. Admin dashboard — staff can manage users and plans
@@ -81,7 +81,7 @@ Rules the CLI relies on:
 - **At most one** `[~]` active leg — the "which leg are we planning now" signal. Exactly one while the
   roadmap is in progress; **zero** once every leg is `[x]` (the completed terminal state — valid, not
   malformed). More than one `[~]` is always malformed.
-- The done-state is the text after the ` — ` **em dash** (U+2014, space-padded) on the item line — the em
+- The done-state is the text after the `—` **em dash** (U+2014, space-padded) on the item line — the em
   dash is the **sole** title/done-state separator, so ASCII hyphens inside the milestone title are preserved
   verbatim. It is the leg's acceptance summary; flightplan scopes to it.
 - A landed leg's continuation line carries `· landed <date> · outcome: <one line>`.
@@ -152,7 +152,7 @@ On write it performs three edits atomically:
 3. Serialize back to `WAYPOINTS.md`.
 
 - `<date>` and `<outcome>` are **passed into** the transition helper (`advanceRoadmap(roadmap, outcome,
-  date)`) — do not call `Date.now()`/`new Date()` inside a tested helper; keep transitions pure so tests
+date)`) — do not call `Date.now()`/`new Date()` inside a tested helper; keep transitions pure so tests
   are deterministic. `main()` supplies today's date when `--date` is omitted.
 - If there is no next `[ ]` leg, land the active one and report the roadmap is complete.
 

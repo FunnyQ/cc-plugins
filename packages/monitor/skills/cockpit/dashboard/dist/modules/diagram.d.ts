@@ -1,7 +1,10 @@
-export declare const SEMANTIC_NODES: Record<string, { stroke: string; fill: string }>;
+export declare const SEMANTIC_NODES: Record<
+  string,
+  { stroke: string; fill: string }
+>;
 export declare function openDiagramLightbox(svg: string, title?: string): void;
 export declare function closeDiagramLightbox(): void;
-export declare function renderDiagram(text: string): Promise<
-  { ok: true; svg: string } | { ok: false; error: string }
->;
+export declare function renderDiagram(
+  text: string,
+): Promise<{ ok: true; svg: string } | { ok: false; error: string }>;
 export declare const PELE_VARS: string[];

@@ -1,6 +1,7 @@
 # CONTRACT-03: Golden stats and rollup suite
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -38,9 +39,9 @@ export function isRust(): boolean;
 
 // fixtures.ts
 export function makeFixtureHome(): Promise<{
-  home: string;                       // temp HOME holding Claude, Codex and OpenCode fixtures
-  env: Record<string, string>;        // HOME, XDG_*, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, stub URLs
-  stub: { url: string; stop(): void };// local HTTP stub for OpenRouter / Codex usage / token refresh
+  home: string; // temp HOME holding Claude, Codex and OpenCode fixtures
+  env: Record<string, string>; // HOME, XDG_*, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, stub URLs
+  stub: { url: string; stop(): void }; // local HTTP stub for OpenRouter / Codex usage / token refresh
   cleanup(): Promise<void>;
 }>;
 ```
@@ -109,12 +110,12 @@ Every fixture home is a fresh `mkdtemp`, and transcript paths land in rollup row
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Suite red against TS, or golden not deterministic | Green, but a scenario asserts only against golden where the rule (usage_hourly survives delete, refuse newer leaves DB untouched) is not checked directly | Green against TS, byte-stable recording, every frozen name present, every silent rollup rule asserted directly |
-| Test coverage | ×2 | Only the full-payload test | Stats and tables covered; scenarios missing | Every stats key, every source, every table, and all six scenarios |
-| Interface & readability | ×1 | Recorder and test duplicate stripping/dump logic | Shared helpers but unclear naming | One set of helpers used by both; test names read as the frozen list |
-| Assumptions & docs | ×1 | Volatile keys unexplained | Some reasons missing | Each volatile key and the `updated_at` / `writer` exclusions carry a one-line reason |
+| Dimension               | Weight | 0–1 (fail)                                        | 2–3 (below bar)                                                                                                                                           | 4–5 (pass)                                                                                                     |
+| ----------------------- | ------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Suite red against TS, or golden not deterministic | Green, but a scenario asserts only against golden where the rule (usage_hourly survives delete, refuse newer leaves DB untouched) is not checked directly | Green against TS, byte-stable recording, every frozen name present, every silent rollup rule asserted directly |
+| Test coverage           | ×2     | Only the full-payload test                        | Stats and tables covered; scenarios missing                                                                                                               | Every stats key, every source, every table, and all six scenarios                                              |
+| Interface & readability | ×1     | Recorder and test duplicate stripping/dump logic  | Shared helpers but unclear naming                                                                                                                         | One set of helpers used by both; test names read as the frozen list                                            |
+| Assumptions & docs      | ×1     | Volatile keys unexplained                         | Some reasons missing                                                                                                                                      | Each volatile key and the `updated_at` / `writer` exclusions carry a one-line reason                           |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # HOOKS-02: Stop hook
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -121,12 +122,12 @@ Git is the only blocking subprocess. The hook has a 10 s timeout, and a throttle
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong output JSON shape, or it nudges when throttled or opted out | Main paths match, but the signature input, the throttle ordering, or the headless argv drifts | Contract group green against Rust and TS; the headless argv matches with only the documented CLI-path change |
-| Test coverage | ×2 | No cargo tests | Reminder strings only | Every pure function's branches, plus a no-git-when-throttled check |
-| Interface & readability | ×1 | Skip or nudge-scope logic re-implemented locally | Works, but side effects are mixed into the pure builders | Pure builders separate from I/O; reuses the shared reminder and nudge-toggle functions |
-| Assumptions & docs | ×1 | The sha1 crate or the CLI-path change is unexplained | One of the two is explained | Both are justified in one line each; the throttle-first ordering keeps its why comment |
+| Dimension               | Weight | 0–1 (fail)                                                        | 2–3 (below bar)                                                                               | 4–5 (pass)                                                                                                   |
+| ----------------------- | ------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Wrong output JSON shape, or it nudges when throttled or opted out | Main paths match, but the signature input, the throttle ordering, or the headless argv drifts | Contract group green against Rust and TS; the headless argv matches with only the documented CLI-path change |
+| Test coverage           | ×2     | No cargo tests                                                    | Reminder strings only                                                                         | Every pure function's branches, plus a no-git-when-throttled check                                           |
+| Interface & readability | ×1     | Skip or nudge-scope logic re-implemented locally                  | Works, but side effects are mixed into the pure builders                                      | Pure builders separate from I/O; reuses the shared reminder and nudge-toggle functions                       |
+| Assumptions & docs      | ×1     | The sha1 crate or the CLI-path change is unexplained              | One of the two is explained                                                                   | Both are justified in one line each; the throttle-first ordering keeps its why comment                       |
 
 ## Out of scope
 

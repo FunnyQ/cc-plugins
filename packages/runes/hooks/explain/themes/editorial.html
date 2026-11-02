@@ -513,11 +513,19 @@
       .card.pick meter::-webkit-meter-optimum-value,
       .card.pick meter::-webkit-meter-suboptimum-value,
       .card.pick meter::-webkit-meter-even-less-good-value {
-        background: radial-gradient(circle, var(--paper) 1.6px, transparent 1.9px)
+        background: radial-gradient(
+            circle,
+            var(--paper) 1.6px,
+            transparent 1.9px
+          )
           0 0 / 4px 4px;
       }
       .card.pick meter::-moz-meter-bar {
-        background: radial-gradient(circle, var(--paper) 1.6px, transparent 1.9px)
+        background: radial-gradient(
+            circle,
+            var(--paper) 1.6px,
+            transparent 1.9px
+          )
           0 0 / 4px 4px;
       }
 
@@ -964,23 +972,24 @@
     </svg>
     <div class="stack">
       <i></i><i></i><i></i><i></i><i></i>
-    <article class="sheet">
-      <header class="masthead">
-        <p class="nameplate">{{project}}</p>
-        <div class="dateline">
-          <time>{{generatedAt}}</time><span><em>The Explained Edition</em></span
-          ><span>Sheet 1 of 1</span>
-        </div>
-      </header>
-      <h1>{{title}}</h1>
-      <p class="byline">By a fork of this session</p>
-      <main>{{main}}</main>
-      <footer class="colophon">
-        <span><b>Printed for</b>{{project}}</span>
-        <span><b>Subject</b>{{title}}</span>
-        <span><b>Set</b>{{generatedAt}}</span>
-      </footer>
-    </article>
+      <article class="sheet">
+        <header class="masthead">
+          <p class="nameplate">{{project}}</p>
+          <div class="dateline">
+            <time>{{generatedAt}}</time
+            ><span><em>The Explained Edition</em></span
+            ><span>Sheet 1 of 1</span>
+          </div>
+        </header>
+        <h1>{{title}}</h1>
+        <p class="byline">By a fork of this session</p>
+        <main>{{main}}</main>
+        <footer class="colophon">
+          <span><b>Printed for</b>{{project}}</span>
+          <span><b>Subject</b>{{title}}</span>
+          <span><b>Set</b>{{generatedAt}}</span>
+        </footer>
+      </article>
     </div>
   </body>
 </html>

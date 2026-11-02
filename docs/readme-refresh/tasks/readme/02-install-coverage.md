@@ -1,6 +1,7 @@
 # README-02: installation coverage and skill counts
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -92,12 +93,12 @@ list one. Those are correct. Do not touch them.
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0
 > to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A plugin id is missing or misspelled, or a corrected count is still wrong. | All five ids present but the Codex opening sentence still misstates what gets installed. | All five ids installable from both sections, every count matches what ships, and the surrounding prose still reads true. |
-| Verification evidence | ×2 | No command run. | Commands run but output not quoted. | All four `## Verification` commands run with their actual output quoted. |
-| Voice & consistency | ×1 | Install steps restructured into a new shape. | Readable but the CLI and TUI flows now disagree with each other. | Both sections keep their existing structure; only the plugin coverage changed. |
-| Scope | ×1 | A plugin section below the installation sections was edited. | Prose that was told to stay put got reworded. | Only the installation sections and the monitor skill table changed. |
+| Dimension             | Weight | 0–1 (fail)                                                                 | 2–3 (below bar)                                                                          | 4–5 (pass)                                                                                                               |
+| --------------------- | ------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Correctness           | ×3     | A plugin id is missing or misspelled, or a corrected count is still wrong. | All five ids present but the Codex opening sentence still misstates what gets installed. | All five ids installable from both sections, every count matches what ships, and the surrounding prose still reads true. |
+| Verification evidence | ×2     | No command run.                                                            | Commands run but output not quoted.                                                      | All four `## Verification` commands run with their actual output quoted.                                                 |
+| Voice & consistency   | ×1     | Install steps restructured into a new shape.                               | Readable but the CLI and TUI flows now disagree with each other.                         | Both sections keep their existing structure; only the plugin coverage changed.                                           |
+| Scope                 | ×1     | A plugin section below the installation sections was edited.               | Prose that was told to stay put got reworded.                                            | Only the installation sections and the monitor skill table changed.                                                      |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # TRIAGE-04: Write the drafting and writing agents
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -24,16 +25,16 @@ Match the frontmatter shape the existing chronicle agents use — `name`, `descr
 
 ### Frontmatter values
 
-| Agent | model | effort | tools | Role |
-|---|---|---|---|---|
-| `codifier` | sonnet | high | `["Bash", "Read"]` | Fetches full bodies for confirmed candidates, drafts the record text. Returns the draft; does not save it. |
-| `barrowkeeper` | haiku | low | `["Bash", "Read", "Write"]` | Writes the confirmed record, applies any lifecycle link update, validates, then archives with the approved plan. |
+| Agent          | model  | effort | tools                       | Role                                                                                                             |
+| -------------- | ------ | ------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `codifier`     | sonnet | high   | `["Bash", "Read"]`          | Fetches full bodies for confirmed candidates, drafts the record text. Returns the draft; does not save it.       |
+| `barrowkeeper` | haiku  | low    | `["Bash", "Read", "Write"]` | Writes the confirmed record, applies any lifecycle link update, validates, then archives with the approved plan. |
 
 The `description` field follows the house pattern: what the agent does, then who spawns it, then what it refuses.
 
 ### One agent carries `Write`, and it is a contract rather than a sandbox
 
-`codifier` holds `Bash`, which creates and moves files whether or not `Write` is listed. So do not claim it *cannot* mutate anything. What is true, and what belongs in its file: it runs no mutating command at all — it returns draft text, it does not save it, and it never invokes the archiver.
+`codifier` holds `Bash`, which creates and moves files whether or not `Write` is listed. So do not claim it _cannot_ mutate anything. What is true, and what belongs in its file: it runs no mutating command at all — it returns draft text, it does not save it, and it never invokes the archiver.
 
 The enforceable half lives elsewhere: the trail collector has no write path, and the archiver refuses to move a byte without `--apply` and an approved plan. `Write` on exactly one agent is what makes "who is supposed to mutate" answerable from the topology alone — the same split the commit flow already draws between its changeset analyzer and its committer.
 
@@ -41,7 +42,7 @@ Write `tools: ["Bash", "Read"]`, never the scoped form `tools: ["Bash(bun:*)"]`-
 
 ### Neither agent holds a confirmation gate
 
-Both gates — confirming the dispositions, confirming the draft — sit in the skill's own instructions, in the main agent, using `cockpit wait`. These two agents are spawned *after* a gate has already passed. Say so in both files: they never ask the user anything, and an agent that tries to prompt from inside a subagent is unverified behaviour.
+Both gates — confirming the dispositions, confirming the draft — sit in the skill's own instructions, in the main agent, using `cockpit wait`. These two agents are spawned _after_ a gate has already passed. Say so in both files: they never ask the user anything, and an agent that tries to prompt from inside a subagent is unverified behaviour.
 
 ### Section shape both files follow
 
@@ -59,7 +60,7 @@ Receives the confirmed candidates and fetches only those bodies, by id. Drafts a
 Three rules that are easy to get subtly wrong, so state each with its reason:
 
 - **Status comes from the decision's implementation state, never from the agent's own confidence.** A promoted record is `Accepted` because the code already works that way — not because the draft reads well.
-- **Evidence entries embed a stable summary plus session id, entry id, and date, and never cite a `.cockpit` path.** Those logs can be deleted by hand and `.cockpit/` never enters git, so a path reference is guaranteed to rot. The summary in the record *is* the durable evidence.
+- **Evidence entries embed a stable summary plus session id, entry id, and date, and never cite a `.cockpit` path.** Those logs can be deleted by hand and `.cockpit/` never enters git, so a path reference is guaranteed to rot. The summary in the record _is_ the durable evidence.
 - **Excludes secrets, credentials, personal data, and raw transcript text.** Records are permanent and shared; the trail they came from was neither.
 
 It returns the draft text and the proposed target path. It saves nothing — the human has not seen the draft yet, and the second gate is what stands between this output and a file on disk.
@@ -91,7 +92,7 @@ Its input carries two distinct write kinds, and conflating them is what breaks s
 
 Between the writes and the archive, `barrowkeeper` runs the record validator over the target directory. It is the only place validation can do anything: archiving is the irreversible step, and once the source sessions move, a malformed record can no longer be regenerated from the evidence that produced it.
 
-So the sequence is **write → validate → archive**, and a validation *error* stops it dead:
+So the sequence is **write → validate → archive**, and a validation _error_ stops it dead:
 
 - Report the violations, leave both records exactly as written, and **skip archiving entirely**. The record is fixable by hand precisely because its sources are still in the inbox.
 - Warnings do not block. A record with an empty evidence section is legal — a hand-written one legitimately has nothing to cite — so only errors gate.
@@ -128,12 +129,12 @@ Ordering and partial failure both need stating, because there is no transaction 
 
 This task ships no unit tests, so read "Test coverage" as **instruction coverage**: does each file state its failure and refusal behaviour, not just its happy path?
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4 (pass) | 5 |
-|---|---|---|---|---|---|
-| Correctness | ×3 | `codifier` holds `Write`, or the writing agent takes raw assignments, or a rollback is specified on partial failure. | The two write kinds are present but their preconditions are stated loosely, or the absent-field cases are not covered. | Both write kinds carry their precondition; either may be absent; the write order and the no-rollback rule are explicit; the plan path passes through untouched. | Also names what to report when the record write itself fails before anything else has happened. |
-| Test coverage | ×2 | No refusals stated. | The happy path is detailed; the refusal list is thin on one agent. | Every refusal from the notes above appears in the file it belongs to, including the exclusion list on evidence. | Refusals read as decidable checks rather than as advice. |
-| Interface & readability | ×1 | Input shape absent or contradicting the emitter's output. | Shape present but a field name drifts from what the previous phase returns. | Both files carry an `## Input` and an `## Output` block whose fields match the chain exactly. | A reader can trace `planPath` from its producer to `--apply` without opening a script. |
-| Assumptions & docs | ×1 | The never-delete and never-overwrite rules appear without their reasons, so a later editor relaxes them. | Reasons present but generic. | Each carries the concrete consequence it prevents — a destroyed record, an unrecoverable half-write. | The reasoning would survive a reviewer who wanted the rules loosened. |
+| Dimension               | Weight | 0–1 (fail)                                                                                                           | 2–3 (below bar)                                                                                                        | 4 (pass)                                                                                                                                                        | 5                                                                                               |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | `codifier` holds `Write`, or the writing agent takes raw assignments, or a rollback is specified on partial failure. | The two write kinds are present but their preconditions are stated loosely, or the absent-field cases are not covered. | Both write kinds carry their precondition; either may be absent; the write order and the no-rollback rule are explicit; the plan path passes through untouched. | Also names what to report when the record write itself fails before anything else has happened. |
+| Test coverage           | ×2     | No refusals stated.                                                                                                  | The happy path is detailed; the refusal list is thin on one agent.                                                     | Every refusal from the notes above appears in the file it belongs to, including the exclusion list on evidence.                                                 | Refusals read as decidable checks rather than as advice.                                        |
+| Interface & readability | ×1     | Input shape absent or contradicting the emitter's output.                                                            | Shape present but a field name drifts from what the previous phase returns.                                            | Both files carry an `## Input` and an `## Output` block whose fields match the chain exactly.                                                                   | A reader can trace `planPath` from its producer to `--apply` without opening a script.          |
+| Assumptions & docs      | ×1     | The never-delete and never-overwrite rules appear without their reasons, so a later editor relaxes them.             | Reasons present but generic.                                                                                           | Each carries the concrete consequence it prevents — a destroyed record, an unrecoverable half-write.                                                            | The reasoning would survive a reviewer who wanted the rules loosened.                           |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # WORKTREE-06: Delete the sibling-interference machinery
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/rubric.md`
@@ -85,12 +86,12 @@ This is a **structural change only**. Remove dead paths and change no surviving 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A live path removed (slots, the restore ban, park or resume behaviour changed), or a surviving test edited to pass | Dead code gone, but a deleted symbol still referenced somewhere in the script or notes | Every listed symbol and path gone, surviving behaviour byte-identical, all remaining tests pass unedited |
-| Test coverage | ×2 | Dead tests left failing, or live tests deleted | Dead tests removed but stub routes or fixtures for them linger | Exactly the dead tests, stub routes, and fixtures removed; surviving coverage intact |
-| Interface & readability | ×1 | Leftover `watch` or `heldBack` parameters, or wrappers left as no-ops | Signatures clean but orphan comments still explain removed mechanics | No leftover params, no no-op wrappers, no comment naming a deleted concept |
-| Assumptions & docs | ×1 | Design notes still describe the defer, requalify, or tree watch | Notes mostly updated, one stale sentence left | Design notes match the code; the `Max parallel` note keeps only slot content |
+| Dimension               | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                        | 4–5 (pass)                                                                                               |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A live path removed (slots, the restore ban, park or resume behaviour changed), or a surviving test edited to pass | Dead code gone, but a deleted symbol still referenced somewhere in the script or notes | Every listed symbol and path gone, surviving behaviour byte-identical, all remaining tests pass unedited |
+| Test coverage           | ×2     | Dead tests left failing, or live tests deleted                                                                     | Dead tests removed but stub routes or fixtures for them linger                         | Exactly the dead tests, stub routes, and fixtures removed; surviving coverage intact                     |
+| Interface & readability | ×1     | Leftover `watch` or `heldBack` parameters, or wrappers left as no-ops                                              | Signatures clean but orphan comments still explain removed mechanics                   | No leftover params, no no-op wrappers, no comment naming a deleted concept                               |
+| Assumptions & docs      | ×1     | Design notes still describe the defer, requalify, or tree watch                                                    | Notes mostly updated, one stale sentence left                                          | Design notes match the code; the `Max parallel` note keeps only slot content                             |
 
 ## Out of scope
 

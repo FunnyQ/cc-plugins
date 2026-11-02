@@ -1,6 +1,7 @@
 # ORCHESTRATOR-02: the scout transcribes, the script interprets
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/rubric.md`
@@ -17,7 +18,7 @@ finish.
 ## Files to create / modify
 
 - `packages/dispatch/skills/autopilot/references/orchestrator.md` (modify) — inside the fenced
-  ```` ```javascript ```` block: replace `SCOUT_SCHEMA`, reduce the scout prompt to a transcription
+  ` ```javascript ` block: replace `SCOUT_SCHEMA`, reduce the scout prompt to a transcription
   instruction, add the parse-and-derive step, and add the empty-tree guard.
 - The same file, **outside** the fenced block (modify) — the prose this change makes stale. The gotcha
   asserting the scout "echoes `next-ready.ts --summary` verbatim" now has to describe a schema that carries
@@ -56,14 +57,14 @@ tree into a commit. Reproduce it with `next-ready.ts <empty-dir> --summary` → 
 // returns requires it to understand the tree, so there is nothing for it to get
 // creatively wrong.
 const SCOUT_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
-    stdout:   { type: 'string' },   // verbatim stdout, uninterpreted
-    exitCode: { type: 'number' },
-    stderr:   { type: 'string' },
+    stdout: { type: "string" }, // verbatim stdout, uninterpreted
+    exitCode: { type: "number" },
+    stderr: { type: "string" },
   },
-  required: ['stdout', 'exitCode', 'stderr'],
-}
+  required: ["stdout", "exitCode", "stderr"],
+};
 ```
 
 ### The new prompt
@@ -82,15 +83,15 @@ Immediately after the agent call, before any guard that reads a tree field:
 
 ```js
 // Pure in-memory work, so this needs no Workflow filesystem access.
-let snap = null
-let derailed = ''
-if (!scout || typeof scout.stdout !== 'string' || scout.stdout.trim() === '') {
-  derailed = `the scout returned no stdout${scout?.stderr ? `: ${scout.stderr}` : ''}`
+let snap = null;
+let derailed = "";
+if (!scout || typeof scout.stdout !== "string" || scout.stdout.trim() === "") {
+  derailed = `the scout returned no stdout${scout?.stderr ? `: ${scout.stderr}` : ""}`;
 } else {
   try {
-    snap = JSON.parse(scout.stdout)
+    snap = JSON.parse(scout.stdout);
   } catch (err) {
-    derailed = `the scout's stdout was not JSON (${err?.message ?? String(err)}): ${scout.stdout.slice(0, 400)}`
+    derailed = `the scout's stdout was not JSON (${err?.message ?? String(err)}): ${scout.stdout.slice(0, 400)}`;
   }
 }
 ```
@@ -118,16 +119,16 @@ if (derailed) {
 Then derive the five values the rest of the loop already consumes, and change nothing else:
 
 ```js
-const ready       = snap.ready
-const c           = snap.counts
-const unfinished  = snap.unfinished
-const invalidRefs = snap.invalid.map(i => i.ref)
-const parseErrors = snap.errors
+const ready = snap.ready;
+const c = snap.counts;
+const unfinished = snap.unfinished;
+const invalidRefs = snap.invalid.map((i) => i.ref);
+const parseErrors = snap.errors;
 ```
 
 Every downstream guard keeps its exact order and semantics — the parse-errors check, the counts-sum
 identity, the `invalid > 0` check that names the refs, the completion test, the `fresh` filter that
-excludes parked and completed refs, and the empty-`fresh` stall. Only the *source* of the values changes,
+excludes parked and completed refs, and the empty-`fresh` stall. Only the _source_ of the values changes,
 from agent-interpreted fields to locally-derived ones.
 
 ### A non-zero exit code is not a failure
@@ -166,11 +167,15 @@ scenarios stay readable rather than carrying hand-written JSON strings:
 ```js
 const snapshot = (tree, exitCode = 0) => ({
   stdout: JSON.stringify({
-    ready: [], unfinished: [], invalid: [], errors: [], ...tree,
+    ready: [],
+    unfinished: [],
+    invalid: [],
+    errors: [],
+    ...tree,
   }),
   exitCode,
   stderr: "",
-})
+});
 ```
 
 Note the field rename the fixture has to absorb: scenarios currently express invalid tasks as
@@ -229,7 +234,7 @@ Then add:
 
 ## Verification
 
-- [x] Every **executable-script** change lands inside the fenced ```` ```javascript ```` block of
+- [x] Every **executable-script** change lands inside the fenced ` ```javascript ` block of
       `orchestrator.md` — the fixture extracts that block verbatim by string search, so script logic
       written in the surrounding prose is invisible to both the runtime and the test.
 - [x] The prose corrections listed under "Files to create / modify" are made **outside** that block, and
@@ -254,9 +259,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | A missing field is defaulted rather than escalated, a guard changed order, or `exitCode !== 0` is treated as failure. | Parsing and derivation work but one validation or the empty-tree placement is wrong. | Derivation, per-field validation, the exit-code subtlety, and the pre-completion placement of the empty-tree guard all hold, with every other guard untouched. |
-| Test coverage | ×2 | Scenarios not migrated, or the suite passes against the old schema. | Migrated, but the new failure cases are untested. | All scenarios migrated through the helper, plus parse-failure, missing-field, empty-tree, and non-zero-exit-with-valid-tree cases, and the accounting invariant re-asserted. |
-| Interface & readability | ×1 | Hand-written JSON strings scattered through scenarios, or validation duplicated per field. | Works but the derivation block is hard to follow. | One snapshot helper carries every scenario, and the validation reads as a single legible block naming its fields. |
-| Assumptions & docs | ×1 | The exit-code subtlety is left implicit. | Noted in one place. | The print-then-exit-non-zero behaviour and the never-default-a-missing-field rule are both *why* comments, and the notes/gotchas prose describing the old echoing scout is rewritten to match. |
+| Dimension               | Weight | 0–1                                                                                                                   | 2–3                                                                                  | 4–5                                                                                                                                                                                            |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A missing field is defaulted rather than escalated, a guard changed order, or `exitCode !== 0` is treated as failure. | Parsing and derivation work but one validation or the empty-tree placement is wrong. | Derivation, per-field validation, the exit-code subtlety, and the pre-completion placement of the empty-tree guard all hold, with every other guard untouched.                                 |
+| Test coverage           | ×2     | Scenarios not migrated, or the suite passes against the old schema.                                                   | Migrated, but the new failure cases are untested.                                    | All scenarios migrated through the helper, plus parse-failure, missing-field, empty-tree, and non-zero-exit-with-valid-tree cases, and the accounting invariant re-asserted.                   |
+| Interface & readability | ×1     | Hand-written JSON strings scattered through scenarios, or validation duplicated per field.                            | Works but the derivation block is hard to follow.                                    | One snapshot helper carries every scenario, and the validation reads as a single legible block naming its fields.                                                                              |
+| Assumptions & docs      | ×1     | The exit-code subtlety is left implicit.                                                                              | Noted in one place.                                                                  | The print-then-exit-non-zero behaviour and the never-default-a-missing-field rule are both _why_ comments, and the notes/gotchas prose describing the old echoing scout is rewritten to match. |

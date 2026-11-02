@@ -9,12 +9,12 @@ Final review task does, because it scores holistic axes instead.
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0**. `Correctness < 4` is an automatic
 > veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The change does not do what the task asked, or it breaks existing behaviour. | Works on the happy path; an edge case named in the task is unhandled. | Does exactly what the task specified, including every edge case the task names. |
-| Test coverage | ×2 | No test, or a test that would pass without the change. | Tests the happy path only. | Tests the behaviour *and* the failure/edge cases the task calls out, and each test would fail without the change. |
-| Interface & readability | ×1 | Confusing names, dead code, or a needless abstraction. | Readable but drifts from the surrounding style. | Matches the file's existing style and naming; a new export has an obvious contract. |
-| Assumptions & docs | ×1 | Silent assumptions; a stale comment left behind. | Assumptions noted somewhere. | Every non-obvious choice is recorded next to the code as a *why* comment, and no doc it contradicts is left stale. |
+| Dimension               | Weight | 0–1                                                                          | 2–3                                                                   | 4–5                                                                                                                |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The change does not do what the task asked, or it breaks existing behaviour. | Works on the happy path; an edge case named in the task is unhandled. | Does exactly what the task specified, including every edge case the task names.                                    |
+| Test coverage           | ×2     | No test, or a test that would pass without the change.                       | Tests the happy path only.                                            | Tests the behaviour _and_ the failure/edge cases the task calls out, and each test would fail without the change.  |
+| Interface & readability | ×1     | Confusing names, dead code, or a needless abstraction.                       | Readable but drifts from the surrounding style.                       | Matches the file's existing style and naming; a new export has an obvious contract.                                |
+| Assumptions & docs      | ×1     | Silent assumptions; a stale comment left behind.                             | Assumptions noted somewhere.                                          | Every non-obvious choice is recorded next to the code as a _why_ comment, and no doc it contradicts is left stale. |
 
 ## Scoring notes for the judge
 

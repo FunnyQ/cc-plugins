@@ -83,11 +83,11 @@ Two stale claims exist today:
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| readme | 01 | chronicle section | todo | > 4.0 | — |
-| readme | 02 | installation coverage and skill counts | todo | > 4.0 | readme/01 |
-| integration | 01 | final review 🏁 | todo | > 4.0 | readme/02 |
+| Bucket      | NN  | Title                                  | Status | Pass line | Depends on |
+| ----------- | --- | -------------------------------------- | ------ | --------- | ---------- |
+| readme      | 01  | chronicle section                      | todo   | > 4.0     | —          |
+| readme      | 02  | installation coverage and skill counts | todo   | > 4.0     | readme/01  |
+| integration | 01  | final review 🏁                        | todo   | > 4.0     | readme/02  |
 
 ## Cross-bucket dependencies
 

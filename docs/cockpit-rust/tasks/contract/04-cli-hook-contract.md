@@ -1,6 +1,7 @@
 # CONTRACT-04: CLI and hook contract
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -25,6 +26,7 @@ Two black-box bun suites that pin every CLI subcommand of `cockpit` and both hoo
 `contract/launcher.ts` exports `command(proc, argv)`, `underTest`, `SCRIPTS_DIR`, `PLUGIN_ROOT`.
 
 `contract/fixtures.ts` exports:
+
 - `makeHomes()`, `freePort()`, `baseEnv(h, extra)`
 - `makeProviderFixtures(h)` → `{projectDir, claudeSessionId, codexThreadId, opencodeSessionId, …}`, `fixtureEnv(f)`
 - `startDaemon(env, {port})` → `{proc, port, token, base, info}`, `stopDaemon(d)`
@@ -58,7 +60,7 @@ Every `describe` name starts with exactly one of the prefixes below. Each group 
   - `--diagram` with valid Mermaid (`flowchart LR\n  A-->B`) exits 0, and the record carries the diagram.
   - `--diagram` with broken Mermaid (`flowchart LR\n  A-->`):
     - Exits 1 and writes nothing to the trail.
-    - Its stderr starts with `cockpit log: --diagram failed lint — fix the Mermaid source and re-run:` and has at least one `  - ` line.
+    - Its stderr starts with `cockpit log: --diagram failed lint — fix the Mermaid source and re-run:` and has at least one ` -` line.
     - Drive this through `cockpit log --diagram`. A stdin CLI entry for `diagram-lint.ts` does not exist yet.
   - `log --help` prints `USAGE` and writes nothing.
   - An unknown subcommand exits 1 with the two stderr lines from `main`.
@@ -147,12 +149,12 @@ Every `describe` name starts with exactly one of the prefixes below. Each group 
 
 > Scale 0–5 (see `../_context/rubric.md`); weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Fails against TS, or asserts output TS does not produce | Green, but stdout/exit codes only loosely checked (e.g. "exit != 0") | Green against TS; exact exit codes, stderr prefixes, stdout JSON shapes and file writes pinned |
-| Test coverage | ×2 | Only `log` and one hook | Every subcommand touched, but failure branches (exit 4, lint failure, suppression) missing | Every subcommand plus every suppression, failure and provider branch covered |
-| Interface & readability | ×1 | Copy-pasted spawn code per test | Helpers exist but groups share state | Groups self-contained and filterable; helpers keep each assertion readable |
-| Assumptions & docs | ×1 | Branches pinned without saying which TS condition drives them | Some conditions named | Each branch names the TS function/condition it pins; quirks carry `// pins TS quirk:` |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                                                                            | 4–5 (pass)                                                                                     |
+| ----------------------- | ------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Fails against TS, or asserts output TS does not produce       | Green, but stdout/exit codes only loosely checked (e.g. "exit != 0")                       | Green against TS; exact exit codes, stderr prefixes, stdout JSON shapes and file writes pinned |
+| Test coverage           | ×2     | Only `log` and one hook                                       | Every subcommand touched, but failure branches (exit 4, lint failure, suppression) missing | Every subcommand plus every suppression, failure and provider branch covered                   |
+| Interface & readability | ×1     | Copy-pasted spawn code per test                               | Helpers exist but groups share state                                                       | Groups self-contained and filterable; helpers keep each assertion readable                     |
+| Assumptions & docs      | ×1     | Branches pinned without saying which TS condition drives them | Some conditions named                                                                      | Each branch names the TS function/condition it pins; quirks carry `// pins TS quirk:`          |
 
 ## Out of scope
 

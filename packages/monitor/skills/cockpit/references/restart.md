@@ -12,8 +12,7 @@ daemon and changes nothing.
 <plugin-root>/skills/cockpit/bin/cockpit restart
 ```
 
-Optional flags: `--port <n>` sets the port, for when the daemon runs off
-5858. `--no-open` skips the browser, for when the user only wants the daemon
+Optional flags: `--port <n>` sets the port, for when the daemon runs off 5858. `--no-open` skips the browser, for when the user only wants the daemon
 refreshed.
 
 Run it in the **foreground**. Do not background it. It kills the live

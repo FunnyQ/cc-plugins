@@ -33,7 +33,9 @@ const decode = (text: string) =>
   );
 
 const textOf = (html: string) =>
-  decode(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
+  decode(html.replace(/<[^>]*>/g, ""))
+    .replace(/\s+/g, " ")
+    .trim();
 
 export const themeInventory = (title: string, main: string): Inventory => {
   const { main: lifted, kinds } = prepareBlocks(main);

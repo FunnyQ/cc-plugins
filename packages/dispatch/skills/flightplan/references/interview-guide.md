@@ -48,7 +48,7 @@ For each task (or each bucket, if the bar is uniform), settle:
 - **Weights** — which axis dominates? Default `×3 / ×2 / ×1 / ×1`. Correctness usually leads.
 - **Pass line** — weighted average threshold. Default `> 4.0` on a 0–5 scale.
 - **Hard-fail veto** — any axis that fails the whole task regardless of average? Default `Correctness < 4 is an automatic veto` (a wrong answer can't be redeemed by style). Ask whether a second axis earns one too, such as `Security < 4` on a task that handles credentials: a low score on a ×2 axis alone cannot pull the average under the pass line.
-- **Anchors** — pick the axes that matter most. What does a 0–1 vs 2–3 vs 4–5 look like *for this task*? (e.g. "the computed total doesn't match the spec's 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
+- **Anchors** — pick the axes that matter most. What does a 0–1 vs 2–3 vs 4–5 look like _for this task_? (e.g. "the computed total doesn't match the spec's 5,264" = 0–1.) Concrete anchors are what make the score reproducible.
 
 Recommend these defaults, and dig deeper only when the user wants a different bar.
 

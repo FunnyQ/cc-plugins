@@ -1,6 +1,7 @@
 # PROMOTE-02: Write the skill and wire it into the repo docs
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -53,7 +54,7 @@ It **routes**. It does not restate what the agent definitions already say — th
 
 This is the single most important structural fact in the task, and it is a deliberate departure from an earlier sketch that put the gates in the orchestrator.
 
-Every other chronicle flow gates in the main agent before spawning its orchestrator. The release skill's own topology block is explicit about it — the main agent is annotated as "the ONLY one that can prompt you", and its orchestrator is spawned *after* the version gate resolves. A nested subagent asking the user is unverified behaviour, and the orchestrator here holds no Bash and no `Write`, so it has nothing to gate on anyway.
+Every other chronicle flow gates in the main agent before spawning its orchestrator. The release skill's own topology block is explicit about it — the main agent is annotated as "the ONLY one that can prompt you", and its orchestrator is spawned _after_ the version gate resolves. A nested subagent asking the user is unverified behaviour, and the orchestrator here holds no Bash and no `Write`, so it has nothing to gate on anyway.
 
 Use `cockpit wait` for both gates rather than `AskUserQuestion`, the way the release skill already specifies for its version gate.
 
@@ -73,7 +74,7 @@ chronicle:adr  (this skill — the main agent; owns both gates)
 **A triage run that promotes nothing still has work to do.** When every disposition comes back `skip` or `watch` there is no draft to confirm, so gate 2 has nothing to gate — but the stale sessions still have to be archived, and leaving them means the next run re-judges the same backlog and the inbox never empties. Spell the branch out rather than leaving it to be improvised:
 
 - After gate 1, if no candidate is dispositioned `promote`, **skip the draft phase and gate 2 entirely** and go straight to the commit phase with only the approved plan path — no `newAdr`, no `metadataUpdate`. The writing agent's input already makes both optional, so this is a supported shape, not a special case.
-- Say so at gate 1, so the user knows what they are approving: with no promotions, approving the dispositions *is* the last decision in the run.
+- Say so at gate 1, so the user knows what they are approving: with no promotions, approving the dispositions _is_ the last decision in the run.
 - The reverse also holds — a promotion whose sessions all turned out live yields a draft with an empty archive plan. Both halves are independently optional; a run that produces neither is a no-op and should say so rather than spawning a commit phase with nothing to do.
 
 **The archive plan is produced before gate 1, and never regenerated.** The `collect` phase emits a serialized plan alongside the dispositions, computed from the same assignments the user is about to see; the archiver refuses `--apply` without a plan and refuses to recompute one from raw assignments, so a plan built after approval would be an object nobody reviewed. Both gates carry that one path through unchanged, and the writing agent executes exactly it. Staleness introduced by the delay is not the skill's problem to solve — the archiver re-stats every source immediately before moving it and skips anything that went live in the meantime.
@@ -163,12 +164,12 @@ Three places, all of them concrete:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Either gate is placed inside the orchestrator, or a gate uses `AskUserQuestion` instead of `cockpit wait`, or a mode is missing | All three modes present and the gates are in the main agent, but the promotion threshold is paraphrased loosely or the wake condition is omitted | All three modes, both gates in the main agent using `cockpit wait`, the threshold reproduced with its one-plus-one structure, and the wake condition stated |
-| Test coverage | ×2 | Only the happy path is described — no behaviour stated for a repository with no trail | The no-trail case is covered but a candidate matching an existing record, or conflicting evidence, is left unspecified | All three edge cases specified: no trail, a candidate matching an existing record, and conflicting evidence surfaced rather than auto-resolved |
-| Interface & readability | ×1 | The file restates the agent definitions' input contracts and per-role procedures, ballooning past 200 lines | Routing is clear but padded with detail that already lives in the agent files | Stays a router: the topology, the modes, the threshold, and the constraints — nothing an agent file already owns |
-| Assumptions & docs | ×1 | The six constraints are listed with no reason attached, so a later reader can safely "simplify" one away | Constraints are stated but the measured evidence behind them is dropped | Each constraint carries why it exists, including the log-file-versus-registry counts and the split-session failure mode |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                      | 2–3 (below bar)                                                                                                                                  | 4–5 (pass)                                                                                                                                                  |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Either gate is placed inside the orchestrator, or a gate uses `AskUserQuestion` instead of `cockpit wait`, or a mode is missing | All three modes present and the gates are in the main agent, but the promotion threshold is paraphrased loosely or the wake condition is omitted | All three modes, both gates in the main agent using `cockpit wait`, the threshold reproduced with its one-plus-one structure, and the wake condition stated |
+| Test coverage           | ×2     | Only the happy path is described — no behaviour stated for a repository with no trail                                           | The no-trail case is covered but a candidate matching an existing record, or conflicting evidence, is left unspecified                           | All three edge cases specified: no trail, a candidate matching an existing record, and conflicting evidence surfaced rather than auto-resolved              |
+| Interface & readability | ×1     | The file restates the agent definitions' input contracts and per-role procedures, ballooning past 200 lines                     | Routing is clear but padded with detail that already lives in the agent files                                                                    | Stays a router: the topology, the modes, the threshold, and the constraints — nothing an agent file already owns                                            |
+| Assumptions & docs      | ×1     | The six constraints are listed with no reason attached, so a later reader can safely "simplify" one away                        | Constraints are stated but the measured evidence behind them is dropped                                                                          | Each constraint carries why it exists, including the log-file-versus-registry counts and the split-session failure mode                                     |
 
 ## Out of scope
 

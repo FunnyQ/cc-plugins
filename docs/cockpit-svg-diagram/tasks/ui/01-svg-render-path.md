@@ -1,6 +1,7 @@
 # UI-01: SVG render path, sanitize policy and theme tokens
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -74,10 +75,12 @@ Keep the sanitize helper lazy: it already imports `../vendor/purify.es.mjs` insi
 `packages/monitor/skills/cockpit/dashboard/dist/modules/transcript.js` imports the **same** `../vendor/purify.es.mjs` module instance and registers a global hook:
 
 ```js
-DOMPurify.addHook("afterSanitizeAttributes", (node) => { /* forces target="_blank" + safe rel on links */ });
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  /* forces target="_blank" + safe rel on links */
+});
 ```
 
-Because ES module instances are shared, that hook also runs during diagram sanitization, including on `<a>` elements inside an author's SVG. It is *believed* harmless — it only adds attributes to links — but this task changes the sanitize policy, so the interaction has to be checked rather than inherited as folklore.
+Because ES module instances are shared, that hook also runs during diagram sanitization, including on `<a>` elements inside an author's SVG. It is _believed_ harmless — it only adds attributes to links — but this task changes the sanitize policy, so the interaction has to be checked rather than inherited as folklore.
 
 Sanitize an SVG containing an `<a>` element, observe what the hook does to it, and record the finding as a comment next to the sanitize helper. State what you observed, not what you expected. If the hook does something the diagram path should not inherit, stop and report it rather than silently working around it.
 
@@ -149,12 +152,12 @@ Everything DOM-bound stays inside a function. `DOMParser`, `XMLSerializer`, `doc
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average >= 4.0 to pass. Correctness < 4 is an automatic veto, and Sanitize & scoping boundary < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | one-argument `renderDiagram` behaves differently than before, or the SVG branch throws | SVG renders but a named failure state is unhandled, or the SVG branch still reaches the mermaid loader | routing, all three failure returns, and the untouched mermaid path all match the spec |
-| Sanitize & scoping boundary | ×3 | a remote URI survives sanitization, or a `<script>` or event handler survives | the tightened config is in place but was never tested against a hostile input, or the shared hook was assumed harmless rather than observed | remote URIs stripped, `data:` images kept, hostile input covered by a test, shared-hook behaviour observed and recorded |
-| Test coverage | ×2 | no test for the SVG branch | happy-path SVG only | failure returns, the remote-URI strip, the no-mermaid-load claim, and the token constant are all asserted |
-| Interface & readability | ×1 | DOM-bound work moved to module top level, breaking the plain-Bun import | works but the token map is duplicated, or the sanitize config is copied per branch | one sanitize config, one token map, all DOM work lazy, rationale comments explain the non-obvious constraints |
+| Dimension                   | Weight | 0–1 (fail)                                                                             | 2–3 (below bar)                                                                                                                             | 4–5 (pass)                                                                                                              |
+| --------------------------- | ------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Correctness                 | ×3     | one-argument `renderDiagram` behaves differently than before, or the SVG branch throws | SVG renders but a named failure state is unhandled, or the SVG branch still reaches the mermaid loader                                      | routing, all three failure returns, and the untouched mermaid path all match the spec                                   |
+| Sanitize & scoping boundary | ×3     | a remote URI survives sanitization, or a `<script>` or event handler survives          | the tightened config is in place but was never tested against a hostile input, or the shared hook was assumed harmless rather than observed | remote URIs stripped, `data:` images kept, hostile input covered by a test, shared-hook behaviour observed and recorded |
+| Test coverage               | ×2     | no test for the SVG branch                                                             | happy-path SVG only                                                                                                                         | failure returns, the remote-URI strip, the no-mermaid-load claim, and the token constant are all asserted               |
+| Interface & readability     | ×1     | DOM-bound work moved to module top level, breaking the plain-Bun import                | works but the token map is duplicated, or the sanitize config is copied per branch                                                          | one sanitize config, one token map, all DOM work lazy, rationale comments explain the non-obvious constraints           |
 
 ## Out of scope
 

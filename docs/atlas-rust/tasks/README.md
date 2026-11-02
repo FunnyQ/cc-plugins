@@ -36,6 +36,7 @@ tasks/
 Start two foundation tasks in parallel: `contract/01-launcher-fixtures-ts-seams.md` (fixture home + TS test seams; every contract suite needs it) and `engine/01-scaffold-paths-dedup-model.md` (the `cockpit atlas` scaffold and the frozen module signatures).
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,26 +48,26 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| cli | 01 | Statusline and push-usage subcommands | todo | > 4 | engine/03, engine/05, engine/07, contract/04 |
-| contract | 01 | Launcher, fixture home, and TS test seams | todo | > 4 | — |
-| contract | 02 | HTTP and lifecycle contract suite | todo | > 4 | contract/01 |
-| contract | 03 | Golden stats and rollup suite | todo | > 4 | contract/01 |
-| contract | 04 | CLI subcommand contract suite | todo | > 4 | contract/01 |
-| engine | 01 | Atlas scaffold, paths, dedup, and model types | todo | > 4 | — |
-| engine | 02 | Rollup DB schema, migrations, and pre-rust backup | todo | > 4 | engine/01 |
-| engine | 03 | Rollup ingest and the rollup-update subcommand | todo | > 4 | engine/02, contract/03 |
-| engine | 04 | Pricing load, resolution, and override refresh | todo | > 4 | engine/01, contract/03 |
-| engine | 05 | Codex usage source and usage limits | todo | > 4 | engine/01, engine/02, contract/03 |
-| engine | 06 | OpenCode usage source | todo | > 4 | engine/01, contract/03 |
-| engine | 07 | Claude usage source and usage limits | todo | > 4 | engine/03, contract/03 |
-| engine | 08 | Stats assembly and fingerprint | todo | > 4 | engine/03, engine/04, engine/05, engine/06, engine/07 |
-| review | 01 | Final review 🏁 | todo | > 4 | ship/02 |
-| server | 01 | Live sessions module and the live subcommand | todo | > 4 | engine/01, contract/04 |
-| server | 02 | The atlas serve HTTP shell and lifecycle | todo | > 4 | server/01, engine/08, contract/02 |
-| ship | 01 | Wire callers to the shim and migrate the statusline | todo | > 4 | server/02, cli/01 |
-| ship | 02 | Delete the TS, update docs, and measure | todo | > 4 | ship/01 |
+| Bucket   | NN  | Title                                               | Status | Pass line | Depends on                                            |
+| -------- | --- | --------------------------------------------------- | ------ | --------- | ----------------------------------------------------- |
+| cli      | 01  | Statusline and push-usage subcommands               | todo   | > 4       | engine/03, engine/05, engine/07, contract/04          |
+| contract | 01  | Launcher, fixture home, and TS test seams           | todo   | > 4       | —                                                     |
+| contract | 02  | HTTP and lifecycle contract suite                   | todo   | > 4       | contract/01                                           |
+| contract | 03  | Golden stats and rollup suite                       | todo   | > 4       | contract/01                                           |
+| contract | 04  | CLI subcommand contract suite                       | todo   | > 4       | contract/01                                           |
+| engine   | 01  | Atlas scaffold, paths, dedup, and model types       | todo   | > 4       | —                                                     |
+| engine   | 02  | Rollup DB schema, migrations, and pre-rust backup   | todo   | > 4       | engine/01                                             |
+| engine   | 03  | Rollup ingest and the rollup-update subcommand      | todo   | > 4       | engine/02, contract/03                                |
+| engine   | 04  | Pricing load, resolution, and override refresh      | todo   | > 4       | engine/01, contract/03                                |
+| engine   | 05  | Codex usage source and usage limits                 | todo   | > 4       | engine/01, engine/02, contract/03                     |
+| engine   | 06  | OpenCode usage source                               | todo   | > 4       | engine/01, contract/03                                |
+| engine   | 07  | Claude usage source and usage limits                | todo   | > 4       | engine/03, contract/03                                |
+| engine   | 08  | Stats assembly and fingerprint                      | todo   | > 4       | engine/03, engine/04, engine/05, engine/06, engine/07 |
+| review   | 01  | Final review 🏁                                     | todo   | > 4       | ship/02                                               |
+| server   | 01  | Live sessions module and the live subcommand        | todo   | > 4       | engine/01, contract/04                                |
+| server   | 02  | The atlas serve HTTP shell and lifecycle            | todo   | > 4       | server/01, engine/08, contract/02                     |
+| ship     | 01  | Wire callers to the shim and migrate the statusline | todo   | > 4       | server/02, cli/01                                     |
+| ship     | 02  | Delete the TS, update docs, and measure             | todo   | > 4       | ship/01                                               |
 
 ## Dependency graph
 
@@ -97,18 +98,19 @@ engine/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| server/01 | engine/01, contract/04 |
-| server/02 | engine/08, contract/02 |
-| cli/01 | engine/03, engine/05, engine/07, contract/04 |
-| review/01 | ship/02 |
-| ship/01 | server/02, cli/01 |
-| engine/07 | contract/03 |
-| engine/05 | contract/03 |
-| engine/06 | contract/03 |
-| engine/04 | contract/03 |
-| engine/03 | contract/03 |
+| Task      | Depends on                                   |
+| --------- | -------------------------------------------- |
+| server/01 | engine/01, contract/04                       |
+| server/02 | engine/08, contract/02                       |
+| cli/01    | engine/03, engine/05, engine/07, contract/04 |
+| review/01 | ship/02                                      |
+| ship/01   | server/02, cli/01                            |
+| engine/07 | contract/03                                  |
+| engine/05 | contract/03                                  |
+| engine/06 | contract/03                                  |
+| engine/04 | contract/03                                  |
+| engine/03 | contract/03                                  |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

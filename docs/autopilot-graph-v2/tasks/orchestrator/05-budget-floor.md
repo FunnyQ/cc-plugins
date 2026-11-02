@@ -1,6 +1,7 @@
 # ORCHESTRATOR-05: budget floor
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/rubric.md`
@@ -23,7 +24,7 @@ in the loop where stopping is free, instead of an unbounded run that dies wherev
 ## Files to create / modify
 
 - `packages/dispatch/skills/autopilot/references/orchestrator.md` (modify) — inside the fenced
-  ```` ```javascript ```` block: a new config field, a defensive read of the Workflow `budget` global, and a
+  ` ```javascript ` block: a new config field, a defensive read of the Workflow `budget` global, and a
   stop-before-dispatch check in the wave loop.
 - The same file, **outside** the fenced block (modify) — the prose this change makes stale. The gotcha that
   enumerates the terminal conditions must now include the budget stop, and the new config field needs its
@@ -35,7 +36,7 @@ in the loop where stopping is free, instead of an unbounded run that dies wherev
 
 ## Implementation notes
 
-**Every edit to the executable script must land INSIDE the fenced ```` ```javascript ```` block.**
+**Every edit to the executable script must land INSIDE the fenced ` ```javascript ` block.**
 The prose corrections listed under "Files to create / modify" are the deliberate and only exception —
 they belong outside the block by definition. The fixture locates the script by
 string search — `doc.indexOf("```javascript")` to the next `"\n```"` — and runs the slice through
@@ -81,7 +82,7 @@ Normalise it once, next to where the other numeric config is coerced:
 ```js
 // Interpolated into an operator-facing reason string and compared against a token
 // count, so a negative or fractional value would render an incoherent one.
-const BUDGET_FLOOR = Math.max(0, Math.trunc(Number(CFG.budgetFloor ?? 0)) || 0)
+const BUDGET_FLOOR = Math.max(0, Math.trunc(Number(CFG.budgetFloor ?? 0)) || 0);
 ```
 
 Then one predicate, so the wave loop stays readable:
@@ -91,14 +92,15 @@ Then one predicate, so the wave loop stays readable:
 // Both "no floor configured" and "no budget declared" are null — not a throw and
 // not a stop.
 const budgetBelowFloor = () => {
-  if (BUDGET_FLOOR <= 0) return null
+  if (BUDGET_FLOOR <= 0) return null;
   // `total === null` is the documented "no target declared" value. Do NOT use
   // a falsy test: a legitimate total of 0 would disable a configured floor at
   // exactly the moment it matters most.
-  if (typeof budget === 'undefined' || !budget || budget.total === null) return null
-  const left = budget.remaining()
-  return left < BUDGET_FLOOR ? left : null
-}
+  if (typeof budget === "undefined" || !budget || budget.total === null)
+    return null;
+  const left = budget.remaining();
+  return left < BUDGET_FLOOR ? left : null;
+};
 ```
 
 ### Where the check goes — this ordering is the whole design
@@ -173,7 +175,7 @@ Two consequences to accept rather than work around:
 - [x] No task's status is written when the floor trips — nothing is parked and nothing is left
       `in-progress` by this code path.
 - [x] The `escalations.length === 0` guard on both commit paths is unchanged.
-- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block;
+- [x] Every change to the executable script sits inside the fenced ` ```javascript ` block;
       the only edits outside it are the prose corrections listed above.
 
 - [x] The terminal-conditions gotcha in `orchestrator.md` includes the budget stop, the new config field
@@ -212,9 +214,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The check throws on an absent global, trips with no declared budget, or sits before the commit or inside the task pipeline. | Trips correctly but a boundary is wrong (a `null` total, a zero floor, or an unnormalised value reaching the reason string). | Placement, both off states, the absent global, and the escalation shape are all exactly as specified. |
-| Test coverage | ×2 | No test, or tests that would pass without the change. | The trip is tested but neither off state is. | Trip, zero floor, `null` total, absent global, and the no-dispatch assertion are all covered, and each test would fail without the change. |
-| Interface & readability | ×1 | The budget read inlined into the loop condition, or the floor compared unnormalised. | Works but the wave loop grows hard to scan. | One named predicate and one normalised constant, so the loop body reads as a single guard alongside its neighbours. |
-| Assumptions & docs | ×1 | The off-by-default rationale and the placement rationale are left silent. | Noted somewhere. | Both are *why* comments next to the code, and the new config field's comment matches the style of its neighbours. |
+| Dimension               | Weight | 0–1                                                                                                                         | 2–3                                                                                                                          | 4–5                                                                                                                                        |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The check throws on an absent global, trips with no declared budget, or sits before the commit or inside the task pipeline. | Trips correctly but a boundary is wrong (a `null` total, a zero floor, or an unnormalised value reaching the reason string). | Placement, both off states, the absent global, and the escalation shape are all exactly as specified.                                      |
+| Test coverage           | ×2     | No test, or tests that would pass without the change.                                                                       | The trip is tested but neither off state is.                                                                                 | Trip, zero floor, `null` total, absent global, and the no-dispatch assertion are all covered, and each test would fail without the change. |
+| Interface & readability | ×1     | The budget read inlined into the loop condition, or the floor compared unnormalised.                                        | Works but the wave loop grows hard to scan.                                                                                  | One named predicate and one normalised constant, so the loop body reads as a single guard alongside its neighbours.                        |
+| Assumptions & docs      | ×1     | The off-by-default rationale and the placement rationale are left silent.                                                   | Noted somewhere.                                                                                                             | Both are _why_ comments next to the code, and the new config field's comment matches the style of its neighbours.                          |

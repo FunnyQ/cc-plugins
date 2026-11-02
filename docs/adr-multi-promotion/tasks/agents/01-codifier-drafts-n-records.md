@@ -1,6 +1,7 @@
 # AGENTS-01: Codifier drafts N records
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -135,7 +136,11 @@ Replace the singular `{ draftText, proposedPath }` block with this array:
 ```json
 {
   "drafts": [
-    { "groupId": "g1", "draftText": "...", "proposedPath": "docs/adr/0027-....md" }
+    {
+      "groupId": "g1",
+      "draftText": "...",
+      "proposedPath": "docs/adr/0027-....md"
+    }
   ]
 }
 ```
@@ -196,12 +201,12 @@ loses a decision the human already approved at the first gate.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the frozen contract, or the Output still returns one `draftText` | `groups` and `drafts` are present, but `groupId` order is unstated, or the Codifier still reads `adrIndex.nextNumber` | Input, Output, and numbering match the frozen contract, and the `id-mismatch` failure is named |
-| Completeness | ×2 | The Output array landed and the Input still names `candidateIds` | Input and Output converted, but the Process steps still read in the singular | Brief, Input, all Process steps, Output, and the 12-group cap all read as a batch |
-| Readability | ×1 | Backticked spans broken across line wraps, or frontmatter edited | Correct content, but sentences over 25 words or stacked em dashes | STE-lite throughout, one voice with the rest of the file, headings and list shape preserved |
-| Assumptions and docs | ×1 | Invents a behavior the frozen contract does not define, such as a retry or a partial return | The one-call rule and the cap are stated with no reason given | Every non-obvious rule names the failure it prevents |
+| Dimension            | Weight | 0–1 (fail)                                                                                  | 2–3 (below bar)                                                                                                       | 4–5 (pass)                                                                                     |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name differs from the frozen contract, or the Output still returns one `draftText`  | `groups` and `drafts` are present, but `groupId` order is unstated, or the Codifier still reads `adrIndex.nextNumber` | Input, Output, and numbering match the frozen contract, and the `id-mismatch` failure is named |
+| Completeness         | ×2     | The Output array landed and the Input still names `candidateIds`                            | Input and Output converted, but the Process steps still read in the singular                                          | Brief, Input, all Process steps, Output, and the 12-group cap all read as a batch              |
+| Readability          | ×1     | Backticked spans broken across line wraps, or frontmatter edited                            | Correct content, but sentences over 25 words or stacked em dashes                                                     | STE-lite throughout, one voice with the rest of the file, headings and list shape preserved    |
+| Assumptions and docs | ×1     | Invents a behavior the frozen contract does not define, such as a retry or a partial return | The one-call rule and the cap are stated with no reason given                                                         | Every non-obvious rule names the failure it prevents                                           |
 
 ## Out of scope
 

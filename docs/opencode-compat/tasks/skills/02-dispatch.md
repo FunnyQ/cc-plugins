@@ -1,6 +1,7 @@
 # SKILLS-02: Dispatch skills — OpenCode branches
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -35,9 +36,9 @@ Touching any `.ts` file, any `plugin.json`, or any hook script under `packages/`
 
 ### These skills do not use `CLAUDE_PLUGIN_ROOT` — check before you write
 
-This is the most likely place to write a wrong instruction. All three script-bearing skills **already** avoid `CLAUDE_PLUGIN_ROOT` and resolve scripts from the skill's load-time *"Base directory for this skill"* banner instead:
+This is the most likely place to write a wrong instruction. All three script-bearing skills **already** avoid `CLAUDE_PLUGIN_ROOT` and resolve scripts from the skill's load-time _"Base directory for this skill"_ banner instead:
 
-- `packages/dispatch/skills/flightplan/SKILL.md:34` — "`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time *"Base directory for this skill"* banner and set `SCRIPTS="<base-dir>/scripts"`."
+- `packages/dispatch/skills/flightplan/SKILL.md:34` — "`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time _"Base directory for this skill"_ banner and set `SCRIPTS="<base-dir>/scripts"`."
 - `packages/dispatch/skills/waypoints/SKILL.md:38` — the same instruction.
 
 So the OpenCode branch is **not** "replace `CLAUDE_PLUGIN_ROOT`" — there is nothing to replace. It is: state the OpenCode install root as the concrete value the banner resolves to, so a reader whose harness prints no banner can still find the scripts. The rule to reproduce is quoted in `../_context/shared.md` under "The OpenCode skill root rule".
@@ -83,12 +84,12 @@ If a fact you decide you need is still marked `UNRESOLVED`, set this file's head
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Touches a `.ts`, a `plugin.json`, the lint hook script, or the autopilot skill | A block is present but names the wrong install root, or hedges the path conditionally instead of stating it | Both script-bearing skills carry a correct, concrete OpenCode root block; the preflight audit is recorded with evidence |
-| Non-regression | ×2 | Existing Claude or Codex instructions rewritten, reordered, or deleted | Additions dilute a neighbouring instruction, or blocks are unfenced and hard to skip | Diff is purely additive, every block clearly fenced and consistently shaped, a Claude reader's path is untouched |
-| Phrasing consistency | ×1 | Each skill invents its own wording and fence shape | Wording is close but the fence shape or path form drifts between the two skills | One fence shape, one path form, wording that would read identically in any of the five plugins |
-| Assumptions & docs | ×1 | Invents banner behavior not observed | Facts cited loosely | Every runtime-dependent claim names its fact, and provisional wording is flagged as provisional |
+| Dimension            | Weight | 0–1 (fail)                                                                     | 2–3 (below bar)                                                                                             | 4–5 (pass)                                                                                                              |
+| -------------------- | ------ | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Correctness          | ×3     | Touches a `.ts`, a `plugin.json`, the lint hook script, or the autopilot skill | A block is present but names the wrong install root, or hedges the path conditionally instead of stating it | Both script-bearing skills carry a correct, concrete OpenCode root block; the preflight audit is recorded with evidence |
+| Non-regression       | ×2     | Existing Claude or Codex instructions rewritten, reordered, or deleted         | Additions dilute a neighbouring instruction, or blocks are unfenced and hard to skip                        | Diff is purely additive, every block clearly fenced and consistently shaped, a Claude reader's path is untouched        |
+| Phrasing consistency | ×1     | Each skill invents its own wording and fence shape                             | Wording is close but the fence shape or path form drifts between the two skills                             | One fence shape, one path form, wording that would read identically in any of the five plugins                          |
+| Assumptions & docs   | ×1     | Invents banner behavior not observed                                           | Facts cited loosely                                                                                         | Every runtime-dependent claim names its fact, and provisional wording is flagged as provisional                         |
 
 ## Out of scope
 

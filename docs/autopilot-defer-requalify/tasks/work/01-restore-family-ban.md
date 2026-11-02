@@ -1,6 +1,7 @@
 # WORK-01: Restore-family ban across every command-discretion prompt
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/orchestrator-anatomy.md`
@@ -43,7 +44,7 @@ edit lands inside the single ` ```javascript ` fence.
 parallel in one shared working tree. It is injected into `devPrompt`, `devExternalPrompt` and
 `fixPrompt` — the three prompts whose agents write source. The ban was scoped by **role**, and
 universal Bash access is what makes that proxy invalid: the verifier, the judge, the review
-lenses and the commit agents all hold Bash too, so "writer" never bounded who *could* run the
+lenses and the commit agents all hold Bash too, so "writer" never bounded who _could_ run the
 command.
 
 Bash access is not the replacement boundary either — every Workflow agent has it, including the
@@ -59,7 +60,7 @@ tree, and attempted `git reset --hard` to get a clean run. A human denied it.
 
 1. the commit ban (`git commit` / `git add` / `git push` / `git stash`),
 2. the restore-family ban, opening `Never run \`git checkout\`, \`git restore\`, \`git reset\`,
-   or \`git clean\` either.` and containing the sentence `do not reason your way past this one`,
+   or \`git clean\` either.`and containing the sentence`do not reason your way past this one`,
 3. the narrow rule that editing a shared source file is fine but another task's file under the
    `tasks/` tree is never yours to touch.
 
@@ -77,7 +78,7 @@ Redefine it as its surviving first paragraph plus an interpolation of the new co
 
 ```js
 const NO_COMMIT_RULE = `Never run \`git commit\`, ... into its commit.
-${NO_RESTORE_RULE}`
+${NO_RESTORE_RULE}`;
 ```
 
 `devPrompt`, `devExternalPrompt` and `fixPrompt` each interpolate `${NO_COMMIT_RULE}` and must
@@ -85,19 +86,19 @@ render **byte-identical** text to today. This step is a pure refactor for them; 
 changes at all, the extraction was done wrong.
 
 Keep the existing explanatory comment above `NO_COMMIT_RULE` with the constant it describes,
-and give `NO_RESTORE_RULE` its own short comment saying *why* it is separate: the ban belongs to
+and give `NO_RESTORE_RULE` its own short comment saying _why_ it is separate: the ban belongs to
 every prompt that lets its agent choose what to run, not only to the writers, so it has to be
 injectable on its own. Do not write "every agent with Bash" — every Workflow agent has Bash, and
 three prompts are excluded precisely because they run one fixed command.
 
 ### Step 3 — inject into the four builders that lack it
 
-| Builder | ~line | Idiom |
-|---|---|---|
-| `reviewPrompt` | 330 | template literal — add `${NO_RESTORE_RULE}` near the closing REVIEWER line |
-| `verifyPrompt` | 380 | template literal |
-| `judgePrompt` | 395 | template literal |
-| `commitInstructions` | 616 | **string concatenation**, `+ '...\n'` per line — match that style, e.g. `+ NO_RESTORE_RULE + '\n'` |
+| Builder              | ~line | Idiom                                                                                              |
+| -------------------- | ----- | -------------------------------------------------------------------------------------------------- |
+| `reviewPrompt`       | 330   | template literal — add `${NO_RESTORE_RULE}` near the closing REVIEWER line                         |
+| `verifyPrompt`       | 380   | template literal                                                                                   |
+| `judgePrompt`        | 395   | template literal                                                                                   |
+| `commitInstructions` | 616   | **string concatenation**, `+ '...\n'` per line — match that style, e.g. `+ NO_RESTORE_RULE + '\n'` |
 
 `commitInstructions` is one builder shared by two call sites (the inter-wave commit agent and
 the post-loop commit agent), so a single injection covers both.
@@ -191,12 +192,12 @@ running beside you.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A writer prompt's rendered text changed, or a moved paragraph was reworded or re-wrapped | All four injections present, but one builder's idiom was broken or the external CLI instruction was skipped | Verbatim extraction, writer prompts byte-identical, all four injections plus the external CLI propagation |
-| Test coverage | ×2 | No test asserts prompt content | Only the dev prompt is asserted, so a dropped injection would pass | Composition and each new injection site asserted; the suite fails if any one is reverted |
-| Interface & readability | ×1 | New constant placed far from the one it was split out of, or named inconsistently with it | Placed well, but the concatenation builder was given template-literal syntax | Constant sits immediately before `NO_COMMIT_RULE`; every builder keeps its own idiom |
-| Assumptions & docs | ×1 | No comment explains why the constant was split | Comment narrates what the constant contains | Comment explains why the ban is scoped by tool access rather than by role |
+| Dimension               | Weight | 0–1 (fail)                                                                                | 2–3 (below bar)                                                                                             | 4–5 (pass)                                                                                                |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A writer prompt's rendered text changed, or a moved paragraph was reworded or re-wrapped  | All four injections present, but one builder's idiom was broken or the external CLI instruction was skipped | Verbatim extraction, writer prompts byte-identical, all four injections plus the external CLI propagation |
+| Test coverage           | ×2     | No test asserts prompt content                                                            | Only the dev prompt is asserted, so a dropped injection would pass                                          | Composition and each new injection site asserted; the suite fails if any one is reverted                  |
+| Interface & readability | ×1     | New constant placed far from the one it was split out of, or named inconsistently with it | Placed well, but the concatenation builder was given template-literal syntax                                | Constant sits immediately before `NO_COMMIT_RULE`; every builder keeps its own idiom                      |
+| Assumptions & docs      | ×1     | No comment explains why the constant was split                                            | Comment narrates what the constant contains                                                                 | Comment explains why the ban is scoped by tool access rather than by role                                 |
 
 ## Out of scope
 
@@ -204,6 +205,6 @@ running beside you.
   transition against its own task file and issues no git command, so the ban would be noise.
 - The inline wave-scout prompt — Deferred. Reason: it runs exactly one command,
   `next-ready.ts --summary`, and returns its stdout verbatim.
-- Giving the verifier anything to do *instead* of wiping the tree — Deferred to a follow-up
+- Giving the verifier anything to do _instead_ of wiping the tree — Deferred to a follow-up
   task in the same bucket. This task removes the permission; it does not yet remove the motive.
 - Any change to control flow, schemas, the wave loop, or the dashboard.

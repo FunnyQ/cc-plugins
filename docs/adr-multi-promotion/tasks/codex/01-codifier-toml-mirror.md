@@ -1,6 +1,7 @@
 # CODEX-01: Codifier TOML mirror
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -70,7 +71,12 @@ the input, so name the field it must not reach for.
 Inline this input literal:
 
 ```json
-{"groups":[{"groupId":"g1","entryIds":["id-1","id-2"],"adrNumber":27},{"groupId":"g2","entryIds":["id-3"],"adrNumber":28}]}
+{
+  "groups": [
+    { "groupId": "g1", "entryIds": ["id-1", "id-2"], "adrNumber": 27 },
+    { "groupId": "g2", "entryIds": ["id-3"], "adrNumber": 28 }
+  ]
+}
 ```
 
 ### Keep the body-fetch warnings verbatim
@@ -100,13 +106,24 @@ record is already written.
 The last line currently pins a singular literal:
 
 ```json
-{"draftText":"<complete record text ready to be written>","proposedPath":"docs/adr/0001-....md"}
+{
+  "draftText": "<complete record text ready to be written>",
+  "proposedPath": "docs/adr/0001-....md"
+}
 ```
 
 Replace it with the batch literal:
 
 ```json
-{"drafts":[{"groupId":"g1","draftText":"<complete record text ready to be written>","proposedPath":"docs/adr/0027-....md"}]}
+{
+  "drafts": [
+    {
+      "groupId": "g1",
+      "draftText": "<complete record text ready to be written>",
+      "proposedPath": "docs/adr/0027-....md"
+    }
+  ]
+}
 ```
 
 State three rules with it. Return one entry per input group. Keep the input order. Carry
@@ -188,12 +205,12 @@ carried, so some growth is the honest cost. Add no sentence that carries no rule
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the frozen contract, or the singular `draftText`/`proposedPath` return literal survives. | The `groups` and `drafts` literals are right, but a rule is softened — the fetch is per group, `adrIndex` still names an input, or the cap is missing. | Both literals match the frozen contract character for character, the union fetch is explicit, `adrIndex` appears only in the never-counts clause, and the cap refuses above 12. |
-| Completeness | ×2 | A preserved rule is dropped, or `model` and `model_reasoning_effort` changed. | The contract landed but a preserved rule thinned out, for example the evidence rule lost session ID or date. | Every preserved rule survives, both tuning keys are byte-identical, and the file parses as TOML with one `developer_instructions` string. |
-| Readability | ×1 | The mirror grew headed sections, bullet lists, or a second string key. | Dense prose, but the paragraph order was reshuffled, so the diff hides the contract change. | Dense prose in the existing three-paragraph order, so the diff shows only the contract change. |
-| Assumptions and docs | ×1 | The brief invents a behavior the frozen contract does not define, such as renumbering or truncation. | The `adrNumber` rule is stated with no reason, so a later editor cannot tell it is load-bearing. | Each non-obvious rule names its failure, including `id-mismatch` for the H1-versus-path match. |
+| Dimension            | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                                                                                        | 4–5 (pass)                                                                                                                                                                      |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name differs from the frozen contract, or the singular `draftText`/`proposedPath` return literal survives. | The `groups` and `drafts` literals are right, but a rule is softened — the fetch is per group, `adrIndex` still names an input, or the cap is missing. | Both literals match the frozen contract character for character, the union fetch is explicit, `adrIndex` appears only in the never-counts clause, and the cap refuses above 12. |
+| Completeness         | ×2     | A preserved rule is dropped, or `model` and `model_reasoning_effort` changed.                                      | The contract landed but a preserved rule thinned out, for example the evidence rule lost session ID or date.                                           | Every preserved rule survives, both tuning keys are byte-identical, and the file parses as TOML with one `developer_instructions` string.                                       |
+| Readability          | ×1     | The mirror grew headed sections, bullet lists, or a second string key.                                             | Dense prose, but the paragraph order was reshuffled, so the diff hides the contract change.                                                            | Dense prose in the existing three-paragraph order, so the diff shows only the contract change.                                                                                  |
+| Assumptions and docs | ×1     | The brief invents a behavior the frozen contract does not define, such as renumbering or truncation.               | The `adrNumber` rule is stated with no reason, so a later editor cannot tell it is load-bearing.                                                       | Each non-obvious rule names its failure, including `id-mismatch` for the H1-versus-path match.                                                                                  |
 
 ## Out of scope
 

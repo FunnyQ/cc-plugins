@@ -8,10 +8,10 @@ Steps 1–5 ran. The TS was deleted only after both suites were green and the re
 
 ## Contract suite before deletion
 
-| Run | Result |
-|---|---|
-| `bun test packages/monitor/skills/usage-dashboard/contract/` (TS) | 106 pass, 5 skip (the `skipIf(!isRust())` tests), 0 fail |
-| `COCKPIT_BIN=… bun test packages/monitor/skills/usage-dashboard/contract/` (Rust) | 111 pass, 0 fail |
+| Run                                                                               | Result                                                   |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `bun test packages/monitor/skills/usage-dashboard/contract/` (TS)                 | 106 pass, 5 skip (the `skipIf(!isRust())` tests), 0 fail |
+| `COCKPIT_BIN=… bun test packages/monitor/skills/usage-dashboard/contract/` (Rust) | 111 pass, 0 fail                                         |
 
 ## Method
 
@@ -21,11 +21,11 @@ Steps 1–5 ran. The TS was deleted only after both suites were green and the re
 
 ## Metrics
 
-| Metric | Target | TS baseline | Rust | Result |
-|---|---|---|---|---|
-| `atlas serve` RSS (max of 5 × `ps -o rss=`, 1 s apart, after one `/api/stats`, `/api/live` polling) | ≤ 40 MB | 607.1 MB (this home; plan's earlier baseline 197 MB) | 77.8 MB | **MISS** — 37.8 MB over target (−87% vs TS) |
-| `/api/stats` cold build (median of 3 launches, same snapshot) | Rust ≤ TS | 6636 ms (6754 / 6616 / 6636) | 6402 ms (6402 / 6402 / 6413) | **PASS** — 234 ms faster |
-| `atlas statusline` net overhead (median of 20, `TOKEN_ATLAS_STATUSLINE_COMMAND=true`, nudge markers fresh, minus `sh -c true`) | ≤ 10 ms net | TS total 23.2 ms, net 18.4 ms | total 11.0 ms, baseline 4.8 ms, net 6.2 ms | **PASS** |
+| Metric                                                                                                                         | Target      | TS baseline                                          | Rust                                       | Result                                      |
+| ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ---------------------------------------------------- | ------------------------------------------ | ------------------------------------------- |
+| `atlas serve` RSS (max of 5 × `ps -o rss=`, 1 s apart, after one `/api/stats`, `/api/live` polling)                            | ≤ 40 MB     | 607.1 MB (this home; plan's earlier baseline 197 MB) | 77.8 MB                                    | **MISS** — 37.8 MB over target (−87% vs TS) |
+| `/api/stats` cold build (median of 3 launches, same snapshot)                                                                  | Rust ≤ TS   | 6636 ms (6754 / 6616 / 6636)                         | 6402 ms (6402 / 6402 / 6413)               | **PASS** — 234 ms faster                    |
+| `atlas statusline` net overhead (median of 20, `TOKEN_ATLAS_STATUSLINE_COMMAND=true`, nudge markers fresh, minus `sh -c true`) | ≤ 10 ms net | TS total 23.2 ms, net 18.4 ms                        | total 11.0 ms, baseline 4.8 ms, net 6.2 ms | **PASS**                                    |
 
 ## Real-home golden check
 
@@ -40,21 +40,21 @@ Result: **equal** under the accepted tolerance (re-run 2026-10-01, after `baa9bc
 
 `contract/golden/live.json` was recorded from the TS `live.ts` on the `extendLiveFixture` home before deletion; `live.contract.test.ts` now compares Rust `atlas live` against it. Removed with the TS, since they can only run against it: the four `TS seams` tests in `fixtures.test.ts` (they imported `api.ts` for `nowMs` and the URL constants) and `mixed fleet: Rust reuses a running TS server` in `lifecycle.contract.test.ts`.
 
-| Run | Result |
-|---|---|
+| Run                                                                                                       | Result                   |
+| --------------------------------------------------------------------------------------------------------- | ------------------------ |
 | `bun test packages/monitor/skills/usage-dashboard/contract/` (`COCKPIT_BIN` unset → local release binary) | 106 pass, 0 skip, 0 fail |
-| `bun test --parallel packages/monitor/` | 370 pass, 0 fail |
+| `bun test --parallel packages/monitor/`                                                                   | 370 pass, 0 fail         |
 
 ## Kept TS
 
 None. Every candidate's only importers were in the deletion set or its own test:
 
-| Module | Importers found | Outcome |
-|---|---|---|
-| `shared/scripts/jsonl-lines.ts` | its own test | deleted with test |
-| `shared/scripts/static-server.ts` | its own test | deleted with test |
-| `shared/scripts/path-inside.ts` | `static-server.ts` (deleted) | deleted |
-| `shared/scripts/process-alive.ts` | none | deleted |
-| `shared/scripts/opencode.ts` | none (relay's hits are its own `backends/opencode.ts`) | deleted |
-| `cockpit/scripts/http.ts` | its own test | deleted with test |
+| Module                            | Importers found                                                 | Outcome           |
+| --------------------------------- | --------------------------------------------------------------- | ----------------- |
+| `shared/scripts/jsonl-lines.ts`   | its own test                                                    | deleted with test |
+| `shared/scripts/static-server.ts` | its own test                                                    | deleted with test |
+| `shared/scripts/path-inside.ts`   | `static-server.ts` (deleted)                                    | deleted           |
+| `shared/scripts/process-alive.ts` | none                                                            | deleted           |
+| `shared/scripts/opencode.ts`      | none (relay's hits are its own `backends/opencode.ts`)          | deleted           |
+| `cockpit/scripts/http.ts`         | its own test                                                    | deleted with test |
 | `cockpit/scripts/cockpit-home.ts` | its own test (`cockpit/bin/cockpit.test.ts` does not import it) | deleted with test |

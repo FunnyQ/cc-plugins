@@ -38,13 +38,19 @@ type UnitFacts = {
     subject: string;
     body: string;
     section: Suggestion;
-    judgedBy?: "jev";   // section came from TypeSafe's Jev, not the commit type
+    judgedBy?: "jev"; // section came from TypeSafe's Jev, not the commit type
     confidence?: number;
   }[];
 };
 type Suggestion =
-  | "Added" | "Changed" | "Deprecated" | "Removed" | "Fixed" | "Security"
-  | "omit" | "judge";
+  | "Added"
+  | "Changed"
+  | "Deprecated"
+  | "Removed"
+  | "Fixed"
+  | "Security"
+  | "omit"
+  | "judge";
 ```
 
 `section` is the engine's reading of the commit type. A named section is a strong
@@ -68,11 +74,16 @@ facts, even when there is only one:
 
 ```ts
 type EntryDraft = {
-  tagName: string;                // copied from the facts
-  sections: Partial<Record<"Added" | "Changed" | "Deprecated" | "Removed" | "Fixed" | "Security", Bullet[]>>;
-  omitted: string[];              // shas you deliberately left out
+  tagName: string; // copied from the facts
+  sections: Partial<
+    Record<
+      "Added" | "Changed" | "Deprecated" | "Removed" | "Fixed" | "Security",
+      Bullet[]
+    >
+  >;
+  omitted: string[]; // shas you deliberately left out
 };
-type Bullet = { text: string; commits: string[] };  // shas this bullet covers
+type Bullet = { text: string; commits: string[] }; // shas this bullet covers
 ```
 
 **Account for every commit.** Each sha in the facts goes into at least one bullet's

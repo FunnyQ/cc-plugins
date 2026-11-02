@@ -1,6 +1,7 @@
 # DOCS-02: Final review — whole-system gate
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -81,12 +82,12 @@ whole deliverable end to end:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. This gate scores the whole deliverable, not individual tasks.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration / does it compose | ×3 | suite red or pieces don't connect | works but a seam is rough (e.g. language not flowing to scribe) | tests green; config→scribe→dashboard all compose end to end |
-| Meets the PLAN goal | ×2 | still 3 skills or goals remain | mostly consolidated, friction remnant | one auto system; only config is global log_language |
-| Consistency | ×1 | contradictory docs/code | minor drift | code, references, command, hook, CLAUDE.md all agree |
-| No regressions | ×1 | bridge or legacy-log handling broke | minor UI regression | bridge intact, legacy logs tolerated, no console errors |
+| Dimension                     | Weight | 0–1 (fail)                          | 2–3 (below bar)                                                 | 4–5 (pass)                                                  |
+| ----------------------------- | ------ | ----------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| Integration / does it compose | ×3     | suite red or pieces don't connect   | works but a seam is rough (e.g. language not flowing to scribe) | tests green; config→scribe→dashboard all compose end to end |
+| Meets the PLAN goal           | ×2     | still 3 skills or goals remain      | mostly consolidated, friction remnant                           | one auto system; only config is global log_language         |
+| Consistency                   | ×1     | contradictory docs/code             | minor drift                                                     | code, references, command, hook, CLAUDE.md all agree        |
+| No regressions                | ×1     | bridge or legacy-log handling broke | minor UI regression                                             | bridge intact, legacy logs tolerated, no console errors     |
 
 ## Out of scope
 

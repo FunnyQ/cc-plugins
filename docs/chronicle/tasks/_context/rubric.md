@@ -24,4 +24,4 @@
 
 ## Final review task
 
-The closing `packaging/03-final-review` task scores *integration-level* axes (does it compose, meets the PLAN goal, consistency, no regressions), not a re-score of individual tasks. It carries its own table with those dimensions.
+The closing `packaging/03-final-review` task scores _integration-level_ axes (does it compose, meets the PLAN goal, consistency, no regressions), not a re-score of individual tasks. It carries its own table with those dimensions.

@@ -1307,7 +1307,11 @@ async function main() {
           throw new HerdrError("tell requires <fragment> and <text>");
         const spawnAgent = Array.isArray(f.agent) ? f.agent.at(-1) : undefined;
         console.log(
-          JSON.stringify(await herd.tell(fragment, text, { spawnAgent }), null, 2),
+          JSON.stringify(
+            await herd.tell(fragment, text, { spawnAgent }),
+            null,
+            2,
+          ),
         );
         break;
       }

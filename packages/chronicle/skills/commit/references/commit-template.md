@@ -15,19 +15,19 @@
 
 ## Change Types
 
-| Emoji | Type | When |
-|---|---|---|
-| ✨ | feat | New feature |
-| 🐛 | fix | Bug fix |
-| 📖 | docs | Docs only |
-| 🎨 | style | UI / formatting, no logic change |
-| 📦 | refactor | Code restructure, behavior unchanged |
-| ✅ | test | Tests |
-| 🔧 | chore | Dev tooling, deps, config |
-| 🔥 | remove | Delete code / files |
-| 🚑 | hotfix | Critical production fix |
-| 🔒 | security | Security fix |
-| ⚡️ | perf | Performance |
+| Emoji | Type     | When                                 |
+| ----- | -------- | ------------------------------------ |
+| ✨    | feat     | New feature                          |
+| 🐛    | fix      | Bug fix                              |
+| 📖    | docs     | Docs only                            |
+| 🎨    | style    | UI / formatting, no logic change     |
+| 📦    | refactor | Code restructure, behavior unchanged |
+| ✅    | test     | Tests                                |
+| 🔧    | chore    | Dev tooling, deps, config            |
+| 🔥    | remove   | Delete code / files                  |
+| 🚑    | hotfix   | Critical production fix              |
+| 🔒    | security | Security fix                         |
+| ⚡️    | perf     | Performance                          |
 
 ## Rules
 
@@ -38,7 +38,7 @@
   still carry the subject.
 - The `---` separator is literal. It is always present when a 繁中 summary
   follows.
-- The message describes only the files in *this* commit.
+- The message describes only the files in _this_ commit.
 
 ## Length guardrail
 
@@ -47,9 +47,9 @@ far more "why" than belongs in a commit. Be terse on purpose: the commit records
 the change, not the whole investigation.
 
 - **Body**: Write one line per bullet where possible. Use about 3–4 bullets
-  for a normal change. Say *why*; do not restate the diff or narrate the
+  for a normal change. Say _why_; do not restate the diff or narrate the
   session.
-- **繁中 summary**: Write genuinely 1–3 sentences that *summarize*. Do not
+- **繁中 summary**: Write genuinely 1–3 sentences that _summarize_. Do not
   write a line-by-line re-translation of the English body. If the zh-TW reads
   like the body in Chinese, it is too long; cut it to the one thing a reader
   needs.

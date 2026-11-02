@@ -1,6 +1,7 @@
 # LINT-01: test-runner detection and the final-review regression-net rule
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/lint-contract.md`
 > - `../_context/rubric.md`
@@ -33,7 +34,7 @@ coverage happens incidentally, because test commands are path-scoped — a late 
 earlier code for free. That incidental net is real but unreliable.
 
 The case incidental coverage cannot reach is the **closing review's fixer**: it applies review findings
-with Edit/Write *after* every other task has already finished and been verified. Its edits are gated only
+with Edit/Write _after_ every other task has already finished and been verified. Its edits are gated only
 by the closing task's own `## Verification`. With no test command there, the run's last code changes are
 never tested, and no earlier task can help — they already ran.
 
@@ -41,8 +42,8 @@ So the rule is **conditional on the tree**: a tree that has proven it owns a tes
 closing gate. A docs-only tree that never runs a test triggers nothing and stays silent. A blanket "must"
 would be wrong, and was rejected.
 
-Do **not** try to re-execute other tasks' verification items. Items are written as *a backticked command
-plus a prose assertion* — `` `grep -c foo file` is ≥ 2 ``, `` `git status` shows X unmodified `` — where the
+Do **not** try to re-execute other tasks' verification items. Items are written as _a backticked command
+plus a prose assertion_ — `` `grep -c foo file` is ≥ 2 ``, `` `git status` shows X unmodified `` — where the
 assertion lives in the prose and the exit code alone is meaningless (`grep -c` exits 0 on one match;
 `git status` always exits 0). Mechanical re-execution would report **false greens**, which at a closing
 gate is worse than no re-verification at all.
@@ -68,7 +69,7 @@ Then a small exported helper:
  * Backticked commands in a task's `## Verification` section that invoke a known
  * test runner. Returns the command strings as written, in document order.
  */
-export function testCommandsIn(task: ParsedTask): string[]
+export function testCommandsIn(task: ParsedTask): string[];
 ```
 
 Implementation shape:
@@ -78,7 +79,7 @@ Implementation shape:
    `extractHeadingSection` from the parser module: it is private there, stricter, and widening it for
    one caller is the kind of layer this repo rejects.
 2. **Reassemble complete checklist items first, then filter.** Walk the section's lines and start a new
-   item on `/^\s*[-*]\s+\[[ x]\]\s/`; append any following line that is *not* itself a new bullet and
+   item on `/^\s*[-*]\s+\[[ x]\]\s/`; append any following line that is _not_ itself a new bullet and
    is not blank to the item currently open. Text before the first item, and text after a blank line that
    is not a bullet, belongs to no item.
 
@@ -93,11 +94,12 @@ Implementation shape:
    Here the second and third backtick spans live on continuation lines. A per-line test drops them, so a
    task that genuinely runs a suite on a wrapped line reads as running none — under-detecting in exactly
    the direction that lets a closing gate with no net pass.
+
 3. Keep only the reassembled items. This is the other half of the detector's correctness: a Verification
    section also contains prose, and a sentence such as "do not run `bun test` here, it is too slow" is not
    an executed suite. Counting it would both trigger the rule on a tree that owns no tests and satisfy the
    rule at a gate that runs nothing — wrong in both directions.
-4. For each item, pull out every backtick-delimited span with a global `` /`([^`]+)`/g `` scan over the
+4. For each item, pull out every backtick-delimited span with a global ``/`([^`]+)`/g`` scan over the
    whole reassembled item. One item can carry several spans; collect all of them.
 5. Trim each span and keep those matching `TEST_RUNNER_REGEX`.
 
@@ -122,7 +124,7 @@ Add beside `checkFinalReview`, with the same signature:
 export function checkFinalReviewTestNet(
   tasks: ParsedTask[],
   label: string,
-): Violation[]
+): Violation[];
 ```
 
 Logic:
@@ -162,7 +164,7 @@ judge a closing gate, and — importantly — an execution run's dev driver lint
   and is handled elsewhere in this plan.
 - Any change to `references/task-template.md` or the flightplan `SKILL.md`.
 - Any change to `parse-task.ts`.
-- Judging test *reach*. Breadth is not mechanically decidable from a command string; this rule enforces
+- Judging test _reach_. Breadth is not mechanically decidable from a command string; this rule enforces
   presence only.
 
 ## Acceptance criteria
@@ -226,9 +228,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The rule fires on a silent tree, misses a real gap, or evaluates for a single-file argument. | Fires correctly on the main case but mishandles a scoped case (no marker, single task, command outside Verification). | Every listed case behaves as specified, including the whole-tree-only scoping. |
-| Test coverage | ×2 | No test, or tests that would pass without the change. | Happy path only. | Fire, silent, scoped, single-task, and file-vs-directory cases all tested, and the exit-code behaviour is proven by driving the CLI. |
-| Interface & readability | ×1 | A duplicated section parser, or a widened parser export. | Works but drifts from the file's existing check style. | Mirrors `checkFinalReview`'s shape and reuses `extractSection`; the detector regex is commented with why its boundary exists. |
-| Assumptions & docs | ×1 | The Verification-only narrowing is left silent. | Noted somewhere. | The Verification-only scope and the no-double-violation choice are both recorded as *why* comments next to the code. |
+| Dimension               | Weight | 0–1                                                                                          | 2–3                                                                                                                   | 4–5                                                                                                                                  |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The rule fires on a silent tree, misses a real gap, or evaluates for a single-file argument. | Fires correctly on the main case but mishandles a scoped case (no marker, single task, command outside Verification). | Every listed case behaves as specified, including the whole-tree-only scoping.                                                       |
+| Test coverage           | ×2     | No test, or tests that would pass without the change.                                        | Happy path only.                                                                                                      | Fire, silent, scoped, single-task, and file-vs-directory cases all tested, and the exit-code behaviour is proven by driving the CLI. |
+| Interface & readability | ×1     | A duplicated section parser, or a widened parser export.                                     | Works but drifts from the file's existing check style.                                                                | Mirrors `checkFinalReview`'s shape and reuses `extractSection`; the detector regex is commented with why its boundary exists.        |
+| Assumptions & docs      | ×1     | The Verification-only narrowing is left silent.                                              | Noted somewhere.                                                                                                      | The Verification-only scope and the no-double-violation choice are both recorded as _why_ comments next to the code.                 |

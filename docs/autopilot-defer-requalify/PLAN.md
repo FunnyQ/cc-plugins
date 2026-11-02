@@ -20,7 +20,7 @@ working tree.
 - A verifier that meets a sibling's half-written tree **postpones** its verdict, waits for the
   tree to go quiet, and re-runs its commands once, strictly. It never wipes the tree, and it
   never waives a non-zero exit.
-- A postponement is only ever granted while another task is *observably* mutating the tree, so
+- A postponement is only ever granted while another task is _observably_ mutating the tree, so
   it cannot become a free re-run of a red command.
 - The audit trail never records a postponement the orchestrator refused. Both gate checks log
   an ordinary `PASS`/`FAIL` verdict; a granted postponement is visible as the second check's
@@ -47,8 +47,8 @@ working tree.
 
 During a live autopilot run in a separate repo, a **verify** agent attempted `git reset --hard`
 and a human denied it. Nothing was lost. The run's flightlog shows two dev agents dispatched
-into the same wave; the first reported *"Cargo test blocked by unrelated TabLayout config
-changes in other task"*. Its verifier then ran `cargo test`, met failures caused by the sibling
+into the same wave; the first reported _"Cargo test blocked by unrelated TabLayout config
+changes in other task"_. Its verifier then ran `cargo test`, met failures caused by the sibling
 still writing `src/config.rs`, and reached for a clean tree.
 
 That same verifier went on to report `PASS` over two still-failing tests, attributing them to
@@ -62,7 +62,7 @@ because parallel tasks share one working tree. It is injected into `devPrompt`,
 `devExternalPrompt` and `fixPrompt` — the three prompts whose agents write source. The ban was
 scoped by **role**, and universal Bash access is what makes that proxy invalid: the verifier,
 the judge, the review lenses and the commit agents all hold Bash too, so "writer" never bounded
-who *could* run the command.
+who _could_ run the command.
 
 Bash access is not the replacement boundary either, since every Workflow agent has it — three
 prompts are excluded on purpose. The boundary is **command discretion**: whether the prompt
@@ -72,9 +72,9 @@ hands the agent a decision about what to run.
 
 Workflow `agent()` accepts no tool allowlist, and agent-frontmatter tool lists do not constrain
 Workflow subagents. A PATH `git` wrapper is bypassed by an absolute path. Comparing the tree
-before and after only *detects* damage, and `reset --hard` has already destroyed the
+before and after only _detects_ damage, and `reset --hard` has already destroyed the
 uncommitted evidence it would need. `isolation: 'worktree'` blinds the verifier to the very
-uncommitted edits it must verify. So the ban is defense-in-depth, and removing the *motive* —
+uncommitted edits it must verify. So the ban is defense-in-depth, and removing the _motive_ —
 what this plan's second half does — is the part that actually changes outcomes.
 
 ### Design provenance
@@ -182,7 +182,7 @@ flightlog run.jsonl              ──>  fleet.ts parseAgentLabel + gateOutcome
   requalify:<ref>#<n> "PASS — …"        role requalify, outcome passed   ← new role, existing outcomes
 ```
 
-The second row's *existence* is what records that the postponement was granted. Nothing needs a
+The second row's _existence_ is what records that the postponement was granted. Nothing needs a
 third outcome value, and `dashboard/dist/` is untouched.
 
 ## Bucketing
@@ -197,14 +197,14 @@ third outcome value, and `dashboard/dist/` is untouched.
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| work | 01 | restore-family-ban | todo | > 4.0 | — |
-| work | 02 | wave-tree-watch | todo | > 4.0 | work/01 |
-| work | 03 | defer-and-requalify | todo | > 4.0 | work/02 |
-| work | 04 | dashboard-defer-state | todo | > 4.0 | work/03 |
-| work | 05 | design-notes | todo | > 4.0 | work/03 |
-| work | 06 | final review 🏁 | todo | > 4.0 | work/04, work/05 |
+| Bucket | NN  | Title                 | Status | Pass line | Depends on       |
+| ------ | --- | --------------------- | ------ | --------- | ---------------- |
+| work   | 01  | restore-family-ban    | todo   | > 4.0     | —                |
+| work   | 02  | wave-tree-watch       | todo   | > 4.0     | work/01          |
+| work   | 03  | defer-and-requalify   | todo   | > 4.0     | work/02          |
+| work   | 04  | dashboard-defer-state | todo   | > 4.0     | work/03          |
+| work   | 05  | design-notes          | todo   | > 4.0     | work/03          |
+| work   | 06  | final review 🏁       | todo   | > 4.0     | work/04, work/05 |
 
 Only `04` and `05` may share a wave. The chain `01 → 02 → 03` is sequential because all three
 edit the same fenced script, and `01`'s injection into the verifier prompt lands in the exact
@@ -220,7 +220,7 @@ in favour of zero-crossing, and is recorded under Non-goals.
 - The residual race named under Requirements → Later: a sibling can begin a dev retry the
   instant after a zero-crossing releases a waiter, so a requalify can still meet a dirty tree.
   It then fails strictly, which is the pre-existing behaviour — never worse.
-- A deferral proves that *some* other task was writing, never that that task caused the
+- A deferral proves that _some_ other task was writing, never that that task caused the
   failure. The strict requalify is what makes a wrong attribution cheap.
 
 ## References

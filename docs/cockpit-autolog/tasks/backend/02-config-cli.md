@@ -1,6 +1,7 @@
 # BACKEND-02: `cockpit config` CLI subcommand
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -46,6 +47,7 @@ usage line to stderr and exit non-zero.
 
 In `cockpit.test.ts`, point `XDG_CONFIG_HOME` at a temp dir, then run the CLI entry (the
 tests already spawn/`run` the CLI for other subcommands — mirror that). Assert:
+
 - `config --log-language zh-TW` writes, and a subsequent `config get-language` prints
   `zh-TW` and nothing else.
 - `config get-language` with no config prints `English`.
@@ -67,12 +69,12 @@ tests already spawn/`run` the CLI for other subcommands — mirror that). Assert
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong output or not routed | sets/gets but get-language is decorated | both forms work; get-language is bare stdout; bad input exits non-zero |
-| Test coverage | ×2 | no tests | only set+get happy path | covers default English + bare-stdout + bad input |
-| Interface & readability | ×1 | ad-hoc parsing inconsistent with file | usable | matches existing subcommand parsing style |
-| Assumptions & docs | ×1 | silent behavior | partial | usage message + comment on bare-stdout contract |
+| Dimension               | Weight | 0–1 (fail)                            | 2–3 (below bar)                         | 4–5 (pass)                                                             |
+| ----------------------- | ------ | ------------------------------------- | --------------------------------------- | ---------------------------------------------------------------------- |
+| Correctness             | ×3     | wrong output or not routed            | sets/gets but get-language is decorated | both forms work; get-language is bare stdout; bad input exits non-zero |
+| Test coverage           | ×2     | no tests                              | only set+get happy path                 | covers default English + bare-stdout + bad input                       |
+| Interface & readability | ×1     | ad-hoc parsing inconsistent with file | usable                                  | matches existing subcommand parsing style                              |
+| Assumptions & docs      | ×1     | silent behavior                       | partial                                 | usage message + comment on bare-stdout contract                        |
 
 ## Out of scope
 

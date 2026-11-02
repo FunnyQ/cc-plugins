@@ -1,6 +1,7 @@
 # SHIP-02: CI release workflow
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -102,12 +103,12 @@ This proves the asset name, the sums format, and the shim's verify step agree en
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong asset names, darwin cross-linked from Linux, or sums in a format the shim rejects | Builds are right but the version guard or release-creation step is missing | Four triples on the right runners, version guard, idempotent release create plus `--clobber` upload, sums accepted by the shim |
-| Test coverage | ×2 | Workflow never parsed and script never run | Script run by hand only | actionlint or YAML parse, a script build with checksum self-check, and the shim end-to-end case |
-| Interface & readability | ×1 | Build logic duplicated between YAML and script | Script works but the YAML carries build flags | YAML is a thin matrix over one script; actions pinned |
-| Assumptions & docs | ×1 | No note on why darwin needs macOS runners | Some whys missing | One-line whys for the runner choice, the Cargo.lock exclusion, and the version guard |
+| Dimension               | Weight | 0–1 (fail)                                                                              | 2–3 (below bar)                                                            | 4–5 (pass)                                                                                                                     |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Wrong asset names, darwin cross-linked from Linux, or sums in a format the shim rejects | Builds are right but the version guard or release-creation step is missing | Four triples on the right runners, version guard, idempotent release create plus `--clobber` upload, sums accepted by the shim |
+| Test coverage           | ×2     | Workflow never parsed and script never run                                              | Script run by hand only                                                    | actionlint or YAML parse, a script build with checksum self-check, and the shim end-to-end case                                |
+| Interface & readability | ×1     | Build logic duplicated between YAML and script                                          | Script works but the YAML carries build flags                              | YAML is a thin matrix over one script; actions pinned                                                                          |
+| Assumptions & docs      | ×1     | No note on why darwin needs macOS runners                                               | Some whys missing                                                          | One-line whys for the runner choice, the Cargo.lock exclusion, and the version guard                                           |
 
 ## Out of scope
 

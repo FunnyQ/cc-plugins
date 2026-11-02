@@ -1,6 +1,7 @@
 # CHANNEL-02: Full channel
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -240,12 +241,12 @@ The printed number is KB, and must be ≤ 10240.
 
 > Scale 0–5 per `../_context/rubric.md`. Pass when the weighted average is > 4.0; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Messages or verdicts are not delivered, the inbox poll stops re-parking during delivery, or channels fight over the daemon | Happy paths work, but a sentinel, the abort-on-supersede, the backoff cap, or the session-chain order drifts from TS | Every loop, sentinel, backoff, supersede rule and error string matches TS; EOF/SIGTERM exits 0; RSS ≤ 10 MB |
-| Test coverage | ×2 | Only the contract groups run | Pure helpers tested; loops and relay untested | Cargo tests cover every case listed under "Cargo tests to port", including abort, budget, out-of-order delivery and convergence |
-| Interface & readability | ×1 | Transport types leak into the loops; `unwrap` on HTTP or JSON | Modules exist but the loop logic is tangled with I/O | Pure helpers take injected time, rand and liveness; the loops depend only on `notify` / `on_notification` and a small HTTP seam |
-| Assumptions & docs | ×1 | New HTTP dependency unjustified; magic numbers unexplained | Constants present without a why | Each constant (1000 ms floor, 250 jitter, 30 s cap, 6 failures, 5 min budget, 3 s waits) carries a one-line why; the HTTP client choice is justified in `Cargo.toml` |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                 | 2–3 (below bar)                                                                                                      | 4–5 (pass)                                                                                                                                                           |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Messages or verdicts are not delivered, the inbox poll stops re-parking during delivery, or channels fight over the daemon | Happy paths work, but a sentinel, the abort-on-supersede, the backoff cap, or the session-chain order drifts from TS | Every loop, sentinel, backoff, supersede rule and error string matches TS; EOF/SIGTERM exits 0; RSS ≤ 10 MB                                                          |
+| Test coverage           | ×2     | Only the contract groups run                                                                                               | Pure helpers tested; loops and relay untested                                                                        | Cargo tests cover every case listed under "Cargo tests to port", including abort, budget, out-of-order delivery and convergence                                      |
+| Interface & readability | ×1     | Transport types leak into the loops; `unwrap` on HTTP or JSON                                                              | Modules exist but the loop logic is tangled with I/O                                                                 | Pure helpers take injected time, rand and liveness; the loops depend only on `notify` / `on_notification` and a small HTTP seam                                      |
+| Assumptions & docs      | ×1     | New HTTP dependency unjustified; magic numbers unexplained                                                                 | Constants present without a why                                                                                      | Each constant (1000 ms floor, 250 jitter, 30 s cap, 6 failures, 5 min budget, 3 s waits) carries a one-line why; the HTTP client choice is justified in `Cargo.toml` |
 
 ## Out of scope
 

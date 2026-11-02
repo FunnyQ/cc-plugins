@@ -1,6 +1,7 @@
 # INTEGRATION-01: final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/lint-contract.md`
@@ -64,7 +65,7 @@ alone. What no single task verified is their interaction. Check these explicitly
   escalation must all suppress the post-loop commit. This guard is the only thing keeping rejected edits
   out of git.
 - **The three load-bearing properties are intact**: completion is tested with `counts.done ===
-  counts.total` and never `completed.length`; the parse-errors list is checked before the completion
+counts.total` and never `completed.length`; the parse-errors list is checked before the completion
   test — read it from the locally derived snapshot, since the scout agent no longer returns tree
   fields at all;
   reconciliation is by index with no `.filter(Boolean)`, so every task lands in `completed` XOR
@@ -89,7 +90,7 @@ alone. What no single task verified is their interaction. Check these explicitly
 - Both dispatch manifests still read the version they had before this work started, and both marketplace
   registries are unmodified. This tree deliberately ships no release.
 - The fenced block still parses. The fixture extracts it by string search
-  (`indexOf("```javascript")` → `indexOf("\n```")`), so a stray fence or an edit made *beside* the block
+  (`indexOf("```javascript")` → `indexOf("\n```")`), so a stray fence or an edit made _beside_ the block
   rather than inside it breaks extraction. A green fixture run proves extraction still works.
 - The linter's existing rules still behave: self-containment, required-reading resolution, status
   validity, completion state, rubric parsing, and the final-review coverage check.
@@ -101,7 +102,7 @@ alone. What no single task verified is their interaction. Check these explicitly
 A tree that owns a test suite can no longer ship a closing gate that runs no test at all — a presence
 guarantee, not a coverage one. The control path contains no interpreting agent,
 a blocked commit is reportable and appears in the audit trail, a retry can see every prior attempt and
-*can* end on a different vendor once that rung is configured, and a run that declares a budget *and* sets
+_can_ end on a different vendor once that rung is configured, and a run that declares a budget _and_ sets
 a non-zero floor gets a reported between-waves stop.
 
 Two of the five are **opt-in and off by default** — the vendor rung and the budget floor. Judge them on
@@ -178,9 +179,9 @@ This gate scores the holistic axes, not the per-task ones in `../_context/rubric
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Regressions < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Integration | ×3 | Any of the five orchestrator edits conflict: a guard is out of order, a value is read from the wrong source, the Claude-cap arithmetic dropped the Opus rung, or the budget check sits on the wrong side of the commit. | They compose, but an interaction was asserted rather than walked and confirmed — or one of the five (commit extraction, scout transcription, retry history, vendor rung, budget floor) went unexamined. | The full guard sequence was walked end to end and every interaction listed above was confirmed against the shipped block, covering all five edits including history rendering and cap arithmetic. |
-| Meets the PLAN goal | ×3 | One or more of the five requirements does not actually deliver its stated outcome. | All five are present; one delivers only partially. | Each of the five delivers the outcome it was scoped to, demonstrated against real output. |
-| Regressions | ×3 | A suite is red, a version or registry moved, or the fenced block no longer extracts. | Everything green, but a check was skipped or taken on trust. | Every suite green, block extraction proven, versions and registries provably untouched, and every existing tree swept. |
-| Consistency | ×2 | Prose, templates, or `CFG` comments contradict the shipped behaviour. | Mostly aligned; a stale claim survives somewhere. | Code, prose, gotchas, templates, and `CFG` comments all describe the same system. |
+| Dimension           | Weight | 0–1                                                                                                                                                                                                                     | 2–3                                                                                                                                                                                                     | 4–5                                                                                                                                                                                               |
+| ------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integration         | ×3     | Any of the five orchestrator edits conflict: a guard is out of order, a value is read from the wrong source, the Claude-cap arithmetic dropped the Opus rung, or the budget check sits on the wrong side of the commit. | They compose, but an interaction was asserted rather than walked and confirmed — or one of the five (commit extraction, scout transcription, retry history, vendor rung, budget floor) went unexamined. | The full guard sequence was walked end to end and every interaction listed above was confirmed against the shipped block, covering all five edits including history rendering and cap arithmetic. |
+| Meets the PLAN goal | ×3     | One or more of the five requirements does not actually deliver its stated outcome.                                                                                                                                      | All five are present; one delivers only partially.                                                                                                                                                      | Each of the five delivers the outcome it was scoped to, demonstrated against real output.                                                                                                         |
+| Regressions         | ×3     | A suite is red, a version or registry moved, or the fenced block no longer extracts.                                                                                                                                    | Everything green, but a check was skipped or taken on trust.                                                                                                                                            | Every suite green, block extraction proven, versions and registries provably untouched, and every existing tree swept.                                                                            |
+| Consistency         | ×2     | Prose, templates, or `CFG` comments contradict the shipped behaviour.                                                                                                                                                   | Mostly aligned; a stale claim survives somewhere.                                                                                                                                                       | Code, prose, gotchas, templates, and `CFG` comments all describe the same system.                                                                                                                 |

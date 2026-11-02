@@ -114,8 +114,6 @@ export function browserStateDir(
   }
   if (platform !== "win32") return posix.join("/tmp/q-lab/browsers", browser);
   const systemTemp =
-    windowsEnv(env, "TEMP") ||
-    windowsEnv(env, "TMP") ||
-    tmpdir();
+    windowsEnv(env, "TEMP") || windowsEnv(env, "TMP") || tmpdir();
   return win32.join(systemTemp, "q-lab", "browsers", browser);
 }

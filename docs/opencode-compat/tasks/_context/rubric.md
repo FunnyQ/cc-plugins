@@ -6,11 +6,11 @@
 
 Each dimension scores 0–5.
 
-| Band | Meaning |
-|---|---|
-| **0–1** | Fails. The work does not do what the task asked, or it does it in a way that has to be redone. |
+| Band    | Meaning                                                                                                              |
+| ------- | -------------------------------------------------------------------------------------------------------------------- |
+| **0–1** | Fails. The work does not do what the task asked, or it does it in a way that has to be redone.                       |
 | **2–3** | Below bar. The happy path works, but edge cases, failure paths, or the contract with neighbouring work have drifted. |
-| **4–5** | Passes. Fully matches the spec including its edge and failure paths, and a reviewer with no context can follow it. |
+| **4–5** | Passes. Fully matches the spec including its edge and failure paths, and a reviewer with no context can follow it.   |
 
 ## Generic dimensions
 

@@ -1,6 +1,7 @@
 # CORE-03: Shared find-session and nudge-toggle
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -116,12 +117,12 @@ Mirror every case in `packages/monitor/skills/cockpit/scripts/find-session.test.
 
 > Scale 0–5 per `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A provider returns the wrong session, or scope precedence is wrong | Happy paths right, but a stderr line, the edges-table check, the 7-day expiry, or the compact-JSON write drifts | Every provider path, diagnostic, and scope rule matches TS byte for byte |
-| Test coverage | ×2 | No tests | Claude and user scope only | Every case from both named TS test files mirrored, incl. DB errors and the missing-table variant |
-| Interface & readability | ×1 | Paths re-resolved locally, or `unwrap` on DB or JSON reads | Works, but the signatures differ from those above | Exactly the signatures above; I/O kept apart from the pure resolution functions |
-| Assumptions & docs | ×1 | Silent divergence from TS | Divergences exist but uncommented | Any deliberate difference carries a one-line comment |
+| Dimension               | Weight | 0–1 (fail)                                                         | 2–3 (below bar)                                                                                                 | 4–5 (pass)                                                                                       |
+| ----------------------- | ------ | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | A provider returns the wrong session, or scope precedence is wrong | Happy paths right, but a stderr line, the edges-table check, the 7-day expiry, or the compact-JSON write drifts | Every provider path, diagnostic, and scope rule matches TS byte for byte                         |
+| Test coverage           | ×2     | No tests                                                           | Claude and user scope only                                                                                      | Every case from both named TS test files mirrored, incl. DB errors and the missing-table variant |
+| Interface & readability | ×1     | Paths re-resolved locally, or `unwrap` on DB or JSON reads         | Works, but the signatures differ from those above                                                               | Exactly the signatures above; I/O kept apart from the pure resolution functions                  |
+| Assumptions & docs      | ×1     | Silent divergence from TS                                          | Divergences exist but uncommented                                                                               | Any deliberate difference carries a one-line comment                                             |
 
 ## Out of scope
 

@@ -6,17 +6,18 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 
 ## Template
 
-```markdown
+````markdown
 # <BUCKET>-NN: <Short Title>
 
 > **Required reading** (read before starting; do not need to open other files):
-> - `../_context/shared.md`
-> - `../_context/<other>.md`  ← only what's actually needed
 >
-> **Depends on**: <bucket>/NN, <bucket>/NN  (or "none — foundation task")
-> **Blocks**: <bucket>/NN  (optional — useful for parallel planning)
+> - `../_context/shared.md`
+> - `../_context/<other>.md` ← only what's actually needed
+>
+> **Depends on**: <bucket>/NN, <bucket>/NN (or "none — foundation task")
+> **Blocks**: <bucket>/NN (optional — useful for parallel planning)
 > **Status**: todo | in-progress | done | blocked
-> **Final review**: true  (ONLY on the one closing review task — omit on every other task)
+> **Final review**: true (ONLY on the one closing review task — omit on every other task)
 
 ## Goal
 
@@ -29,7 +30,7 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 
 ## Implementation notes
 
-<Everything an executor needs that isn't already in `_context/`. Inline signatures, schemas, sample data, key decisions specific to this task. Refer to the *thing* (the API client, the user schema), never another task id — `frontend/01`-style refs fail the linter.>
+<Everything an executor needs that isn't already in `_context/`. Inline signatures, schemas, sample data, key decisions specific to this task. Refer to the _thing_ (the API client, the user schema), never another task id — `frontend/01`-style refs fail the linter.>
 
 ### <Sub-heading per area>
 
@@ -37,8 +38,9 @@ Each task file is `docs/<topic>/tasks/<bucket>/NN-<slug>.md`. NN is two-digit ze
 
 ```ts
 // Inline real signatures rather than referring to a file
-export function foo(bar: Bar): Baz
+export function foo(bar: Bar): Baz;
 ```
+````
 
 ## Acceptance criteria
 
@@ -57,12 +59,12 @@ Write Verification commands relative to the repo root. Autopilot runs them from 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | <wrong result / doesn't match spec> | <happy path works but edge cases drift> | <fully matches, edge cases handled> |
-| Test coverage | ×2 | <no tests> | <happy path only> | <covers edges + failure paths> |
-| Interface & readability | ×1 | <smuggles I/O / messy naming> | <usable but types unclear> | <pure function, clear types, easy to compose> |
-| Assumptions & docs | ×1 | <unmarked magic numbers> | <assumptions made, not explained> | <assumptions flagged TODO, sources clear> |
+| Dimension               | Weight | 0–1 (fail)                          | 2–3 (below bar)                         | 4–5 (pass)                                    |
+| ----------------------- | ------ | ----------------------------------- | --------------------------------------- | --------------------------------------------- |
+| Correctness             | ×3     | <wrong result / doesn't match spec> | <happy path works but edge cases drift> | <fully matches, edge cases handled>           |
+| Test coverage           | ×2     | <no tests>                          | <happy path only>                       | <covers edges + failure paths>                |
+| Interface & readability | ×1     | <smuggles I/O / messy naming>       | <usable but types unclear>              | <pure function, clear types, easy to compose> |
+| Assumptions & docs      | ×1     | <unmarked magic numbers>            | <assumptions made, not explained>       | <assumptions flagged TODO, sources clear>     |
 
 ## Out of scope
 
@@ -70,7 +72,8 @@ Write Verification commands relative to the repo root. Autopilot runs them from 
 
 - <Tempting thing> — Deferred. Reason: <one-line summary the executor needs to know>.
 - <Tempting thing> — Deferred to a follow-up task in the same bucket.
-```
+
+````
 
 ## Header rules
 
@@ -134,7 +137,7 @@ Treat the Models header as optional. Pick it by where the task would fail, not b
 
 ```markdown
 > **Models**: dev=opus/high, judge=opus/high
-```
+````
 
 Write comma-separated entries as `role=model` or `role=model/effort`. Use lowercase tokens. Allow whitespace around `=`, `/`, and each entry. Allow a trailing comma. Keep explanations outside the example line: a trailing note becomes part of the last entry and fails parsing.
 
@@ -142,12 +145,12 @@ Use only the roles `dev`, `verify`, `judge`, and `fix`. Write each role at most 
 
 Autopilot reads the Models header value as written: `next-ready.ts` passes it along as `modelsRaw`, and the orchestrator parses it. Roles the Models header does not name keep autopilot's default map:
 
-| Role | Default |
-|---|---|
-| dev | opus/low |
-| verify | opus/low |
-| judge | opus/medium |
-| fix | opus/medium |
+| Role   | Default     |
+| ------ | ----------- |
+| dev    | opus/low    |
+| verify | opus/low    |
+| judge  | opus/medium |
+| fix    | opus/medium |
 
 The last Claude dev attempt runs opus/high. When the Models header names `dev`, the last attempt raises that dev effort one step and keeps the model instead. The ladder is `low → medium → high → xhigh → max`, and `max` stays `max`. For example, `dev=opus/high` over 3 attempts gives opus/high, opus/high, opus/xhigh.
 
@@ -205,7 +208,7 @@ Before finalizing a task file, verify each:
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes, with paths relative to the repo root.
 - [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
 - [ ] Every Final review gate that checks which files changed uses `git diff --name-only <baseRef> -- <paths>`, never `git status`.
-- [ ] Every criterion about a report names the report's file in backticks, for example `` The report at `docs/<slug>/review-notes.md` lists … ``. In the Final review, `lint-task.ts` flags "the report" with no path as the `report-path` rule, because a verifier checks disk and finds nothing to check.
+- [ ] Every criterion about a report names the report's file in backticks, for example ``The report at `docs/<slug>/review-notes.md` lists …``. In the Final review, `lint-task.ts` flags "the report" with no path as the `report-path` rule, because a verifier checks disk and finds nothing to check.
 - [ ] Each gate section holds at least one item a verifier can run itself — an all-`(human)` section fails lint. See "Human-only gate items" below.
 - [ ] `## Eval rubric` is present with a threshold line and weighted dimension table, anchors filled in for this task (not the template placeholders).
 - [ ] Nothing in this file requires opening PLAN.md or another task file to understand.
@@ -215,10 +218,10 @@ Before finalizing a task file, verify each:
 
 A gate that reads `git status` without a `--` pathspec reads the **whole working tree**, and no task owns that tree. Write the pathspec:
 
-- ❌ `` Run `git status --short` — expect `README.md` as the only modified path. ``
+- ❌ ``Run `git status --short` — expect `README.md` as the only modified path.``
 - ❌ `` `git status --short` shows nothing else modified. ``
-- ❌ `` Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation. ``
-- ✅ `` Run `git status --short -- README.md docs/<slug>/tasks/<bucket>/NN-<slug>.md` and confirm both paths are dirty. ``
+- ❌ ``Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation.``
+- ✅ ``Run `git status --short -- README.md docs/<slug>/tasks/<bucket>/NN-<slug>.md` and confirm both paths are dirty.``
 
 A whole-tree form fails a correct task for two reasons:
 

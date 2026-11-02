@@ -31,9 +31,10 @@ Three facts (verified against Claude Code docs) shape the design:
 
 1. **Hooks can't help.** A command hook is a shell script — it cannot trigger tools or fork subagents. A `Stop` hook can only inject text via `decision:block` + `additionalContext`, which is non-deterministic and pollutes the main context. So triggering is moved into the model: `/thoughtful` injects a standing instruction; the main agent decides when.
 2. **Stay in-session for billing.** A forked subagent runs under the interactive subscription session, unlike `claude -p` (exposed to separate API metering). So the distiller is a fork, not a headless call.
-3. **Fork beats clean subagent.** A fork inherits the main context, which is still warm in the prompt cache right at turn-end → cache-hit reads are cheap, and the fork already knows *why* the code was written. (Fork and a custom `subagent_type` are mutually exclusive, so the scribe's instructions are delivered via the spawn prompt → the `/cockpit-scribe` skill.)
+3. **Fork beats clean subagent.** A fork inherits the main context, which is still warm in the prompt cache right at turn-end → cache-hit reads are cheap, and the fork already knows _why_ the code was written. (Fork and a custom `subagent_type` are mutually exclusive, so the scribe's instructions are delivered via the spawn prompt → the `/cockpit-scribe` skill.)
 
 Existing architecture lives in `packages/monitor/skills/cockpit/`:
+
 - `scripts/cockpit.ts` — CLI (`start`/`log`/`wait`/`send`); `cmdLog` builds a `DecisionRecord` and appends it to `<project>/.cockpit/logs/<sessionId>.jsonl` with a read-back guard.
 - `scripts/log-stream.ts` — tails the log jsonl and emits each record **verbatim** over SSE (so new fields flow through automatically).
 - `scripts/registry.ts` — `~/.cockpit/registry.json`; a session is `tracked:true` only if it has a registry entry (written by `cmdStart`'s `upsertSession`).
@@ -101,14 +102,14 @@ Existing architecture lives in `packages/monitor/skills/cockpit/`:
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| backend | 01 | scribe-cli-and-schema | todo | > 4.0 | — |
-| skills | 01 | cockpit-scribe-skill | todo | > 4.0 | backend/01 |
-| skills | 02 | thoughtful-skill | todo | > 4.0 | skills/01 |
-| ui | 01 | dashboard-kind-source-empty-state | todo | > 4.0 | backend/01 |
-| release | 01 | version-and-changelog | todo | > 4.0 | backend/01, skills/02, ui/01 |
-| release | 02 | final-review 🏁 | todo | > 4.0 | release/01 |
+| Bucket  | NN  | Title                             | Status | Pass line | Depends on                   |
+| ------- | --- | --------------------------------- | ------ | --------- | ---------------------------- |
+| backend | 01  | scribe-cli-and-schema             | todo   | > 4.0     | —                            |
+| skills  | 01  | cockpit-scribe-skill              | todo   | > 4.0     | backend/01                   |
+| skills  | 02  | thoughtful-skill                  | todo   | > 4.0     | skills/01                    |
+| ui      | 01  | dashboard-kind-source-empty-state | todo   | > 4.0     | backend/01                   |
+| release | 01  | version-and-changelog             | todo   | > 4.0     | backend/01, skills/02, ui/01 |
+| release | 02  | final-review 🏁                   | todo   | > 4.0     | release/01                   |
 
 (Mirrors `tasks/README.md`. The last row is the **final review** task, marked `> **Final review**: true`; its `Depends on` transitively reaches every task via `release/01`.)
 

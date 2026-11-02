@@ -1,6 +1,7 @@
 # CORE-03: Relay prompt builder
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -25,14 +26,14 @@ Port shape from `odin-codex/scripts/codex-prompt.ts` but **drop any backend nami
 **Split pure formatting from I/O.** The pure formatter takes an already-collected `context` string (it must NOT call `collect()` itself — that reads the filesystem and would make it impure/untestable). The impure CLI wrapper calls `collect()` and feeds the result in.
 
 ```ts
-type PromptKind = "delegate" | "review";   // image is codex-native, never prompt-built
+type PromptKind = "delegate" | "review"; // image is codex-native, never prompt-built
 
 type FormatOptions = {
   kind: PromptKind;
-  context: string;   // pre-collected git/file/project context (caller runs collect())
-  focus: string;     // review concern
-  task: string;      // delegate task
-  files: string[];   // for the delegate file-scope line
+  context: string; // pre-collected git/file/project context (caller runs collect())
+  focus: string; // review concern
+  task: string; // delegate task
+  files: string[]; // for the delegate file-scope line
 };
 
 // PURE — string in, string out. Unit-tested without touching the filesystem.
@@ -47,7 +48,7 @@ export function buildPromptFile(options: {
   task: string;
   gitScope: "all" | "related" | "none";
   noProject: boolean;
-}): string;  // returns the prompt-file path
+}): string; // returns the prompt-file path
 ```
 
 Prompt content (neutral wording — no "codex"/"opencode"/"claude"):
@@ -79,12 +80,12 @@ Optional CLI entry (`import.meta.main`): parse `relay-prompt <delegate|review> -
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | leaks backend names or missing read-only line | builds prompts but a constraint/fallback drifts | neutral prompt; review read-only line + delegate constraints exact; stdin fallbacks correct |
-| Test coverage | ×2 | no tests | one mode only | both modes + stdin fallback + no-backend-name assertion |
-| Interface & readability | ×1 | I/O inside formatter | usable but mixes collect + format | `formatPrompt` pure (context passed in); collect()/CLI wiring separate under import.meta.main |
-| Assumptions & docs | ×1 | magic strings unexplained | present | prompt-template intent + "image never uses this" noted |
+| Dimension               | Weight | 0–1 (fail)                                    | 2–3 (below bar)                                 | 4–5 (pass)                                                                                    |
+| ----------------------- | ------ | --------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | leaks backend names or missing read-only line | builds prompts but a constraint/fallback drifts | neutral prompt; review read-only line + delegate constraints exact; stdin fallbacks correct   |
+| Test coverage           | ×2     | no tests                                      | one mode only                                   | both modes + stdin fallback + no-backend-name assertion                                       |
+| Interface & readability | ×1     | I/O inside formatter                          | usable but mixes collect + format               | `formatPrompt` pure (context passed in); collect()/CLI wiring separate under import.meta.main |
+| Assumptions & docs      | ×1     | magic strings unexplained                     | present                                         | prompt-template intent + "image never uses this" noted                                        |
 
 ## Out of scope
 

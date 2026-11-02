@@ -81,7 +81,7 @@ All new code lives in `packages/runes/hooks/explain/`:
 | `html.test.ts`     | its tests                                                                            |
 | `checker.ts`       | the hidden layout-checker agent: register, spawn, allow-list, hand-back deny, answer |
 | `checker.test.ts`  | its tests                                                                            |
-| `explain.ts`       | the orchestrator: `explainPress`, `explainAsk`, `explainPick`, `explainSelect`   |
+| `explain.ts`       | the orchestrator: `explainPress`, `explainAsk`, `explainPick`, `explainSelect`       |
 | `explain.test.ts`  | its tests                                                                            |
 | `pane.tsx`         | the pane `ui.render` hook                                                            |
 | `pane.test.tsx`    | its tests                                                                            |

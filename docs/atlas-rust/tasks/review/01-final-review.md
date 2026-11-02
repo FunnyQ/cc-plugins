@@ -1,6 +1,7 @@
 # REVIEW-01: Final review 🏁
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -72,13 +73,13 @@ Fix integration defects in place. Do not rewrite a module whose golden or contra
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Meets the PLAN goal < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Meets the PLAN goal | ×3 | golden or contract suite fails against Rust, golden files were re-recorded after the TS was deleted, or a target is unmeasured | parity green but a target miss is reported without its cause, or the real-home golden result is missing | parity proven by the untouched golden suite; every target met or its miss reported with number and cause |
-| Integration | ×2 | a launch path still runs Bun dashboard code, or the statusline migration breaks an existing wiring | launches work but the migration fresh-wires, drops a wrapped user command, or the drift watch misses the new form | skill, OpenCode reference, install, statusline migration, and shim compose end to end |
-| No regressions | ×2 | cockpit contract suite, install tests, or whole-repo monitor/opencode tests fail | tests pass but typecheck reports new errors in touched paths | every suite green; typecheck clean for touched paths |
-| Consistency | ×1 | docs, contracts, and code disagree on commands, env vars, or routes | one drift (a missing env var, an undocumented route, a stale file name) | CLAUDE.md, README, contracts, and code agree everywhere |
-| Leanness | ×1 | forwarding-only modules, unused config, unjustified crates, or duplicated cockpit helpers throughout | a few pieces with one caller or no justification | no abstraction without a second caller; every crate justified; cockpit helpers reused |
+| Dimension           | Weight | 0–1 (fail)                                                                                                                     | 2–3 (below bar)                                                                                                   | 4–5 (pass)                                                                                               |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Meets the PLAN goal | ×3     | golden or contract suite fails against Rust, golden files were re-recorded after the TS was deleted, or a target is unmeasured | parity green but a target miss is reported without its cause, or the real-home golden result is missing           | parity proven by the untouched golden suite; every target met or its miss reported with number and cause |
+| Integration         | ×2     | a launch path still runs Bun dashboard code, or the statusline migration breaks an existing wiring                             | launches work but the migration fresh-wires, drops a wrapped user command, or the drift watch misses the new form | skill, OpenCode reference, install, statusline migration, and shim compose end to end                    |
+| No regressions      | ×2     | cockpit contract suite, install tests, or whole-repo monitor/opencode tests fail                                               | tests pass but typecheck reports new errors in touched paths                                                      | every suite green; typecheck clean for touched paths                                                     |
+| Consistency         | ×1     | docs, contracts, and code disagree on commands, env vars, or routes                                                            | one drift (a missing env var, an undocumented route, a stale file name)                                           | CLAUDE.md, README, contracts, and code agree everywhere                                                  |
+| Leanness            | ×1     | forwarding-only modules, unused config, unjustified crates, or duplicated cockpit helpers throughout                           | a few pieces with one caller or no justification                                                                  | no abstraction without a second caller; every crate justified; cockpit helpers reused                    |
 
 ## Out of scope
 

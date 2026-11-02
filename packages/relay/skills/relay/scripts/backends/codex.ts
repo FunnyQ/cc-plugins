@@ -26,9 +26,7 @@ export function extractGeneratedPngPath(
     output.match(/(?:[A-Za-z]:[\\/]|~[\\/]|\/)[^\s"'`]+\.png/g) ?? [];
 
   for (const match of matches) {
-    const fullPath = /^~[\\/]/.test(match)
-      ? join(home, match.slice(2))
-      : match;
+    const fullPath = /^~[\\/]/.test(match) ? join(home, match.slice(2)) : match;
     if (exists(fullPath)) return fullPath;
   }
 

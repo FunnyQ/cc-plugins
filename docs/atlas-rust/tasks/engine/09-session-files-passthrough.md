@@ -1,6 +1,7 @@
 # ENGINE-09: Pass Claude session files through whole
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -47,12 +48,12 @@ Found by the real-home golden check before TS deletion: real session files carry
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | unknown keys still dropped, or goldens recorded from Rust | stats passes through but `/api/live` diverges from TS, or the skip rules drift | both suites green against TS and Rust; every consumer emits what TS emits; skip rules match |
-| Test coverage | ×2 | no fixture key the old struct would drop | fixture covers it but no `cargo test` for the skip cases | fixture has string and nested unknown keys; units cover every skip branch |
-| Interface & readability | ×1 | `unwrap` on file or JSON data | a second parallel type added where one would do | one type, typed access where Rust reads fields, clippy clean |
-| Assumptions & docs | ×1 | silent change to another golden | changed goldens not named in the log note | the log note names every regenerated golden file |
+| Dimension               | Weight | 0–1 (fail)                                                | 2–3 (below bar)                                                                | 4–5 (pass)                                                                                  |
+| ----------------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | unknown keys still dropped, or goldens recorded from Rust | stats passes through but `/api/live` diverges from TS, or the skip rules drift | both suites green against TS and Rust; every consumer emits what TS emits; skip rules match |
+| Test coverage           | ×2     | no fixture key the old struct would drop                  | fixture covers it but no `cargo test` for the skip cases                       | fixture has string and nested unknown keys; units cover every skip branch                   |
+| Interface & readability | ×1     | `unwrap` on file or JSON data                             | a second parallel type added where one would do                                | one type, typed access where Rust reads fields, clippy clean                                |
+| Assumptions & docs      | ×1     | silent change to another golden                           | changed goldens not named in the log note                                      | the log note names every regenerated golden file                                            |
 
 ## Out of scope
 

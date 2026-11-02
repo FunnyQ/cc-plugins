@@ -36,7 +36,7 @@ Port the usage-dashboard server and everything it runs — `atlas-server.ts`, th
 - `cockpit-rs` is one binary crate (axum, rusqlite bundled, reqwest **without TLS**, flate2, libc). Reusable modules: `paths.rs` (cockpit home), `daemon_info.rs`, `process_alive.rs`, `server/static_files.rs` (gzip + ETag + 304), `server::json_response`.
 - Endpoints: `GET /api/stats` (ETag `W/"<BOOT_ID>-<fingerprint>"`, gzip, single in-flight build), `GET /api/live`, `POST /api/pricing/refresh` (missing from CLAUDE.md today), static dist with `/partials/*` and `/vendor/*`.
 - HTTPS hosts: `openrouter.ai`, `chatgpt.com/backend-api/codex/usage`, `auth.openai.com/oauth/token`.
-- **Contradiction recorded**: `setup.ts` `migrate()` says it "never touches the statusline" because any collector path kept working across updates. That stops being true once `statusline-collector.ts` is deleted, so session-check now rewrites an *existing* collector command. It still never fresh-wires; opt-in stays manual.
+- **Contradiction recorded**: `setup.ts` `migrate()` says it "never touches the statusline" because any collector path kept working across updates. That stops being true once `statusline-collector.ts` is deleted, so session-check now rewrites an _existing_ collector command. It still never fresh-wires; opt-in stays manual.
 - Coupling to update: statusline regex `/(\S*statusline-collector\.ts)/` in `setup.ts`, `install.ts`, `statusline-decision.ts` (+ tests); `install.ts` `COLLECTOR_COMMAND`; `reap-stale.ts` (atlas excluded by comment + test); SKILL.md launch commands; `opencode` reference; CLAUDE.md + README commands.
 
 ## Requirements
@@ -109,26 +109,26 @@ Claude statusLine ─▶ bin/cockpit atlas statusline ─▶ inner command; deta
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | launcher-fixtures-ts-seams | todo | > 4.0 | — |
-| contract | 02 | http-lifecycle-contract | todo | > 4.0 | contract/01 |
-| contract | 03 | golden-stats-rollup | todo | > 4.0 | contract/01 |
-| contract | 04 | cli-contract | todo | > 4.0 | contract/01 |
-| engine | 01 | scaffold-paths-dedup-model | todo | > 4.0 | — |
-| engine | 02 | rollup-db-schema-backup | todo | > 4.0 | engine/01 |
-| engine | 03 | rollup-ingest | todo | > 4.0 | engine/02, contract/03 |
-| engine | 04 | pricing | todo | > 4.0 | engine/01, contract/03 |
-| engine | 05 | codex-sources-limits | todo | > 4.0 | engine/02, contract/03 |
-| engine | 06 | opencode-sources | todo | > 4.0 | engine/01, contract/03 |
-| engine | 07 | claude-sources | todo | > 4.0 | engine/03, contract/03 |
-| engine | 08 | stats-assembly-fingerprint | todo | > 4.0 | engine/03, engine/04, engine/05, engine/06, engine/07 |
-| server | 01 | live-sessions | todo | > 4.0 | engine/01, contract/04 |
-| server | 02 | atlas-serve-routes-lifecycle | todo | > 4.0 | server/01, engine/08, contract/02 |
-| cli | 01 | statusline-rollup-push-stats | todo | > 4.0 | engine/03, engine/05, engine/07, contract/04 |
-| ship | 01 | wiring-statusline-migration | todo | > 4.0 | server/02, cli/01 |
-| ship | 02 | delete-ts-docs-measure | todo | > 4.0 | ship/01 |
-| review | 01 | final review 🏁 | todo | > 4.0 | ship/02 |
+| Bucket   | NN  | Title                        | Status | Pass line | Depends on                                            |
+| -------- | --- | ---------------------------- | ------ | --------- | ----------------------------------------------------- |
+| contract | 01  | launcher-fixtures-ts-seams   | todo   | > 4.0     | —                                                     |
+| contract | 02  | http-lifecycle-contract      | todo   | > 4.0     | contract/01                                           |
+| contract | 03  | golden-stats-rollup          | todo   | > 4.0     | contract/01                                           |
+| contract | 04  | cli-contract                 | todo   | > 4.0     | contract/01                                           |
+| engine   | 01  | scaffold-paths-dedup-model   | todo   | > 4.0     | —                                                     |
+| engine   | 02  | rollup-db-schema-backup      | todo   | > 4.0     | engine/01                                             |
+| engine   | 03  | rollup-ingest                | todo   | > 4.0     | engine/02, contract/03                                |
+| engine   | 04  | pricing                      | todo   | > 4.0     | engine/01, contract/03                                |
+| engine   | 05  | codex-sources-limits         | todo   | > 4.0     | engine/02, contract/03                                |
+| engine   | 06  | opencode-sources             | todo   | > 4.0     | engine/01, contract/03                                |
+| engine   | 07  | claude-sources               | todo   | > 4.0     | engine/03, contract/03                                |
+| engine   | 08  | stats-assembly-fingerprint   | todo   | > 4.0     | engine/03, engine/04, engine/05, engine/06, engine/07 |
+| server   | 01  | live-sessions                | todo   | > 4.0     | engine/01, contract/04                                |
+| server   | 02  | atlas-serve-routes-lifecycle | todo   | > 4.0     | server/01, engine/08, contract/02                     |
+| cli      | 01  | statusline-rollup-push-stats | todo   | > 4.0     | engine/03, engine/05, engine/07, contract/04          |
+| ship     | 01  | wiring-statusline-migration  | todo   | > 4.0     | server/02, cli/01                                     |
+| ship     | 02  | delete-ts-docs-measure       | todo   | > 4.0     | ship/01                                               |
+| review   | 01  | final review 🏁              | todo   | > 4.0     | ship/02                                               |
 
 Rubric: shared bar in `_context/rubric.md` — Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1, pass > 4.0, Correctness < 4 veto. review/01 adds Leanness ×1.
 

@@ -36,6 +36,7 @@ tasks/
 Commit this plan tree on its own first, so the commit autopilot records as `baseRef` precedes all of this plan's work. Then start with `models/01-models-header.md` and `worktree/01-worktree-script.md`. They share no files, so wave 1 runs them in parallel.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,19 +48,19 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| docs | 01 | Flightplan docs for Models and the narrowed Max parallel | todo | > 4 | models/01 |
-| docs | 02 | Autopilot docs for worktrees, models, and cleanup | todo | > 4 | worktree/06 |
-| models | 01 | Parse and lint the Models task header | todo | > 4 | — |
-| models | 02 | Per-role model and effort map in the orchestrator | todo | > 4 | models/01 |
-| review | 01 | Final review | todo | > 4 | docs/01, docs/02 |
-| worktree | 01 | worktree.ts — create, land, rebase, sweep | todo | > 4 | — |
-| worktree | 02 | Run each task pipeline in its own worktree | todo | > 4 | worktree/01, models/02 |
-| worktree | 03 | Land results — conflict rebase and park | todo | > 4 | worktree/02 |
-| worktree | 04 | Drift re-verify and its flightdeck and resume-point support | todo | > 4 | worktree/03 |
-| worktree | 05 | Run-wide abort on leak, and single-task resume in worktrees | todo | > 4 | worktree/04 |
-| worktree | 06 | Delete the sibling-interference machinery | todo | > 4 | worktree/05 |
+| Bucket   | NN  | Title                                                       | Status | Pass line | Depends on             |
+| -------- | --- | ----------------------------------------------------------- | ------ | --------- | ---------------------- |
+| docs     | 01  | Flightplan docs for Models and the narrowed Max parallel    | todo   | > 4       | models/01              |
+| docs     | 02  | Autopilot docs for worktrees, models, and cleanup           | todo   | > 4       | worktree/06            |
+| models   | 01  | Parse and lint the Models task header                       | todo   | > 4       | —                      |
+| models   | 02  | Per-role model and effort map in the orchestrator           | todo   | > 4       | models/01              |
+| review   | 01  | Final review                                                | todo   | > 4       | docs/01, docs/02       |
+| worktree | 01  | worktree.ts — create, land, rebase, sweep                   | todo   | > 4       | —                      |
+| worktree | 02  | Run each task pipeline in its own worktree                  | todo   | > 4       | worktree/01, models/02 |
+| worktree | 03  | Land results — conflict rebase and park                     | todo   | > 4       | worktree/02            |
+| worktree | 04  | Drift re-verify and its flightdeck and resume-point support | todo   | > 4       | worktree/03            |
+| worktree | 05  | Run-wide abort on leak, and single-task resume in worktrees | todo   | > 4       | worktree/04            |
+| worktree | 06  | Delete the sibling-interference machinery                   | todo   | > 4       | worktree/05            |
 
 ## Dependency graph
 
@@ -83,12 +84,13 @@ worktree/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| worktree/02 | models/02 |
-| docs/02 | worktree/06 |
-| docs/01 | models/01 |
-| review/01 | docs/01, docs/02 |
+| Task        | Depends on       |
+| ----------- | ---------------- |
+| worktree/02 | models/02        |
+| docs/02     | worktree/06      |
+| docs/01     | models/01        |
+| review/01   | docs/01, docs/02 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

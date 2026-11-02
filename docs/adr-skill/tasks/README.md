@@ -41,12 +41,13 @@ already-shipped code. Getting it wrong regresses `/chronicle:pr`.
 two can run side by side. Everything else waits on one of them.
 
 **Running this with autopilot:** the two highest-risk tasks are `foundation/01` (it edits
-already-shipped code — its gate is that `analyze-branch.test.ts` passes with *zero* edits) and
+already-shipped code — its gate is that `analyze-branch.test.ts` passes with _zero_ edits) and
 `triage/02` (the only component that writes under `.cockpit/`, executing an untrusted plan). Read
 those two results yourself rather than trusting the score. Everything else is new files with
 self-contained tests.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -58,21 +59,21 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| foundation | 01 | Extract the shared cockpit trail reader | todo | >= 4 | — |
-| foundation | 02 | Freeze the ADR template and conventions | todo | >= 4 | — |
-| foundation | 03 | Collect the trail context, read-only | todo | >= 4 | foundation/01, foundation/02 |
-| foundation | 04 | Read the ADR directory into an index | todo | >= 4 | foundation/02 |
-| promote | 01 | Validate a written ADR | todo | >= 4 | foundation/02, foundation/04 |
-| promote | 02 | Write the skill and wire it into the repo docs | todo | >= 4 | triage/03, triage/04, triage/05, promote/01 |
-| promote | 03 | Build the hand-judged forward-test fixtures | todo | >= 4 | promote/02 |
-| promote | 04 | Final review | todo | >= 4 | promote/03 |
-| triage | 01 | Plan an archive move set | todo | >= 4 | foundation/01 |
-| triage | 02 | Execute an approved archive plan, safely | todo | >= 4 | triage/01 |
-| triage | 03 | Write the orchestrator and the two read-only agents | todo | >= 4 | foundation/03, foundation/04, triage/01 |
-| triage | 04 | Write the drafting and writing agents | todo | >= 4 | triage/02, triage/03 |
-| triage | 05 | Ship the Codex half of the ADR roles | todo | >= 4 | triage/03, triage/04 |
+| Bucket     | NN  | Title                                               | Status | Pass line | Depends on                                  |
+| ---------- | --- | --------------------------------------------------- | ------ | --------- | ------------------------------------------- |
+| foundation | 01  | Extract the shared cockpit trail reader             | todo   | >= 4      | —                                           |
+| foundation | 02  | Freeze the ADR template and conventions             | todo   | >= 4      | —                                           |
+| foundation | 03  | Collect the trail context, read-only                | todo   | >= 4      | foundation/01, foundation/02                |
+| foundation | 04  | Read the ADR directory into an index                | todo   | >= 4      | foundation/02                               |
+| promote    | 01  | Validate a written ADR                              | todo   | >= 4      | foundation/02, foundation/04                |
+| promote    | 02  | Write the skill and wire it into the repo docs      | todo   | >= 4      | triage/03, triage/04, triage/05, promote/01 |
+| promote    | 03  | Build the hand-judged forward-test fixtures         | todo   | >= 4      | promote/02                                  |
+| promote    | 04  | Final review                                        | todo   | >= 4      | promote/03                                  |
+| triage     | 01  | Plan an archive move set                            | todo   | >= 4      | foundation/01                               |
+| triage     | 02  | Execute an approved archive plan, safely            | todo   | >= 4      | triage/01                                   |
+| triage     | 03  | Write the orchestrator and the two read-only agents | todo   | >= 4      | foundation/03, foundation/04, triage/01     |
+| triage     | 04  | Write the drafting and writing agents               | todo   | >= 4      | triage/02, triage/03                        |
+| triage     | 05  | Ship the Codex half of the ADR roles                | todo   | >= 4      | triage/03, triage/04                        |
 
 ## Dependency graph
 
@@ -98,12 +99,13 @@ foundation/02
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| promote/01 | foundation/02, foundation/04 |
+| Task       | Depends on                      |
+| ---------- | ------------------------------- |
+| promote/01 | foundation/02, foundation/04    |
 | promote/02 | triage/03, triage/04, triage/05 |
-| triage/01 | foundation/01 |
-| triage/03 | foundation/03, foundation/04 |
+| triage/01  | foundation/01                   |
+| triage/03  | foundation/03, foundation/04    |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

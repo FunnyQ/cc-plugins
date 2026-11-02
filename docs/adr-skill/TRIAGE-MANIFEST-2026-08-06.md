@@ -37,12 +37,12 @@ Secondary — at least one must hold:
 
 ### `promote`
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                         |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------ |
 | `72562506-d75a-4147-ad08-06d504087e80` | `5c662721-58f3-4623-8885-b90c9675d007` | Plugins in this repo may never import each other |
 
 - **M2** — the body records what the code cannot: the import count from
-  `packages/chronicle` to `packages/monitor` is zero *by constraint*, not by accident.
+  `packages/chronicle` to `packages/monitor` is zero _by constraint_, not by accident.
   Plugins install and version independently, so a cache path like
   `.../chronicle/0.9.6/` cannot resolve `../../monitor/...` at
   `.../monitor/3.22.0/`, and the other plugin may not be installed at all. The entry
@@ -53,8 +53,8 @@ Secondary — at least one must hold:
   literally impossible, and the reason `shared/scripts/cockpit-trail.ts` is a port
   carrying spec comments rather than an import.
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                         |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------ |
 | `5104364a-5a6a-431c-bbd3-bfa344b6f68a` | `82327df5-6355-45c3-8550-3facb7b7aac9` | The `.cockpit` walk-up must stop at the git root |
 
 - **M2** — the body carries a fact no reader can recover from `logRoot()`: `~/.cockpit`
@@ -66,8 +66,8 @@ Secondary — at least one must hold:
 - **S3** — the bound reads as an arbitrary extra condition. A maintainer simplifying the
   loop would remove it, and the failure is silent: trails merge rather than error.
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                                 |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------ |
 | `12da43a3-4b59-4ad5-978d-1bf2fbd735b9` | `2a7606f0-acf8-4c76-8af3-1ac7d54d712c` | Gate `needs_your_call` on an explicit switch, never on inferred presence |
 
 - **M2** — the rejected alternatives are recorded with their measurements and are gone
@@ -79,8 +79,8 @@ Secondary — at least one must hold:
   and no tab connected, a park hangs forever. That is exactly the simplification a later
   maintainer would attempt.
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                      |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------- |
 | `f6ea0894-6419-4075-abc3-54989f91275c` | `dba60e1c-d26b-49da-8627-bdb22ada1c7d` | Migrate to GitHub Flow — `main` is the only long-lived branch |
 
 - **M1** — the body is a completed migration with a verified order: five component
@@ -92,8 +92,8 @@ Secondary — at least one must hold:
 - **S1** — it governs every release from that point on, and the entry notes
   `.chronicle/pr.json` was already GitHub Flow while `release.json` had drifted behind.
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                                              |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------- |
 | `8372cd2f-480d-4b5f-8796-b02bc5b31a9f` | `82327df5-6355-45c3-8550-3facb7b7aac9` | Daemon readers treat the registry entry as authoritative, not the request's `project` |
 
 - **M1** — the change is coordinated across three readers: `log-stream.ts` resolves by
@@ -101,13 +101,13 @@ Secondary — at least one must hold:
   `design-system.ts` move to `resolveKnownProject()`. The body records that
   `design-system.ts` was missed by the author and caught in review, which is what makes
   the set, not the single file, the decision.
-- **S2** — the body names why exact comparison breaks in *both* directions: a live
+- **S2** — the body names why exact comparison breaks in _both_ directions: a live
   session's link carries the raw cwd while the trail anchors at the repo root, and older
   entries are the reverse. It also states the safety property preserved — confinement
   moved to the entry's own project, and `resolveKnownProject()` never resolves upward.
 
-| Entry | Sessions | Decision |
-| --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                                            |
+| -------------------------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
 | `9b9fcd4b-02ec-4a1f-8d4f-4e9f23a95a16` | `137d45de-beb9-4d04-8961-5b07629df7c2` | Relay live mode captures results through a file contract, never by reading the pane |
 
 - **M2** — the rejected route was measured and abandoned wholesale, and the measurement
@@ -121,8 +121,8 @@ Secondary — at least one must hold:
 
 ### `watch`
 
-| Entry | Sessions | Decision | Clause it fails |
-| --- | --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                                         | Clause it fails    |
+| -------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------- | ------------------ |
 | `16bcd405-76e2-4a89-ab3d-a976a155516d` | `896fbaf0-6528-42fe-a4b4-e59334a28b74` | Multi-component release implemented in orchestration prose, not in the pure core | **M1 not yet met** |
 
 The body makes a real either/or — extend `analyze-release.ts` to understand multiple
@@ -133,8 +133,8 @@ logic. Reversing it is therefore a rewrite of prose, not a migration, and **M1 f
 Held for a second data point: if a third component shape forces the core to change
 anyway, the decision becomes durable and promotes then.
 
-| Entry | Sessions | Decision | Clause it fails |
-| --- | --- | --- | --- |
+| Entry                                  | Sessions                               | Decision                                                      | Clause it fails     |
+| -------------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ------------------- |
 | `401dd149-8b45-4efb-bbd2-c59f588e0eb7` | `e2e8a980-f8d7-4776-8030-a50ab2dbffb4` | Scribe nudge becomes a three-tier session/project/user switch | **M2 partly fails** |
 
 The durable half is real: project scope is keyed by git root inside the one global
@@ -147,9 +147,9 @@ appears; on its own it is a settings-layout choice.
 
 ### `skip`
 
-| Entry | Sessions | Decision | Clause it fails |
-| --- | --- | --- | --- |
-| `7529a380-fb3d-4c73-8550-18c93bf1e76c` | `e2e8a980-f8d7-4776-8030-a50ab2dbffb4` | Scribe nudge as a two-layer env + file switch | **S1** |
+| Entry                                  | Sessions                               | Decision                                      | Clause it fails |
+| -------------------------------------- | -------------------------------------- | --------------------------------------------- | --------------- |
+| `7529a380-fb3d-4c73-8550-18c93bf1e76c` | `e2e8a980-f8d7-4776-8030-a50ab2dbffb4` | Scribe nudge as a two-layer env + file switch | **S1**          |
 
 Superseded within the same session by `401dd149`, which states it "**取代**前一筆" and
 removes `COCKPIT_NUDGE_OFF` outright. The decision no longer holds across sessions or
@@ -157,9 +157,9 @@ releases, so **S1 fails** and no mandatory clause is reachable. Surfaced here ra
 silently dropped, because the pair is the kind of same-session reversal the skill must
 never resolve by simply taking the newest entry.
 
-| Entry | Sessions | Decision | Clause it fails |
-| --- | --- | --- | --- |
-| `6e0ad679-4153-49d1-934e-6b9da1decd7f` | `main` | Chronicle agents get three reasoning-effort tiers by role, not two by model | **M1 and M2** |
+| Entry                                  | Sessions | Decision                                                                    | Clause it fails |
+| -------------------------------------- | -------- | --------------------------------------------------------------------------- | --------------- |
+| `6e0ad679-4153-49d1-934e-6b9da1decd7f` | `main`   | Chronicle agents get three reasoning-effort tiers by role, not two by model | **M1 and M2**   |
 
 A mechanical convention. **M1 fails**: reversing it is editing an `effort` line in each
 of eleven agent files plus the matching `model_reasoning_effort` in the Codex TOMLs — no
@@ -168,9 +168,9 @@ each file's frontmatter and the role's job is visible in the same file, so the m
 recoverable by reading the very files it configures. Correct as a `## Conventions` note,
 not as a record.
 
-| Entry | Sessions | Decision | Clause it fails |
-| --- | --- | --- | --- |
-| 357 remaining clusters | 66 sessions | Single-entry local work | **M1 and M2** |
+| Entry                  | Sessions    | Decision                | Clause it fails |
+| ---------------------- | ----------- | ----------------------- | --------------- |
+| 357 remaining clusters | 66 sessions | Single-entry local work | **M1 and M2**   |
 
 Not shortlisted. Each is one entry in one session naming a rename, a test helper, a
 disposable snapshot format, or a workaround pinned to an open upstream issue. Reversal is
@@ -184,21 +184,21 @@ Both synthetic paths were driven end to end by hand, each in its own `git init`-
 copy with logs backdated to `202601010000`. No serialized hand-off — skeleton payload,
 body fetch, or archive plan — was edited between steps.
 
-| Fixture | Expected | Result |
-| --- | --- | --- |
-| `single-decision` | promotes | 1 candidate `promote`; `docs/adr/0001-archive-decision-logs-never-delete-them.md` written with `Status: Accepted` and all five sections, evidence naming `session-001` / `dec-single-001`; validator exit `0`; session moved to `.cockpit/archive/done/`; `.cockpit/logs/` empty; md5 `3279dc37…` identical before and after |
-| `local-detail` | does not promote | 4 single-entry clusters, all `skip`: a private rename, a test-local helper, a workaround tied to Bun issue 18210, and a disposable snapshot format. All fail **M1** and **M2** |
-| `spread-decision` | one candidate, four sessions | 4 sessions / 5 entries collapse into **one** cluster (`Should ADRs ship with a Status field?`) spanning `session-001`–`session-004`; bodies fetched for all five; plan folded 4 moves, 0 refusals; all four archived byte-identically |
-| `already-recorded` | index sees the existing record | `exists: true`, `nextNumber: 2`, `ADR-0001` parsed with `Accepted`; validator exit `0` with one `empty-evidence` warning |
+| Fixture            | Expected                       | Result                                                                                                                                                                                                                                                                                                                       |
+| ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `single-decision`  | promotes                       | 1 candidate `promote`; `docs/adr/0001-archive-decision-logs-never-delete-them.md` written with `Status: Accepted` and all five sections, evidence naming `session-001` / `dec-single-001`; validator exit `0`; session moved to `.cockpit/archive/done/`; `.cockpit/logs/` empty; md5 `3279dc37…` identical before and after |
+| `local-detail`     | does not promote               | 4 single-entry clusters, all `skip`: a private rename, a test-local helper, a workaround tied to Bun issue 18210, and a disposable snapshot format. All fail **M1** and **M2**                                                                                                                                               |
+| `spread-decision`  | one candidate, four sessions   | 4 sessions / 5 entries collapse into **one** cluster (`Should ADRs ship with a Status field?`) spanning `session-001`–`session-004`; bodies fetched for all five; plan folded 4 moves, 0 refusals; all four archived byte-identically                                                                                        |
+| `already-recorded` | index sees the existing record | `exists: true`, `nextNumber: 2`, `ADR-0001` parsed with `Accepted`; validator exit `0` with one `empty-evidence` warning                                                                                                                                                                                                     |
 
 ## Corrective edits
 
 Paths this review touched that no other task declared.
 
-| Path | What was wrong | How it is covered |
-| --- | --- | --- |
-| `packages/chronicle/shared/scripts/temp-payload.ts` (new) | The same "mkdir a `/tmp/chronicle/<skill>` directory, write `<prefix>-<unique>.json`, return the path" writer existed three times — `analyze-branch.ts`, `archive-plan.ts`, and inline in `collect-adr-context.ts` — with two different uniqueness schemes. All three now call one helper. | `temp-payload.test.ts`; plus the three call sites exercised by `archive-plan.test.ts`, `collect-adr-context.test.ts`, and the fixture runs above |
-| `packages/chronicle/shared/scripts/temp-payload.test.ts` (new) | — | Asserts the output directory, the `<prefix>-<ms>-<pid>.json` name, and object/array round-trips |
+| Path                                                           | What was wrong                                                                                                                                                                                                                                                                             | How it is covered                                                                                                                                |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/chronicle/shared/scripts/temp-payload.ts` (new)      | The same "mkdir a `/tmp/chronicle/<skill>` directory, write `<prefix>-<unique>.json`, return the path" writer existed three times — `analyze-branch.ts`, `archive-plan.ts`, and inline in `collect-adr-context.ts` — with two different uniqueness schemes. All three now call one helper. | `temp-payload.test.ts`; plus the three call sites exercised by `archive-plan.test.ts`, `collect-adr-context.test.ts`, and the fixture runs above |
+| `packages/chronicle/shared/scripts/temp-payload.test.ts` (new) | —                                                                                                                                                                                                                                                                                          | Asserts the output directory, the `<prefix>-<ms>-<pid>.json` name, and object/array round-trips                                                  |
 
 Every other path this review edited appears in some task's declared file list. The
 integration repairs are recorded there rather than here:

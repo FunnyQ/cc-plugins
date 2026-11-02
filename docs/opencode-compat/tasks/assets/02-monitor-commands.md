@@ -1,6 +1,7 @@
 # ASSETS-02: Monitor commands in OpenCode format
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -92,7 +93,7 @@ So the OpenCode section follows the Codex shape, not the Claude one:
 - Resolve the parent session id **first**, then embed it literally in the spawn prompt. There is no fork-style inheritance to lean on.
 - State in the prompt which harness the child is running under, so its `cockpit scribe` calls carry the right provider flag — exactly as the Codex section passes `--provider codex` and an explicit `<parent-session-id>`.
 - Spawn with `subagent_type: general`, the built-in subagent, and do not wait for it.
-- Because the child sees none of the conversation, the prompt has to carry enough of the *what* for the distillation to be worth anything. Say so plainly in the section: an OpenCode fork is a briefing, not a handoff.
+- Because the child sees none of the conversation, the prompt has to carry enough of the _what_ for the distillation to be worth anything. Say so plainly in the section: an OpenCode fork is a briefing, not a handoff.
 
 The section must additionally state: **OpenCode has no SessionStart hook**, the same limitation the Codex section already notes. So invoking the command is the only way to enable this behavior there — nothing turns it on automatically at session start.
 
@@ -128,12 +129,12 @@ The `nudge` conversion never had a runtime-fact dependency. Complete both halves
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A source file under `packages/monitor/commands/` was modified, or `CLAUDE_PLUGIN_ROOT` survives in a port | Paths converted but `argument-hint` carried over, or a harness section was dropped from the thoughtful port | Both ports match the conversion spec exactly; sources byte-identical; all three harness sections present |
-| Runnable instructions | ×2 | The nudge bash line does not resolve to a real script path | Command runs but arguments are not threaded through | `/nudge status` round-trips in a sandbox; the thoughtful spawn prompt is literal and copy-pasteable |
-| Section clarity | ×1 | The OpenCode section is interleaved with the Claude one | A reader must compare sections to work out which applies to them | Each harness section is self-contained and findable in one glance |
-| Assumptions & docs | ×1 | The S9 branch was guessed with no note | The chosen branch is stated but its source is not | The chosen branch cites the resolved runtime fact, and the no-SessionStart limitation is stated explicitly |
+| Dimension             | Weight | 0–1 (fail)                                                                                                | 2–3 (below bar)                                                                                             | 4–5 (pass)                                                                                                 |
+| --------------------- | ------ | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Correctness           | ×3     | A source file under `packages/monitor/commands/` was modified, or `CLAUDE_PLUGIN_ROOT` survives in a port | Paths converted but `argument-hint` carried over, or a harness section was dropped from the thoughtful port | Both ports match the conversion spec exactly; sources byte-identical; all three harness sections present   |
+| Runnable instructions | ×2     | The nudge bash line does not resolve to a real script path                                                | Command runs but arguments are not threaded through                                                         | `/nudge status` round-trips in a sandbox; the thoughtful spawn prompt is literal and copy-pasteable        |
+| Section clarity       | ×1     | The OpenCode section is interleaved with the Claude one                                                   | A reader must compare sections to work out which applies to them                                            | Each harness section is self-contained and findable in one glance                                          |
+| Assumptions & docs    | ×1     | The S9 branch was guessed with no note                                                                    | The chosen branch is stated but its source is not                                                           | The chosen branch cites the resolved runtime fact, and the no-SessionStart limitation is stated explicitly |
 
 ## Out of scope
 

@@ -109,7 +109,10 @@ export function resolveBinary(
     const real = platform === "linux" ? target(path) : path;
     if (wsl && (/\.exe$/i.test(real) || /^[a-z]:/i.test(real))) continue;
     // A Snap confines the browser to its own /tmp, so it never sees the profile or DevToolsActivePort.
-    if (platform === "linux" && (/^\/snap\/|^\/usr\/bin\/snap$/.test(real) || execsSnap(real))) {
+    if (
+      platform === "linux" &&
+      (/^\/snap\/|^\/usr\/bin\/snap$/.test(real) || execsSnap(real))
+    ) {
       snap = true;
       continue;
     }
@@ -295,7 +298,9 @@ export function recordInstance(stateDir: string, instance: Instance): void {
 export type ShutdownOptions = {
   close?: () => Promise<unknown>;
   alive?: (pid: number) => boolean;
-  details?: (pid: number) => { command: string; identity: string | null } | null;
+  details?: (
+    pid: number,
+  ) => { command: string; identity: string | null } | null;
   busy?: (instance: Instance) => boolean;
   kill?: (pid: number) => void;
   sleep?: (ms: number) => Promise<unknown>;

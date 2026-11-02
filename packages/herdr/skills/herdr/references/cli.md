@@ -11,6 +11,7 @@ Most commands output JSON for scripting.
 Workspace, tab, and pane ids look like `w1`, `w1:t1`, and `w1:p1`. Closed ids are not reused. A cross-workspace `pane move` gives the pane a new workspace-qualified id; continue with `result.move_result.pane.pane_id` or its live agent name. The response keeps the old value at `result.move_result.previous_pane_id`. Creation responses expose new ids at `result.workspace`, `result.tab`, `result.root_pane`, or `result.pane`.
 
 ## Launch & Status
+
 ```bash
 herdr                           # launch or attach default session
 herdr --session work            # named session
@@ -38,6 +39,7 @@ Every TUI launch attaches to a background server. Detach and the panes keep runn
 `herdr --help` routes AI agents to two more sources. Read https://herdr.dev/agent-guide.md to help a human set Herdr up for the first time. Read https://herdr.dev/llms.txt to debug Herdr itself. Do not load `herdr --skill`; this skill covers it.
 
 ## Server
+
 ```bash
 herdr server                    # headless server (supervised setups)
 herdr server stop
@@ -48,6 +50,7 @@ herdr server reload-agent-manifests
 ```
 
 ## Sessions
+
 ```bash
 herdr session list [--json]
 herdr session attach <name>
@@ -60,6 +63,7 @@ Use `default` as `<name>` to target the default session for `session stop`.
 `session delete` needs the exact name from `session list`, letter case included — on a case-insensitive filesystem `delete foo` refuses a session named `Foo`. Pass a name that starts with `-` after `--`.
 
 ## Machines
+
 ```bash
 herdr machine list [--json]
 herdr machine status [<label-or-id>]   # checks without prompting for auth
@@ -87,6 +91,7 @@ herdr --machine <profile-id> agent prompt w1:p1 "review this change"
 - Remote ids are not local ids: `--current` cannot name the caller's local pane. Remote worktree paths must be absolute, `~`, or `~/…`.
 
 ## Workspaces
+
 ```bash
 herdr workspace list
 herdr workspace create [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus|--no-focus]
@@ -100,6 +105,7 @@ herdr workspace close <id> [--group]
 `workspace close` on a primary workspace leaves its open worktree workspaces alone. Pass `--group` to close the primary workspace and its linked worktree workspaces together; without it the close is refused with `workspace_group_close_required` and the group stays open. Never add `--group` merely to clear that refusal — it is the user's call.
 
 ## Worktrees
+
 ```bash
 herdr worktree list [--workspace ID | --cwd PATH] [--trust-repository]
 herdr worktree create [--workspace ID | --cwd PATH] [--branch NAME] [--base REF] [--path PATH] [--label TEXT] [--focus|--no-focus] [--trust-repository]
@@ -110,6 +116,7 @@ herdr worktree remove --workspace ID [--force] [--trust-repository]
 `--trust-repository` grants per-request Git trust for one command, including an accessible Windows repository owned by another SID, without changing global Git configuration. Pass it only after the user has verified the repository. Do not retry a failed worktree command with it.
 
 ## Tabs
+
 ```bash
 herdr tab list [--workspace <id>]
 herdr tab create [--workspace <id>] [--cwd PATH] [--label TEXT] [--env KEY=VALUE] [--focus|--no-focus]
@@ -120,6 +127,7 @@ herdr tab close <id>
 ```
 
 ## Panes
+
 ```bash
 herdr pane list [--workspace <id>]
 herdr pane current [--pane ID|--current]
@@ -149,23 +157,25 @@ herdr pane close <id>
 Pass `--right-click pane` to forward unmodified right-click gestures to a mouse-reporting application inside the pane. Pass `--right-click herdr` to restore Herdr's pane menu. Right-clicking the pane frame still opens Herdr's menu. Set the same policy at creation with `pane split --right-click pane`.
 
 **Read output:**
+
 ```bash
 herdr pane read <id> [--source visible|recent|recent-unwrapped|detection] [--lines N] [--format text|ansi] [--ansi] [--raw]
 herdr pane read <id> --source visible --ansi
 ```
 
-| Source | Meaning |
-|---|---|
-| `visible` | Current rendered screen |
-| `recent` | Recent scrollback with wrapping |
-| `recent-unwrapped` | Recent scrollback without soft wraps (best for logs) |
-| `detection` | Bottom-buffer snapshot used by agent screen detection |
+| Source             | Meaning                                               |
+| ------------------ | ----------------------------------------------------- |
+| `visible`          | Current rendered screen                               |
+| `recent`           | Recent scrollback with wrapping                       |
+| `recent-unwrapped` | Recent scrollback without soft wraps (best for logs)  |
+| `detection`        | Bottom-buffer snapshot used by agent screen detection |
 
 `pane read` and `pane wait-output` accept `--flag=value` and take options before or after the pane id. `pane read` and `agent read` print plain text. Recent sources default to 80 rows when `--lines` is omitted. `visible` and `detection` return the full snapshot unless `--lines` limits them. An idle recognized agent at the transcript bottom can collect alternate-screen history when the requested line count exceeds its visible rows. A history request that needs this collection while the agent is working, blocked, or unknown returns `agent_not_idle`.
 
 `herdr pane wait-output --source recent` matches against the **unwrapped** recent text. Pane width and soft-wrapping do not affect the match. This is true even though `pane read --source recent` displays the wrapped version. To see exactly what a wait matched against, read with `--source recent-unwrapped`. Use `pane read` for output that already exists. Use `pane wait-output` for output you expect to appear next.
 
 **Send input:**
+
 ```bash
 herdr pane send-text <id> <text>
 herdr pane send-keys <id> <key> [key ...]   # e.g. ctrl+h, enter, alt+x, f1, minus
@@ -175,6 +185,7 @@ herdr pane run <id> <command>                # text + Enter atomically (prefer o
 `pane send-keys` and `agent send-keys` preserve Shift for `shift+tab`, so agent permission modes cycle programmatically.
 
 **Report agent state:**
+
 ```bash
 herdr pane report-agent <id> \
   --source ID --agent LABEL \
@@ -191,6 +202,7 @@ herdr pane release-agent <id> --source ID --agent LABEL [--seq N]
 `pane report-agent` and `pane report-agent-session` accept `--flag=value` and take options before or after the pane id, matching `pane read` and `pane wait-output`.
 
 **Report metadata (display-only):**
+
 ```bash
 herdr pane report-metadata <id> \
   --source ID [--agent LABEL] [--applies-to-source ID] \
@@ -201,6 +213,7 @@ herdr pane report-metadata <id> \
 ```
 
 ## Agents
+
 ```bash
 herdr agent list
 herdr agent get <target>
@@ -229,6 +242,7 @@ Agent kinds: `pi`, `claude`, `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline
 Targets: a unique live agent name or the pane id currently hosting that agent.
 
 ## Direct Terminal Attach
+
 ```bash
 herdr terminal attach <terminal_id> [--takeover]
 herdr terminal session control <target> [--takeover] [--cols N] [--rows N]
@@ -241,6 +255,7 @@ herdr terminal title clear
 On Linux and macOS, the server disconnects an observer whose socket write makes no progress for 30 seconds. That stream can end without a final `terminal.closed` record, so treat EOF as closed. A quiet pane does not trigger the timeout.
 
 ## Waits
+
 ```bash
 herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visible|recent|recent-unwrapped] [--lines N] [--timeout MS] [--raw]
 ```
@@ -248,11 +263,13 @@ herdr pane wait-output <pane_id> (--match TEXT | --regex PATTERN) [--source visi
 For agent-status waits, use `herdr agent wait <target> --until <status>` (see Agents).
 
 ## Notifications
+
 ```bash
 herdr notification show <title> [--body TEXT] [--position top-left|top-right|bottom-left|bottom-right] [--sound none|done|request]
 ```
 
 ## Integrations
+
 ```bash
 herdr integration install pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|cursor|mastracode|antigravity-cli|grok
 herdr integration uninstall <name>
@@ -262,6 +279,7 @@ herdr integration status [--outdated-only]
 `herdr integration install letta` also works but is experimental and CLI-only: the Settings screen and the JSON integration API do not list it. Reinstall the `claude` integration after upgrading to 0.9.1 — v10 narrows its `SessionStart` matcher to `startup|resume|clear|compact|fork`.
 
 ## Plugins (CLI)
+
 ```bash
 herdr plugin install <owner>/<repo>[/subdir...] [--ref REF] [--yes]
 herdr plugin list [--plugin ID] [--json]

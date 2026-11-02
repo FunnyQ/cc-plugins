@@ -1,6 +1,7 @@
 # CLI-01: Statusline and push-usage subcommands
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -50,11 +51,11 @@ fn build_rate_limits_record(payload: &[u8], now_ms: i64) -> Option<serde_json::V
 
 Worked example (from `rate-limits-cache.test.ts`), now = `2026-05-25T00:00:00.000Z` (1779667200000):
 
-| payload | result |
-|---|---|
-| `not json` | `None` |
-| `{"model":"x"}` | `None` |
-| `{"rate_limits":null}` / `{"rate_limits":0}` | `None` |
+| payload                                           | result                                                                                                                      |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `not json`                                        | `None`                                                                                                                      |
+| `{"model":"x"}`                                   | `None`                                                                                                                      |
+| `{"rate_limits":null}` / `{"rate_limits":0}`      | `None`                                                                                                                      |
 | `{"rate_limits":{"primary":{"used_percent":12}}}` | `{"capturedAt":"2026-05-25T00:00:00.000Z","capturedAtEpochMs":1779667200000,"rate_limits":{"primary":{"used_percent":12}}}` |
 
 ### Nudges
@@ -133,12 +134,12 @@ Subtract the cost of running `sh -c true` alone (measure it the same way) to get
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | CLI contract suite fails against Rust, or the statusline blocks on a nudged child, or a nudge error breaks the statusline | Suite passes but a pinned detail drifts: trailing newline on `rate-limits.json`, seam clock used for the stamp or throttle, marker touched after spawn, signal exit mapped to non-zero, empty `rate_limits` object skipped | Suite green against Rust and TS; file text, key order, falsy rule, throttle, touch-before-spawn, stdin passthrough, stderr inheritance, exit mapping, and push-usage headers/body/timeout all match the TS |
-| Test coverage | ×2 | No cargo tests | Happy-path record only | Record builder covers every falsy/truthy case and ISO milliseconds; throttle boundary tested; exit-code mapping tested including the signal case |
-| Interface & readability | ×1 | Tokio runtime in the statusline path, `unwrap` on stdin/JSON/fs, nudge logic duplicated per marker | Works, but pure logic tangled with I/O so it cannot be unit-tested | Pure `build_rate_limits_record` / `should_nudge` separated from I/O; one `nudge` fn for both markers; clippy clean |
-| Assumptions & docs | ×1 | Deliberate differences from TS unexplained | Some explained | One-line comments on: real clock (not seam) for stamp and throttle, raw stdout forwarding, why no zombie after detach; the overhead measurement reported with method and baseline |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                | 2–3 (below bar)                                                                                                                                                                                                            | 4–5 (pass)                                                                                                                                                                                                 |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | CLI contract suite fails against Rust, or the statusline blocks on a nudged child, or a nudge error breaks the statusline | Suite passes but a pinned detail drifts: trailing newline on `rate-limits.json`, seam clock used for the stamp or throttle, marker touched after spawn, signal exit mapped to non-zero, empty `rate_limits` object skipped | Suite green against Rust and TS; file text, key order, falsy rule, throttle, touch-before-spawn, stdin passthrough, stderr inheritance, exit mapping, and push-usage headers/body/timeout all match the TS |
+| Test coverage           | ×2     | No cargo tests                                                                                                            | Happy-path record only                                                                                                                                                                                                     | Record builder covers every falsy/truthy case and ISO milliseconds; throttle boundary tested; exit-code mapping tested including the signal case                                                           |
+| Interface & readability | ×1     | Tokio runtime in the statusline path, `unwrap` on stdin/JSON/fs, nudge logic duplicated per marker                        | Works, but pure logic tangled with I/O so it cannot be unit-tested                                                                                                                                                         | Pure `build_rate_limits_record` / `should_nudge` separated from I/O; one `nudge` fn for both markers; clippy clean                                                                                         |
+| Assumptions & docs      | ×1     | Deliberate differences from TS unexplained                                                                                | Some explained                                                                                                                                                                                                             | One-line comments on: real clock (not seam) for stamp and throttle, raw stdout forwarding, why no zombie after detach; the overhead measurement reported with method and baseline                          |
 
 ## Out of scope
 

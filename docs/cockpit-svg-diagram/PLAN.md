@@ -31,7 +31,7 @@
 Today's pipeline, all inside `packages/monitor/skills/cockpit/`:
 
 1. `scripts/cockpit.ts` — `--diagram` is a single-valued flag. `gateDiagram()` (line 314) calls `lintDiagram()` before anything is written, and exits non-zero with fix hints on failure. The source lands in `DecisionRecord.diagram` (line 79) and is appended to `.cockpit/logs/<session>.jsonl`.
-2. `scripts/diagram-lint.ts` — runs the *vendored mermaid bundle's own parser* headless under happy-dom, plus hand-rolled heuristics for `:::class` validation and fix hints. Degrades silently when the parser can't be stood up; never blocks a write on its own.
+2. `scripts/diagram-lint.ts` — runs the _vendored mermaid bundle's own parser_ headless under happy-dom, plus hand-rolled heuristics for `:::class` validation and fix hints. Degrades silently when the parser can't be stood up; never blocks a write on its own.
 3. `dashboard/dist/modules/diagram.js` — lazy-loads the 3.3MB mermaid UMD bundle on first render, themes it with `NIGHT_FLIGHT_THEME` (concrete hex, because mermaid's khroma engine cannot parse `oklch()`), renders, then sanitizes through DOMPurify's SVG profile. Also owns the lightbox and `standaloneSvg()` (bakes `--space` as the background so a downloaded file is readable outside the cockpit).
 4. `dashboard/dist/modules/decision-log.js:394-414` — emits a `<figure data-pending>` holding the source in a `<pre>`, then `mountDiagram()` replaces it with the SVG. On failure the `<pre>` stays as the fallback.
 
@@ -50,7 +50,7 @@ One hazard the Mermaid path never hits: **a `<style>` element inside inline SVG 
    - Acceptance: a pure `detectDiagramFormat(src)` returns `"svg"` when the first non-whitespace character is `<`, else `"mermaid"`. Unit-tested against an XML prolog, a leading XML comment, leading blank lines, a Mermaid YAML-frontmatter source, and every keyword in `DIAGRAM_TYPES`.
 
 2. **`@path` input** — `--diagram @some/file` reads the argument from disk.
-   - Acceptance: the file's contents are resolved *before* detection, so `@flow.mmd` and `@flow.svg` both work with no extension rule. The resolved content is stored inline in the jsonl — the record stays self-contained. A missing or unreadable path exits non-zero naming the path.
+   - Acceptance: the file's contents are resolved _before_ detection, so `@flow.mmd` and `@flow.svg` both work with no extension rule. The resolved content is stored inline in the jsonl — the record stays self-contained. A missing or unreadable path exits non-zero naming the path.
 
 3. **Record format** — the entry records which format it holds.
    - Acceptance: `DecisionRecord` gains `diagram_format?: "mermaid" | "svg"`. It is written **only** when the value is `"svg"`, so a Mermaid entry is byte-identical to one written today. Readers treat an absent field as `"mermaid"`.
@@ -59,7 +59,7 @@ One hazard the Mermaid path never hits: **a `<style>` element inside inline SVG 
    - Acceptance: `lintSvg(src)` returns `[]` when clean, else one `what's wrong — how to fix` message per problem, and never throws. It flags: not well-formed XML; a root element that is not `<svg>`; a missing `viewBox` (required outright — a width/height pair is not a substitute, because the lightbox scales by the viewBox); an attribute URI outside the renderer's admitted set; a `url()` inside `<style>` that is neither `data:` nor a `#` fragment; a `<script>`, `on*` handler, or `<foreignObject>`. When happy-dom is unavailable the DOM-dependent checks are skipped silently, exactly as `diagram-lint.ts` degrades.
 
 5. **Cross-format fix hint** — a near-miss SVG is not diagnosed as broken Mermaid.
-   - Acceptance: when `lintDiagram()` rejects the first line *and* the source contains `<svg`, the message says the source looks like SVG whose root element is preceded by something else, and points at `--diagram @path.svg`.
+   - Acceptance: when `lintDiagram()` rejects the first line _and_ the source contains `<svg`, the message says the source looks like SVG whose root element is preceded by something else, and points at `--diagram @path.svg`.
 
 6. **Raw SVG rendering** — the card shows the SVG.
    - Acceptance: `renderDiagram(text, format)` routes on format; the SVG path skips mermaid entirely (the 3.3MB bundle is never fetched for an SVG-only session) and returns the sanitized markup.
@@ -143,16 +143,16 @@ Modified: `scripts/cockpit.ts`, `scripts/diagram-lint.ts`, `dashboard/dist/modul
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| cli | 01 | diagram-format-contract | todo | >= 4.0 | — |
-| cli | 02 | svg-lint | todo | >= 4.0 | cli/01 |
-| cli | 03 | mermaid-cross-hint | todo | >= 4.0 | cli/01 |
-| ui | 01 | svg-render-path | todo | >= 4.0 | cli/01 |
-| ui | 02 | style-scoping | todo | >= 4.0 | — |
-| ui | 03 | card-integration | todo | >= 4.0 | ui/01, ui/02 |
-| docs | 01 | diagram-docs | todo | >= 4.0 | cli/02, cli/03, ui/03 |
-| docs | 02 | final-review 🏁 | todo | >= 4.0 | cli/01, cli/02, cli/03, ui/01, ui/02, ui/03, docs/01 |
+| Bucket | NN  | Title                   | Status | Pass line | Depends on                                           |
+| ------ | --- | ----------------------- | ------ | --------- | ---------------------------------------------------- |
+| cli    | 01  | diagram-format-contract | todo   | >= 4.0    | —                                                    |
+| cli    | 02  | svg-lint                | todo   | >= 4.0    | cli/01                                               |
+| cli    | 03  | mermaid-cross-hint      | todo   | >= 4.0    | cli/01                                               |
+| ui     | 01  | svg-render-path         | todo   | >= 4.0    | cli/01                                               |
+| ui     | 02  | style-scoping           | todo   | >= 4.0    | —                                                    |
+| ui     | 03  | card-integration        | todo   | >= 4.0    | ui/01, ui/02                                         |
+| docs   | 01  | diagram-docs            | todo   | >= 4.0    | cli/02, cli/03, ui/03                                |
+| docs   | 02  | final-review 🏁         | todo   | >= 4.0    | cli/01, cli/02, cli/03, ui/01, ui/02, ui/03, docs/01 |
 
 Eight tasks, not the seven named during the interview — the split is 3 / 3 / 2, with the terminal `Final review` as the eighth. It stays a task of its own rather than being folded into the docs task: it gates integration and regressions, which is a different job from writing the reference.
 
@@ -184,7 +184,7 @@ Per bucket, defined in `tasks/_context/rubric.md`. Each task file reproduces its
 
 ## Open questions
 
-1. **Is happy-dom's CSSOM strong enough to unit-test the scoping pass?** If `CSSStyleSheet`/`cssRules` is too thin there, the test must drive the pass through a hand-built rule list instead. Not blocking: the fail-closed requirement makes the *contract* testable regardless of how the rewrite is implemented. Resolved inside the style-scoping task.
+1. **Is happy-dom's CSSOM strong enough to unit-test the scoping pass?** If `CSSStyleSheet`/`cssRules` is too thin there, the test must drive the pass through a hand-built rule list instead. Not blocking: the fail-closed requirement makes the _contract_ testable regardless of how the rewrite is implemented. Resolved inside the style-scoping task.
 2. **Does `transcript.js`'s global DOMPurify `afterSanitizeAttributes` hook affect `<a>` inside an SVG?** `transcript.js:150` registers a hook on the shared DOMPurify module instance, and `diagram.js` imports the same instance. Harmless if it only adds `target`/`rel`, but it must be confirmed rather than assumed. Resolved inside the SVG render-path task.
 
 ## Known gaps

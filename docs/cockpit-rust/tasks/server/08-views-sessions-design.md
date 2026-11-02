@@ -1,6 +1,7 @@
 # SERVER-08: Views, sessions, design system
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -80,12 +81,12 @@ Declare both modules `pub(crate)` so other server modules can call them; nothing
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Payload shapes or key order differ; sessions missing | Happy-path payloads match; title persistence, untracked sessions, subagent counts, or design parsing drift | Sessions, projects, project-info and design-system match TS on every fixture |
-| Test coverage | ×2 | Contract group not run against Rust | Group passes; no `cargo test` for pure helpers | Group passes on both; `cargo test` covers live-status mapping, sort, colour heuristics, the hand-scanned `extractRules` |
-| Interface & readability | ×1 | Edits outside the views module, or subagent/title logic duplicated elsewhere | Works but subagent/title helpers not reusable | One file per ported TS module; `subagents` and `session_title` exposed with the signatures above |
-| Assumptions & docs | ×1 | Silent deviations | Deviations exist without comments | The `extractRules` rewrite and JS `NaN`-sort parity carry a one-line why |
+| Dimension               | Weight | 0–1 (fail)                                                                   | 2–3 (below bar)                                                                                            | 4–5 (pass)                                                                                                              |
+| ----------------------- | ------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Payload shapes or key order differ; sessions missing                         | Happy-path payloads match; title persistence, untracked sessions, subagent counts, or design parsing drift | Sessions, projects, project-info and design-system match TS on every fixture                                            |
+| Test coverage           | ×2     | Contract group not run against Rust                                          | Group passes; no `cargo test` for pure helpers                                                             | Group passes on both; `cargo test` covers live-status mapping, sort, colour heuristics, the hand-scanned `extractRules` |
+| Interface & readability | ×1     | Edits outside the views module, or subagent/title logic duplicated elsewhere | Works but subagent/title helpers not reusable                                                              | One file per ported TS module; `subagents` and `session_title` exposed with the signatures above                        |
+| Assumptions & docs      | ×1     | Silent deviations                                                            | Deviations exist without comments                                                                          | The `extractRules` rewrite and JS `NaN`-sort parity carry a one-line why                                                |
 
 ## Out of scope
 

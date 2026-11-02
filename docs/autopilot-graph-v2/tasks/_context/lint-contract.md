@@ -8,10 +8,10 @@ Parser it imports: `packages/dispatch/skills/flightplan/scripts/lib/parse-task.t
 
 ## Two levels of check — this distinction is load-bearing
 
-| Level | Function | Runs when |
-|---|---|---|
-| **Per-file** | `lintFile(filePath): Promise<Violation[]>` | Always, once per task file. |
-| **Tree-level** | `checkFinalReview(tasks, label): Violation[]` | **Only** when a *directory* argument was given. |
+| Level          | Function                                      | Runs when                                       |
+| -------------- | --------------------------------------------- | ----------------------------------------------- |
+| **Per-file**   | `lintFile(filePath): Promise<Violation[]>`    | Always, once per task file.                     |
+| **Tree-level** | `checkFinalReview(tasks, label): Violation[]` | **Only** when a _directory_ argument was given. |
 
 `main()` gates the tree-level pass on `treeRoots.length > 0`:
 
@@ -32,9 +32,9 @@ rule therefore cannot fire during an autopilot run, because the external dev dri
 
 ```ts
 export type Violation = {
-  file: string;    // absolute path, or the tree label for a tree-level violation
-  rule: string;    // short kebab slug, e.g. "self-containment", "final-review"
-  detail: string;  // the actionable message
+  file: string; // absolute path, or the tree label for a tree-level violation
+  rule: string; // short kebab slug, e.g. "self-containment", "final-review"
+  detail: string; // the actionable message
 };
 ```
 
@@ -51,17 +51,17 @@ From `lib/parse-task.ts`. `parseTask(content)` returns `{ ok: true, task }` or `
 
 ```ts
 export type ParsedTask = {
-  bucket: string;          // lowercased from the H1, e.g. "lint"
-  nn: string;              // zero-padded, e.g. "01"
+  bucket: string; // lowercased from the H1, e.g. "lint"
+  nn: string; // zero-padded, e.g. "01"
   title: string;
   h1: string;
   requiredReading: string[];
-  dependsOn: TaskRef[];    // TaskRef = { bucket, nn }
+  dependsOn: TaskRef[]; // TaskRef = { bucket, nn }
   blocks: TaskRef[];
-  status: TaskStatus | null;    // "todo" | "in-progress" | "done" | "blocked"
-  finalReview: boolean;         // header carries `> **Final review**: true`
-  sections: string[];           // e.g. ["Goal", "Acceptance criteria", "Verification", "Eval rubric"]
-  body: string;                 // everything after the header blockquote
+  status: TaskStatus | null; // "todo" | "in-progress" | "done" | "blocked"
+  finalReview: boolean; // header carries `> **Final review**: true`
+  sections: string[]; // e.g. ["Goal", "Acceptance criteria", "Verification", "Eval rubric"]
+  body: string; // everything after the header blockquote
   rubric: Rubric | null;
 };
 ```
@@ -72,7 +72,7 @@ export type ParsedTask = {
 
 ## Section extraction — reuse, do not re-add
 
-Two private helpers already exist, and they are *not* interchangeable:
+Two private helpers already exist, and they are _not_ interchangeable:
 
 - `lint-task.ts` has its own **private** `extractSection(body, heading): string` (near the bottom of the
   file). It returns the lines under a `## Heading`, or `""` when absent. It matches with

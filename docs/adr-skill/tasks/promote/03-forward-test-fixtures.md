@@ -1,6 +1,7 @@
 # PROMOTE-03: Build the hand-judged forward-test fixtures
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -28,9 +29,9 @@ A set of fixture repositories and a written checklist that make the judgment hal
 
 ### Why fixtures instead of tests
 
-Some of what this skill does cannot be asserted in a unit test. Clustering, threshold judgment, and duplicate detection are quality of *judgment*, not behaviour — a test that pinned them would pin one model's opinion and start failing the moment the model got better.
+Some of what this skill does cannot be asserted in a unit test. Clustering, threshold judgment, and duplicate detection are quality of _judgment_, not behaviour — a test that pinned them would pin one model's opinion and start failing the moment the model got better.
 
-What *can* be made repeatable is the input: a fixed corpus, plus a written expectation of what a good run looks like. So the deliverable is fixtures plus a checklist. The checklist states what a correct run produces; a human reads the run against it.
+What _can_ be made repeatable is the input: a fixed corpus, plus a written expectation of what a good run looks like. So the deliverable is fixtures plus a checklist. The checklist states what a correct run produces; a human reads the run against it.
 
 **This task is graded on whether the fixtures are complete and runnable, not on whether any particular judgment came out right.** Do not weaken a fixture because a trial run disagreed with the stated expectation — record the disagreement in the checklist and leave the fixture alone.
 
@@ -38,21 +39,21 @@ What *can* be made repeatable is the input: a fixed corpus, plus a written expec
 
 Each is its own directory holding a `.cockpit/` trail, and where the case needs it, a `docs/adr/` directory.
 
-| Case | What it holds | A correct run produces |
-|---|---|---|
-| `empty-repo/` | No `.cockpit/` at all | An empty inbox reported cleanly, exit 0. No crash, no created directory. |
-| `single-decision/` | One session, one clearly promotable decision | Exactly one candidate, disposition `promote`, and a reason that cites both halves of the threshold. |
-| `spread-decision/` | The same decision argued across four sessions, settled only in the last | **One** candidate carrying evidence from all four sessions — not four candidates. |
-| `local-detail/` | One session of genuine but local choices | Everything `skip` or `watch`. Nothing promoted. |
-| `already-recorded/` | A session whose decision is already captured by an ADR in the fixture's own `docs/adr/` | Disposition `skip`, naming that ADR — not a near-duplicate draft. |
-| `watch-wake/` + `variant-matching/` | A session in the watched bucket; stage the matching entry into the inbox | The watched session is pulled back and the combined evidence is re-judged. |
-| `watch-wake/` + `variant-quiet/` | Same watched session; reset the inbox, then stage the unrelated entry instead | The watched session stays asleep and does not appear among the candidates. |
+| Case                                | What it holds                                                                           | A correct run produces                                                                              |
+| ----------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `empty-repo/`                       | No `.cockpit/` at all                                                                   | An empty inbox reported cleanly, exit 0. No crash, no created directory.                            |
+| `single-decision/`                  | One session, one clearly promotable decision                                            | Exactly one candidate, disposition `promote`, and a reason that cites both halves of the threshold. |
+| `spread-decision/`                  | The same decision argued across four sessions, settled only in the last                 | **One** candidate carrying evidence from all four sessions — not four candidates.                   |
+| `local-detail/`                     | One session of genuine but local choices                                                | Everything `skip` or `watch`. Nothing promoted.                                                     |
+| `already-recorded/`                 | A session whose decision is already captured by an ADR in the fixture's own `docs/adr/` | Disposition `skip`, naming that ADR — not a near-duplicate draft.                                   |
+| `watch-wake/` + `variant-matching/` | A session in the watched bucket; stage the matching entry into the inbox                | The watched session is pulled back and the combined evidence is re-judged.                          |
+| `watch-wake/` + `variant-quiet/`    | Same watched session; reset the inbox, then stage the unrelated entry instead           | The watched session stays asleep and does not appear among the candidates.                          |
 
 `empty-repo/` is the case most likely to crash a collector that assumes a trail exists, so it earns its own directory despite holding almost nothing. `local-detail/` is the false-positive guard: a variable rename, a test helper, and a workaround with a linked upstream fix are all real decisions, and none of them is architecture. `spread-decision/` is the case that proves clustering happens by decision rather than by session.
 
 ### The seventh condition: conflicting evidence
 
-Do not give this its own directory. Put two entries inside one existing fixture — `spread-decision/` is the natural home — that reach opposite conclusions about the same question, with the later entry being the *wrong* one. Record in the checklist that the correct behaviour is to surface the conflict for a human, not to silently take the newer entry.
+Do not give this its own directory. Put two entries inside one existing fixture — `spread-decision/` is the natural home — that reach opposite conclusions about the same question, with the later entry being the _wrong_ one. Record in the checklist that the correct behaviour is to surface the conflict for a human, not to silently take the newer entry.
 
 ### Fixture construction rules
 
@@ -163,12 +164,12 @@ because the copy is its own git root.
 
 Grade the **fixtures**, not the judgment they provoke. A run that disagrees with a stated expectation is a finding to record, not a defect in this task.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A case is missing, or the fixture tree is silently swallowed by the ignore rule and nothing was actually committed | Cases exist but do not isolate what they claim — the spread case is one file, or the logs are not backdated so the archiving half cannot be exercised at all | Every case is runnable exactly as written and isolates the one condition it names; the ignore exception is verified, not assumed |
-| Test coverage (case coverage) | ×2 | Only the cases that succeed are present | The happy cases are complete but the negative half is thin — no false-positive guard, or the wake condition ships only its matching variant | Both guards present: the local-detail case and the non-matching wake variant, plus the conflicting-evidence pair |
-| Interface & readability | ×1 | The checklist is prose with no stated expectations | A table exists but expectations are vague ("looks reasonable") | Each row states a concrete, checkable outcome a reader can judge without opening the fixture |
-| Assumptions & docs | ×1 | The backdating requirement is unstated, so a fresh clone silently fails | Setup steps listed without saying why they are needed | The mtime trap, the ignore trap, and the do-not-edit-the-fixture rule are each stated with their reason |
+| Dimension                     | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                                                                                              | 4–5 (pass)                                                                                                                       |
+| ----------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                   | ×3     | A case is missing, or the fixture tree is silently swallowed by the ignore rule and nothing was actually committed | Cases exist but do not isolate what they claim — the spread case is one file, or the logs are not backdated so the archiving half cannot be exercised at all | Every case is runnable exactly as written and isolates the one condition it names; the ignore exception is verified, not assumed |
+| Test coverage (case coverage) | ×2     | Only the cases that succeed are present                                                                            | The happy cases are complete but the negative half is thin — no false-positive guard, or the wake condition ships only its matching variant                  | Both guards present: the local-detail case and the non-matching wake variant, plus the conflicting-evidence pair                 |
+| Interface & readability       | ×1     | The checklist is prose with no stated expectations                                                                 | A table exists but expectations are vague ("looks reasonable")                                                                                               | Each row states a concrete, checkable outcome a reader can judge without opening the fixture                                     |
+| Assumptions & docs            | ×1     | The backdating requirement is unstated, so a fresh clone silently fails                                            | Setup steps listed without saying why they are needed                                                                                                        | The mtime trap, the ignore trap, and the do-not-edit-the-fixture rule are each stated with their reason                          |
 
 ## Out of scope
 

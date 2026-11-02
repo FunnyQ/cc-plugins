@@ -1,6 +1,7 @@
 # BROWSERS-01: Repair portable browser test fixtures.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -72,12 +73,12 @@ When the audit finds no fixture defect in a listed file, leave that file untouch
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Fixtures still assume POSIX execution or product changes hide failures. | Common fixture paths work but environment or executable assumptions remain. | Concrete fixture defects are repaired while product semantics and intentional protocol data remain intact. |
-| Test coverage | ×2 | Assertions are removed or platform skips hide failures. | The suite passes locally but fixture failure paths or cleanup are unexamined. | Existing assertions survive, touched fixtures cover their failure mechanics, and absent-browser behavior remains explicit. |
-| Interface & readability | ×1 | A new fixture framework obscures simple setup. | Setup works but path and environment intent are unclear. | Small local fixture changes identify actual host resources and preserve surrounding test style. |
-| Assumptions & docs | ×1 | A local run is claimed as native Windows proof. | Platform limits are noted without distinguishing fixture and product failures. | Execution notes distinguish fixture corrections, product limitations, optional live prerequisites and the host actually tested. |
+| Dimension               | Weight | 0–1 (fail)                                                              | 2–3 (below bar)                                                                | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Fixtures still assume POSIX execution or product changes hide failures. | Common fixture paths work but environment or executable assumptions remain.    | Concrete fixture defects are repaired while product semantics and intentional protocol data remain intact.                      |
+| Test coverage           | ×2     | Assertions are removed or platform skips hide failures.                 | The suite passes locally but fixture failure paths or cleanup are unexamined.  | Existing assertions survive, touched fixtures cover their failure mechanics, and absent-browser behavior remains explicit.      |
+| Interface & readability | ×1     | A new fixture framework obscures simple setup.                          | Setup works but path and environment intent are unclear.                       | Small local fixture changes identify actual host resources and preserve surrounding test style.                                 |
+| Assumptions & docs      | ×1     | A local run is claimed as native Windows proof.                         | Platform limits are noted without distinguishing fixture and product failures. | Execution notes distinguish fixture corrections, product limitations, optional live prerequisites and the host actually tested. |
 
 ## Out of scope
 

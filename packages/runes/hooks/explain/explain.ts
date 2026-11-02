@@ -2,7 +2,13 @@ import { atom, read, update } from "claude-code";
 import type { EngineInterface, On } from "claude-code";
 import type { ExplainEntry, ExplainView } from "../../types";
 import { where } from "../transcript/where";
-import { childEnv, modEnv, platformCommand, runtime, type PlatformOperation } from "../platform";
+import {
+  childEnv,
+  modEnv,
+  platformCommand,
+  runtime,
+  type PlatformOperation,
+} from "../platform";
 import { hasDiagram } from "./blocks";
 import { checker, startCheck } from "./checker";
 import { config } from "../config";
@@ -24,7 +30,8 @@ const view = atom(
 const messageOf = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
 
-const basename = (path: string) => path.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
+const basename = (path: string) =>
+  path.split(/[\\/]/).filter(Boolean).at(-1) ?? "";
 
 async function platformAction(
   $: EngineInterface,

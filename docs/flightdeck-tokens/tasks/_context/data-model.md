@@ -40,15 +40,15 @@ The `<project-slug>` directory name is the session's absolute cwd with **every
 non-alphanumeric character replaced by `-`**:
 
 ```ts
-absPath.replace(/[^A-Za-z0-9]/g, "-")
+absPath.replace(/[^A-Za-z0-9]/g, "-");
 ```
 
 Uppercase is preserved. Verified against real directory names:
 
-| cwd | slug |
-|---|---|
-| `/Users/funnyq/Projects/q-lab/cc-plugins` | `-Users-funnyq-Projects-q-lab-cc-plugins` |
-| `/Users/funnyq/.claude` | `-Users-funnyq--claude` |
+| cwd                                                        | slug                                                       |
+| ---------------------------------------------------------- | ---------------------------------------------------------- |
+| `/Users/funnyq/Projects/q-lab/cc-plugins`                  | `-Users-funnyq-Projects-q-lab-cc-plugins`                  |
+| `/Users/funnyq/.claude`                                    | `-Users-funnyq--claude`                                    |
 | `/private/var/folders/vt/ldvzjls92l12pp4_s870ngr80000gn/T` | `-private-var-folders-vt-ldvzjls92l12pp4-s870ngr80000gn-T` |
 
 Note the leading `-` (from the leading `/`) and the doubled `--` where a dot sat.
@@ -86,7 +86,7 @@ prompt:
   "timestamp": "2026-08-01T09:32:03.528Z",
   "isSidechain": true,
   "version": "2.1.250",
-  "message": { "role": "user", "content": "First, announce yourself: bun …" }
+  "message": { "role": "user", "content": "First, announce yourself: bun …" },
 }
 ```
 
@@ -107,9 +107,9 @@ An `assistant` line's usage:
       "input_tokens": 352,
       "cache_creation_input_tokens": 266889,
       "cache_read_input_tokens": 1620698,
-      "output_tokens": 3465
-    }
-  }
+      "output_tokens": 3465,
+    },
+  },
 }
 ```
 
@@ -160,14 +160,14 @@ neither has an unknown task and its usage still counts toward the plan total.
 
 The flightlog of the reference run holds exactly six role values:
 
-| role | note entries |
-|---|---|
-| `verify` | 18 |
-| `judge` | 18 |
-| `dev` | 16 |
-| `scout` | 14 |
-| `review` | 10 |
-| `fix` | 2 |
+| role     | note entries |
+| -------- | ------------ |
+| `verify` | 18           |
+| `judge`  | 18           |
+| `dev`    | 16           |
+| `scout`  | 14           |
+| `review` | 10           |
+| `fix`    | 2            |
 
 These are the same strings the announce line's `--role` carries, so an agent's parsed
 role and a fleet row's role compare directly as strings. No translation layer is needed
@@ -195,10 +195,10 @@ one of its agent files matches.
 
 Several agents can share one `(task, role, attempt)`:
 
-| identity | agents | why |
-|---|---|---|
-| `integration/01` · `review` | 5 | the final-review lens fan-out, one agent per lens |
-| `scout` · `scout` | 7 | one scout per wave, all logged under the same ref |
+| identity                    | agents | why                                               |
+| --------------------------- | ------ | ------------------------------------------------- |
+| `integration/01` · `review` | 5      | the final-review lens fan-out, one agent per lens |
+| `scout` · `scout`           | 7      | one scout per wave, all logged under the same ref |
 
 So a pairing between transcripts and fleet rows must be many-to-many aware. Both sides
 carry a start timestamp — the flightlog's `start` note has `ts`, the transcript's first
@@ -210,12 +210,12 @@ From `wf_993ede2c-a44`, the run behind `docs/autopilot-graph-v2` (48 agents). Us
 sanity anchors, not as test fixtures — the directory is a real artifact on one machine
 and must never be read by a test.
 
-| model | input | cache write | cache read | output |
-|---|---|---|---|---|
-| claude-haiku-4-5-20251001 | 9,580 | 4,587,664 | 48,782,428 | 154,516 |
-| claude-opus-5 | 568 | 1,822,043 | 16,681,341 | 86,577 |
-| claude-fable-5 | 196 | 774,150 | 6,753,441 | 37,053 |
-| **total** | **10,344** | **7,183,857** | **72,217,210** | **278,146** |
+| model                     | input      | cache write   | cache read     | output      |
+| ------------------------- | ---------- | ------------- | -------------- | ----------- |
+| claude-haiku-4-5-20251001 | 9,580      | 4,587,664     | 48,782,428     | 154,516     |
+| claude-opus-5             | 568        | 1,822,043     | 16,681,341     | 86,577      |
+| claude-fable-5            | 196        | 774,150       | 6,753,441      | 37,053      |
+| **total**                 | **10,344** | **7,183,857** | **72,217,210** | **278,146** |
 
 The shape to notice: cache-read is roughly 260× output. Any UI that sums all four
 counters into one figure is displaying cache-read with extra steps.

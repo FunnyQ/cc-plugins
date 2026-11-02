@@ -1,6 +1,7 @@
 # SHIP-04: Delete TS, update docs, measure RSS
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -55,6 +56,7 @@ The launcher's TS branch has nothing left to launch. The new rule:
 - Unset → default to `<repo>/packages/monitor/cockpit-rs/target/release/cockpit`. If that file is missing, throw at import time with exactly: `contract suite: no binary — run cargo build --release --manifest-path packages/monitor/cockpit-rs/Cargo.toml or set COCKPIT_BIN`.
 
   A silent skip is not allowed: a green suite that tested nothing is the failure mode this suite exists to prevent.
+
 - Remove the TS script mapping entirely. Keep the exported `command()` / `underTest` signatures. `underTest` is always `"rust"` now; keep the export, because tests may branch on it.
 
 `_context/contracts.md` §8 already describes this post-deletion default; the one-line comment in `launcher.ts` should say why there is no TS fallback.
@@ -72,12 +74,12 @@ The launcher's TS branch has nothing left to launch. The new rule:
 
 Replace every runtime invocation, not the history:
 
-| Old | New |
-|---|---|
-| `bun <plugin-root>/skills/cockpit/scripts/cockpit.ts <sub> …` | `<plugin-root>/skills/cockpit/bin/cockpit <sub> …` |
+| Old                                                                     | New                                                                  |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `bun <plugin-root>/skills/cockpit/scripts/cockpit.ts <sub> …`           | `<plugin-root>/skills/cockpit/bin/cockpit <sub> …`                   |
 | `bun <plugin-root>/skills/cockpit/scripts/find-session.ts --provider …` | `<plugin-root>/skills/cockpit/bin/cockpit find-session --provider …` |
-| `bun ${CACHE}/${v}/skills/cockpit/scripts/cockpit-server.ts --no-open` | `${CACHE}/${v}/skills/cockpit/bin/cockpit server --no-open` |
-| `bun ~/.config/opencode/skills/cockpit/scripts/…ts` | `~/.config/opencode/skills/cockpit/bin/cockpit …` |
+| `bun ${CACHE}/${v}/skills/cockpit/scripts/cockpit-server.ts --no-open`  | `${CACHE}/${v}/skills/cockpit/bin/cockpit server --no-open`          |
+| `bun ~/.config/opencode/skills/cockpit/scripts/…ts`                     | `~/.config/opencode/skills/cockpit/bin/cockpit …`                    |
 
 - Change nothing under `docs/` (past plans, ADRs) and nothing in `CHANGELOG.md` history. Those record what was true then.
 - `restart.md` keeps its rule that you run the restart from the updated cache. Only the command changes.
@@ -122,6 +124,7 @@ Drive steps 2–3 from one bun script (e.g. a temp `rss-probe.ts` outside the re
 5. Read the server RSS the same way. Take the max of 5 readings, 1 s apart.
 
 Write `docs/cockpit-rust/rss.md`:
+
 - A table of process, target, measured value, and pass/miss.
 - The machine (`uname -sm`) and the date.
 - The exact commands.
@@ -154,12 +157,12 @@ A miss is written down with its number and is not blocked on. The task still pas
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A module usage-dashboard, install, or opencode imports gets deleted, or the contract suite silently tests nothing | Deletion right but a doc still points at a deleted script, or the RSS numbers are missing | Keep-set exact, importer check done per module, docs swept, suite green against the binary, RSS honestly recorded |
-| Test coverage | ×2 | Suites not run after deletion | Contract suite run, monitor/opencode dirs not | Contract, cargo, monitor, and opencode suites all green, plus a before/after typecheck diff |
-| Interface & readability | ×1 | Launcher keeps a dead TS branch | Launcher changed but the error is vague | Launcher defaults cleanly, exact loud error, exports kept |
-| Assumptions & docs | ×1 | CLAUDE.md untouched or describes Bun | Partially updated | CLAUDE.md tree, commands, constraints, and hook table all current; rss.md lists machine, commands, and gaps |
+| Dimension               | Weight | 0–1 (fail)                                                                                                        | 2–3 (below bar)                                                                           | 4–5 (pass)                                                                                                        |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A module usage-dashboard, install, or opencode imports gets deleted, or the contract suite silently tests nothing | Deletion right but a doc still points at a deleted script, or the RSS numbers are missing | Keep-set exact, importer check done per module, docs swept, suite green against the binary, RSS honestly recorded |
+| Test coverage           | ×2     | Suites not run after deletion                                                                                     | Contract suite run, monitor/opencode dirs not                                             | Contract, cargo, monitor, and opencode suites all green, plus a before/after typecheck diff                       |
+| Interface & readability | ×1     | Launcher keeps a dead TS branch                                                                                   | Launcher changed but the error is vague                                                   | Launcher defaults cleanly, exact loud error, exports kept                                                         |
+| Assumptions & docs      | ×1     | CLAUDE.md untouched or describes Bun                                                                              | Partially updated                                                                         | CLAUDE.md tree, commands, constraints, and hook table all current; rss.md lists machine, commands, and gaps       |
 
 ## Out of scope
 

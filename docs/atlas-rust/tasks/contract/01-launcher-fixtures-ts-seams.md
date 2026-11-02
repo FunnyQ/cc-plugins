@@ -1,6 +1,7 @@
 # CONTRACT-01: Launcher, fixture home, and TS test seams
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -28,8 +29,9 @@ A bun contract harness under `packages/monitor/skills/usage-dashboard/contract/`
 ### Launcher
 
 ```ts
-export type AtlasSub = "serve" | "stats" | "live" | "rollup-update" | "statusline" | "push-usage";
-export function isRust(): boolean;                               // COCKPIT_BIN non-empty
+export type AtlasSub =
+  "serve" | "stats" | "live" | "rollup-update" | "statusline" | "push-usage";
+export function isRust(): boolean; // COCKPIT_BIN non-empty
 export function atlasCommand(sub: AtlasSub, args: string[] = []): string[];
 ```
 
@@ -40,7 +42,12 @@ export function atlasCommand(sub: AtlasSub, args: string[] = []): string[];
 ### Fixture home
 
 ```ts
-export type StubRequest = { path: string; method: string; headers: Record<string, string>; body: string };
+export type StubRequest = {
+  path: string;
+  method: string;
+  headers: Record<string, string>;
+  body: string;
+};
 export type StubServer = {
   url: string;
   requests: StubRequest[];
@@ -108,12 +115,12 @@ Contents of the home — each item exists to exercise one rule:
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Seams change default behavior, or the fixture home leaves a provider at zero tokens | All providers populated, but a dedup/first-wins/subagent/missing-timestamp case is absent, or output differs between two runs | Every listed fixture case present, output deterministic, defaults unchanged, `--source` shapes match `_context/contracts.md` §4 |
-| Test coverage | ×2 | No tests for launcher or fixtures | Happy-path smoke only | Launcher mapping for all six subs + Rust form; fixture determinism; seam defaults; each `--source` name; unknown source exit 2 |
-| Interface & readability | ×1 | Launcher depends on cwd; fixture builder is one opaque blob | Works, but fixture cases are not traceable to the rule they exercise | Typed exports as specified; each fixture item named for the rule it exercises |
-| Assumptions & docs | ×1 | Clock call sites changed without an audit | Audit done but not recorded | Audit list matches the code; any fixture shape guessed from TS parsing is noted in a one-line comment |
+| Dimension               | Weight | 0–1 (fail)                                                                          | 2–3 (below bar)                                                                                                               | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Seams change default behavior, or the fixture home leaves a provider at zero tokens | All providers populated, but a dedup/first-wins/subagent/missing-timestamp case is absent, or output differs between two runs | Every listed fixture case present, output deterministic, defaults unchanged, `--source` shapes match `_context/contracts.md` §4 |
+| Test coverage           | ×2     | No tests for launcher or fixtures                                                   | Happy-path smoke only                                                                                                         | Launcher mapping for all six subs + Rust form; fixture determinism; seam defaults; each `--source` name; unknown source exit 2  |
+| Interface & readability | ×1     | Launcher depends on cwd; fixture builder is one opaque blob                         | Works, but fixture cases are not traceable to the rule they exercise                                                          | Typed exports as specified; each fixture item named for the rule it exercises                                                   |
+| Assumptions & docs      | ×1     | Clock call sites changed without an audit                                           | Audit done but not recorded                                                                                                   | Audit list matches the code; any fixture shape guessed from TS parsing is noted in a one-line comment                           |
 
 ## Out of scope
 

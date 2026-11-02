@@ -21,7 +21,7 @@ Read this before any task in this tree. It is the same for every task.
 - **No external npm dependencies.** Never add one. Vendored frontend libs live in `dashboard/dist/vendor/`.
 - **Use `type`, never `interface`.** This is enforced by convention across the whole repo.
 - Prefer a longer function over an indirection used once.
-- Comment *why*, never *what*.
+- Comment _why_, never _what_.
 
 ## Test layout and how to run tests
 
@@ -61,7 +61,7 @@ A skill runs from `~/.claude/plugins/cache/q-lab-marketplace/<plugin>/<version>/
 of the repo at release time. Editing the repo does not change what a live session executes. Two
 consequences that matter here:
 
-- The `flightplan-lint.sh` PostToolUse hook lints with the *cache* copy of `lint-task.ts`, so a new
+- The `flightplan-lint.sh` PostToolUse hook lints with the _cache_ copy of `lint-task.ts`, so a new
   lint rule added in this tree will not fire in this session's hook.
 - The orchestrator script is baked into the Workflow call before the run starts, so editing
   `orchestrator.md` mid-run cannot affect the run in progress. That is a safety property, not a bug.

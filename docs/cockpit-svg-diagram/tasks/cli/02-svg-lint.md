@@ -1,6 +1,7 @@
 # CLI-02: SVG lint at write time
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -35,7 +36,7 @@ export async function lintSvg(src: string): Promise<string[]>;
 
 ### Why this lint exists at all
 
-The browser sanitizes and strips before rendering, so most of the problems below do not break the page — they silently produce an SVG with holes in it, on a screen the authoring agent never opens. Every check here reports something the renderer will *remove*, so the author learns at the only moment they can still fix it. That is the same reasoning that put the Mermaid lint in the CLI.
+The browser sanitizes and strips before rendering, so most of the problems below do not break the page — they silently produce an SVG with holes in it, on a screen the authoring agent never opens. Every check here reports something the renderer will _remove_, so the author learns at the only moment they can still fix it. That is the same reasoning that put the Mermaid lint in the CLI.
 
 ### Checks to implement
 
@@ -100,7 +101,10 @@ The degrade path is an acceptance criterion, so a test must be able to reach it 
 ```ts
 export type XmlParse = (src: string) => Document;
 
-export async function lintSvg(src: string, parse?: XmlParse | null): Promise<string[]>;
+export async function lintSvg(
+  src: string,
+  parse?: XmlParse | null,
+): Promise<string[]>;
 ```
 
 Justify no more than that. A configuration object or a swappable loader registry is more machinery than the one failure this seam prevents (an unverified degrade path shipping).
@@ -152,12 +156,12 @@ Keep the early-out that skips the whole gate when no `--diagram` was passed. A `
 
 > Scale and dimension definitions: see `../_context/rubric.md`. Each dimension is scored 0–5; the weighted average must be `>= 4.0` to pass; `Correctness < 4` is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A listed check is missing, or malformed XML passes because the code relied on a thrown exception instead of `parsererror` | Every check exists but one misfires — a `data:` URI or `#` fragment is flagged as remote, or only the first problem is reported | All seven checks fire on the cases listed and stay quiet on the legitimate ones; every problem in a document is reported at once |
-| Backward compatibility | ×2 | A missing happy-dom now blocks a write, or a `--diagram`-free call pays a parser load | Degrades without throwing but reports spurious problems when the parser is absent, or the gate's failure output shape changed | Absent happy-dom skips the DOM-dependent checks silently and the write proceeds; the Mermaid path, the gate's output shape, and the no-diagram early-out are untouched |
-| Test coverage | ×2 | No tests, or only the clean-SVG case | Happy path plus one or two failure cases; the degrade path is unverified | Covers every listed check on both its positive and negative case, the multi-problem case, the hostile throw-free set, and the injected-`null` degrade path |
-| Interface & readability | ×1 | I/O and check logic tangled; the parser is reloaded per call | Works, but the seam is broader than needed or the memoization misses the failed case | `lintSvg` mirrors the Mermaid lint's shape, the parser (including its failure) is memoized once, the test seam is the single optional parameter, `type` not `interface` |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                | 2–3 (below bar)                                                                                                                 | 4–5 (pass)                                                                                                                                                              |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A listed check is missing, or malformed XML passes because the code relied on a thrown exception instead of `parsererror` | Every check exists but one misfires — a `data:` URI or `#` fragment is flagged as remote, or only the first problem is reported | All seven checks fire on the cases listed and stay quiet on the legitimate ones; every problem in a document is reported at once                                        |
+| Backward compatibility  | ×2     | A missing happy-dom now blocks a write, or a `--diagram`-free call pays a parser load                                     | Degrades without throwing but reports spurious problems when the parser is absent, or the gate's failure output shape changed   | Absent happy-dom skips the DOM-dependent checks silently and the write proceeds; the Mermaid path, the gate's output shape, and the no-diagram early-out are untouched  |
+| Test coverage           | ×2     | No tests, or only the clean-SVG case                                                                                      | Happy path plus one or two failure cases; the degrade path is unverified                                                        | Covers every listed check on both its positive and negative case, the multi-problem case, the hostile throw-free set, and the injected-`null` degrade path              |
+| Interface & readability | ×1     | I/O and check logic tangled; the parser is reloaded per call                                                              | Works, but the seam is broader than needed or the memoization misses the failed case                                            | `lintSvg` mirrors the Mermaid lint's shape, the parser (including its failure) is memoized once, the test seam is the single optional parameter, `type` not `interface` |
 
 ## Out of scope
 

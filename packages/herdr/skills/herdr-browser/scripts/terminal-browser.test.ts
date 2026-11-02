@@ -265,21 +265,32 @@ describe("prerequisite diagnostics", () => {
       expect(message).toContain("WSL");
       expect(message).not.toMatch(/curl|bash|powershell|winget|npm/);
       const calls: string[] = [];
-      expect(() => requireExecutable(dependency, dependency, "win32", (bin) => {
-        calls.push(bin);
-        return null;
-      })).toThrow(message);
+      expect(() =>
+        requireExecutable(dependency, dependency, "win32", (bin) => {
+          calls.push(bin);
+          return null;
+        }),
+      ).toThrow(message);
       expect(calls).toEqual([dependency]);
     });
 
     test(`${dependency} accepts an available executable without running it`, () => {
-      expect(() => requireExecutable("C:/Program Files/CLI/tool.exe", dependency, "win32", () => "C:/Program Files/CLI/tool.exe")).not.toThrow();
+      expect(() =>
+        requireExecutable(
+          "C:/Program Files/CLI/tool.exe",
+          dependency,
+          "win32",
+          () => "C:/Program Files/CLI/tool.exe",
+        ),
+      ).not.toThrow();
     });
   }
 
   test("retains Unix installation guidance on macOS and Linux including WSL", () => {
     for (const platform of ["darwin", "linux"] as const) {
-      expect(prerequisiteHint("terminal-browser", platform)).toContain("curl -fsSL https://terminal-browser.sh/install | bash");
+      expect(prerequisiteHint("terminal-browser", platform)).toContain(
+        "curl -fsSL https://terminal-browser.sh/install | bash",
+      );
       expect(prerequisiteHint("herdr", platform)).toContain("herdr");
     }
   });

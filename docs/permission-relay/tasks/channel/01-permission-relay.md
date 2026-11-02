@@ -1,6 +1,7 @@
 # CHANNEL-01: Channel permission relay
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/protocol.md`
 >
@@ -42,7 +43,7 @@ capabilities: {
 
 Register a notification handler for `notifications/claude/channel/permission_request`
 (use the SDK's notification-handler registration; the channel currently registers
-only a `ListToolsRequestSchema` *request* handler, so this is new). On receipt:
+only a `ListToolsRequestSchema` _request_ handler, so this is new). On receipt:
 
 1. Read `request_id`, `tool_name`, `description`, `input_preview` from `params`.
 2. POST them to the daemon:
@@ -58,7 +59,7 @@ only a `ListToolsRequestSchema` *request* handler, so this is new). On receipt:
 ```ts
 await mcp.notification({
   method: "notifications/claude/channel/permission",
-  params: { request_id, behavior },  // request_id echoed verbatim
+  params: { request_id, behavior }, // request_id echoed verbatim
 });
 ```
 
@@ -93,7 +94,7 @@ the UI's own TTL fallback handles closure. **Do not block the design on it.**
       carrying all four fields plus session + token. (unit-tested with mock fetch)
 - [x] After the daemon returns a verdict, the channel sends
       `notifications/claude/channel/permission` with the verbatim `request_id` and
-      the `behavior`. (unit-tested; the *running session proceeds/denies* half is
+      the `behavior`. (unit-tested; the _running session proceeds/denies_ half is
       gated on the live integration check below.)
 - [x] The verdict wait never stalls the inbox loop — the round-trip runs off a
       fire-and-forget serialized chain (`registerPermissionRelay`), structurally
@@ -141,10 +142,10 @@ into the live session: Allow lets the tool run, Deny blocks it. (Q, interactive.
    - Interactive TUI (Q): a modal **did** appear and then went stale (per finding
      1, it lingered because nothing closes it) — i.e. the hook did not reliably
      suppress the channel request before the modal surfaced.
-   ⇒ Either way the relay is correct, but the interactive case means an
-   auto-approve user sees **ghost modals** that linger up to the 90s TTL. This is
-   the known gap from the PLAN, now confirmed material for Q's setup — see the
-   follow-up note in the PLAN Open questions.
+     ⇒ Either way the relay is correct, but the interactive case means an
+     auto-approve user sees **ghost modals** that linger up to the 90s TTL. This is
+     the known gap from the PLAN, now confirmed material for Q's setup — see the
+     follow-up note in the PLAN Open questions.
 
 Implications already baked into the design: the modal's three-source auto-close
 keeps the TTL as the guaranteed closer; no protocol changes are needed.

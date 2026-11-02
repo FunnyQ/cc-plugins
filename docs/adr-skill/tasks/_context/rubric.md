@@ -8,11 +8,11 @@
 
 Each dimension scores **0–5**.
 
-| Score | Meaning |
-|---|---|
-| 0–1 | Fails. The work does not do what the task asked, or the check was never run. |
-| 2–3 | Below bar. The happy path works; edges, failures, or clarity are missing. |
-| **4** | **Passes.** Everything the task states is done, including the edge cases it names, with the evidence to prove it. This is the target — a 4 is a good result, not a grudging one. |
+| Score | Meaning                                                                                                                                                                                                       |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0–1   | Fails. The work does not do what the task asked, or the check was never run.                                                                                                                                  |
+| 2–3   | Below bar. The happy path works; edges, failures, or clarity are missing.                                                                                                                                     |
+| **4** | **Passes.** Everything the task states is done, including the edge cases it names, with the evidence to prove it. This is the target — a 4 is a good result, not a grudging one.                              |
 | **5** | Passes, and goes beyond what was written: a failure mode the task did not anticipate is handled, or a seam is left materially easier for the next task than the spec required. Never awarded for extra scope. |
 
 Four and five are deliberately separated because the pass line is `≥ 4.0` — an implementation that
@@ -28,7 +28,7 @@ whose scores are all 4s should not read as a near miss.
 - **Interface & readability** (×1) — are the exported functions pure where they can be, with clear
   `type` declarations and names that match the domain vocabulary in this plan?
 - **Assumptions & docs** (×1) — are non-obvious constants, ported values, and deliberate omissions
-  explained in a comment that says *why*, not *what*?
+  explained in a comment that says _why_, not _what_?
 
 ## Acceptance criteria gate first, then score
 

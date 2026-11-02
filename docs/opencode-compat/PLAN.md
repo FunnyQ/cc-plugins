@@ -18,7 +18,7 @@ After this build: one installer wires all 15 skills, one plugin module ports fou
 
 **Goals**
 
-- **Claude Code and Codex behave identically afterwards.** This outranks every other goal. Everything executable is new code under `opencode/`; inside `packages/` only `.md` files change, and only by *adding* a clearly fenced opencode section. The hook scripts, `plugin.json` manifests, agent definitions, monitor commands, and every `.ts` under `packages/` stay byte-identical — the module *calls* the hook scripts rather than refactoring them. The final review gates on `git diff --name-only main -- packages/ | grep -v '\.md$'` printing nothing and `bun test packages/` still passing.
+- **Claude Code and Codex behave identically afterwards.** This outranks every other goal. Everything executable is new code under `opencode/`; inside `packages/` only `.md` files change, and only by _adding_ a clearly fenced opencode section. The hook scripts, `plugin.json` manifests, agent definitions, monitor commands, and every `.ts` under `packages/` stay byte-identical — the module _calls_ the hook scripts rather than refactoring them. The final review gates on `git diff --name-only main -- packages/ | grep -v '\.md$'` printing nothing and `bun test packages/` still passing.
 - Skills: all 15 `SKILL.md` files discovered and script-resolvable under opencode.
 - Hooks: one plugin module ports monitor's decision-log start and scribe nudge, chronicle's branch guard, and dispatch's flightplan lint — by **invoking the existing scripts**, never by reimplementing their logic.
 - Commands: `nudge` and `thoughtful` as opencode commands.
@@ -45,19 +45,19 @@ After this build: one installer wires all 15 skills, one plugin module ports fou
 - **Plugins are JS/TS modules, not manifests.** Loaded from `{.opencode,~/.config/opencode}/{plugin,plugins}/*.{ts,js}` with `symlink: true` (**symlinks are followed**). A file plugin **must NOT export `id`** — see S18. Exporting any non-function value stops the loader from ever calling the plugin function, silently. The module exports one or more async plugin functions `(ctx) => hooksObject`, where `ctx = { project, client, $, directory, worktree }` (`$` = Bun shell). Hook keys: `event`, `"tool.execute.before"`, `"tool.execute.after"`, `"shell.env"`, `tool`, `"experimental.session.compacting"`. Events include `session.created/updated/status/idle/compacted`, `message.part.*`, `permission.asked/replied`.
 - **Commands**: markdown in `{.opencode,~/.config/opencode}/commands/`; filename = command name; frontmatter `description` (+ optional `agent`, `model`); body supports `$ARGUMENTS`, `$1..`, `` !`cmd` ``, `@file`.
 - **Agents**: markdown in `{.opencode,~/.config/opencode}/agents/`; filename = agent name; frontmatter `description` (required), `mode` (`primary|subagent|all`), `model`, `temperature`, `steps` (`maxSteps` deprecated), `permission` (`read`/`edit`/`bash`/`task`/`glob`/`grep`/`list`/`webfetch`/`websearch`/`lsp`/`skill`/`question`/`external_directory`/`todowrite` → `allow|ask|deny` or glob maps), `hidden`, `color`, `top_p`. Subagents spawn via the **task tool**, gated by `permission.task`. Two subagents are built in — `explore` and `general` — alongside the `build`, `plan`, `compaction`, `summary` and `title` primaries.
-- **OpenCode has a spawn-depth gate, exactly like Claude Code.** `subagent_depth` in `~/.config/opencode/opencode.json` (a plain number, alongside `permission` and `plugin`). Chronicle's deepest chain is skill → orchestrator → child, so it needs **≥ 2** — the same requirement, and the same silent failure mode, as `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. **The shipped default is 1** — the published config schema states it outright: *"Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents."* So chronicle is broken on every fresh install until the installer raises it. Whether the value is re-read live, and whether a project config overrides the global one, remain S14.
+- **OpenCode has a spawn-depth gate, exactly like Claude Code.** `subagent_depth` in `~/.config/opencode/opencode.json` (a plain number, alongside `permission` and `plugin`). Chronicle's deepest chain is skill → orchestrator → child, so it needs **≥ 2** — the same requirement, and the same silent failure mode, as `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. **The shipped default is 1** — the published config schema states it outright: _"Maximum subagent nesting depth. Defaults to 1, which prevents subagents from launching subagents."_ So chronicle is broken on every fresh install until the installer raises it. Whether the value is re-read live, and whether a project config overrides the global one, remain S14.
 
 ### 3.2 Current repo state (verified 2026-08-15)
 
 **Already opencode-aware — do not rebuild:**
 
-| Surface | State |
-|---|---|
-| usage-dashboard | reads `opencode.db` via `skills/shared/scripts/opencode.ts` |
-| cockpit reads | `transcript-stream.ts` has an `opencode` provider |
+| Surface           | State                                                                                                                                                                                                                                                                                                                                                                           |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| usage-dashboard   | reads `opencode.db` via `skills/shared/scripts/opencode.ts`                                                                                                                                                                                                                                                                                                                     |
+| cockpit reads     | `transcript-stream.ts` has an `opencode` provider                                                                                                                                                                                                                                                                                                                               |
 | cockpit **sends** | `opencode-send.ts` + `cockpit-server.ts:227` `/api/send-opencode-message`. Discovers the TUI server from `OPENCODE_TUI_SERVER_URL` / `OPENCODE_SERVER_URL` or a `ps` scan for `opencode --port <n>`; health-checks `/global/health`; verifies `/session/<id>`; delivers via `/tui/append-prompt` + `/tui/submit-prompt`. **Precondition: the TUI must be started with a port.** |
-| relay | full opencode backend (delegate/review; image gated off) |
-| herdr | `herd.ts` detects/spawns opencode panes |
+| relay             | full opencode backend (delegate/review; image gated off)                                                                                                                                                                                                                                                                                                                        |
+| herdr             | `herd.ts` detects/spawns opencode panes                                                                                                                                                                                                                                                                                                                                         |
 
 **15 skills**, enumerated by `SKILL.md` presence — monitor {usage-dashboard, cockpit, install}, dispatch {preflight, flightplan, autopilot, waypoints}, relay {relay}, chronicle {adr, commit, pr, release, install}, herdr {herdr, herdr-protocol-upgrade}. `packages/monitor/skills/shared/` sits inside `skills/` but has **no `SKILL.md` and is not a skill** — a `packages/*/skills/*` glob returns 16 and is wrong.
 
@@ -65,14 +65,14 @@ After this build: one installer wires all 15 skills, one plugin module ports fou
 
 **Hook surface — six Claude hook blocks across three `.claude-plugin/plugin.json` files (`packages/monitor/.codex-plugin/hooks.json` mirrors the monitor pair for Codex and needs no separate port):**
 
-| Plugin | Hook | Command | Port? |
-|---|---|---|---|
-| monitor | `SessionStart` (startup\|resume\|clear\|compact) | `setup.ts --session-check` | **no** — inert under opencode, see below |
-| monitor | `SessionStart` (same matcher) | `decision-log-start.ts` | yes |
-| monitor | `Stop` | `scribe-nudge.ts` | yes |
+| Plugin    | Hook                                             | Command                                | Port?                                                                                                                                                                       |
+| --------- | ------------------------------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| monitor   | `SessionStart` (startup\|resume\|clear\|compact) | `setup.ts --session-check`             | **no** — inert under opencode, see below                                                                                                                                    |
+| monitor   | `SessionStart` (same matcher)                    | `decision-log-start.ts`                | yes                                                                                                                                                                         |
+| monitor   | `Stop`                                           | `scribe-nudge.ts`                      | yes                                                                                                                                                                         |
 | chronicle | `SessionStart` (startup\|resume\|clear\|compact) | `setup-spawn-depth.ts --session-check` | **not as a hook** — the gate exists (`subagent_depth`, §3.1) but opencode has no session-start hook, and the value is read at startup anyway. Moves into the installer (T3) |
-| chronicle | `PreToolUse` (matcher `Bash`) | `hooks/check-branch.sh` | yes |
-| dispatch | `PostToolUse` (matcher `Edit\|Write`) | `hooks/flightplan-lint.sh` | yes |
+| chronicle | `PreToolUse` (matcher `Bash`)                    | `hooks/check-branch.sh`                | yes                                                                                                                                                                         |
+| dispatch  | `PostToolUse` (matcher `Edit\|Write`)            | `hooks/flightplan-lint.sh`             | yes                                                                                                                                                                         |
 
 **`setup.ts --session-check` is dead code under opencode.** `packages/monitor/skills/install/scripts/setup.ts:357-358` returns immediately when `CLAUDE_PLUGIN_DATA` is unset, which it always is outside Claude Code. Even with the gate satisfied, its work is statusline-path migration and reaping orphaned Claude processes (`setup.ts:370-408`) — both Claude-only, and the statusline is an explicit non-goal. Porting it would produce a target that runs, does nothing, and gets tested.
 
@@ -82,7 +82,7 @@ After this build: one installer wires all 15 skills, one plugin module ports fou
 
 **13 chronicle agents** in `packages/chronicle/agents/*.md`, Claude format: `name`, `description`, `model` (sonnet/haiku), optional `effort`, `tools` array, `maxTurns: 15` on the three orchestrators (lawspeaker, lorekeeper, storykeeper).
 
-**2 commands**: `packages/monitor/commands/{nudge,thoughtful}.md`. They are Claude-bound in *different* ways — `nudge.md:11` interpolates `${CLAUDE_PLUGIN_ROOT}`, while `thoughtful.md` never mentions it and is instead bound to the Agent tool's `subagent_type: "fork"` (`thoughtful.md:19-26`). Each needs a different fix.
+**2 commands**: `packages/monitor/commands/{nudge,thoughtful}.md`. They are Claude-bound in _different_ ways — `nudge.md:11` interpolates `${CLAUDE_PLUGIN_ROOT}`, while `thoughtful.md` never mentions it and is instead bound to the Agent tool's `subagent_type: "fork"` (`thoughtful.md:19-26`). Each needs a different fix.
 
 **Existing legacy install path**: `README.md:261` tells the user `ln -s .../packages/relay/skills/relay ~/.claude/skills/relay`. OpenCode scans `~/.claude/skills/`, so that symlink collides by name with a new `~/.config/opencode/skills/relay`.
 
@@ -107,6 +107,7 @@ After this build: one installer wires all 15 skills, one plugin module ports fou
   **Confirmed by the spike (S8)**: a symlink-loaded module reports its realpath, both under a direct dynamic import and under the loader's glob-then-import path. The shim fallback that was drafted against the other branch is not needed and must not be built.
 
 - **The opencode skill root rule** (goes into every SKILL.md opencode branch):
+
   > Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under opencode — never use it.
 
 - **Skills install to `~/.config/opencode/skills/`**, not `~/.claude/skills/`. Reason: `~/.claude/skills/` is where the README's legacy relay symlink lives, and opencode scans both — installing there would produce two skills named `relay`. (Marketplace-installed Claude skills live in the plugin cache and never collide.) `--check` must detect the legacy symlink and tell the user to remove it.
@@ -150,14 +151,14 @@ opencode/install.ts  (run from the checkout, any shell)
 
 ### Hook parity table
 
-| Claude/Codex hook | opencode port |
-|---|---|
-| monitor `SessionStart` → `setup.ts --session-check` | **not ported, by design** — inert without `CLAUDE_PLUGIN_DATA`, and its work (statusline migration, Claude process reaping) is Claude-only (§3.2) |
-| monitor `SessionStart` → `decision-log-start` | `session.created` |
-| monitor `Stop` (`scribe-nudge`) | `session.idle` — matches the nudge's per-turn design (cadence per S2) |
+| Claude/Codex hook                                              | opencode port                                                                                                                                                                                                                       |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| monitor `SessionStart` → `setup.ts --session-check`            | **not ported, by design** — inert without `CLAUDE_PLUGIN_DATA`, and its work (statusline migration, Claude process reaping) is Claude-only (§3.2)                                                                                   |
+| monitor `SessionStart` → `decision-log-start`                  | `session.created`                                                                                                                                                                                                                   |
+| monitor `Stop` (`scribe-nudge`)                                | `session.idle` — matches the nudge's per-turn design (cadence per S2)                                                                                                                                                               |
 | chronicle `SessionStart` (`setup-spawn-depth --session-check`) | **moved, not dropped** — the same prerequisite exists (`subagent_depth ≥ 2`), but opencode offers no session-start hook and reads the value at startup. The installer raises it under `--apply` and reports it under `--check` (T3) |
-| chronicle `PreToolUse` (`check-branch.sh`) | `tool.execute.before` on bash → run the script, throw its `systemMessage` (no hook-level ask) |
-| dispatch `PostToolUse` (`flightplan-lint.sh`) | `tool.execute.after` on write/edit → run the script, surface stderr on exit 2 (API per S4) |
+| chronicle `PreToolUse` (`check-branch.sh`)                     | `tool.execute.before` on bash → run the script, throw its `systemMessage` (no hook-level ask)                                                                                                                                       |
+| dispatch `PostToolUse` (`flightplan-lint.sh`)                  | `tool.execute.after` on write/edit → run the script, surface stderr on exit 2 (API per S4)                                                                                                                                          |
 
 ### What the module must not re-derive
 
@@ -170,49 +171,49 @@ Both scripts keep their own semantics; the module supplies stdin and reads the r
 
 Resolve every item in a sandbox before any production code. Sandbox recipe: `XDG_CONFIG_HOME=/tmp/opencode-sandbox opencode …` (record the override that actually works); a probe module logs every event; a fake subagent, command, and symlinked skill verify discovery. **Never touch the real `~/.config/opencode`.**
 
-| # | Question | Gates |
-|---|---|---|
-| S1 | Does `session.created` fire on **resume**? Fallback events (`session.updated` / `session.status`)? | T2 |
-| S2 | `session.idle` cadence (per turn end?) + payload shape | T2 |
-| S3 | `tool.execute.before`: `output.permission = "ask"` mutation vs `throw` — what does the user see? | T2 |
-| S4 | `tool.execute.after`: which tools fire it; how to surface a violation (mutate `output.error` vs throw); does the write still land? | T2 |
-| S5 | Bash tool argument name (`input.args.command`?) + background/detached command support | T2, T6 |
-| S6 | Are symlinked skill dirs under `~/.config/opencode/skills/` discovered? | T3 |
-| S7 | **Does `bun ~/.config/opencode/skills/cockpit/scripts/find-session.ts` resolve `../../shared/scripts/opencode`?** (entry-symlink → realpath). If no, the whole symlink-per-skill model is dead and T3 needs a different install shape. | T3, all |
-| S8 | `import.meta.dir` inside a symlink-loaded plugin module: realpath or link path? | T2, T3 |
-| S9 | Task-subagent **context** inheritance | T4, T5 |
-| S10 | Confirm no Workflow tool → the manual task-tool wave loop is autopilot's only option | T6 |
-| S11 | Any hook-side user prompting (`ctx.question`)? Else throw-with-message is the only surface | T2 |
-| S12 | Duplicate skill name across `~/.claude/skills/` and `~/.config/opencode/skills/` — which wins, is there a warning? **Not a gate** — §4 already resolves the collision by install location and a `--check` warning; record the observed behavior only | — |
-| S13 | Cockpit send round-trip: start `opencode --port <n>`, confirm `/global/health`, `/session/<id>`, `/tui/append-prompt` + `/tui/submit-prompt` land in a live session; record the session-id format and whether the port flag is mandatory | T6, T7, T8 |
+| #   | Question                                                                                                                                                                                                                                                                                                                         | Gates      |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| S1  | Does `session.created` fire on **resume**? Fallback events (`session.updated` / `session.status`)?                                                                                                                                                                                                                               | T2         |
+| S2  | `session.idle` cadence (per turn end?) + payload shape                                                                                                                                                                                                                                                                           | T2         |
+| S3  | `tool.execute.before`: `output.permission = "ask"` mutation vs `throw` — what does the user see?                                                                                                                                                                                                                                 | T2         |
+| S4  | `tool.execute.after`: which tools fire it; how to surface a violation (mutate `output.error` vs throw); does the write still land?                                                                                                                                                                                               | T2         |
+| S5  | Bash tool argument name (`input.args.command`?) + background/detached command support                                                                                                                                                                                                                                            | T2, T6     |
+| S6  | Are symlinked skill dirs under `~/.config/opencode/skills/` discovered?                                                                                                                                                                                                                                                          | T3         |
+| S7  | **Does `bun ~/.config/opencode/skills/cockpit/scripts/find-session.ts` resolve `../../shared/scripts/opencode`?** (entry-symlink → realpath). If no, the whole symlink-per-skill model is dead and T3 needs a different install shape.                                                                                           | T3, all    |
+| S8  | `import.meta.dir` inside a symlink-loaded plugin module: realpath or link path?                                                                                                                                                                                                                                                  | T2, T3     |
+| S9  | Task-subagent **context** inheritance                                                                                                                                                                                                                                                                                            | T4, T5     |
+| S10 | Confirm no Workflow tool → the manual task-tool wave loop is autopilot's only option                                                                                                                                                                                                                                             | T6         |
+| S11 | Any hook-side user prompting (`ctx.question`)? Else throw-with-message is the only surface                                                                                                                                                                                                                                       | T2         |
+| S12 | Duplicate skill name across `~/.claude/skills/` and `~/.config/opencode/skills/` — which wins, is there a warning? **Not a gate** — §4 already resolves the collision by install location and a `--check` warning; record the observed behavior only                                                                             | —          |
+| S13 | Cockpit send round-trip: start `opencode --port <n>`, confirm `/global/health`, `/session/<id>`, `/tui/append-prompt` + `/tui/submit-prompt` land in a live session; record the session-id format and whether the port flag is mandatory                                                                                         | T6, T7, T8 |
 | S14 | **`subagent_depth`**: what does a fresh install default to? Is it read once at startup or live? Does a project `.opencode/opencode.json` override the global? Confirm `2` actually carries chronicle's deepest chain (skill → lawspeaker → watcher), and that `permission.task: allow` alone suffices without a per-spawn prompt | T3, T4, T6 |
-| S15 | `scribe-nudge.ts` output under opencode — confirm the Claude hook-JSON shape (§3.2) and decide whether the module parses `systemMessage` out of it or discards the wrapper | T2 |
-| S16 | Does opencode print a skill base-directory banner? Six skills resolve their scripts through Claude's *"Base directory for this skill"* banner rather than `CLAUDE_PLUGIN_ROOT`, so a skill can be Claude-bound without ever naming the variable | T6 |
-| S17 | What `subagent_type` values can the task tool spawn — is there a built-in general-purpose one, and can a spawn pass an inline role prompt to it? Autopilot's manual wave loop needs a dev role and a judge role, and this build defines neither as an agent file | T6 |
+| S15 | `scribe-nudge.ts` output under opencode — confirm the Claude hook-JSON shape (§3.2) and decide whether the module parses `systemMessage` out of it or discards the wrapper                                                                                                                                                       | T2         |
+| S16 | Does opencode print a skill base-directory banner? Six skills resolve their scripts through Claude's _"Base directory for this skill"_ banner rather than `CLAUDE_PLUGIN_ROOT`, so a skill can be Claude-bound without ever naming the variable                                                                                  | T6         |
+| S17 | What `subagent_type` values can the task tool spawn — is there a built-in general-purpose one, and can a spawn pass an inline role prompt to it? Autopilot's manual wave loop needs a dev role and a judge role, and this build defines neither as an agent file                                                                 | T6         |
 
 ## 7. Task list
 
 This plan is executable as a flightplan tree at `docs/opencode-compat/tasks/`. The mapping:
 
-| Task below | Tree location | Depends on |
-|---|---|---|
-| T2 Module | `runtime/01-plugin-module` | none — foundation |
-| T3 Installer | `runtime/02-installer` | `runtime/01`, `assets/01`, `assets/02` |
-| T4 Agents | `assets/01-chronicle-agents` | none — foundation |
-| T5 Commands | `assets/02-monitor-commands` | none — foundation |
-| T6 Skills | `skills/01-monitor` … `skills/05-herdr`, plus `skills/06-autopilot-parity` | `runtime/02` (+ `assets/01` for chronicle) |
-| T7 Docs | `docs/01-readme-and-claude-md` | all six `skills/` tasks |
-| T8 Final review | `review/01-final-review` | `docs/01`, transitively everything |
+| Task below      | Tree location                                                              | Depends on                                 |
+| --------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| T2 Module       | `runtime/01-plugin-module`                                                 | none — foundation                          |
+| T3 Installer    | `runtime/02-installer`                                                     | `runtime/01`, `assets/01`, `assets/02`     |
+| T4 Agents       | `assets/01-chronicle-agents`                                               | none — foundation                          |
+| T5 Commands     | `assets/02-monitor-commands`                                               | none — foundation                          |
+| T6 Skills       | `skills/01-monitor` … `skills/05-herdr`, plus `skills/06-autopilot-parity` | `runtime/02` (+ `assets/01` for chronicle) |
+| T7 Docs         | `docs/01-readme-and-claude-md`                                             | all six `skills/` tasks                    |
+| T8 Final review | `review/01-final-review`                                                   | `docs/01`, transitively everything         |
 
 Wave 1 runs `runtime/01` + `assets/01` + `assets/02` in parallel; wave 3 runs all six `skills/` tasks in parallel.
 
-### T1 — Spike: opencode runtime verification *(prerequisite, not a tree task)*
+### T1 — Spike: opencode runtime verification _(prerequisite, not a tree task)_
 
 **T1 is deliberately outside the task tree.** Resolving it requires a live, interactive opencode session — starting one, watching which events fire, and reading what the runtime actually does. A headless executor cannot observe that and would fabricate plausible answers instead, which is the single worst outcome for this build: a wrong runtime assumption propagates into the module, the installer, five `SKILL.md` files, and the README before anyone notices.
 
 **Run it by hand, before starting the tree.** Answer S7 and S8 first — either can invalidate the tree's shape rather than just fill in a blank.
 
-**Outputs**: `opencode/references/opencode-runtime.md` — one section per S1–S17, each recording *observed behavior* → *decision*, plus the observed `opencode --version`. Mirror each answer into `tasks/_context/runtime-facts.md`, which is what the executors read and which is the authoritative list.
+**Outputs**: `opencode/references/opencode-runtime.md` — one section per S1–S17, each recording _observed behavior_ → _decision_, plus the observed `opencode --version`. Mirror each answer into `tasks/_context/runtime-facts.md`, which is what the executors read and which is the authoritative list.
 
 **The gate**: `runtime-facts.md` ships with every item marked `UNRESOLVED`, and instructs any task that needs an unresolved fact to set `Status: blocked` and stop rather than guess. Blocking is the intended behavior, not a failure.
 
@@ -222,6 +223,7 @@ Wave 1 runs `runtime/01` + `assets/01` + `assets/02` in parallel; wave 3 runs al
 **Shape**: `export const QLabPlugin = async (ctx) => ({ event, "tool.execute.before", "tool.execute.after" })` — **and no other export whatsoever** (S18: a non-function export stops the loader from ever calling the plugin, silently). Single file, no repo imports, no config I/O. Root from `import.meta.dir` per §4. A missing script or hook is a silent no-op (fail-open); session handlers log to stderr and never throw; the branch-guard throw is the only intentional throw. **Four ported behaviors, not five** — the two `--session-check` hooks are deliberately absent (§5).
 
 The module holds wiring, not workflow rules. Pure exported functions:
+
 - `hookPayload(kind, value): string` — the stdin JSON each shell hook expects.
 - `guardVerdict(exitCode, stdout): string | null` — the `systemMessage` to throw, or `null`.
 - `lintVerdict(exitCode, stderr): string | null` — the violation text to surface, or `null`.
@@ -237,13 +239,13 @@ Impure: `runHook(root, relScript, payload)` (Bun spawn, stdin pipe, capture) and
 **Depends on**: T1, T2, T4, T5.
 **Target table** — a pure function of the repo root returning `{ kind: "symlink", installed, source, label }`:
 
-| Source | Target | Count |
-|---|---|---|
-| `packages/*/skills/*` with a `SKILL.md` | `~/.config/opencode/skills/<name>` | 15 |
-| `opencode/plugin.ts` | `~/.config/opencode/plugin/q-lab.ts` | 1 |
-| `opencode/agents/*.md` | `~/.config/opencode/agents/<name>.md` | 13 |
-| `opencode/commands/*.md` | `~/.config/opencode/commands/<name>.md` | 2 |
-| *(edit, not symlink)* `subagent_depth: 2` | `~/.config/opencode/opencode.json` | 1 |
+| Source                                    | Target                                  | Count |
+| ----------------------------------------- | --------------------------------------- | ----- |
+| `packages/*/skills/*` with a `SKILL.md`   | `~/.config/opencode/skills/<name>`      | 15    |
+| `opencode/plugin.ts`                      | `~/.config/opencode/plugin/q-lab.ts`    | 1     |
+| `opencode/agents/*.md`                    | `~/.config/opencode/agents/<name>.md`   | 13    |
+| `opencode/commands/*.md`                  | `~/.config/opencode/commands/<name>.md` | 2     |
+| _(edit, not symlink)_ `subagent_depth: 2` | `~/.config/opencode/opencode.json`      | 1     |
 
 The `subagent_depth` target is the only write. Reuse the shape of `packages/chronicle/skills/install/scripts/spawn-depth-decision.ts` — a pure `decide(current, required)` that **only ever raises** — rather than inventing a second policy. Preserve every other key and the file's formatting; refuse to write on unparseable JSON and print the manual edit instead (`setup-spawn-depth.ts:30-36` does exactly this). `--unlink` leaves the value alone: it may predate this install (it does on Q's machine), and lowering it would break a working setup.
 
@@ -264,6 +266,7 @@ Convert from `packages/chronicle/agents/*.md` per §4: `description` verbatim; `
 ### T5 — Commands: `opencode/commands/{nudge,thoughtful}.md`
 
 **Depends on**: T1 (S9).
+
 - **nudge** — `description` verbatim; drop `argument-hint`; body command becomes `bun ~/.config/opencode/skills/cockpit/scripts/cockpit.ts nudge $ARGUMENTS`; Actions/Scopes prose unchanged.
 - **thoughtful** — keep the Claude and Codex sections; add an **opencode section** per S9. If task subagents inherit context: spawn one with the same distill prompt and do not wait. If not: pass `<parent-session-id>` explicitly, mirroring the Codex `--provider codex` pattern. State that opencode has no SessionStart auto-enable (same as Codex), so `/thoughtful` is the only way in.
 
@@ -276,7 +279,7 @@ Convert from `packages/chronicle/agents/*.md` per §4: `description` verbatim; `
 **Depends on**: T1, T3, T4.
 Add the §4 root rule wherever a skill resolves scripts or warns about `CLAUDE_PLUGIN_ROOT`, plus per-plugin notes:
 
-- **monitor** (`usage-dashboard`, `cockpit` + `references/{pilot,scribe,claude-cli,restart}`, `install`) — usage-dashboard gains S5's background-launch fact and notes opencode data is read natively. **cockpit states that reads *and* sends both work for opencode sessions**, with S13's precondition spelled out: the TUI must run with `--port <n>`, or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts; `claude-cli.md` stays the Claude-channel reference and gains one line saying opencode sends take the TUI HTTP path instead of the channel MCP. install marks the statusline Claude-only and points at `opencode/install.ts`.
+- **monitor** (`usage-dashboard`, `cockpit` + `references/{pilot,scribe,claude-cli,restart}`, `install`) — usage-dashboard gains S5's background-launch fact and notes opencode data is read natively. **cockpit states that reads _and_ sends both work for opencode sessions**, with S13's precondition spelled out: the TUI must run with `--port <n>`, or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts; `claude-cli.md` stays the Claude-channel reference and gains one line saying opencode sends take the TUI HTTP path instead of the channel MCP. install marks the statusline Claude-only and points at `opencode/install.ts`.
 - **dispatch** (`preflight` audit-only, `flightplan`, `autopilot` + `orchestrator.md`, `waypoints`) — flightplan/waypoints get the root rule; **autopilot gets the honest-parity port**: no Workflow tool (S10), so document the manual task-tool wave loop — `next-ready` → per ready task spawn `dev` → run Verification → `judge` → `score-task.ts --log` → retry until the rubric passes → atomic commit between waves → `Final review` last. State plainly that this is behaviorally close, not identical (no automatic parallel-wave scheduling). Reconcile `orchestrator.md`'s spawn claims with the agents that actually exist.
 - **relay** (`relay` + `references/backends.md`) — root rule; install section points at `opencode/install.ts`; the legacy `~/.claude/skills/relay` symlink is marked **legacy, remove it** (§4 collision), not "an alternative"; the capability table (delegate/review ✓, image ✗) is unchanged.
 - **chronicle** (`adr`, `commit`, `pr`, `release`, `install`) — root rule in every `${CLAUDE_PLUGIN_ROOT}` warning paragraph; **every orchestrator spawn point gains "under opencode, spawn via the task tool with `subagent_type: <name>`"** (commit → lawspeaker/watcher/runesmith; pr → storykeeper/skald/messenger; adr → lorekeeper/gleaner/reckoner/codifier/barrowkeeper; release → skirnir/annalist); spawn instructions reflect S9; the `install` skill gains an opencode branch — run `opencode/install.ts --apply`, and **state that the spawn-depth prerequisite still applies, as `subagent_depth ≥ 2` in `~/.config/opencode/opencode.json`, raised by the installer instead of a session hook** (§3.1, §5). The failure signature is the same silent one as on Claude: an orchestrator that cannot spawn its children; release wording stays consistent with the guard's `🔧 release:` exemption.
@@ -289,6 +292,7 @@ Add the §4 root rule wherever a skill resolves scripts or warns about `CLAUDE_P
 ### T7 — Docs: README + CLAUDE.md
 
 **Depends on**: T3, T6.
+
 - **README** — an "OpenCode Installation" section after Codex's: `bun opencode/install.ts --check` / `--apply` / `--unlink`, what gets installed, and an explicit **works / does not work** split. Works: 15 skills, usage-dashboard reads, cockpit reads **and sends** (with S13's port precondition), relay delegate/review, the four ported hook behaviors, both commands, chronicle subagents. Does not: statusline, relay `image`, Workflow-driven autopilot (manual loop instead), and monitor's `setup.ts --session-check` (statusline migration, Claude-only). Chronicle's spawn-depth prerequisite is **not** dropped — it becomes the installer's `subagent_depth` write, and the README says so, because a user who edits `opencode.json` by hand needs to know the number. Each per-plugin install block gains one opencode line; **the relay block's `~/.claude/skills/relay` line is replaced, not kept**. The overview paragraph names OpenCode as a supported harness.
 - **CLAUDE.md** — an "opencode runtime layer" entry under Harness constraints: location, install model, the parity table, the no-hook-level-ask caveat, and the module constraints (single file, no repo imports, root from `import.meta.dir`, never harness env vars). **Extend the existing "Chronicle needs nested subagent spawning" constraint to name OpenCode's `subagent_depth ≥ 2` alongside Claude's env var** — one constraint, two harnesses, same silent failure. Add `opencode/` to the layout tree and the installer to Commands. **Also fix the stale "Route sends by provider" paragraph**, which lists only Claude and Codex while `opencode-send.ts` has shipped.
 
@@ -305,7 +309,7 @@ Add the §4 root rule wherever a skill resolves scripts or warns about `CLAUDE_P
 
 ## 8. Rubric
 
-Scale 0–5 per dimension. **Pass = weighted average > 4.0. Correctness < 4 is an automatic veto.** Generic meanings — *Correctness*: matches the spec including edge and failure paths. *Test coverage*: pure functions tested across every touched cell; no real opencode in unit tests. *Interface & readability*: pure/impure split, `type` over `interface`, single-file module. *Assumptions & docs*: every spike-dependent claim cites its reference section; failure modes documented. Per-task weights are listed inline in §7.
+Scale 0–5 per dimension. **Pass = weighted average > 4.0. Correctness < 4 is an automatic veto.** Generic meanings — _Correctness_: matches the spec including edge and failure paths. _Test coverage_: pure functions tested across every touched cell; no real opencode in unit tests. _Interface & readability_: pure/impure split, `type` over `interface`, single-file module. _Assumptions & docs_: every spike-dependent claim cites its reference section; failure modes documented. Per-task weights are listed inline in §7.
 
 ## 9. Known gaps and risks
 

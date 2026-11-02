@@ -1,6 +1,7 @@
 # SHIP-01: sh shim and download
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -61,6 +62,7 @@ Every harness launches cockpit through one POSIX sh shim, which execs a cached R
 This suite replaces the clean-machine install check that nobody will run by hand, so it must cover every branch of the shim.
 
 Harness:
+
 - A per-test temp root holding a fake plugin root. Copy the shim to `<tmp>/monitor/skills/cockpit/bin/cockpit` and write `<tmp>/monitor/.claude-plugin/plugin.json` with `{"version":"9.9.9"}`.
 - A temp `XDG_DATA_HOME`, and `HOME` pointed at a temp dir so the real `~/.local/share` is never touched.
 - A fake "binary": a tiny sh script that prints `FAKE $COCKPIT_PLUGIN_ROOT $*` and exits 0.
@@ -68,6 +70,7 @@ Harness:
 - Spawn the shim with `COCKPIT_RELEASE_BASE_URL=http://127.0.0.1:<port>`.
 
 Cases, each its own `test`:
+
 1. **COCKPIT_BIN exec**: the shim runs `$COCKPIT_BIN` with the args, and the server receives 0 requests.
 2. **Cached binary**: pre-placed `$XDG_DATA_HOME/q-lab/cockpit/bin/9.9.9/cockpit` is exec'd, and the server receives 0 requests.
 3. **Download + verify + install**: output starts with `FAKE <resolved plugin root>`; the binary is now in the bin dir and executable; a second run makes 0 new requests.
@@ -105,12 +108,12 @@ The host triple in tests comes from the same `uname` mapping, computed in TS. Sk
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong triple mapping, hook path blocks or prints, or an unverified binary gets installed | Happy path downloads; lock, symlink, or budget behavior drifts from §7 | Every §7 step exact, including stderr strings, lock, 30 s budget, and fail-soft hook |
-| Test coverage | ×2 | No test, or tests hit the real network | Download happy path only | All 9 cases, including mismatch, concurrency, stale lock, symlink, and unsupported platform |
-| Interface & readability | ×1 | Bashisms or unquoted expansions | Works but download logic is duplicated across paths | One download function, quoted everywhere, shellcheck clean |
-| Assumptions & docs | ×1 | Magic timeouts unexplained | Some one-line whys missing | Each timeout and trust assumption has a one-line why (the checksum comes from the same release, so it catches corruption, not tampering) |
+| Dimension               | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                        | 4–5 (pass)                                                                                                                               |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong triple mapping, hook path blocks or prints, or an unverified binary gets installed | Happy path downloads; lock, symlink, or budget behavior drifts from §7 | Every §7 step exact, including stderr strings, lock, 30 s budget, and fail-soft hook                                                     |
+| Test coverage           | ×2     | No test, or tests hit the real network                                                   | Download happy path only                                               | All 9 cases, including mismatch, concurrency, stale lock, symlink, and unsupported platform                                              |
+| Interface & readability | ×1     | Bashisms or unquoted expansions                                                          | Works but download logic is duplicated across paths                    | One download function, quoted everywhere, shellcheck clean                                                                               |
+| Assumptions & docs      | ×1     | Magic timeouts unexplained                                                               | Some one-line whys missing                                             | Each timeout and trust assumption has a one-line why (the checksum comes from the same release, so it catches corruption, not tampering) |
 
 ## Out of scope
 

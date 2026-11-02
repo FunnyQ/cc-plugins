@@ -16,12 +16,12 @@ argument-hint: "[topic]"
 
 # Flightplan
 
-Interview thoroughly, then commit a complete blueprint to disk so a *different* session — possibly a sub-agent — executes each piece cold. `hop` is the lighter sibling: it plans and executes in this conversation.
+Interview thoroughly, then commit a complete blueprint to disk so a _different_ session — possibly a sub-agent — executes each piece cold. `hop` is the lighter sibling: it plans and executes in this conversation.
 
 - Executing now, single session, small scope → **`hop`**.
 - Recording what you want with no solution decided yet → **`preflight`** (writes `INTENT.md`, which this skill reads later).
 - Multi-stage, multi-file, handed to a sub-agent, or decisions frozen in version-controlled docs → **`flightplan`**.
-- Unsure? Ask *"executing now, or saving for later?"* Later = `flightplan`.
+- Unsure? Ask _"executing now, or saving for later?"_ Later = `flightplan`.
 
 The output is three layers:
 
@@ -33,7 +33,7 @@ The output is three layers:
 
 ## Setup
 
-`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time *"Base directory for this skill"* banner and set `SCRIPTS="<base-dir>/scripts"`. Every command below uses `bun "$SCRIPTS"/...`.
+`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time _"Base directory for this skill"_ banner and set `SCRIPTS="<base-dir>/scripts"`. Every command below uses `bun "$SCRIPTS"/...`.
 
 **OpenCode only**: there is no banner. Set `SCRIPTS=~/.config/opencode/skills/flightplan/scripts`; `CLAUDE_PLUGIN_ROOT` is empty there.
 
@@ -57,11 +57,11 @@ Ask these **before the interview**, in one `AskUserQuestion` call. A question as
 
 **Review depth** — how many review→fix cycles Step 7 runs.
 
-| Tier | Fits | Floor | Checkpoint | Cap | Narrow |
-|---|---|---|---|---|---|
-| **Light** | ≤ 5 tasks, one bucket | 2 | 3 | 4 | +5 |
-| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets | 2 | 5 | 8 | +5 |
-| **Deep** | 16+ tasks, 4+ buckets, migration or greenfield | 3 | 8 | 12 | +5 |
+| Tier                       | Fits                                           | Floor | Checkpoint | Cap | Narrow |
+| -------------------------- | ---------------------------------------------- | ----- | ---------- | --- | ------ |
+| **Light**                  | ≤ 5 tasks, one bucket                          | 2     | 3          | 4   | +5     |
+| **Standard (Recommended)** | 6–15 tasks, 2–3 buckets                        | 2     | 5          | 8   | +5     |
+| **Deep**                   | 16+ tasks, 4+ buckets, migration or greenfield | 3     | 8          | 12  | +5     |
 
 Floor, checkpoint, cap, and narrow phase are defined in Step 7; they govern the tree gate. **Light skips the design gate**, and its tree gate runs Navigator in its place. Recommend `Standard` unless the request already reads clearly small or clearly sprawling.
 
@@ -79,7 +79,7 @@ Carry both answers to Step 7. The tier is a guess about a tree that doesn't exis
 
 `references/interview-guide.md` holds the per-topic question banks, tree-walking examples, question-design checklist, and stop criteria.
 
-**When `docs/<slug>/INTENT.md` exists, read it first.** It answers *why* and *what*, never *how*, so it pre-fills some dimensions below and none of the rest. Confirm what it already settled in **one** `AskUserQuestion` batch — an intent can be weeks old and the want may have moved — then interview only the gaps. Do not re-ask what it answers; do not treat it as answering more than it does.
+**When `docs/<slug>/INTENT.md` exists, read it first.** It answers _why_ and _what_, never _how_, so it pre-fills some dimensions below and none of the rest. Confirm what it already settled in **one** `AskUserQuestion` batch — an intent can be weeks old and the want may have moved — then interview only the gaps. Do not re-ask what it answers; do not treat it as answering more than it does.
 
 **Never generate the tree from INTENT.md alone.** Architecture, bucketing, cross-bucket dependencies, verification commands, and eval rubrics are absent from it by design, so skipping the interview means inventing all of them and rendering a fuzzy input as a confident tree. The intent shortens the interview; it does not replace it.
 
@@ -94,7 +94,7 @@ Carry INTENT.md's Open questions into PLAN.md's — each is either resolved duri
 - **Architecture** — how pieces fit, where new code lives, what talks to what.
 - **Bucketing** — `ui/backend/api`, by phase, by feature, or a single `work/` bucket for short plans. **`review` is reserved**: it holds the closing task and nothing else. Never put feature work there, and never name a feature bucket `review`.
 - **Cross-bucket dependencies** — which task in A unblocks which task in B.
-- **Acceptance criteria & verification** — per requirement, how it gets validated. **Ask which checks a person has to perform**, and tag each one `- [ ] (human) …` (see `references/task-template.md`). Untagged, such an item guarantees a park: autopilot's verifier can only fail a check it cannot run, so the task burns every attempt on work that was already correct. Tagged, the verifier skips it and the run reports it as owed at the end. `lint-task.ts` rejects a gate section whose items are *all* tagged, so keep at least one check a command can make.
+- **Acceptance criteria & verification** — per requirement, how it gets validated. **Ask which checks a person has to perform**, and tag each one `- [ ] (human) …` (see `references/task-template.md`). Untagged, such an item guarantees a park: autopilot's verifier can only fail a check it cannot run, so the task burns every attempt on work that was already correct. Tagged, the verifier skips it and the run reports it as owed at the end. `lint-task.ts` rejects a gate section whose items are _all_ tagged, so keep at least one check a command can make.
 - **Eval rubric** — the graded quality bar on top of the binary gate. Recommend the defaults (`Correctness ×3 / Test coverage ×2 / Interface & readability ×1 / Assumptions & docs ×1`, pass `> 4.0`, `Correctness < 4` veto, more vetoes allowed on the same line) and adapt. A shared bar goes in `_context/rubric.md`.
 - **Final review** — every plan ends with one terminal task marked `> **Final review**: true` whose `Depends on` reaches every other task, transitively. **It always lives at `review/01`** — its own bucket, never appended as the next number in a feature bucket. It gates integration, consistency, regressions, and whether the PLAN goal was met — it does not re-score individual tasks. Offer a low-weight **Leanness** axis on its rubric too (see `references/task-template.md`); only the whole diff reveals accumulated over-engineering. `lint-task.ts` requires it (single-task plans exempt), and requires its `## Verification` to run a test suite whenever the tree runs tests anywhere.
 - **Visual design** — when the plan builds or reshapes UI and the `impeccable` skill is available, ask whether to design it with impeccable. A yes becomes the design phase in Step 6, which ends in an approved HTML mock. Skip the question when either condition fails.
@@ -120,24 +120,28 @@ Restate the Step 2 options — engine and depth tier — in one line in the draf
 **Atomicity**: the sequence isn't transactional. Once `scaffold.ts` runs, the tree exists. Two failure classes, two responses:
 
 - **Repairable** (missing task file, lint violation, dead fork) — fix that file in place and re-run the step. Never delete the tree.
-- **Unrecoverable** (wrong slug or buckets, tree too damaged to reason about) — `trash docs/<slug>/` and re-run from scaffold. Only ever trash a tree *this run* created; if `docs/<slug>/` predates this run, stop and ask.
+- **Unrecoverable** (wrong slug or buckets, tree too damaged to reason about) — `trash docs/<slug>/` and re-run from scaffold. Only ever trash a tree _this run_ created; if `docs/<slug>/` predates this run, stop and ask.
 
 Either way, never leave a half-written tree.
 
 **Bucket names are single kebab tokens** with no internal dashes (`ui`, `backend`, `api`, `work`). `lint-task.ts` and `build-readme.ts` parse the H1 `BUCKET` as one uppercase token, so a dashed name scaffolds but fails validation.
 
 1. **Scaffold the tree** — deterministic `mkdir` only, no stub files:
+
    ```bash
    bun "$SCRIPTS"/scaffold.ts <slug> <bucket1>,<bucket2>,...,review
    ```
+
    Creates `tasks/_context/` and one dir per bucket. The root is created non-recursively, so a slug created between the Step 3 check and now throws EEXIST instead of silently overwriting. The one root it merges into is a dir holding only `INTENT.md`, which it leaves in place.
 
    **Pass `review` as the last bucket on every multi-task plan.** The closing task lives at `review/01` and nowhere else. Omit it only for a single-task plan, which is exempt from the final-review rule entirely.
 
    **Then write the contract to disk and suggest a compact.** The interview fills the context, and every fork inherits all of it. Write PLAN.md and every `_context/*.md` except `design.md` now, per step 2. Put every decision the interview made into those files, including each task's files, signatures, schemas, and verification commands, because they are all that survives the compact. Then tell the user to run, and wait for their reply:
+
    ```
    /compact flightplan docs/<slug> is approved; PLAN.md and _context/ are on disk. Resume dispatch:flightplan Step 6 right after its compact suggestion: re-read the skill, PLAN.md, and _context/ before writing anything.
    ```
+
    The user may skip it and say go. After a compact, take every fork's interview substance from PLAN.md and `_context/`, never from the summary.
 
    **When the interview chose impeccable, run the design phase now** — after scaffold, because scaffold refuses a root that already holds files, and before step 2, because `_context/design.md` is derived from its result.
@@ -172,23 +176,29 @@ Either way, never leave a half-written tree.
    - Report one line: the path written, plus any unresolved violation.
 
    **Join before moving on.** A fork can die on an API error, time out, or claim success without leaving a file, and none of that raises on its own. Keep the expected-path list, and snapshot the worktree right before the spawn:
+
    ```bash
    mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug>   # <project>: basename of the repo root
    git status --short -uall | sort > /tmp/q-lab/dispatch/flightplan/<project>/<slug>/status.txt
    ```
+
    Once every fork returns:
+
    ```bash
    ls docs/<slug>/tasks/*/*.md      # every expected path present?
    git status --short -uall | sort | comm -13 /tmp/q-lab/dispatch/flightplan/<project>/<slug>/status.txt -   # what changed since the spawn?
    ```
+
    Write any missing file yourself, inline — don't re-spawn the batch, don't trash the tree (a missing file is repairable). Revert any new path outside `docs/<slug>/`; the brief forbids it but nothing enforces it. The snapshot keeps what existed before the spawn, such as the design phase's `PRODUCT.md` and `.impeccable/`. `-uall` lists each file inside an untracked directory, so a new file there still shows. A file already dirty before the spawn keeps its status line when a fork edits it again, so the snapshot cannot catch that edit.
 
    Every task file needs a `## Eval rubric` (threshold line + weighted table), and exactly one task carries `> **Final review**: true`. See `references/task-template.md`.
 
 4. **Lint the whole tree** — catches what the per-file hook can't see (duplicate `bucket/NN`, broken cross-bucket deps). Run it yourself after every fork reports, never inside a fork:
+
    ```bash
    bun "$SCRIPTS"/lint-task.ts docs/<slug>/tasks
    ```
+
    Pass the **tasks directory**, not a glob; the script walks bucket dirs and auto-skips `_context/` and `README.md`. Fix and re-run until it reports no violations.
 
    **Every task in this tree may run beside another one.** Under Claude Code, autopilot runs every ready task of a wave in parallel, each in its own worktree, subject to **Max parallel**. It lands each task into the main tree only after the task passes its judge. No task commits. Write a task's own files through its worktree: writing them into the main tree is a leak, and autopilot aborts the whole run when it detects one. When tasks share an external live resource that a worktree cannot isolate (a device, a LaunchAgent, a local database), declare `> **Max parallel**: N` in the PLAN.md master-spec header. Do not use a lock rule in `_context/` for this. Tree lint prints a `[serial-undeclared]` advisory when it finds such prose without the header.
@@ -207,12 +217,12 @@ Two gates review the plan, each with persona lenses running in parallel, and eac
 
 One broad reviewer reports a handful of findings per pass, so it drains a plan's defects one pass at a time. Each lens owns a slice of the criteria, so one pass surfaces more of them, and the design gate fixes contract defects before any task file copies them.
 
-| Lens | Hunts | Design gate | Tree gate | Engine |
-|---|---|---|---|---|
-| `sim-instructor` — Sim Instructor | races, lifecycle and ownership, security boundaries, platform constraints; reads the real code | yes | yes | the Step 2 pick |
-| `navigator` — Navigator | goal against decisions, non-goals, and the plan's own claims | yes | Light only | sonnet / medium |
-| `check-airman` — Check Airman | whether a correct implementation passes every gate and a broken one fails | — | yes | sonnet / medium |
-| `tower` — Tower | contradictions, unpropagated renames, ownership, dependencies, self-containment, task scope | — | yes, every pass | sonnet / medium |
+| Lens                              | Hunts                                                                                          | Design gate | Tree gate       | Engine          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- | ----------- | --------------- | --------------- |
+| `sim-instructor` — Sim Instructor | races, lifecycle and ownership, security boundaries, platform constraints; reads the real code | yes         | yes             | the Step 2 pick |
+| `navigator` — Navigator           | goal against decisions, non-goals, and the plan's own claims                                   | yes         | Light only      | sonnet / medium |
+| `check-airman` — Check Airman     | whether a correct implementation passes every gate and a broken one fails                      | —           | yes             | sonnet / medium |
+| `tower` — Tower                   | contradictions, unpropagated renames, ownership, dependencies, self-containment, task scope    | —           | yes, every pass | sonnet / medium |
 
 **Make one fresh review directory before the design gate**, or before the tree gate on Light, and call the path it prints `<review>`: `mkdir -p /tmp/q-lab/dispatch/flightplan/<project>/<slug> && mktemp -d /tmp/q-lab/dispatch/flightplan/<project>/<slug>/review-XXXXXX`. A fixed path would hand an earlier review's findings to this one. Each lens's raw findings go to `<review>/<gate>-N-<lens>.md`, where `<gate>` is `design` or `pass` (the tree gate). These are scratch, not artifacts.
 
@@ -230,7 +240,7 @@ One broad reviewer reports a handful of findings per pass, so it drains a plan's
   1. Capture the same bundle the CLIs get into a file: `bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens sim-instructor --scope <scope> --print > <review>/bundle-sim-instructor.md`
   2. Invoke `/relay:claude-cli` with `review --prompt-file <review>/bundle-sim-instructor.md --model opus --effort high --headless`. Relay runs a fresh `claude -p` process on opus/high under its read-only review contract. The fresh process starts context-less, so the author never reviews its own plan. A fork would inherit the interview and review its own reasoning, the exact bias this step exists to defeat (the opposite of Step 6's fan-out). `--model` here is this step's fixed choice, not a user pick, so skip relay's save-to-config question. When relay rejects `--effort` as an unknown flag, the installed relay predates it: tell the user to update relay, and do not rerun without the flag.
   3. Take the findings back to the loop. A fresh subagent each pass keeps reviewer ≠ author — the same anti-bias split autopilot uses.
-- **Navigator, Check Airman, Tower** — capture each lens's bundle with `bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens <lens> --scope <scope> --print > <review>/bundle-<lens>.md`, then spawn one `Agent` per lens with `subagent_type: "Explore"`, `model: "sonnet"`, and `effort: "medium"`. Never use a fork, which would inherit the interview. The prompt is: *"Read `<review>/bundle-<lens>.md` and follow its instructions exactly. Reply with the findings only."* Write each reply to `<review>/<gate>-N-<lens>.md` yourself. Explore is read-only and starts context-less, so the author never reviews its own plan. **OpenCode and Codex** have no such subagent: run these three lenses on the Sim Instructor engine instead, with the same `--lens` flags.
+- **Navigator, Check Airman, Tower** — capture each lens's bundle with `bun "$SCRIPTS"/review-plan.ts docs/<slug> --lens <lens> --scope <scope> --print > <review>/bundle-<lens>.md`, then spawn one `Agent` per lens with `subagent_type: "Explore"`, `model: "sonnet"`, and `effort: "medium"`. Never use a fork, which would inherit the interview. The prompt is: _"Read `<review>/bundle-<lens>.md` and follow its instructions exactly. Reply with the findings only."_ Write each reply to `<review>/<gate>-N-<lens>.md` yourself. Explore is read-only and starts context-less, so the author never reviews its own plan. **OpenCode and Codex** have no such subagent: run these three lenses on the Sim Instructor engine instead, with the same `--lens` flags.
 
 **From pass 2 on, hand each lens what it found last pass:** add `--prior-findings <review>/<gate>-<N-1>-<lens>.md` to that lens's command. It works on every engine, `--print` included. Every reviewer starts context-less by design, so without this each pass re-files findings you already fixed or already dispositioned, and the loop never reaches a P1-clean pass. The tree bundle also carries `tasks/README.md`, so a gap banked there is visible to the reviewer as a decision.
 
@@ -269,7 +279,7 @@ bun "$SCRIPTS"/review-plan.ts docs/<slug> --narrow --prior-passes <broad passes 
 
 Run the narrow phase on the Sim Instructor engine. `pass-<last>-all.md` is every lens file of the last tree-gate pass, concatenated; write it before the first narrow pass, and save each narrow pass to `<review>/narrow-N.md`. Narrow pass 1 takes `--prior-findings <review>/pass-<last>-all.md`; every later narrow pass takes `--prior-findings <review>/narrow-<N-1>.md`. On the Opus engine, add the same two flags to the `--print` capture (`--print --narrow --prior-passes <n>`) and invoke relay exactly as before — `/relay:claude-cli`, never a fork.
 
-- **Carry the still-open P1s in on `--prior-findings`, always.** The narrow reviewer must *adjudicate* what the broad loop left open, not merely fail to mention it. A P1 that survives adjudication is real. One the narrow pass drops was noise — and you may only treat it as noise because a reviewer was shown it and declined it, never because the prompt changed underneath it.
+- **Carry the still-open P1s in on `--prior-findings`, always.** The narrow reviewer must _adjudicate_ what the broad loop left open, not merely fail to mention it. A P1 that survives adjudication is real. One the narrow pass drops was noise — and you may only treat it as noise because a reviewer was shown it and declined it, never because the prompt changed underneath it.
 - **Reset the convergence counter at the switch.** The two-consecutive-passes rule compares open-P1 counts, and a new prompt is a new denominator. The count falling on the first narrow pass is the prompt working, not the plan improving. Do not compare across the switch; start counting again from the first narrow pass, so ending the narrow phase early needs two consecutive narrow passes that fail to lower it.
 - **Fix between narrow passes exactly as before.** A narrow P1 is by construction blocking, so it gets fixed, not banked. Re-run `lint-task.ts` and `build-readme.ts` after any structural change.
 - **The first `No blocking findings.` ends the review.** That is the narrow phase's normal exit and the plan ships. `--narrow` is only ever entered after a full broad loop, so the floor is long satisfied.
@@ -279,7 +289,7 @@ Run the narrow phase on the Sim Instructor engine. `pass-<last>-all.md` is every
 **At the end of the narrow phase:**
 
 - **Bank the last pass's findings. Do not fix them.** A fix applied after the final pass is unverified, and an unverified fix inside a tree that reads as reviewed is worse than a recorded gap — the gap gets the executor's attention and the fix does not. If one is trivially safe and you fix it anyway, say plainly in the recap that it was fixed with no confirming pass.
-- **Hand the decision back to the user. It is not the end of the conversation.** Give them numbers, not a question they cannot answer. Show the open-P1 count for every pass as a trend, mark where the narrow phase began, name the P1s still open, and offer the three real options: ship with the gaps banked, extend, or re-cut at PLAN level. *"Should I review again?"* is not a decision anyone can make. *"broad 5 → 4 → 4 → 3, narrow 2 → 2, two open, here they are"* is.
+- **Hand the decision back to the user. It is not the end of the conversation.** Give them numbers, not a question they cannot answer. Show the open-P1 count for every pass as a trend, mark where the narrow phase began, name the P1s still open, and offer the three real options: ship with the gaps banked, extend, or re-cut at PLAN level. _"Should I review again?"_ is not a decision anyone can make. _"broad 5 → 4 → 4 → 3, narrow 2 → 2, two open, here they are"_ is.
 - **Extending past the narrow phase needs a named reason and a new bound.** The user may spend more of their budget — but only against a hypothesis for why the next pass would differ: a root-cause fix that should collapse a whole class of findings, or a tier that was visibly wrong. "One more look" is not a reason. State the new bound before starting and stop there. Every rule above still applies inside the extension, so two consecutive passes that fail to lower the count end it early no matter what the new bound said.
 - **A non-converged tree is handed over, not hidden.** List every open P1 in `tasks/README.md`'s Known gaps, and lead the Step 8 recap with it.
 

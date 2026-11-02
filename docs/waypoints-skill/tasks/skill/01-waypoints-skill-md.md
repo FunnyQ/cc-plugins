@@ -1,6 +1,7 @@
 # SKILL-01: waypoints skill and references
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -23,7 +24,7 @@ real CLI verb signatures.
 ## Implementation notes
 
 Everything required for correctness is inlined below (frontmatter fields, the body outline, the verb
-signatures via `../_context/shared.md`). For tone only, you *may* skim the sibling skills
+signatures via `../_context/shared.md`). For tone only, you _may_ skim the sibling skills
 `packages/dispatch/skills/preflight/SKILL.md` and `.../flightplan/SKILL.md` to match their voice, but it is
 not required to complete the task. Do NOT re-derive the CLI behavior — it is fixed in
 `../_context/shared.md`; cite the verbs as documented there.
@@ -91,12 +92,12 @@ and when NOT to (single feature → flightplan; small goal → preflight; a task
 
 > Scale and shared dimensions: see `../_context/rubric.md` (dimension set B — docs tasks). Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | documents verbs/format that don't match the CLI | mostly right but an arg or output block drifts from the CLI | every verb signature, arg, and format matches the CLI and shared context exactly |
-| Completeness | ×2 | missing process or verbs | covers process but thin on when-vs-siblings or non-goals | why/when/process/verbs/non-goals + both references all present |
-| Clarity & consistency | ×1 | tone/structure clashes with sibling skills | readable but inconsistent framing | reads as a natural fourth sibling to preflight/flightplan |
-| Conventions | ×1 | wrong frontmatter shape | frontmatter ok but stray fields | exactly the three frontmatter fields, AUTO-TRIGGER description style |
+| Dimension             | Weight | 0–1 (fail)                                      | 2–3 (below bar)                                             | 4–5 (pass)                                                                       |
+| --------------------- | ------ | ----------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Correctness           | ×3     | documents verbs/format that don't match the CLI | mostly right but an arg or output block drifts from the CLI | every verb signature, arg, and format matches the CLI and shared context exactly |
+| Completeness          | ×2     | missing process or verbs                        | covers process but thin on when-vs-siblings or non-goals    | why/when/process/verbs/non-goals + both references all present                   |
+| Clarity & consistency | ×1     | tone/structure clashes with sibling skills      | readable but inconsistent framing                           | reads as a natural fourth sibling to preflight/flightplan                        |
+| Conventions           | ×1     | wrong frontmatter shape                         | frontmatter ok but stray fields                             | exactly the three frontmatter fields, AUTO-TRIGGER description style             |
 
 ## Out of scope
 

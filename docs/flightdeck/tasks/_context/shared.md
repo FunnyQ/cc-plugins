@@ -115,7 +115,11 @@ Two hard rules:
 
    ```ts
    import { loadAllTasks } from "../../flightplan/scripts/next-ready";
-   import type { FlightlogEntry, NoteEntry, ScoreEntry } from "../../flightplan/scripts/lib/flightlog";
+   import type {
+     FlightlogEntry,
+     NoteEntry,
+     ScoreEntry,
+   } from "../../flightplan/scripts/lib/flightlog";
    import { parseLog } from "../../flightplan/scripts/lib/flightlog";
    import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
    ```
@@ -134,7 +138,7 @@ Two hard rules:
 
 - This repo runs GitHub Flow. `main` is the only long-lived branch.
 - Commit format: emoji + conventional, e.g. `✨ feat: add flightdeck daemon`, `✅ test: cover label
-  parsing`, `📖 docs: document Hangar tokens`, `♻️ refactor:`, `🐛 fix:`.
+parsing`, `📖 docs: document Hangar tokens`, `♻️ refactor:`, `🐛 fix:`.
 - One task should land as one commit.
 - Do not bump any `plugin.json` version and do not touch `CHANGELOG.md`. Releases are cut separately
   by the chronicle release skill after this whole tree lands.

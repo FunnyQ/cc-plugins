@@ -66,6 +66,7 @@ Write a startup hook as one-shot initialization, not a supervised daemon. Restor
 ## Runtime Environment Variables
 
 Injected into all runtime commands:
+
 - `HERDR_SOCKET_PATH`, `HERDR_BIN_PATH`, `HERDR_ENV=1`
 - `HERDR_PLUGIN_ID`, `HERDR_PLUGIN_ROOT`, `HERDR_PLUGIN_CONFIG_DIR`, `HERDR_PLUGIN_STATE_DIR`
 - `HERDR_PLUGIN_CONTEXT_JSON` (workspace, tab, focused pane, worktree, agent, selected text, clicked URL, link handler fields when available)
@@ -78,6 +79,7 @@ Pane-specific: `HERDR_PLUGIN_ENTRYPOINT_ID`
 Link handler: `HERDR_PLUGIN_CLICKED_URL`, `HERDR_PLUGIN_LINK_HANDLER_ID`, `invocation_source = "link_click"`
 
 ## Storage Rules
+
 - **Config** (`.env`, user-editable): `HERDR_PLUGIN_CONFIG_DIR`
 - **Runtime state**: `HERDR_PLUGIN_STATE_DIR`
 - **NOT in `HERDR_PLUGIN_ROOT`.** GitHub-installed roots are managed checkouts.
@@ -85,6 +87,7 @@ Link handler: `HERDR_PLUGIN_CLICKED_URL`, `HERDR_PLUGIN_LINK_HANDLER_ID`, `invoc
 ## First Plugin Example
 
 Directory structure:
+
 ```
 my-plugin/
   herdr-plugin.toml
@@ -92,6 +95,7 @@ my-plugin/
 ```
 
 Manifest:
+
 ```toml
 id = "example.workspace-tools"
 name = "Workspace Tools"
@@ -108,6 +112,7 @@ command = ["node", "index.js"]
 ```
 
 Script (`index.js`):
+
 ```js
 const { spawnSync } = require("node:child_process");
 const herdr = process.env.HERDR_BIN_PATH ?? "herdr";
@@ -121,6 +126,7 @@ process.exit(result.status ?? 1);
 ```
 
 ## Dev Workflow
+
 ```bash
 # Link local plugin for development
 herdr plugin link /path/to/plugin
@@ -149,6 +155,7 @@ herdr plugin unlink example.layout
 ```
 
 ## Keybindings for Plugin Actions
+
 ```toml
 [[keys.command]]
 key = "prefix+l"
@@ -158,6 +165,7 @@ description = "apply layout"
 ```
 
 ## Install & Distribute
+
 ```bash
 # Install from GitHub (shorthand only, no URLs)
 herdr plugin install owner/repo[/subdir...] [--ref REF] [--yes]
@@ -169,6 +177,7 @@ herdr plugin uninstall <plugin-id|owner/repo[/subdir...]>
 **Marketplace listing:** Add the GitHub topic `herdr-plugin` to a public repository. Put one or more `herdr-plugin.toml` manifests on its default branch, at the root or in subdirectories. The index shows one card per repository and lists each valid manifest as a separately installable plugin, recording its `name`, `version`, `platforms`, `min_herdr_version`, and the exact default-branch commit. It refreshes every 30 minutes and rescans a repository when its default-branch head changes. It excludes forks, archived repositories, and manifests whose required metadata does not parse.
 
 ## Pitfalls
+
 - A plugin's build, startup, and runtime commands run as your user with your environment. Read the manifest before you install or link one.
 - `command` is argv, not shell. It supports no `$VAR` expansion, no pipes, and no `&&`.
 - Relative command paths resolve from the plugin root.

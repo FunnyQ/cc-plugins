@@ -1,6 +1,7 @@
 # WORK-04: Dashboard Rendering
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/types.md`
 >
@@ -56,15 +57,15 @@ export function formatTokens(value)
 
 Rules, in evaluation order:
 
-| Input | Output | Why |
-|---|---|---|
-| `undefined`, `null` | `"N/A"` | no measurement exists |
-| not a finite number | `"N/A"` | garbage in, no claim out |
-| negative | `"N/A"` | a token count cannot be negative; a negative one means the pipeline is broken, not that zero tokens were spent |
-| `0` | `"0"` | a real, measured zero |
-| `1`–`999` | the plain integer, e.g. `999` | |
-| `1_000`–`999_999` | one decimal with a `K` suffix | |
-| `1_000_000` and up | one decimal with an `M` suffix | |
+| Input               | Output                         | Why                                                                                                            |
+| ------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `undefined`, `null` | `"N/A"`                        | no measurement exists                                                                                          |
+| not a finite number | `"N/A"`                        | garbage in, no claim out                                                                                       |
+| negative            | `"N/A"`                        | a token count cannot be negative; a negative one means the pipeline is broken, not that zero tokens were spent |
+| `0`                 | `"0"`                          | a real, measured zero                                                                                          |
+| `1`–`999`           | the plain integer, e.g. `999`  |                                                                                                                |
+| `1_000`–`999_999`   | one decimal with a `K` suffix  |                                                                                                                |
+| `1_000_000` and up  | one decimal with an `M` suffix |                                                                                                                |
 
 Worked examples to assert directly: `999` → `"999"`, `1000` → `"1.0K"`, `8545` → `"8.5K"`, `278146` → `"278.1K"`, `7183857` → `"7.2M"`.
 
@@ -79,7 +80,7 @@ The fleet panel renders a header row of column labels (`.fleet-columns`, seven `
 The cell:
 
 ```js
-`<span class="fleet-cell -tokens" role="cell" title="${escapeHtml(tokenTitle(row.usage))}">${escapeHtml(formatTokens(row.usage?.output))}</span>`
+`<span class="fleet-cell -tokens" role="cell" title="${escapeHtml(tokenTitle(row.usage))}">${escapeHtml(formatTokens(row.usage?.output))}</span>`;
 ```
 
 Output tokens are the headline. The `title` attribute carries the input count too, so hovering reveals both. This is a **tooltip, not an expandable region** — it needs no interaction code, no expanded-state set, and no click handler.
@@ -139,7 +140,7 @@ Add one figure beside the existing `.plan-elapsed` block, following its shape: a
 Gate it on the rollup reporting work, not on the number being truthy:
 
 ```html
-<div class="plan-tokens" v-if="usage.agentCount">
+<div class="plan-tokens" v-if="usage.agentCount"></div>
 ```
 
 A zero-agent rollup renders nothing at all. An empty header slot labelled "Tokens" with no value is worse than no slot — it reads as a broken panel rather than an idle one.
@@ -169,12 +170,12 @@ The value is the plan-wide output total, through the same formatter. petite-vue 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | a missing measurement renders as `0` anywhere, or the formatter throws on a bad input | the `N/A` case is handled in one panel but not the others, or the header shows an empty slot at zero agents | absent and zero are visibly different in all three places; every formatter branch behaves as tabulated; the grid track count matches the rendered columns |
-| Test coverage | ×2 | no tests for the formatter | happy-path numbers only | every formatter branch asserted including null, non-finite, and negative; row rendering asserted for both the absent-usage and present-usage cases; the lanes absent-key case asserted |
-| Interface & readability | ×1 | a second copy of the formatter in a panel module, or usage derivation duplicated in the browser | the formatter is shared but the title-building logic is inlined twice | one exported formatter, one local title helper with its single caller, panels that render what they are handed |
-| Assumptions & docs | ×1 | the `N/A`-versus-zero distinction is nowhere explained | a comment says what the code does | a one-line comment says why absent must not render as zero, so the next reader does not "simplify" it away |
+| Dimension               | Weight | 0–1 (fail)                                                                                      | 2–3 (below bar)                                                                                             | 4–5 (pass)                                                                                                                                                                             |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | a missing measurement renders as `0` anywhere, or the formatter throws on a bad input           | the `N/A` case is handled in one panel but not the others, or the header shows an empty slot at zero agents | absent and zero are visibly different in all three places; every formatter branch behaves as tabulated; the grid track count matches the rendered columns                              |
+| Test coverage           | ×2     | no tests for the formatter                                                                      | happy-path numbers only                                                                                     | every formatter branch asserted including null, non-finite, and negative; row rendering asserted for both the absent-usage and present-usage cases; the lanes absent-key case asserted |
+| Interface & readability | ×1     | a second copy of the formatter in a panel module, or usage derivation duplicated in the browser | the formatter is shared but the title-building logic is inlined twice                                       | one exported formatter, one local title helper with its single caller, panels that render what they are handed                                                                         |
+| Assumptions & docs      | ×1     | the `N/A`-versus-zero distinction is nowhere explained                                          | a comment says what the code does                                                                           | a one-line comment says why absent must not render as zero, so the next reader does not "simplify" it away                                                                             |
 
 ## Out of scope
 

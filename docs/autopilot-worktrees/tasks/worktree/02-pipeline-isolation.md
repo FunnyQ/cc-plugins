@@ -1,6 +1,7 @@
 # WORKTREE-02: Run each task pipeline in its own worktree
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/models.md`
@@ -29,6 +30,7 @@ This change is behaviour-only. **Leave the tree watch, the deferral, the requali
 ### Clean-only land (stated on purpose)
 
 This task lands only a `clean` result. A later change replaces everything else in this list.
+
 - A land that returns `clean` lands, whatever its `drift` value, and gets no re-verify.
 - Any other land status (`conflict` or `leak`) is an infrastructure failure for that task, built with `infrastructureFailure(...)`.
   - Its cause starts with `LAND NOT CLEAN (<status>):` and lists `files` for a conflict or `paths` for a leak.
@@ -47,24 +49,26 @@ This task lands only a `clean` result. A later change replaces everything else i
 ### Mechanical worktree agents
 
 A Workflow script has no process API, so each `worktree.ts` call is an `agent()` with these properties:
+
 - It runs on haiku, taken from the mechanical entry of the role map in `../_context/models.md`, not a literal.
 - It has a JSON schema that mirrors the printed object, with every field required.
 - Its prompt says to run exactly this one command and return its stdout JSON through StructuredOutput. Include `RETURN_CONTRACT`.
 
 **Null-throwing wrapper.** The existing `resilient(make, retryModel)` retries only when `make` throws, and passes a `null` result through unchanged.
+
 - Add one helper, for example `wtCall(label, command, schema)`. Its `make` calls `agent(...)` and throws when the result is `null`, and it runs that `make` through `resilient(make, MODEL.structuredRetry)` (or whatever the role map calls the structuredRetry entry). A missing structured result is then retried exactly once.
 - The retry repeats the identical command string, including the same `--op` and the same `--expect`. Never recompute either between the two calls. This is safe because `worktree.ts` replays a recorded `--op` and makes every other subcommand idempotent.
 - A second failure, meaning the retry also threw, reaches the caller as a thrown error. The caller turns it into `infrastructureFailure(ref, attempt, cause, …)`, the same way a verify that returns nothing is handled. When the failing call is a sweep or the baseline, the run stops with the cause, because no task owns it.
 
-| Label | Command | Schema fields (all required) |
-|---|---|---|
-| `wt-create:<ref>` | `bun ${S}/worktree.ts create <ref> --repo … --slug …` | `path` string, `base` string |
-| `wt-land:<ref>` | `… land <ref> --expect <fingerprint> --op a<attempt>-land …` | `status` enum `clean`/`conflict`/`leak`, `drift` boolean, `files` string[], `paths` string[], `fingerprint` string, `previous` string |
-| `wt-remove:<ref>` | `… remove <ref> …` | `removed` boolean |
-| `wt-sweep:list` | `… sweep --keep-all …` | `removed` array, `kept` array of `{ ref, path }` |
-| `wt-show:<ref>` | `… show <ref> …` | `path` string, `base` string or null, `exists` boolean |
-| `wt-sweep:start` / `wt-sweep:end` | `… sweep --keep <ref,…> …`, omitting `--keep` when the list is empty | `removed` string[], `kept` array of `{ ref: string, path: string }` |
-| `wt-leak:baseline` | `… fingerprint …` | `fingerprint` string, `paths` string[] |
+| Label                             | Command                                                              | Schema fields (all required)                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `wt-create:<ref>`                 | `bun ${S}/worktree.ts create <ref> --repo … --slug …`                | `path` string, `base` string                                                                                                          |
+| `wt-land:<ref>`                   | `… land <ref> --expect <fingerprint> --op a<attempt>-land …`         | `status` enum `clean`/`conflict`/`leak`, `drift` boolean, `files` string[], `paths` string[], `fingerprint` string, `previous` string |
+| `wt-remove:<ref>`                 | `… remove <ref> …`                                                   | `removed` boolean                                                                                                                     |
+| `wt-sweep:list`                   | `… sweep --keep-all …`                                               | `removed` array, `kept` array of `{ ref, path }`                                                                                      |
+| `wt-show:<ref>`                   | `… show <ref> …`                                                     | `path` string, `base` string or null, `exists` boolean                                                                                |
+| `wt-sweep:start` / `wt-sweep:end` | `… sweep --keep <ref,…> …`, omitting `--keep` when the list is empty | `removed` string[], `kept` array of `{ ref: string, path: string }`                                                                   |
+| `wt-leak:baseline`                | `… fingerprint …`                                                    | `fingerprint` string, `paths` string[]                                                                                                |
 
 - The `wt-land` schema requires all six fields for every status, with the values fixed by the "Land result fields" table in `../_context/worktree.md`.
 - Build the land op id from the attempt: `a<attempt>-land`. A new attempt gets a new id.
@@ -73,6 +77,7 @@ A Workflow script has no process API, so each `worktree.ts` call is an `agent()`
 ### Main-tree lock
 
 Add a plain promise-chain lock beside `makeSlots`, for example `const withMainLock = (fn) => { const run = mainTail.then(fn); mainTail = run.catch(() => {}); return run }`.
+
 - Exactly one lock exists for the whole run.
 - It wraps **every** `wt-*` agent call: `wt-create`, `wt-land`, `wt-remove`, both `wt-sweep` calls, and `wt-leak:baseline`. Each one reads or rewrites the main tree or the shared `state.json`.
   - A multi-file `git apply` is not atomic, so a `create` that snapshots while another task is landing would capture half a land.
@@ -83,6 +88,7 @@ Add a plain promise-chain lock beside `makeSlots`, for example `const withMainLo
 ### Pipeline for a non-final task
 
 `executeTask(item, watch)` gains a per-task `wt = { path, base }`.
+
 1. Before the attempt loop, run `wt-create` under the lock, then set `live[ref] = path`.
 2. Each attempt runs dev, then verify, then judge, exactly as today, with the worktree rules in every prompt (see Prompts).
 3. When the judge passes, run `wt-land` under the lock with `--expect ${mainFingerprint} --op a<attempt>-land`.
@@ -98,6 +104,7 @@ Add a plain promise-chain lock beside `makeSlots`, for example `const withMainLo
 ### Live worktrees
 
 Keep one module-scope `live` map from ref to worktree path.
+
 - Set `live[ref]` right after every successful `wt-create`.
 - Delete `live[ref]` right after every successful `wt-remove`.
 - The kept-worktree report is `live` plus every entry in `startKept` (see below) whose ref the last scout still reports as `blocked`, with no duplicate refs. The run result's `worktrees`, and anything else that reports kept worktrees, uses only this union. Never build it from the end sweep's result.
@@ -109,7 +116,7 @@ Keep one module-scope `live` map from ref to worktree path.
   - Build the keep list from the first scout's `unfinished` entries whose `state` is `blocked`.
   - The sweep deliberately removes this slug's leftovers from a previous run, except those of `blocked` refs. It touches nothing outside the slug's worktree root, `<repo-parent>/.<repo-name>-autopilot/<slug>/`.
   - Save the sweep's returned `kept` entries (`{ ref, path }`) as `startKept`. They were not created by this run, so they are not in `live`.
-- **End sweep.** After the loop, run `wt-sweep:end --keep <refs>`. The keep list is every ref in `live`, plus every ref in `startKept` that the last *successful* scout still reports as `blocked`. A blocked leftover this run never touched therefore keeps its worktree, and its unlanded work survives.
+- **End sweep.** After the loop, run `wt-sweep:end --keep <refs>`. The keep list is every ref in `live`, plus every ref in `startKept` that the last _successful_ scout still reports as `blocked`. A blocked leftover this run never touched therefore keeps its worktree, and its unlanded work survives.
   - When the first scout failed, there is no keep list at all. Skip both sweeps, and instead run `wt-sweep:list` (`sweep --keep-all`, which removes nothing). Report its `kept` entries plus `live`, so every worktree on disk is listed.
   - When a later scout failed, skip the end sweep, and report `live` plus every `startKept` entry. A stale blocked state must never delete a worktree.
   - Add a test for each: first scout fails → only `wt-sweep:list` runs, and its entries appear in `worktrees`; a later scout fails → no `wt-sweep:end` runs and `startKept` entries are still reported.
@@ -121,6 +128,7 @@ Keep one module-scope `live` map from ref to worktree path.
 ### Prompts
 
 Add one helper, `worktreeRules(wtPath)`. It returns the rules from "Prompt rules for agents in a worktree" in `../_context/worktree.md`:
+
 - `WORKTREE: <path>`. Run `cd` there first. Every source file you create or edit has an absolute path under it.
 - Exactly three writes are exempt, because they belong to the run rather than the task's source:
   - `flightlog.ts log` into the main-tree flightlog.
@@ -132,17 +140,20 @@ Add one helper, `worktreeRules(wtPath)`. It returns the rules from "Prompt rules
 - External drivers run `cd <WORKTREE> && <command>` in one shell call.
 
 Pass the worktree path into `devPrompt`, `devExternalPrompt`, `verifyPrompt`, and `judgePrompt`, either as a new trailing parameter or through the item. Each includes `worktreeRules(path)` when the task is not a final review.
+
 - In `devExternalPrompt`, prefix the wrapper command line with `cd <WORKTREE> && `. The wrapper line is either `bun ${S}/${engine.wrapper} delegate…` or `bun ${CFG.relayPath} …`.
 - `markDonePrompt` and `markBlockedPrompt` stay main-tree only, because they edit the task file.
 
 ### Design notes prose (below the script)
 
 Rewrite the note that begins **"Do NOT give the dev agent `isolation: 'worktree'`."** so that it says three things:
+
 - `agent({isolation: 'worktree'})` is still wrong, because it isolates one agent call and never merges back.
 - The orchestrator now owns one worktree per task. It spans dev → verify → judge, and mechanical agents create and land it through `worktree.ts`.
 - A judged pass enters the main tree only through a three-way land under the main-tree lock.
 
 Also:
+
 - Add one short note on the main-tree lock. It covers every `worktree.ts` call, because a create that ran unlocked could snapshot half a land, and two unlocked state rewrites could lose an entry.
 - Add one short note on the null-throwing wrapper. `resilient` retries only a throw, and the retry is safe only because `worktree.ts` replays a repeated `--op`.
 - Edit only the sentences that now contradict behaviour. The deferral and held-back notes stay, because a later change deletes them.
@@ -186,12 +197,12 @@ Also:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Any of: a `wt-*` call runs without the lock; a final review gets a worktree; a non-clean land lands; a retried land uses a new `--op` or `--expect` | The clean path works, but a non-clean land removes its worktree, or `worktrees` is built from a sweep result | The clean path, the non-clean failure, both sweeps, and the cross-run blocked leftover match the worktree contract. Every `wt-*` call is under the lock and goes through the null-throwing wrapper. `worktrees` is the `live` ∪ still-blocked `startKept` union. |
-| Test coverage | ×2 | No new tests, or existing sibling-machinery tests edited to pass | Clean order and one failure branch tested | All of these are tested: clean order, lock exclusivity, the null-then-retry land, the double null, a non-clean land, drift treated as clean, final review, both sweeps, and the cross-run blocked leftover |
-| Interface & readability | ×1 | `worktree.ts` commands inlined ad hoc at each call site, with schemas duplicated | One helper per command, but retries or prompts assembled inconsistently | One `wtCall` helper, one `worktreeRules`, and one lock, matching the script's existing idiom |
-| Assumptions & docs | ×1 | Design notes still tell readers to sequence instead of isolate | Isolation note rewritten, but the lock or wrapper rationale is missing, or the clean-only branch has no comment | Isolation, lock, and wrapper notes each state their why in a few lines, and the clean-only branch carries its one-line comment |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                          | 2–3 (below bar)                                                                                                 | 4–5 (pass)                                                                                                                                                                                                                                                       |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Any of: a `wt-*` call runs without the lock; a final review gets a worktree; a non-clean land lands; a retried land uses a new `--op` or `--expect` | The clean path works, but a non-clean land removes its worktree, or `worktrees` is built from a sweep result    | The clean path, the non-clean failure, both sweeps, and the cross-run blocked leftover match the worktree contract. Every `wt-*` call is under the lock and goes through the null-throwing wrapper. `worktrees` is the `live` ∪ still-blocked `startKept` union. |
+| Test coverage           | ×2     | No new tests, or existing sibling-machinery tests edited to pass                                                                                    | Clean order and one failure branch tested                                                                       | All of these are tested: clean order, lock exclusivity, the null-then-retry land, the double null, a non-clean land, drift treated as clean, final review, both sweeps, and the cross-run blocked leftover                                                       |
+| Interface & readability | ×1     | `worktree.ts` commands inlined ad hoc at each call site, with schemas duplicated                                                                    | One helper per command, but retries or prompts assembled inconsistently                                         | One `wtCall` helper, one `worktreeRules`, and one lock, matching the script's existing idiom                                                                                                                                                                     |
+| Assumptions & docs      | ×1     | Design notes still tell readers to sequence instead of isolate                                                                                      | Isolation note rewritten, but the lock or wrapper rationale is missing, or the clean-only branch has no comment | Isolation, lock, and wrapper notes each state their why in a few lines, and the clean-only branch carries its one-line comment                                                                                                                                   |
 
 ## Out of scope
 

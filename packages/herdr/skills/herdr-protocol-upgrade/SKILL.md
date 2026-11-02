@@ -15,7 +15,7 @@ version: 2
 
 # Herdr protocol upgrade
 
-Herdr bumps its socket protocol often, and almost every bump only *adds* methods and fields. A plugin that pins an exact protocol number therefore breaks on upgrades that did not actually break it. The job here is to find out which kind of bump this was, cheaply.
+Herdr bumps its socket protocol often, and almost every bump only _adds_ methods and fields. A plugin that pins an exact protocol number therefore breaks on upgrades that did not actually break it. The job here is to find out which kind of bump this was, cheaply.
 
 ## Check
 
@@ -41,7 +41,7 @@ If the plugin compares protocols with `!=`, that is usually the real bug. An exa
 
 The trade-off is real and worth stating to the user rather than deciding for them: with no upper bound, a future removal surfaces as a runtime error instead of a clean startup notification. This script is what makes that acceptable — run it on each upgrade and the removal shows up before it ships.
 
-Two things tend to be missed when switching to a floor. The error message and notification usually read backwards afterwards, since only a *too-old* Herdr can trigger them now. And tests that hardcode the old protocol number fail one at a time across several runs; derive them from the constant instead.
+Two things tend to be missed when switching to a floor. The error message and notification usually read backwards afterwards, since only a _too-old_ Herdr can trigger them now. And tests that hardcode the old protocol number fail one at a time across several runs; derive them from the constant instead.
 
 ## OpenCode only — skip on Claude Code and Codex
 

@@ -1,6 +1,7 @@
 # DOCS-01: README and CLAUDE.md
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -40,6 +41,7 @@ Contents:
    ```
 
    Confirm each flag against the installer as built before publishing it. `--dry-run` also exists; mention it in one clause rather than a fourth code block.
+
 3. What `--apply` installs, as a short table: the 15 skills, the plugin module, the 13 chronicle agents, the 2 commands, and the one `subagent_depth` config edit. Target paths are tabulated in `../_context/shared.md` under "Where things install, under OpenCode".
 4. **The `subagent_depth` prerequisite gets its own short paragraph**, not a footnote. State the key, the file (`~/.config/opencode/opencode.json`), the required value (**at least 2**), and that the installer raises it (raise-only, every other key preserved). Say why a reader should care: below that depth a chronicle orchestrator simply stops, with no error naming the config — it reads as a plugin bug. Someone hand-editing that file needs the number.
 
@@ -145,12 +147,12 @@ The **Route sends by provider** paragraph under `## Cockpit constraints` (line 1
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A documented command does not run, or a capability claim is false — sends described as unsupported, spawn-depth listed as not-working, or a flag that does not exist | The install section is right but a stale exclusion survives, or the relay legacy symlink is kept as an alternative rather than replaced | Every command runs as written, every capability claim traces to a verified fact, both corrections applied, no stale exclusion anywhere |
-| Accuracy against observed runtime facts | ×2 | A claim is asserted from an `UNRESOLVED` entry | Claims are true but their preconditions are vague — "sends work" with no port requirement | Every OpenCode claim carries its precondition and matches its resolved entry word for word where the wording matters |
-| Tight sections | ×1 | The new sections restate the whole plan or duplicate the skills' own docs | Readable but padded; the works/doesn't lists blur into prose | Scannable; a reader decides in one pass whether OpenCode covers their use, and is pointed elsewhere rather than told twice |
-| Version policy documented | ×1 | No mention; a future reader bumps a plugin for this work | Mentioned in passing, easy to miss | Stated explicitly: no bump, no tag, no CHANGELOG entry, with the reason that `opencode/` belongs to no plugin |
+| Dimension                               | Weight | 0–1 (fail)                                                                                                                                                           | 2–3 (below bar)                                                                                                                         | 4–5 (pass)                                                                                                                             |
+| --------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                             | ×3     | A documented command does not run, or a capability claim is false — sends described as unsupported, spawn-depth listed as not-working, or a flag that does not exist | The install section is right but a stale exclusion survives, or the relay legacy symlink is kept as an alternative rather than replaced | Every command runs as written, every capability claim traces to a verified fact, both corrections applied, no stale exclusion anywhere |
+| Accuracy against observed runtime facts | ×2     | A claim is asserted from an `UNRESOLVED` entry                                                                                                                       | Claims are true but their preconditions are vague — "sends work" with no port requirement                                               | Every OpenCode claim carries its precondition and matches its resolved entry word for word where the wording matters                   |
+| Tight sections                          | ×1     | The new sections restate the whole plan or duplicate the skills' own docs                                                                                            | Readable but padded; the works/doesn't lists blur into prose                                                                            | Scannable; a reader decides in one pass whether OpenCode covers their use, and is pointed elsewhere rather than told twice             |
+| Version policy documented               | ×1     | No mention; a future reader bumps a plugin for this work                                                                                                             | Mentioned in passing, easy to miss                                                                                                      | Stated explicitly: no bump, no tag, no CHANGELOG entry, with the reason that `opencode/` belongs to no plugin                          |
 
 ## Out of scope
 

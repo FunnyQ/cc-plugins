@@ -8,7 +8,7 @@ shared by that mode.
 
 ## Plugin root
 
-OpenCode prints no *"Base directory for this skill"* banner, and
+OpenCode prints no _"Base directory for this skill"_ banner, and
 `CLAUDE_PLUGIN_ROOT` is empty. State the path literally:
 
 ```text

@@ -292,7 +292,10 @@ export const teach = (on: On) => {
   on("prompt.submit", { origin: { kind: "composer" } }, async ($, e, next) => {
     const r = await next(e);
     if (!("drop" in r))
-      teacher.submit(r.text, $.session.id().catch(() => undefined));
+      teacher.submit(
+        r.text,
+        $.session.id().catch(() => undefined),
+      );
     return r;
   });
 };

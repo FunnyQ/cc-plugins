@@ -74,7 +74,9 @@ describe.skipIf(!installed)("chrome CLI against a real browser", () => {
       const id = opened.out.split(" ")[0]!;
 
       try {
-        expect(await runAsync("click", "--id", id, "#go")).toMatchObject({ code: 0 });
+        expect(await runAsync("click", "--id", id, "#go")).toMatchObject({
+          code: 0,
+        });
         expect(
           (
             await runAsync(

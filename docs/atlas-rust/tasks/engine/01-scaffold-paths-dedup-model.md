@@ -1,6 +1,7 @@
 # ENGINE-01: Atlas scaffold, paths, dedup, and model types
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -141,12 +142,12 @@ rustls pulls `ring` (C/asm). CI (`.github/workflows/cockpit-release.yml`) builds
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Build fails, dispatch missing, or `serve_dir` changes cockpit behavior | Dispatch works but `hour_start_ms` is UTC or wrong across DST, or jsonl splits UTF-8, or a signature drifts from `engine-api.md` | Signatures exactly match `engine-api.md`; local-hour, jsonl cursor, dedup, and path fallbacks match the TS; cockpit suite green |
-| Test coverage | ×2 | No cargo tests | Happy paths only; no DST or multibyte boundary case | DST, multibyte boundary, partial line, env-seam, and path-fallback cases, with TS-derived expected values |
-| Interface & readability | ×1 | A bare or bogus `atlas` subcommand, or an illegal `--source`, reaches a stub or panics; or modules are merged (a `todo!()` panic from a real but not-yet-ported subcommand is expected at this stage) | Usable, but helpers duplicated from cockpit modules or env read in statics | One module per TS module; cockpit helpers reused per `shared.md`; lazily resolved paths |
-| Assumptions & docs | ×1 | New deps with no justification | Justified deps, but the rustls feature name or musl status is unverified and unreported | Feature name confirmed via context7; musl build status stated; stub-only `allow(dead_code)` commented |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                                                                            | 2–3 (below bar)                                                                                                                  | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Build fails, dispatch missing, or `serve_dir` changes cockpit behavior                                                                                                                                | Dispatch works but `hour_start_ms` is UTC or wrong across DST, or jsonl splits UTF-8, or a signature drifts from `engine-api.md` | Signatures exactly match `engine-api.md`; local-hour, jsonl cursor, dedup, and path fallbacks match the TS; cockpit suite green |
+| Test coverage           | ×2     | No cargo tests                                                                                                                                                                                        | Happy paths only; no DST or multibyte boundary case                                                                              | DST, multibyte boundary, partial line, env-seam, and path-fallback cases, with TS-derived expected values                       |
+| Interface & readability | ×1     | A bare or bogus `atlas` subcommand, or an illegal `--source`, reaches a stub or panics; or modules are merged (a `todo!()` panic from a real but not-yet-ported subcommand is expected at this stage) | Usable, but helpers duplicated from cockpit modules or env read in statics                                                       | One module per TS module; cockpit helpers reused per `shared.md`; lazily resolved paths                                         |
+| Assumptions & docs      | ×1     | New deps with no justification                                                                                                                                                                        | Justified deps, but the rustls feature name or musl status is unverified and unreported                                          | Feature name confirmed via context7; musl build status stated; stub-only `allow(dead_code)` commented                           |
 
 ## Out of scope
 

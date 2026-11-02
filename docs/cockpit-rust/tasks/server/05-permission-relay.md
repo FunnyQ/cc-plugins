@@ -1,6 +1,7 @@
 # SERVER-05: Permission relay
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -97,12 +98,12 @@ Only when the pending entry exists with that id: tear down its guard and timer, 
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Verdicts lost or delivered to the wrong request; stale prompts never withdrawn | Main flow works; guard window, stash, or abandoned path drifts | Request, verdict, pull, stash, guard, resolved-elsewhere, and presence all match TS |
-| Test coverage | ×2 | Contract group not run on Rust | Group passes; guard and presence untested in Rust | Group passes on both; `cargo test` covers `is_forward_progress`, expiry teardown, pull replacement, subscriber pruning |
-| Interface & readability | ×1 | Edits outside `permission.rs`, or presence API changed | Works, but watcher/timer ownership is unclear | Each pending owns its guard and timer; teardown is one function; only `permission.rs` touched |
-| Assumptions & docs | ×1 | Guard window hard-coded | Env honoured; closed-sender probe choice unexplained | Env fallbacks match TS; the probe replacement and ordering carry one-line whys |
+| Dimension               | Weight | 0–1 (fail)                                                                     | 2–3 (below bar)                                                | 4–5 (pass)                                                                                                             |
+| ----------------------- | ------ | ------------------------------------------------------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Verdicts lost or delivered to the wrong request; stale prompts never withdrawn | Main flow works; guard window, stash, or abandoned path drifts | Request, verdict, pull, stash, guard, resolved-elsewhere, and presence all match TS                                    |
+| Test coverage           | ×2     | Contract group not run on Rust                                                 | Group passes; guard and presence untested in Rust              | Group passes on both; `cargo test` covers `is_forward_progress`, expiry teardown, pull replacement, subscriber pruning |
+| Interface & readability | ×1     | Edits outside `permission.rs`, or presence API changed                         | Works, but watcher/timer ownership is unclear                  | Each pending owns its guard and timer; teardown is one function; only `permission.rs` touched                          |
+| Assumptions & docs      | ×1     | Guard window hard-coded                                                        | Env honoured; closed-sender probe choice unexplained           | Env fallbacks match TS; the probe replacement and ordering carry one-line whys                                         |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # UI-03: agent fleet and score meters
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/hangar.md`
@@ -131,13 +132,13 @@ complete list.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Reimplements pairing or ordering, or in-flight rows never appear | Renders the payload but re-sorts it, or recomputes a finished row's elapsed value | Renders rows as given, replaces on each snapshot, ticks only in-flight rows, all three connection states correct |
-| Design fidelity | ×2 | Invents colours, or animates whole rows | Uses tokens but the meter or badge form drifts | Only the dot pulses, meter and badge match the specs, reduced-motion honoured |
-| Test coverage | ×2 | No verification performed | Rendered a static trail only | Static trail, live append, reconnect, missing-log waiting state, unknown label, reduced motion |
-| Interface & readability | ×1 | Stream handling and rendering tangled | Separated but the component carries derivation helpers it should not own | Stream client separate from the component, component is a pure renderer over the payload |
-| Assumptions & docs | ×1 | The server-owns-derivation split is undocumented | Noted but not explained | Comments explain why rows are rendered as given and why the live tick is the one exception |
+| Dimension               | Weight | 0–1 (fail)                                                       | 2–3 (below bar)                                                                   | 4–5 (pass)                                                                                                       |
+| ----------------------- | ------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Reimplements pairing or ordering, or in-flight rows never appear | Renders the payload but re-sorts it, or recomputes a finished row's elapsed value | Renders rows as given, replaces on each snapshot, ticks only in-flight rows, all three connection states correct |
+| Design fidelity         | ×2     | Invents colours, or animates whole rows                          | Uses tokens but the meter or badge form drifts                                    | Only the dot pulses, meter and badge match the specs, reduced-motion honoured                                    |
+| Test coverage           | ×2     | No verification performed                                        | Rendered a static trail only                                                      | Static trail, live append, reconnect, missing-log waiting state, unknown label, reduced motion                   |
+| Interface & readability | ×1     | Stream handling and rendering tangled                            | Separated but the component carries derivation helpers it should not own          | Stream client separate from the component, component is a pure renderer over the payload                         |
+| Assumptions & docs      | ×1     | The server-owns-derivation split is undocumented                 | Noted but not explained                                                           | Comments explain why rows are rendered as given and why the live tick is the one exception                       |
 
 ## Out of scope
 

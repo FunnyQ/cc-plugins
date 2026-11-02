@@ -1,6 +1,7 @@
 # CONTRACT-02: fleet and task state derivation
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -34,7 +35,10 @@ exactly those signatures. The notes below cover only what that file does not.
 ```ts
 import type { ParsedTask } from "../../flightplan/scripts/lib/parse-task";
 import { refToString } from "../../flightplan/scripts/lib/parse-task";
-import type { FlightlogEntry, ScoreEntry } from "../../flightplan/scripts/lib/flightlog";
+import type {
+  FlightlogEntry,
+  ScoreEntry,
+} from "../../flightplan/scripts/lib/flightlog";
 ```
 
 Nothing else. Do not import from `packages/monitor`.
@@ -136,12 +140,12 @@ start produces a `finished` row with no `startedAt` and no `elapsedMs`.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A label form parses wrong, or a running task derives as ready | Common cases right but the engine-prefixed label, the dangling dependency, or the per-attempt pairing is wrong | Every taxonomy form parses, all six precedence rules apply in order, pairing is per-attempt, malformed entries never throw |
-| Test coverage | ×2 | No tests | Happy path per function only | Every label form, each of the four states, unpaired start, end-without-start, several completion-only rows ordering deterministically, key collision, score for an unknown ref, empty log |
-| Interface & readability | ×1 | Functions read files or call the clock | Pure but signatures drift from the specified types | Exactly the specified signatures, no I/O, no clock, composable |
-| Assumptions & docs | ×1 | The dev-prefix ordering trap is undocumented | Noted but not explained | Comments explain *why* the engine form matches first and *why* elapsed comes from timestamps |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                                                                                                | 4–5 (pass)                                                                                                                                                                                |
+| ----------------------- | ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A label form parses wrong, or a running task derives as ready | Common cases right but the engine-prefixed label, the dangling dependency, or the per-attempt pairing is wrong | Every taxonomy form parses, all six precedence rules apply in order, pairing is per-attempt, malformed entries never throw                                                                |
+| Test coverage           | ×2     | No tests                                                      | Happy path per function only                                                                                   | Every label form, each of the four states, unpaired start, end-without-start, several completion-only rows ordering deterministically, key collision, score for an unknown ref, empty log |
+| Interface & readability | ×1     | Functions read files or call the clock                        | Pure but signatures drift from the specified types                                                             | Exactly the specified signatures, no I/O, no clock, composable                                                                                                                            |
+| Assumptions & docs      | ×1     | The dev-prefix ordering trap is undocumented                  | Noted but not explained                                                                                        | Comments explain _why_ the engine form matches first and _why_ elapsed comes from timestamps                                                                                              |
 
 ## Out of scope
 

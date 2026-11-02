@@ -1,6 +1,7 @@
 # DOCS-01: Flightplan docs for Models and the narrowed Max parallel
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/models.md`
 > - `../_context/worktree.md`
@@ -25,6 +26,7 @@ A flightplan author reads the flightplan docs and learns two things: autopilot i
 ## Implementation notes
 
 Follow the repo's writing rule in every edited paragraph:
+
 - Write one instruction per sentence.
 - Start each instruction with a verb.
 - Put the condition before the instruction.
@@ -90,6 +92,7 @@ Inline these rules in that section; do not point at another file for them:
 ### lint-task.test.ts — the template example lints clean
 
 Add one test to `packages/dispatch/skills/flightplan/scripts/lint-task.test.ts`:
+
 - Read `packages/dispatch/skills/flightplan/references/task-template.md`, resolved relative to the test file.
 - Slice the text of the `### Models` section: from its heading to the next `### ` or `## ` heading.
 - Extract the section's first line matching `/^> \*\*Models\*\*:.*$/m`. The test fails when no line matches.
@@ -131,12 +134,12 @@ The test stops the documented example and the parser from drifting apart.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | "one build target" still recommends a cap, the Models syntax is wrong, or the template's example line fails the parser | Syntax right, but defaults, the `fix` restriction, or the escalation rule is missing or wrong | Every fact matches `models.md` and `worktree.md`; both runtimes are described accurately |
-| Consistency with _context | ×2 | Contradicts a `_context/` decision | Uses different terms for the same thing across the four files | One term per thing, and every file agrees with the others and with `_context/` |
-| Clarity | ×1 | Rules buried in long paragraphs | Readable, but conditions come after instructions or several instructions share a sentence | One instruction per sentence, verb first, condition first |
-| Scope | ×1 | Edits files outside the five listed | Rewrites unrelated sections of the four files | Only the named paragraphs and additions change |
+| Dimension                 | Weight | 0–1 (fail)                                                                                                             | 2–3 (below bar)                                                                               | 4–5 (pass)                                                                               |
+| ------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Correctness               | ×3     | "one build target" still recommends a cap, the Models syntax is wrong, or the template's example line fails the parser | Syntax right, but defaults, the `fix` restriction, or the escalation rule is missing or wrong | Every fact matches `models.md` and `worktree.md`; both runtimes are described accurately |
+| Consistency with _context | ×2     | Contradicts a `_context/` decision                                                                                     | Uses different terms for the same thing across the four files                                 | One term per thing, and every file agrees with the others and with `_context/`           |
+| Clarity                   | ×1     | Rules buried in long paragraphs                                                                                        | Readable, but conditions come after instructions or several instructions share a sentence     | One instruction per sentence, verb first, condition first                                |
+| Scope                     | ×1     | Edits files outside the five listed                                                                                    | Rewrites unrelated sections of the four files                                                 | Only the named paragraphs and additions change                                           |
 
 ## Out of scope
 

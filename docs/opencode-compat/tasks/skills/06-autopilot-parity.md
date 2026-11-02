@@ -1,6 +1,7 @@
 # SKILLS-06: Autopilot — OpenCode parity
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -32,7 +33,7 @@ Touching any `.ts` file, any `plugin.json`, or any hook script under `packages/`
 
 ### The script-root branch
 
-`packages/dispatch/skills/autopilot/SKILL.md:47` resolves two paths — `<base>/../flightplan/scripts` as `$SCRIPTS` and `<base>/scripts` as `$OWN` — and warns that `CLAUDE_PLUGIN_ROOT` is unreliable, telling the reader to take `<base>` from the skill's load-time *"Base directory for this skill"* banner.
+`packages/dispatch/skills/autopilot/SKILL.md:47` resolves two paths — `<base>/../flightplan/scripts` as `$SCRIPTS` and `<base>/scripts` as `$OWN` — and warns that `CLAUDE_PLUGIN_ROOT` is unreliable, telling the reader to take `<base>` from the skill's load-time _"Base directory for this skill"_ banner.
 
 So the OpenCode branch is **not** "replace `CLAUDE_PLUGIN_ROOT`" — there is nothing to replace. It states the OpenCode install root outright. The rule to reproduce is quoted in `../_context/shared.md` under "The OpenCode skill root rule".
 
@@ -42,7 +43,7 @@ The sibling-relative path survives the install layout, and this is worth stating
 
 ### The manual wave loop — the substance of this task
 
-`packages/dispatch/skills/autopilot/SKILL.md:33` currently opens with "Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent to call Workflow is a *sanctioned opt-in*." Under OpenCode there is no Workflow tool (runtime fact S10). Autopilot therefore runs as a **hand-driven wave loop over the task tool**, and the branch must document it step by step:
+`packages/dispatch/skills/autopilot/SKILL.md:33` currently opens with "Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent to call Workflow is a _sanctioned opt-in_." Under OpenCode there is no Workflow tool (runtime fact S10). Autopilot therefore runs as a **hand-driven wave loop over the task tool**, and the branch must document it step by step:
 
 1. Run the ready-task lister (`next-ready.ts`, from the flightplan skill's `scripts/`) against the tasks directory to get the current wave.
 2. For each ready task in the wave, spawn a subagent through the task tool in the **dev role**, giving it the task file path.
@@ -108,12 +109,12 @@ If a blocking fact is still marked `UNRESOLVED`, set this file's header to `> **
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Touches a `.ts`, a `plugin.json`, or the lint hook script; ports the orchestrator script; or names a spawn type that does not exist | Wave loop present but a step is vague, or the branch asserts a runtime fact still marked unresolved | Eight-step loop concrete and ordered, spawn steps honest about the unresolved type, orchestrator note added without touching the script |
-| Non-regression | ×2 | Existing Claude or Codex instructions rewritten, reordered, or deleted | Additions dilute a neighbouring instruction, or blocks are unfenced and hard to skip | Diff is purely additive, every block clearly fenced, a Claude reader's path untouched |
-| Honest parity caveat | ×1 | Implies OpenCode autopilot equals the Claude flight | Caveat present but buried or hedged | A reader learns before the loop steps that waves are hand-driven and unattended scheduling does not exist |
-| Assumptions & docs | ×1 | Invents banner, Workflow, or spawn-type behavior not observed | Facts cited loosely, or the two meanings of OpenCode left ambiguous | Every runtime-dependent claim names its fact, the engine-versus-harness distinction stated outright |
+| Dimension            | Weight | 0–1 (fail)                                                                                                                          | 2–3 (below bar)                                                                                     | 4–5 (pass)                                                                                                                              |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness          | ×3     | Touches a `.ts`, a `plugin.json`, or the lint hook script; ports the orchestrator script; or names a spawn type that does not exist | Wave loop present but a step is vague, or the branch asserts a runtime fact still marked unresolved | Eight-step loop concrete and ordered, spawn steps honest about the unresolved type, orchestrator note added without touching the script |
+| Non-regression       | ×2     | Existing Claude or Codex instructions rewritten, reordered, or deleted                                                              | Additions dilute a neighbouring instruction, or blocks are unfenced and hard to skip                | Diff is purely additive, every block clearly fenced, a Claude reader's path untouched                                                   |
+| Honest parity caveat | ×1     | Implies OpenCode autopilot equals the Claude flight                                                                                 | Caveat present but buried or hedged                                                                 | A reader learns before the loop steps that waves are hand-driven and unattended scheduling does not exist                               |
+| Assumptions & docs   | ×1     | Invents banner, Workflow, or spawn-type behavior not observed                                                                       | Facts cited loosely, or the two meanings of OpenCode left ambiguous                                 | Every runtime-dependent claim names its fact, the engine-versus-harness distinction stated outright                                     |
 
 ## Out of scope
 

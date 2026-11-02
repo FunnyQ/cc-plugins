@@ -49,7 +49,7 @@ Resolve `$SKILL_DIR` from the load-time **"Base directory for this skill"** bann
 
 ## Addressing
 
-Herdr runs one workspace per project, and its label *is* the project name; herdr-app does the same with a space per project — the fragment is matched case-insensitively against that workspace label, the tab label, the agent name, the pane id, and the cwd. Split it on `/` to narrow. Every part must match, though different parts may match different fields. `web-app/dashboard` resolves on workspace plus tab; `clients/acme` resolves on path plus label.
+Herdr runs one workspace per project, and its label _is_ the project name; herdr-app does the same with a space per project — the fragment is matched case-insensitively against that workspace label, the tab label, the agent name, the pane id, and the cwd. Split it on `/` to narrow. Every part must match, though different parts may match different fields. `web-app/dashboard` resolves on workspace plus tab; `clients/acme` resolves on path plus label.
 
 The readable address is the agent's `name` when it has one, otherwise `workspaceLabel/tabLabel`. `paneId` is the exact one; under herdr-app it holds the terminal address, such as `t3m`. It is the only handle guaranteed unique, because two tabs in one workspace may share a label. Every failure message already prints both, so pass the fullest fragment you have and let the error correct you. Run `list` only when the user asks who is open.
 
@@ -76,7 +76,7 @@ Put those candidates to the user through the harness's own question tool. On Cla
 
 **Never pick for them, and never work around a refusal.** Do not send to the first candidate, do not loop over the candidates, and do not fall back to `herdr pane send-text`. This applies at the registry layer too: an ambiguous fragment there refuses rather than guessing which repo to open a fresh agent in — spawning into the wrong one is worse than telling the wrong agent, since a prompt cannot be recalled and every agent that receives one acts on it in its own repo.
 
-**A typo that matches nothing is safe; one that matches something is not.** On zero live matches the error, once the registry and zoxide also come up empty, lists every reachable agent — read that list back and ask which was meant. But a fragment is a substring, so a mistyped one can resolve uniquely to the *wrong* agent or, worse, the wrong project to spawn into. Prefer the fullest fragment you have.
+**A typo that matches nothing is safe; one that matches something is not.** On zero live matches the error, once the registry and zoxide also come up empty, lists every reachable agent — read that list back and ask which was meant. But a fragment is a substring, so a mistyped one can resolve uniquely to the _wrong_ agent or, worse, the wrong project to spawn into. Prefer the fullest fragment you have.
 
 **Ask before telling anything destructive.** The receiving agent has its own permissions in its own working tree. Deleting, force-pushing, releasing, or deploying there deserves the same confirmation it would deserve here.
 

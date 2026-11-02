@@ -1,6 +1,7 @@
 # FOUNDATION-01: Extract the shared cockpit trail reader
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -27,21 +28,23 @@ This task has three halves that must not blur together: symbols **moved** out of
 
 These already exist in `packages/chronicle/skills/pr/scripts/analyze-branch.ts`. Cut them, paste them into the new shared module, and export them. Grep for each name rather than trusting a line number — the file will shift as you edit it.
 
-| Symbol | Currently | After |
-|---|---|---|
-| `DecisionRecord` | exported type | exported from the shared module, re-exported or imported by the analyzer |
-| `RegistryEntry` | private type | exported type on the shared module |
-| `projectMatches` | exported function | exported from the shared module |
-| `normalizePath` | private helper of `projectMatches` | private helper inside the shared module |
-| `isDecisionRecord` | private function | exported from the shared module |
-| `readDecisionLog` | private async function | exported from the shared module |
-| `collectDecisions` | exported async function | exported from the shared module, injectable `read` parameter intact |
+| Symbol             | Currently                          | After                                                                    |
+| ------------------ | ---------------------------------- | ------------------------------------------------------------------------ |
+| `DecisionRecord`   | exported type                      | exported from the shared module, re-exported or imported by the analyzer |
+| `RegistryEntry`    | private type                       | exported type on the shared module                                       |
+| `projectMatches`   | exported function                  | exported from the shared module                                          |
+| `normalizePath`    | private helper of `projectMatches` | private helper inside the shared module                                  |
+| `isDecisionRecord` | private function                   | exported from the shared module                                          |
+| `readDecisionLog`  | private async function             | exported from the shared module                                          |
+| `collectDecisions` | exported async function            | exported from the shared module, injectable `read` parameter intact      |
 
 Also move the cockpit-home and registry-path resolution that is currently inlined inside `harvestCockpit`:
 
 ```ts
-const dataHome = process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
-const cockpitHome = process.env.COCKPIT_HOME || join(dataHome, "q-lab", "cockpit");
+const dataHome =
+  process.env.XDG_DATA_HOME || join(homedir(), ".local", "share");
+const cockpitHome =
+  process.env.COCKPIT_HOME || join(dataHome, "q-lab", "cockpit");
 const registryPath = join(cockpitHome, "registry.json");
 ```
 
@@ -167,12 +170,12 @@ Use `LogRootDeps.gitRoot` to inject in tests rather than shelling out to real gi
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A symbol is missing, the analyzer still holds a local copy, or the monitor plugin was imported rather than ported | Compiles and the new tests pass, but the existing PR suite needed edits to go green, or the walk-up can cross the git root | Every listed symbol exported, the PR test file untouched and reporting 35 pass, the walk-up bounded, both port details handled |
-| Test coverage | ×2 | No new tests, or tests that only import the module | Happy-path walk-up and a clean JSONL file only | All five named cases covered, including the symlinked temp directory and cwd outside the reported root |
-| Interface & readability | ×1 | Environment variables read at module load, or filesystem calls hard-wired so tests cannot inject | Works, but `LogRootDeps` is unused or the return types are implicit | `logRoot` takes its injectable dep, `collectDecisions` keeps its injectable `read`, `type` used throughout, names match the domain vocabulary |
-| Assumptions & docs | ×1 | Ported values appear as bare magic numbers with no origin | A comment says what the constant is but not where it came from or why it was copied | Every ported item names its monitor source file and says why it was copied rather than imported |
+| Dimension               | Weight | 0–1 (fail)                                                                                                        | 2–3 (below bar)                                                                                                            | 4–5 (pass)                                                                                                                                    |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A symbol is missing, the analyzer still holds a local copy, or the monitor plugin was imported rather than ported | Compiles and the new tests pass, but the existing PR suite needed edits to go green, or the walk-up can cross the git root | Every listed symbol exported, the PR test file untouched and reporting 35 pass, the walk-up bounded, both port details handled                |
+| Test coverage           | ×2     | No new tests, or tests that only import the module                                                                | Happy-path walk-up and a clean JSONL file only                                                                             | All five named cases covered, including the symlinked temp directory and cwd outside the reported root                                        |
+| Interface & readability | ×1     | Environment variables read at module load, or filesystem calls hard-wired so tests cannot inject                  | Works, but `LogRootDeps` is unused or the return types are implicit                                                        | `logRoot` takes its injectable dep, `collectDecisions` keeps its injectable `read`, `type` used throughout, names match the domain vocabulary |
+| Assumptions & docs      | ×1     | Ported values appear as bare magic numbers with no origin                                                         | A comment says what the constant is but not where it came from or why it was copied                                        | Every ported item names its monitor source file and says why it was copied rather than imported                                               |
 
 ## Out of scope
 

@@ -22,9 +22,7 @@
     "longDescription": "The agent writes a small JSON spec of tunable values; atelier renders sliders, colour, easing and spring controls beside the effect, or injects them into your running dev server page. Press Apply and the agent receives only the final values.",
     "developerName": "Q",
     "category": "Productivity",
-    "capabilities": [
-      "Interactive"
-    ],
+    "capabilities": ["Interactive"],
     "defaultPrompt": [
       "Let me tune this card's glow with sliders.",
       "Give me controls for the modal's open animation.",

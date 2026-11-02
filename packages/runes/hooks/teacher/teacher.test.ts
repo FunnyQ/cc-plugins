@@ -92,7 +92,10 @@ test("no key asks nothing", async () => {
     record: () => {},
     language: async () => undefined,
   });
-  teacher.submit("could you making this more faster please", Promise.resolve("s1"));
+  teacher.submit(
+    "could you making this more faster please",
+    Promise.resolve("s1"),
+  );
   await new Promise((r) => setTimeout(r, 5));
   expect(posts).toBe(0);
   expect(teacher.lesson("could you making this more faster please")).toBe(
@@ -140,14 +143,26 @@ test("parseReply takes a why written after the rewrite", () => {
     parseReply("<quip>RIP</quip>\nCan you check?\n<why>can + base verb</why>"),
   ).toEqual({ better: "Can you check?", quip: "RIP", why: "can + base verb" });
   expect(
-    parseReply("<quip>RIP</quip>\nCan you\ncheck?\n<why>\nUse the base verb\nafter can.\n</why>\n"),
-  ).toEqual({ better: "Can you\ncheck?", quip: "RIP", why: "Use the base verb after can." });
+    parseReply(
+      "<quip>RIP</quip>\nCan you\ncheck?\n<why>\nUse the base verb\nafter can.\n</why>\n",
+    ),
+  ).toEqual({
+    better: "Can you\ncheck?",
+    quip: "RIP",
+    why: "Use the base verb after can.",
+  });
 });
 
 test("parseReply reads a tag that spans lines and folds its whitespace", () => {
   expect(
-    parseReply("<quip>RIP</quip>\n<why>\nUse the base verb\nafter can.\n</why>\nCan you check?"),
-  ).toEqual({ better: "Can you check?", quip: "RIP", why: "Use the base verb after can." });
+    parseReply(
+      "<quip>RIP</quip>\n<why>\nUse the base verb\nafter can.\n</why>\nCan you check?",
+    ),
+  ).toEqual({
+    better: "Can you check?",
+    quip: "RIP",
+    why: "Use the base verb after can.",
+  });
   expect(
     parseReply(`<why>\n${"rule ".repeat(40)}\n</why>\nCan you check?`),
   ).toEqual({ better: "Can you check?", quip: undefined, why: undefined });
@@ -155,7 +170,12 @@ test("parseReply reads a tag that spans lines and folds its whitespace", () => {
 
 test("a lesson with a why still draws in a column narrower than one cell", () => {
   expect(() =>
-    lessonLines("can you checking it", "Can you check it?", "can + base verb", -1),
+    lessonLines(
+      "can you checking it",
+      "Can you check it?",
+      "can + base verb",
+      -1,
+    ),
   ).not.toThrow();
 });
 
@@ -272,7 +292,9 @@ test("isRewrite rejects a reply far longer than the prompt or holding a fence, w
 
 test("keyOf strips pasted_content blocks, so only what the user typed is taught", () => {
   expect(
-    keyOf(`<pasted_content id="d204">\n共用 base sheet 拆分。\n</pasted_content id="d204">\n\nlets improving those 2 now`),
+    keyOf(
+      `<pasted_content id="d204">\n共用 base sheet 拆分。\n</pasted_content id="d204">\n\nlets improving those 2 now`,
+    ),
   ).toBe("lets improving those 2 now");
 });
 
@@ -435,11 +457,19 @@ const recorded = async (seen: Seen[]) => {
 const both = scored({ english: { noul: 0.95 }, improve: { noul: 0.9 } });
 
 test("a failed Jev call records jev-failed with no scores", async () => {
-  const seen = recording(async () => ({ ok: false, text: "" }), async () => "x");
+  const seen = recording(
+    async () => ({ ok: false, text: "" }),
+    async () => "x",
+  );
   teacher.submit("record the failing jev call please", Promise.resolve("s1"));
   const a = await recorded(seen);
   expect(a.outcome).toBe("jev-failed");
-  expect([a.english, a.improve, a.better, a.quip]).toEqual([null, null, null, null]);
+  expect([a.english, a.improve, a.better, a.quip]).toEqual([
+    null,
+    null,
+    null,
+    null,
+  ]);
 });
 
 test("a gated prompt records its scores and no rewrite", async () => {
@@ -450,7 +480,12 @@ test("a gated prompt records its scores and no rewrite", async () => {
   teacher.submit("thanks that works fine for me", Promise.resolve("s1"));
   const a = await recorded(seen);
   expect(a.outcome).toBe("gated");
-  expect([a.english, a.improve, a.better, a.quip]).toEqual([0.9, 0.1, null, null]);
+  expect([a.english, a.improve, a.better, a.quip]).toEqual([
+    0.9,
+    0.1,
+    null,
+    null,
+  ]);
 });
 
 test("a gated prompt with a missing answer records that score as null", async () => {
@@ -467,7 +502,12 @@ test("no reply from the model records no-reply", async () => {
   teacher.submit("the model never answering this one", Promise.resolve("s1"));
   const a = await recorded(seen);
   expect(a.outcome).toBe("no-reply");
-  expect([a.english, a.improve, a.better, a.quip]).toEqual([0.95, 0.9, null, null]);
+  expect([a.english, a.improve, a.better, a.quip]).toEqual([
+    0.95,
+    0.9,
+    null,
+    null,
+  ]);
 });
 
 test("a model call that throws records no-reply", async () => {
@@ -503,7 +543,10 @@ test("the why is asked in the settings language, and the logged system is the on
 
 test("no settings language asks the why in English", async () => {
   let sent = "";
-  const seen = recording(both, async (_, system) => ((sent = system), "Please check it."));
+  const seen = recording(
+    both,
+    async (_, system) => ((sent = system), "Please check it."),
+  );
   teacher.submit("please checking the default language", Promise.resolve("s1"));
   await recorded(seen);
   expect(sent).not.toContain("Write the why in");
@@ -528,7 +571,10 @@ test("a rewrite equal to the prompt records same", async () => {
 });
 
 test("a reply holding a fence records not-rewrite", async () => {
-  const seen = recording(both, async () => "<quip>Wow.</quip>\nSure:\n```ts\nfast()\n```");
+  const seen = recording(
+    both,
+    async () => "<quip>Wow.</quip>\nSure:\n```ts\nfast()\n```",
+  );
   teacher.submit("please making this code more fast", Promise.resolve("s1"));
   const a = await recorded(seen);
   expect(a.outcome).toBe("not-rewrite");
@@ -539,7 +585,8 @@ test("a reply holding a fence records not-rewrite", async () => {
 test("a shown lesson records the rewrite, the quip, the thresholds and the system prompt", async () => {
   const seen = recording(
     both,
-    async () => "<quip>Checking? Bold tense.</quip>\nCan you check the logs first?",
+    async () =>
+      "<quip>Checking? Bold tense.</quip>\nCan you check the logs first?",
   );
   teacher.submit("can you checking the logs first", Promise.resolve("s1"));
   const a = await recorded(seen);
@@ -563,7 +610,10 @@ test("record receives the very session promise submit was given", async () => {
 
 test("a recorded prompt, rewrite and quip never hold a raw secret", async () => {
   const key = "sk-abcdefghijklmnopqrstuv";
-  const seen = recording(both, async () => `<quip>${key} leaked</quip>\nPlease use ${key} here.`);
+  const seen = recording(
+    both,
+    async () => `<quip>${key} leaked</quip>\nPlease use ${key} here.`,
+  );
   teacher.submit(`please using ${key} here`, Promise.resolve("s1"));
   const a = await recorded(seen);
   expect(a.outcome).toBe("shown");

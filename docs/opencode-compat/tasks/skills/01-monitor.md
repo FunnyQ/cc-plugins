@@ -1,6 +1,7 @@
 # SKILLS-01: Monitor skills — OpenCode branches
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -51,15 +52,15 @@ There is an existing two-harness pattern to extend rather than replace. `usage-d
 
 Current `CLAUDE_PLUGIN_ROOT` occurrence counts, as a map of where work is needed:
 
-| File | Occurrences |
-|---|---|
-| `packages/monitor/skills/install/SKILL.md` | 6 |
-| `packages/monitor/skills/usage-dashboard/SKILL.md` | 4 |
-| `packages/monitor/skills/cockpit/references/claude-cli.md` | 2 |
-| `packages/monitor/skills/cockpit/references/pilot.md` | 1 |
-| `packages/monitor/skills/cockpit/references/scribe.md` | 1 |
-| `packages/monitor/skills/cockpit/references/restart.md` | 1 |
-| `packages/monitor/skills/cockpit/SKILL.md` | 0 |
+| File                                                       | Occurrences |
+| ---------------------------------------------------------- | ----------- |
+| `packages/monitor/skills/install/SKILL.md`                 | 6           |
+| `packages/monitor/skills/usage-dashboard/SKILL.md`         | 4           |
+| `packages/monitor/skills/cockpit/references/claude-cli.md` | 2           |
+| `packages/monitor/skills/cockpit/references/pilot.md`      | 1           |
+| `packages/monitor/skills/cockpit/references/scribe.md`     | 1           |
+| `packages/monitor/skills/cockpit/references/restart.md`    | 1           |
+| `packages/monitor/skills/cockpit/SKILL.md`                 | 0           |
 
 `cockpit/SKILL.md` is a router and resolves no scripts itself, so it gets the capability statement described below rather than a root rule.
 
@@ -128,12 +129,12 @@ Attempt 3 delivered every cockpit / install / reference edit and stopped one sen
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Says sends do not work under OpenCode, or invents an S5/S13 answer instead of blocking | Root rule added but a capability claim is vague, or the port precondition is stated without its source | Every OpenCode claim traces to the verified inventory or a resolved runtime fact; sends documented as working with the exact precondition |
-| Non-regression | ×2 | Touched a `.ts`, a `plugin.json`, or anything under `.codex-plugin/` — **Correctness scores 0 as well** | A Claude or Codex sentence was reworded, reordered, or condensed while adding the OpenCode clause | Diff is additions only; deleted-lines column is 0 everywhere; a Claude reader's instructions are byte-identical |
-| Phrasing consistency | ×1 | Each file invents its own wording for the root rule | Root rule present but paraphrased differently across files | The root rule reads identically everywhere bar the skill name, and extends the existing Claude/Codex paragraph rather than sitting in a new orphan section |
-| Assumptions & docs | ×1 | An unresolved runtime fact was silently filled in | Fact cited but the reader cannot tell what was observed versus assumed | Every runtime-fact-dependent sentence is traceable, and the OpenCode section is fenced so it can be skipped in one glance |
+| Dimension            | Weight | 0–1 (fail)                                                                                              | 2–3 (below bar)                                                                                        | 4–5 (pass)                                                                                                                                                 |
+| -------------------- | ------ | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness          | ×3     | Says sends do not work under OpenCode, or invents an S5/S13 answer instead of blocking                  | Root rule added but a capability claim is vague, or the port precondition is stated without its source | Every OpenCode claim traces to the verified inventory or a resolved runtime fact; sends documented as working with the exact precondition                  |
+| Non-regression       | ×2     | Touched a `.ts`, a `plugin.json`, or anything under `.codex-plugin/` — **Correctness scores 0 as well** | A Claude or Codex sentence was reworded, reordered, or condensed while adding the OpenCode clause      | Diff is additions only; deleted-lines column is 0 everywhere; a Claude reader's instructions are byte-identical                                            |
+| Phrasing consistency | ×1     | Each file invents its own wording for the root rule                                                     | Root rule present but paraphrased differently across files                                             | The root rule reads identically everywhere bar the skill name, and extends the existing Claude/Codex paragraph rather than sitting in a new orphan section |
+| Assumptions & docs   | ×1     | An unresolved runtime fact was silently filled in                                                       | Fact cited but the reader cannot tell what was observed versus assumed                                 | Every runtime-fact-dependent sentence is traceable, and the OpenCode section is fenced so it can be skipped in one glance                                  |
 
 ## Out of scope
 

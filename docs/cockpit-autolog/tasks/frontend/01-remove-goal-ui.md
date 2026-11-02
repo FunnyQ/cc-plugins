@@ -1,6 +1,7 @@
 # FRONTEND-01: Remove goal rendering from the dashboard
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -83,12 +84,12 @@ Line numbers are approximate — verify against the files. Remove, don't just hi
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Frontend has no automated tests — Correctness folds in no-regression on the owner's dev server.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | dashboard errors or goal UI remains | goal UI gone but legacy goal log crashes | goal UI fully removed; legacy goal record skipped; no console errors |
-| Test coverage | ×2 | no verification path | only "it loads" | both manual checks (clean session + legacy-goal session) specified & done |
-| Interface & readability | ×1 | dead functions/CSS left | mostly clean | no orphaned fns, imports, or CSS classes |
-| Assumptions & docs | ×1 | silent partial removal | partial | confirms grep-clean across all five files |
+| Dimension               | Weight | 0–1 (fail)                          | 2–3 (below bar)                          | 4–5 (pass)                                                                |
+| ----------------------- | ------ | ----------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------- |
+| Correctness             | ×3     | dashboard errors or goal UI remains | goal UI gone but legacy goal log crashes | goal UI fully removed; legacy goal record skipped; no console errors      |
+| Test coverage           | ×2     | no verification path                | only "it loads"                          | both manual checks (clean session + legacy-goal session) specified & done |
+| Interface & readability | ×1     | dead functions/CSS left             | mostly clean                             | no orphaned fns, imports, or CSS classes                                  |
+| Assumptions & docs      | ×1     | silent partial removal              | partial                                  | confirms grep-clean across all five files                                 |
 
 ## Out of scope
 

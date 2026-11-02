@@ -292,7 +292,8 @@
         const rate = Number(prefs.speed);
         for (const a of anims)
           if (a.playbackRate !== rate) a.playbackRate = rate;
-        const done = anims.length > 0 && anims.every((a) => a.playState === "finished");
+        const done =
+          anims.length > 0 && anims.every((a) => a.playState === "finished");
         if (done && prefs.loop && !queued) {
           queued = true;
           setTimeout(replay, 400);

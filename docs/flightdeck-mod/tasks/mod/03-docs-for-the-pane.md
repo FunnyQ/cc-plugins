@@ -1,6 +1,7 @@
 # MOD-03: Docs for the pane
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -73,11 +74,11 @@ Near the `flightdeck.ts --plan` launch command, add one sentence with the same m
 
 > Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Shared bands: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Docs describe behaviour the pane does not have, or omit the command | Facts right but a reason (SSE cap, global `daemon.json`) missing | Every fact matches the shipped pane and its reasons are stated |
-| Concision | ×2 | Restates code or adds a new section | Accurate but wordier than the surrounding prose | Fits the dense `CLAUDE.md` style; one or two sentences per spot |
-| Assumptions & docs | ×1 | Edits outside the named sections | Minor drift in wording elsewhere | Only the named sections changed |
+| Dimension          | Weight | 0–1 (fail)                                                          | 2–3 (below bar)                                                  | 4–5 (pass)                                                      |
+| ------------------ | ------ | ------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| Correctness        | ×3     | Docs describe behaviour the pane does not have, or omit the command | Facts right but a reason (SSE cap, global `daemon.json`) missing | Every fact matches the shipped pane and its reasons are stated  |
+| Concision          | ×2     | Restates code or adds a new section                                 | Accurate but wordier than the surrounding prose                  | Fits the dense `CLAUDE.md` style; one or two sentences per spot |
+| Assumptions & docs | ×1     | Edits outside the named sections                                    | Minor drift in wording elsewhere                                 | Only the named sections changed                                 |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # PACKAGING-03: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -65,12 +66,12 @@ This task transitively depends on every other task in the plan (the dependency c
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Integration / does it compose < 4 is an automatic veto. This gate scores integration-level axes, not a re-score of individual tasks.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration / does it compose | ×4 | a skill references a missing script, or tests fail together | composes but one wiring/consistency gap | every skill→script path resolves, all tests green together, manifests+registries consistent |
-| Meets the PLAN goal | ×2 | a v1 goal (commit or pr) absent | both present but one is thin vs the spec | commit auto-decision + 4-section pr (both providers) + independent version all delivered |
-| Consistency | ×2 | contradictions across files | minor drift | descriptions, field mappings, versions all aligned across files |
-| No regressions / no leak | ×1 | odin leak or monitor/dispatch/relay touched | minor stray edit | zero odin leak, sibling plugins + registries untouched beyond the additive entry |
+| Dimension                     | Weight | 0–1 (fail)                                                  | 2–3 (below bar)                          | 4–5 (pass)                                                                                  |
+| ----------------------------- | ------ | ----------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Integration / does it compose | ×4     | a skill references a missing script, or tests fail together | composes but one wiring/consistency gap  | every skill→script path resolves, all tests green together, manifests+registries consistent |
+| Meets the PLAN goal           | ×2     | a v1 goal (commit or pr) absent                             | both present but one is thin vs the spec | commit auto-decision + 4-section pr (both providers) + independent version all delivered    |
+| Consistency                   | ×2     | contradictions across files                                 | minor drift                              | descriptions, field mappings, versions all aligned across files                             |
+| No regressions / no leak      | ×1     | odin leak or monitor/dispatch/relay touched                 | minor stray edit                         | zero odin leak, sibling plugins + registries untouched beyond the additive entry            |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # FOUNDATION-03: Collect the trail context, read-only
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -45,7 +46,7 @@ It does **not** read `.cockpit/archive/done/` during triage. The drafting path r
 export type Bucket = "inbox" | "watch" | "done";
 
 export type SessionFile = {
-  sessionId: string;   // the log filename without .jsonl
+  sessionId: string; // the log filename without .jsonl
   path: string;
   bucket: Bucket;
   mtimeMs: number;
@@ -63,23 +64,29 @@ export type EntrySkeleton = {
 };
 
 export type AdrContext = {
-  trailRoot: string;      // the directory holding .cockpit/, or "" when there is none
+  trailRoot: string; // the directory holding .cockpit/, or "" when there is none
   hasTrail: boolean;
   sessions: SessionFile[];
   skeletons: EntrySkeleton[];
-  adrDir: string;         // docs/adr under the GIT root — not under trailRoot; see below
+  adrDir: string; // docs/adr under the GIT root — not under trailRoot; see below
   error?: string;
 };
 
 /** A full record plus the session it came from. `DecisionRecord` alone has no session field. */
 export type EntryBody = DecisionRecord & { sessionId: string };
 
-export function toSkeleton(record: DecisionRecord, sessionId: string): EntrySkeleton;
-export function collectContext(cwd: string, opts?: { includeDone?: boolean }): Promise<AdrContext>;
+export function toSkeleton(
+  record: DecisionRecord,
+  sessionId: string,
+): EntrySkeleton;
+export function collectContext(
+  cwd: string,
+  opts?: { includeDone?: boolean },
+): Promise<AdrContext>;
 export function fetchBodies(cwd: string, ids: string[]): Promise<EntryBody[]>;
 ```
 
-`EntryBody` exists because `sessionId` is not a field of `DecisionRecord` — the session is the *file*
+`EntryBody` exists because `sessionId` is not a field of `DecisionRecord` — the session is the _file_
 the record was read from, not something the record knows about itself. Returning bare
 `DecisionRecord[]` would drop it, and the drafting path needs it: every ADR evidence entry carries
 the session id alongside the entry id, and by the time a body is fetched the session may already
@@ -89,8 +96,8 @@ in the export surface, in the `--bodies` CLI payload, and in the tests.
 `fetchBodies` searches **every bucket — the inbox, `archive/watch/`, and `archive/done/`** — and it
 does so unconditionally, with no opt-in flag. That is deliberately unlike `collectContext`, which
 defaults to the inbox plus the watched bucket. The two answer different questions. Collection asks
-*"what is still unprocessed?"*, so including already-dispositioned sessions would re-surface work
-that was settled. Body lookup asks *"what did entry `X` actually say?"*, and the drafting path
+_"what is still unprocessed?"_, so including already-dispositioned sessions would re-surface work
+that was settled. Body lookup asks _"what did entry `X` actually say?"_, and the drafting path
 reaches into already-processed sessions by design: reconstructing a decision that spans an archived
 session is the stated reason the archive exists at all. An id that resolves in the inbox before
 archiving and stops resolving after it would break the ADR flow in a way nothing reports.
@@ -101,7 +108,7 @@ Ids are unique across the whole trail, so there is no ambiguity to resolve — t
 
 They look like they should come from the same place. They must not.
 
-`trailRoot` comes from `logRoot(cwd)`, which walks up for an *existing* `.cockpit/` before falling
+`trailRoot` comes from `logRoot(cwd)`, which walks up for an _existing_ `.cockpit/` before falling
 back to the git root. That walk-up is a deliberate escape hatch: a hand-made
 `packages/x/.cockpit` keeps its own trail. So `trailRoot` can legitimately be a subdirectory.
 
@@ -185,12 +192,12 @@ State these in code and cover them in tests:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Lists sessions from the registry, re-implements the shared reader, or writes into `.cockpit/` | Works on a populated trail but throws on a repository with none, or leaks a body field into a skeleton | Globs both source directories, skeletons carry no body fields, missing-trail and malformed-line paths return cleanly, and nothing under `.cockpit/` is touched |
-| Test coverage | ×2 | No tests, or tests that only construct types | Happy path only — a populated trail asserted for a non-zero session count | Empty-trail, empty-directory, malformed-line, watch-included, and unknown-id cases all covered, plus an explicit assertion that a skeleton has no `reason` key |
-| Interface & readability | ×1 | I/O smuggled into `toSkeleton`, or types that do not match the declared surface | Exports match but `collectContext` mixes globbing, parsing, and payload writing in one unstructured function | `toSkeleton` is pure and separately testable, the three exports match the declared signatures, and glob / parse / serialize are distinct steps |
-| Assumptions & docs | ×1 | The registry-versus-directory choice is unexplained, so a later reader "fixes" it back | The choice is noted but the 63-versus-27 evidence is missing | A comment states why the directory is read instead of the registry, with the measured counts, and why `done/` is opt-in |
+| Dimension               | Weight | 0–1 (fail)                                                                                    | 2–3 (below bar)                                                                                              | 4–5 (pass)                                                                                                                                                     |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Lists sessions from the registry, re-implements the shared reader, or writes into `.cockpit/` | Works on a populated trail but throws on a repository with none, or leaks a body field into a skeleton       | Globs both source directories, skeletons carry no body fields, missing-trail and malformed-line paths return cleanly, and nothing under `.cockpit/` is touched |
+| Test coverage           | ×2     | No tests, or tests that only construct types                                                  | Happy path only — a populated trail asserted for a non-zero session count                                    | Empty-trail, empty-directory, malformed-line, watch-included, and unknown-id cases all covered, plus an explicit assertion that a skeleton has no `reason` key |
+| Interface & readability | ×1     | I/O smuggled into `toSkeleton`, or types that do not match the declared surface               | Exports match but `collectContext` mixes globbing, parsing, and payload writing in one unstructured function | `toSkeleton` is pure and separately testable, the three exports match the declared signatures, and glob / parse / serialize are distinct steps                 |
+| Assumptions & docs      | ×1     | The registry-versus-directory choice is unexplained, so a later reader "fixes" it back        | The choice is noted but the 63-versus-27 evidence is missing                                                 | A comment states why the directory is read instead of the registry, with the measured counts, and why `done/` is opt-in                                        |
 
 ## Out of scope
 

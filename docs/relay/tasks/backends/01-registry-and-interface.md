@@ -1,6 +1,7 @@
 # BACKENDS-01: Capability gate
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -25,7 +26,10 @@ These helpers take the `Backend` type (from the foundation types module) and ope
 import type { Backend, Mode } from "../types";
 
 // Look a backend up in a passed registry. undefined for unknown names.
-export function getBackend(registry: Record<string, Backend>, name: string): Backend | undefined;
+export function getBackend(
+  registry: Record<string, Backend>,
+  name: string,
+): Backend | undefined;
 
 // Returns null if (backend, mode) is allowed; otherwise a human-readable error string.
 export function capabilityGate(backend: Backend, mode: Mode): string | null;
@@ -52,12 +56,12 @@ Tests construct small inline fake `Backend` objects (e.g. one with `supports = n
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | gate wrong or imports a concrete backend (reintroduces cycle) | gate ok but lookup mishandles unknown | pure gate + lookup; no concrete imports; correct null/message/undefined |
-| Test coverage | ×2 | no tests | one case | supported + unsupported + unknown-name, via fakes |
-| Interface & readability | ×1 | gate logic duplicatable elsewhere | usable | single pure gate; registry passed in, not imported |
-| Assumptions & docs | ×1 | acyclic rationale unstated | present | comment notes why concrete backends are not imported here |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                       | 4–5 (pass)                                                              |
+| ----------------------- | ------ | ------------------------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------- |
+| Correctness             | ×3     | gate wrong or imports a concrete backend (reintroduces cycle) | gate ok but lookup mishandles unknown | pure gate + lookup; no concrete imports; correct null/message/undefined |
+| Test coverage           | ×2     | no tests                                                      | one case                              | supported + unsupported + unknown-name, via fakes                       |
+| Interface & readability | ×1     | gate logic duplicatable elsewhere                             | usable                                | single pure gate; registry passed in, not imported                      |
+| Assumptions & docs      | ×1     | acyclic rationale unstated                                    | present                               | comment notes why concrete backends are not imported here               |
 
 ## Out of scope
 

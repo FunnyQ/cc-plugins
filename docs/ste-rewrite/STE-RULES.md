@@ -3,8 +3,8 @@
 This document is the single rule sheet for the ASD-STE100 rewrite. Every agent that
 rewrites a file must read this document first, and must obey it exactly.
 
-The standard is **STE-lite**. It adopts the ASD-STE100 *writing rules*. It rejects the
-ASD-STE100 *approved-word dictionary*. Section 5 explains why.
+The standard is **STE-lite**. It adopts the ASD-STE100 _writing rules_. It rejects the
+ASD-STE100 _approved-word dictionary_. Section 5 explains why.
 
 ---
 
@@ -28,12 +28,12 @@ and report it. A kept sentence is always better than a lost instruction.
 
 **In scope (56 files):**
 
-| Tier | Location | Files |
-|---|---|---|
-| A | `packages/*/skills/*/SKILL.md` | 13 |
-| B | `packages/*/skills/*/references/*.md` | 26 |
-| C | `packages/chronicle/agents/*.md` | 11 |
-| D | `packages/*/commands/*.md` | 6 |
+| Tier | Location                              | Files |
+| ---- | ------------------------------------- | ----- |
+| A    | `packages/*/skills/*/SKILL.md`        | 13    |
+| B    | `packages/*/skills/*/references/*.md` | 26    |
+| C    | `packages/chronicle/agents/*.md`      | 11    |
+| D    | `packages/*/commands/*.md`            | 6     |
 
 **Out of scope. Do not touch these files:**
 
@@ -64,6 +64,7 @@ These are not style questions. A change here breaks the product.
    `provider === "unknown"`, the condition that decides whether PR creation aborts.
 
    If a span will not fit on the line, start a new line and put the whole span there.
+
 4. **Heading structure.** Do not add a heading. Do not remove a heading. Do not merge two
    headings. Do not change a heading's level. The heading count must be identical before
    and after.
@@ -74,6 +75,7 @@ These are not style questions. A change here breaks the product.
 
    The reviewer runs `bun docs/ste-rewrite/check-anchors.ts` after each batch. It resolves
    every in-repo `](#anchor)` and `](file.md#anchor)` link and exits non-zero on a break.
+
 5. **Links.** Keep every URL and relative path exactly as it is.
 6. **Non-English text.** Do not translate. Some files carry zh-TW output templates, for
    example `已套用變更`. These are literal strings that the product prints. Copy them

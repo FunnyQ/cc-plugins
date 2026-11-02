@@ -9,9 +9,13 @@
 - Date: YYYY-MM-DD
 
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
@@ -37,9 +41,13 @@ not an error.
 - Date: 2026-08-06
 
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
@@ -49,8 +57,8 @@ Add lifecycle links only when they describe an actual relationship. Write them
 with the related record's real ID:
 
 ```md
-- Supersedes: ADR-0003        ← add only when this record replaces ADR-0003
-- Superseded by: ADR-0007     ← add only when ADR-0007 has replaced this one
+- Supersedes: ADR-0003 ← add only when this record replaces ADR-0003
+- Superseded by: ADR-0007 ← add only when ADR-0007 has replaced this one
 ```
 
 Never leave either line as a placeholder containing `ADR-NNNN`. The literal
@@ -79,12 +87,12 @@ scanning the directory should understand the decision without opening the file.
 
 ## Status
 
-| Value | Means | Requires |
-| --- | --- | --- |
-| `Accepted` | Live in the code today | — |
-| `Proposed` | Drafted ahead of the work | — |
-| `Superseded` | Replaced by a named successor | a `Superseded by: ADR-NNNN` line |
-| `Deprecated` | No longer applies, with no successor | no successor link |
+| Value        | Means                                | Requires                         |
+| ------------ | ------------------------------------ | -------------------------------- |
+| `Accepted`   | Live in the code today               | —                                |
+| `Proposed`   | Drafted ahead of the work            | —                                |
+| `Superseded` | Replaced by a named successor        | a `Superseded by: ADR-NNNN` line |
+| `Deprecated` | No longer applies, with no successor | no successor link                |
 
 The conventional ADR lifecycle runs forward: draft, review, accept, then build.
 This workflow runs backward because decisions are documented after implementation.
@@ -127,7 +135,7 @@ sentence, then cite the record in parentheses. `ADR-NNNN` names where the fact i
 recorded. It never carries the fact.
 
 - Good: `Following ADR-0019's fix (parallel-wave commits had been fully stopped
-  after one escalation), the old guard was not a safe baseline.`
+after one escalation), the old guard was not a safe baseline.`
 - Bad: `ADR-0019 already fixed the guard, so the old baseline was unsafe.`
 
 Apply one test before saving: delete every referenced record, and read the draft
@@ -171,17 +179,17 @@ both the finding and the measurement without opening anything.
 
 ## Validation rule summary
 
-| Rule | Requirement | Severity |
-| --- | --- | --- |
-| `filename` | Records live at `docs/adr/NNNN-<kebab-title>.md`, with a four-digit, zero-padded number. | Error |
-| `id-mismatch` | The H1's `ADR-NNNN` number equals the filename's number. | Error |
-| `missing-section` | All five section headings are present: Context, Considered alternatives, Decision, Consequences, and Evidence. | Error |
-| `bad-status` | The Status line is present and its value is exactly one of `Accepted`, `Proposed`, `Superseded`, or `Deprecated`. | Error |
-| `bad-date` | The Date line is present and names a real calendar date in `YYYY-MM-DD`. `2026-99-99` and `2025-02-30` match the shape and are rejected. | Error |
-| `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line. | Error |
-| `deprecated-linked` | A `Deprecated` record carries no successor link. | Error |
-| `link-missing` | Every `ADR-NNNN` on a `Supersedes` or `Superseded by` line names a record that exists. | Error |
-| `link-not-mutual` | Supersession is declared in both directions. | Error |
-| `self-link` | A record never references its own ID. | Error |
-| `stale-prose-ref` | Every `ADR-NNNN` in the body names a record that exists. | Warning |
-| `empty-evidence` | The Evidence section holds at least one entry. | Warning |
+| Rule                 | Requirement                                                                                                                              | Severity |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `filename`           | Records live at `docs/adr/NNNN-<kebab-title>.md`, with a four-digit, zero-padded number.                                                 | Error    |
+| `id-mismatch`        | The H1's `ADR-NNNN` number equals the filename's number.                                                                                 | Error    |
+| `missing-section`    | All five section headings are present: Context, Considered alternatives, Decision, Consequences, and Evidence.                           | Error    |
+| `bad-status`         | The Status line is present and its value is exactly one of `Accepted`, `Proposed`, `Superseded`, or `Deprecated`.                        | Error    |
+| `bad-date`           | The Date line is present and names a real calendar date in `YYYY-MM-DD`. `2026-99-99` and `2025-02-30` match the shape and are rejected. | Error    |
+| `superseded-no-link` | A `Superseded` record carries a `Superseded by:` line.                                                                                   | Error    |
+| `deprecated-linked`  | A `Deprecated` record carries no successor link.                                                                                         | Error    |
+| `link-missing`       | Every `ADR-NNNN` on a `Supersedes` or `Superseded by` line names a record that exists.                                                   | Error    |
+| `link-not-mutual`    | Supersession is declared in both directions.                                                                                             | Error    |
+| `self-link`          | A record never references its own ID.                                                                                                    | Error    |
+| `stale-prose-ref`    | Every `ADR-NNNN` in the body names a record that exists.                                                                                 | Warning  |
+| `empty-evidence`     | The Evidence section holds at least one entry.                                                                                           | Warning  |

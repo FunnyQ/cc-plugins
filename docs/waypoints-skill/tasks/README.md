@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,14 +48,14 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| integration | 01 | flightplan waypoint mode + lint-hook widen | todo | > 4 | scripts/01, scripts/02 |
-| integration | 02 | dispatch plugin metadata bump | todo | > 4 | skill/01, integration/01 |
-| integration | 03 | final review | todo | > 4 | scripts/01, scripts/02, skill/01, integration/01, integration/02 |
-| scripts | 01 | waypoints CLI core (parse · active · leg-scaffold) | todo | > 4 | — |
-| scripts | 02 | waypoints advance verb | todo | > 4 | scripts/01 |
-| skill | 01 | waypoints skill and references | todo | > 4 | scripts/01, scripts/02 |
+| Bucket      | NN  | Title                                              | Status | Pass line | Depends on                                                       |
+| ----------- | --- | -------------------------------------------------- | ------ | --------- | ---------------------------------------------------------------- |
+| integration | 01  | flightplan waypoint mode + lint-hook widen         | todo   | > 4       | scripts/01, scripts/02                                           |
+| integration | 02  | dispatch plugin metadata bump                      | todo   | > 4       | skill/01, integration/01                                         |
+| integration | 03  | final review                                       | todo   | > 4       | scripts/01, scripts/02, skill/01, integration/01, integration/02 |
+| scripts     | 01  | waypoints CLI core (parse · active · leg-scaffold) | todo   | > 4       | —                                                                |
+| scripts     | 02  | waypoints advance verb                             | todo   | > 4       | scripts/01                                                       |
+| skill       | 01  | waypoints skill and references                     | todo   | > 4       | scripts/01, scripts/02                                           |
 
 ## Dependency graph
 
@@ -73,12 +74,13 @@ scripts/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| skill/01 | scripts/01, scripts/02 |
-| integration/02 | skill/01 |
+| Task           | Depends on                       |
+| -------------- | -------------------------------- |
+| skill/01       | scripts/01, scripts/02           |
+| integration/02 | skill/01                         |
 | integration/03 | scripts/01, scripts/02, skill/01 |
-| integration/01 | scripts/01, scripts/02 |
+| integration/01 | scripts/01, scripts/02           |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

@@ -144,19 +144,19 @@ Split by plugin so unrelated work can proceed independently. Within each plugin,
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| browsers | 01 | Repair portable browser test fixtures | todo | > 4.0 | none |
-| browsers | 02 | Support native browser discovery and lifecycle | todo | > 4.0 | browsers/01 |
-| browsers | 03 | Require native browser smoke coverage | todo | > 4.0 | browsers/02 |
-| runes | 01 | Separate portable contracts from mod tests | todo | > 4.0 | none |
-| runes | 02 | Open and retain runes artifacts across platforms | todo | > 4.0 | runes/01 |
-| runes | 03 | Port the explain checker off macOS | todo | > 4.0 | runes/02 |
-| herdr | 01 | Repair Windows test path assumptions | todo | > 4.0 | none |
-| herdr | 02 | Support Windows ask and browser CLI boundaries | todo | > 4.0 | herdr/01 |
-| platform | 01 | Gate browser and UI portability in CI | todo | > 4.0 | browsers/03, runes/03, herdr/02 |
-| platform | 02 | Document support boundaries and owed checks | todo | > 4.0 | platform/01 |
-| review | 01 | Verify integrated browser and UI portability | todo | > 4.0 | platform/02 |
+| Bucket   | NN  | Title                                            | Status | Pass line | Depends on                      |
+| -------- | --- | ------------------------------------------------ | ------ | --------- | ------------------------------- |
+| browsers | 01  | Repair portable browser test fixtures            | todo   | > 4.0     | none                            |
+| browsers | 02  | Support native browser discovery and lifecycle   | todo   | > 4.0     | browsers/01                     |
+| browsers | 03  | Require native browser smoke coverage            | todo   | > 4.0     | browsers/02                     |
+| runes    | 01  | Separate portable contracts from mod tests       | todo   | > 4.0     | none                            |
+| runes    | 02  | Open and retain runes artifacts across platforms | todo   | > 4.0     | runes/01                        |
+| runes    | 03  | Port the explain checker off macOS               | todo   | > 4.0     | runes/02                        |
+| herdr    | 01  | Repair Windows test path assumptions             | todo   | > 4.0     | none                            |
+| herdr    | 02  | Support Windows ask and browser CLI boundaries   | todo   | > 4.0     | herdr/01                        |
+| platform | 01  | Gate browser and UI portability in CI            | todo   | > 4.0     | browsers/03, runes/03, herdr/02 |
+| platform | 02  | Document support boundaries and owed checks      | todo   | > 4.0     | platform/01                     |
+| review   | 01  | Verify integrated browser and UI portability     | todo   | > 4.0     | platform/02                     |
 
 Run options: all review lenses on Codex headless; Standard tier; 11 tasks in 5 buckets; no design phase.
 

@@ -1,6 +1,7 @@
 # FOUNDATION-04: Read the ADR directory into an index
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -33,9 +34,13 @@ Quoted here so you do not have to go looking for it. An ADR opens with an H1 car
 - Superseded by: ADR-0007
 
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
@@ -49,7 +54,7 @@ built later calls this function rather than parsing the file a second time, and 
 - `evidenceEntries` — how many top-level list items sit under `## Evidence`. A count, not content.
 
 Nothing else about the body is parsed. Deciding what a missing section or an empty evidence list
-*means* belongs to the validator; this function only reports what is there.
+_means_ belongs to the validator; this function only reports what is there.
 
 `Supersedes` and `Superseded by` may each carry more than one id (comma-separated), and either line may be absent. `Status` may be absent or hold an unrecognized word; that is a `null`, not an error.
 
@@ -61,13 +66,13 @@ Write exactly these exports. Use `type`, never `interface`.
 export type AdrStatus = "Proposed" | "Accepted" | "Superseded" | "Deprecated";
 
 export type AdrMeta = {
-  id: string;               // "ADR-0002"
-  number: number;           // 2
-  title: string;            // "ADR status reports implementation state"
+  id: string; // "ADR-0002"
+  number: number; // 2
+  title: string; // "ADR status reports implementation state"
   status: AdrStatus | null; // null when the line is missing or unrecognized
-  date: string | null;      // "2026-08-06"
-  supersedes: string[];     // ["ADR-0001"]
-  supersededBy: string[];   // ["ADR-0007"]
+  date: string | null; // "2026-08-06"
+  supersedes: string[]; // ["ADR-0001"]
+  supersededBy: string[]; // ["ADR-0007"]
   path: string;
   /** H2 headings present, in document order — e.g. ["Context", "Decision", "Evidence"]. */
   sections: string[];
@@ -76,23 +81,23 @@ export type AdrMeta = {
 };
 
 export type BrokenLink = {
-  from: string;             // "ADR-0002"
-  to: string;               // "ADR-0099"
+  from: string; // "ADR-0002"
+  to: string; // "ADR-0099"
   reason: "missing" | "not-mutual" | "self";
 };
 
 export type AdrIndex = {
   dir: string;
   exists: boolean;
-  adrs: AdrMeta[];          // ascending by number
+  adrs: AdrMeta[]; // ascending by number
   nextNumber: number;
   brokenLinks: BrokenLink[];
   /** Markdown files in the directory that `parseAdr` could not read, with why. Never dropped. */
   skipped: { path: string; reason: "no-h1" | "bad-h1" | "unreadable" }[];
 };
 
-export function formatAdrId(n: number): string;                  // 1 → "ADR-0001"
-export function adrFilename(n: number, title: string): string;   // (1, "Cockpit trail is an inbox") → "0001-cockpit-trail-is-an-inbox.md"
+export function formatAdrId(n: number): string; // 1 → "ADR-0001"
+export function adrFilename(n: number, title: string): string; // (1, "Cockpit trail is an inbox") → "0001-cockpit-trail-is-an-inbox.md"
 export function parseAdr(content: string, path: string): AdrMeta | null;
 export function buildIndex(dir: string): Promise<AdrIndex>;
 ```
@@ -134,6 +139,7 @@ The index **reports** broken links. It does not repair them, does not sort them 
 - A file whose H1 does not match `# ADR-NNNN: Title` returns `null` from `parseAdr` and is left out of `adrs` by `buildIndex`. A stray `README.md` dropped into `docs/adr/` must neither crash the index nor occupy a number.
 
   **But it lands in `skipped`, not in a void.** "Skipped" here means "not a record", never "not seen". The validator discovers records through this index, so a file dropped silently would be a file no rule could ever fire on — a malformed record and a bad filename would both pass validation by being unreadable, which is precisely backwards. Every `.md` in the directory ends up in exactly one of `adrs` or `skipped`, and the caller decides what a skip means: harmless for a README, a violation for something that was meant to be a record.
+
 - Nothing in this module writes, creates, renames, or deletes anything.
 
 ## Acceptance criteria
@@ -160,17 +166,17 @@ The index **reports** broken links. It does not repair them, does not sort them 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong id format, wrong slug, or `nextNumber` computed as a count instead of max plus one | Parses a well-formed directory but throws on a stray file or a missing directory, or misses a broken-link case | Every listed case handled: gaps, stray files, missing directory, all three link reasons; nothing written to disk |
-| Test coverage | ×2 | No tests, or tests that only assert the return shape | Happy-path directory only; broken links or the gap case untested | All three broken-link reasons plus the numbering-gap, missing-directory, and stray-file cases each have a test |
-| Interface & readability | ×1 | `parseAdr` reads the filesystem, or the exports differ from the surface above | Exports match but types are loose (`string` where the status union belongs) | `parseAdr` is pure, `buildIndex` holds the only I/O, `type` declarations match the surface exactly |
-| Assumptions & docs | ×1 | Slug rules or the four-digit width appear as unexplained magic | Rules implemented but the reason for max-plus-one is not recorded | A comment explains why gaps are never reused and why a stray file is skipped rather than fatal |
+| Dimension               | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                                                                | 4–5 (pass)                                                                                                       |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong id format, wrong slug, or `nextNumber` computed as a count instead of max plus one | Parses a well-formed directory but throws on a stray file or a missing directory, or misses a broken-link case | Every listed case handled: gaps, stray files, missing directory, all three link reasons; nothing written to disk |
+| Test coverage           | ×2     | No tests, or tests that only assert the return shape                                     | Happy-path directory only; broken links or the gap case untested                                               | All three broken-link reasons plus the numbering-gap, missing-directory, and stray-file cases each have a test   |
+| Interface & readability | ×1     | `parseAdr` reads the filesystem, or the exports differ from the surface above            | Exports match but types are loose (`string` where the status union belongs)                                    | `parseAdr` is pure, `buildIndex` holds the only I/O, `type` declarations match the surface exactly               |
+| Assumptions & docs      | ×1     | Slug rules or the four-digit width appear as unexplained magic                           | Rules implemented but the reason for max-plus-one is not recorded                                              | A comment explains why gaps are never reused and why a stray file is skipped rather than fatal                   |
 
 ## Out of scope
 
 - Enforcing the lifecycle rules — Deferred. This index reports broken links; the ADR validator decides what actually fails.
 - Writing, renaming, or renumbering an ADR — Deferred. This module only reads; the writing agent owns every change under the ADR directory.
 - Reading the cockpit decision trail — Deferred. A separate collector owns the trail; this module only reads the ADR directory.
-- Reading the prose *inside* the body sections — Deferred. `sections` and `evidenceEntries` report structure so the validator does not parse the file twice; nothing downstream needs the text itself to pick a number or spot a duplicate.
+- Reading the prose _inside_ the body sections — Deferred. `sections` and `evidenceEntries` report structure so the validator does not parse the file twice; nothing downstream needs the text itself to pick a number or spot a duplicate.
 - Deciding whether a missing section or an empty evidence list is a defect — Deferred. This module reports structure; the ADR validator owns the judgment and the severity.

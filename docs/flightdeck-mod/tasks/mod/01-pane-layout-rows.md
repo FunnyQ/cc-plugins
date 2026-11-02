@@ -1,6 +1,7 @@
 # MOD-01: Pane layout rows
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -46,7 +47,12 @@ export function bucketBars(s: DeckSnapshot, width: number): Line[];
 export function waveRows(s: DeckSnapshot, width: number): Line[];
 export function agentLines(s: DeckSnapshot, now: number): Line[];
 export function formatElapsed(ms: number): string;
-export function docked(s: DeckSnapshot, width: number, now: number, stale: boolean): Line[];
+export function docked(
+  s: DeckSnapshot,
+  width: number,
+  now: number,
+  stale: boolean,
+): Line[];
 export function inline(s: DeckSnapshot, width: number, stale: boolean): Line[];
 export function clip(line: Line, width: number): Line;
 export function endState(s: DeckSnapshot): "wave" | "done" | "stuck";
@@ -64,7 +70,7 @@ Width counts characters: every glyph above, `█`, `░`, `…`, and `—` count
 Two lines, diagnostics placed first so a right-edge clip never hides them. The slug is not here: the mod puts it in the pane title.
 
 - **Line 1**: `<done>/<total> done · <wave part>`. The wave part is `wave <currentWave> of <waves.length>`; when `currentWave` is `null` it is `all done` if `counts.done === counts.total` (even when done tasks sit in `unschedulable`), else `stuck · <n> unschedulable` coloured `#f85149`, where `n` counts the `unschedulable` refs whose task is not `done`. `export function endState(s: DeckSnapshot): "wave" | "done" | "stuck"` holds this rule once; `summary`, `compactSummary`, and `inline` all call it. Example: `12/20 done · wave 3 of 6` (24 columns); worst case `12/20 done · stuck · 3 unschedulable` (36).
-- **Line 2**: the diagnostic segments first, each followed by ` · `: dim `stale` when `stale`; `<errors> errors` coloured `#f85149` when `s.errors > 0`. Then the state counts as glyph pairs separated by one space: `●<inProgress> ○<ready> ·<blocked> ✗<invalid>`, each coloured like its card state (`✗` pair red only when `invalid > 0`). Example: `stale · 2 errors · ●2 ○3 ·3 ✗0` (30 columns).
+- **Line 2**: the diagnostic segments first, each followed by `·`: dim `stale` when `stale`; `<errors> errors` coloured `#f85149` when `s.errors > 0`. Then the state counts as glyph pairs separated by one space: `●<inProgress> ○<ready> ·<blocked> ✗<invalid>`, each coloured like its card state (`✗` pair red only when `invalid > 0`). Example: `stale · 2 errors · ●2 ○3 ·3 ✗0` (30 columns).
 
 ### `compactSummary(s, stale)`
 
@@ -144,12 +150,12 @@ Build fixtures in the test file with a small helper, for example `snap(overrides
 
 > Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Shared bands: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Glyphs, colours, or wave grouping disagree with `shared.md`; lines overflow the width | Happy path right, but wrapping, `W?`, `all done`, or truncation drift | Every function matches the spec above at every tested width, edges included |
-| Test coverage | ×2 | No tests, or only a smoke test | Each function covered on one fixture; no width sweep or null cases | Width sweep (24/40/80), null `currentWave`, missing ref, stale, elapsed boundaries all covered |
-| Interface & readability | ×1 | Imports `claude-code` or `node:`, or mixes I/O in | Pure, but types loose or helpers duplicated | Pure functions over `DeckSnapshot`, exported signatures exactly as above |
-| Assumptions & docs | ×1 | Unnamed magic numbers and colours | Constants named but the one-column glyph assumption unstated | Colours and glyphs come from `GLYPH`/`COLOR`; the one-column assumption is stated in a single comment |
+| Dimension               | Weight | 0–1 (fail)                                                                            | 2–3 (below bar)                                                       | 4–5 (pass)                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Glyphs, colours, or wave grouping disagree with `shared.md`; lines overflow the width | Happy path right, but wrapping, `W?`, `all done`, or truncation drift | Every function matches the spec above at every tested width, edges included                           |
+| Test coverage           | ×2     | No tests, or only a smoke test                                                        | Each function covered on one fixture; no width sweep or null cases    | Width sweep (24/40/80), null `currentWave`, missing ref, stale, elapsed boundaries all covered        |
+| Interface & readability | ×1     | Imports `claude-code` or `node:`, or mixes I/O in                                     | Pure, but types loose or helpers duplicated                           | Pure functions over `DeckSnapshot`, exported signatures exactly as above                              |
+| Assumptions & docs      | ×1     | Unnamed magic numbers and colours                                                     | Constants named but the one-column glyph assumption unstated          | Colours and glyphs come from `GLYPH`/`COLOR`; the one-column assumption is stated in a single comment |
 
 ## Out of scope
 

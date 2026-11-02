@@ -19,7 +19,7 @@ All new executable code lives in a new repo-root `opencode/` directory, delibera
 
 - `type` over `interface`.
 - Pure exported functions carry the logic; process spawns and file I/O sit behind thin named wrappers.
-- Comment *why*, never *what*. One line. When an approach broke, that belongs in the commit body, not the source.
+- Comment _why_, never _what_. One line. When an approach broke, that belongs in the commit body, not the source.
 - Build the smallest thing that satisfies the task. Add a layer, abstraction, option, or dependency only when a stated requirement fails without it — and name the concrete failure it prevents.
 - Do not handle errors the code cannot reach.
 - Prefer a longer function over an indirection used once.
@@ -27,7 +27,7 @@ All new executable code lives in a new repo-root `opencode/` directory, delibera
 
 ## THE DO-NOT-TOUCH LIST — read this before editing anything
 
-This build must leave **Claude Code and Codex behaving identically**. Everything executable is *new* code under `opencode/`. Inside `packages/`, only `.md` files change, and only by **adding** a clearly fenced OpenCode section — never by rewriting, reordering, condensing, or deleting an existing instruction.
+This build must leave **Claude Code and Codex behaving identically**. Everything executable is _new_ code under `opencode/`. Inside `packages/`, only `.md` files change, and only by **adding** a clearly fenced OpenCode section — never by rewriting, reordering, condensing, or deleting an existing instruction.
 
 Never modify:
 
@@ -63,12 +63,12 @@ Existing repo layout worth knowing:
 
 ## Where things install, under OpenCode
 
-| What | Target |
-|---|---|
-| Skills | `~/.config/opencode/skills/<name>/` (directory symlink) |
-| Plugin module | `~/.config/opencode/plugin/q-lab.ts` (symlink) |
-| Agents | `~/.config/opencode/agents/<name>.md` (symlink) |
-| Commands | `~/.config/opencode/commands/<name>.md` (symlink) |
+| What             | Target                                                   |
+| ---------------- | -------------------------------------------------------- |
+| Skills           | `~/.config/opencode/skills/<name>/` (directory symlink)  |
+| Plugin module    | `~/.config/opencode/plugin/q-lab.ts` (symlink)           |
+| Agents           | `~/.config/opencode/agents/<name>.md` (symlink)          |
+| Commands         | `~/.config/opencode/commands/<name>.md` (symlink)        |
 | `subagent_depth` | `~/.config/opencode/opencode.json` (the one config edit) |
 
 ## The OpenCode skill root rule
@@ -77,9 +77,9 @@ This exact rule goes into every `SKILL.md` OpenCode branch, and every script pat
 
 > Under OpenCode, skills are installed at `~/.config/opencode/skills/<name>/` (symlinked by `opencode/install.ts`). Resolve scripts from there: `bun ~/.config/opencode/skills/<name>/scripts/…`. `CLAUDE_PLUGIN_ROOT` is empty under OpenCode — never use it.
 
-**Two Claude-specific resolution mechanisms need replacing, not just `CLAUDE_PLUGIN_ROOT`.** Several skills tell the reader to take `$SKILL_DIR` from Claude Code's *"Base directory for this skill"* banner, which OpenCode does not print. An OpenCode branch must supply the literal `~/.config/opencode/skills/<name>/` path instead of reusing the banner rule. Grep for the banner phrasing as well as for the variable — a skill can be Claude-bound without ever naming `CLAUDE_PLUGIN_ROOT`.
+**Two Claude-specific resolution mechanisms need replacing, not just `CLAUDE_PLUGIN_ROOT`.** Several skills tell the reader to take `$SKILL_DIR` from Claude Code's _"Base directory for this skill"_ banner, which OpenCode does not print. An OpenCode branch must supply the literal `~/.config/opencode/skills/<name>/` path instead of reusing the banner rule. Grep for the banner phrasing as well as for the variable — a skill can be Claude-bound without ever naming `CLAUDE_PLUGIN_ROOT`.
 
-A skill that resolves no scripts at all needs no root rule. Say what it *does* gain (a capability statement, a caveat) rather than adding a rule it has no use for.
+A skill that resolves no scripts at all needs no root rule. Say what it _does_ gain (a capability statement, a caveat) rather than adding a rule it has no use for.
 
 ## Decisions frozen before execution
 
@@ -103,7 +103,7 @@ A skill that resolves no scripts at all needs no root rule. Say what it *does* g
 Commands any task can rely on:
 
 - `bun test opencode/` — the new unit tests.
-- `bun test packages/` — the existing suites. They must keep passing; you are not expected to add to them. **Baseline at the time this tree was written: 1840 pass, 0 fail, 98 files.** Record your own baseline before you start editing, and judge yourself on *new* failures rather than on a raw green/red. A few of these tests are environment-sensitive — running from a non-git working directory, or from a fresh clone with no local state, can flip one without anything being wrong with your change.
+- `bun test packages/` — the existing suites. They must keep passing; you are not expected to add to them. **Baseline at the time this tree was written: 1840 pass, 0 fail, 98 files.** Record your own baseline before you start editing, and judge yourself on _new_ failures rather than on a raw green/red. A few of these tests are environment-sensitive — running from a non-git working directory, or from a fresh clone with no local state, can flip one without anything being wrong with your change.
 - `bun <path>/script.ts --help` style smoke runs for any CLI you write.
 
 There is no lint or build command; there is no transpile step.

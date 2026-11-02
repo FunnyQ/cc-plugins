@@ -578,33 +578,27 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  cockpitTest(
-    "stops pushing after PUSH_CAP requests (S21)",
-    async () => {
-      const hooks = await QLabPlugin({ directory: root });
-      const sessionID = "ses_cap";
-      await hooks.event({
-        event: { type: "session.created", properties: { sessionID } },
-      });
+  cockpitTest("stops pushing after PUSH_CAP requests (S21)", async () => {
+    const hooks = await QLabPlugin({ directory: root });
+    const sessionID = "ses_cap";
+    await hooks.event({
+      event: { type: "session.created", properties: { sessionID } },
+    });
 
-      const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
-        system: ["base"],
-      }));
-      for (const output of outputs) {
-        await hooks["experimental.chat.system.transform"](
-          { sessionID },
-          output,
-        );
-      }
+    const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
+      system: ["base"],
+    }));
+    for (const output of outputs) {
+      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+    }
 
-      for (const output of outputs.slice(0, PUSH_CAP)) {
-        expect(output.system).toHaveLength(2);
-      }
-      for (const output of outputs.slice(PUSH_CAP)) {
-        expect(output.system).toHaveLength(1);
-      }
-    },
-  );
+    for (const output of outputs.slice(0, PUSH_CAP)) {
+      expect(output.system).toHaveLength(2);
+    }
+    for (const output of outputs.slice(PUSH_CAP)) {
+      expect(output.system).toHaveLength(1);
+    }
+  });
 
   cockpitTest(
     "session.idle retires the turn's entry and seeds the nudge (S21)",

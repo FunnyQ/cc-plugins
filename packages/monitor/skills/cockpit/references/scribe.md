@@ -79,18 +79,18 @@ A typical worthy chunk yields entries across **two or three** lenses, not
 one. If only `decision` survives the sweep, that is a valid outcome. It
 should be the result of honestly asking all four, not of never asking.
 Lenses are independent: a single piece of work can warrant a `decision`
-*and* a `caveat` *and* a `learning`.
+_and_ a `caveat` _and_ a `learning`.
 
 ### Default to a diagram — prose is the fallback
 
 The pilot reads diagrams faster than prose. Default to **diagram-first**.
 For each surviving entry, first try to express the insight as a Mermaid
 `--diagram` — a flow, state machine, sequence, fan-out, before/after, or
-decision tree. The `--diagram` rides *alongside* `--text`. The picture
+decision tree. The `--diagram` rides _alongside_ `--text`. The picture
 carries the shape. The text carries what a picture cannot.
 
 **Guardrail — diagram-first is not diagram-always.** When the insight is
-genuinely *flat* — a single `caveat` sentence ("X must run before Y"), or a
+genuinely _flat_ — a single `caveat` sentence ("X must run before Y"), or a
 one-line `decision` ("chose append-only JSONL over SQLite") — fall back to
 prose-only. Forcing a diagram onto a flat fact adds noise, not clarity. The
 test: if the "what" has a shape, draw it. If it is a sentence, write the
@@ -110,12 +110,12 @@ pick a `kind` and call:
 
 ### Kind values and when to use them
 
-| `kind` | Use when | Tell-tale phrase |
-|---|---|---|
-| `decision` | A choice was made between real alternatives — something the diff alone can't explain. | "chose X over Y because…" |
+| `kind`      | Use when                                                                                                        | Tell-tale phrase                                |
+| ----------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `decision`  | A choice was made between real alternatives — something the diff alone can't explain.                           | "chose X over Y because…"                       |
 | `rationale` | A non-obvious implementation is the way it is for a specific reason; answers "why not the obvious alternative?" | "this looks wrong but it's deliberate because…" |
-| `learning` | A teachable result or pattern the pilot should take away — something reusable beyond this task. | "turns out…", "next time, …" |
-| `caveat` | A trap, precondition, or sharp edge to remember — something that will bite you if you forget it. | "watch out — if you…", "must happen before…" |
+| `learning`  | A teachable result or pattern the pilot should take away — something reusable beyond this task.                 | "turns out…", "next time, …"                    |
+| `caveat`    | A trap, precondition, or sharp edge to remember — something that will bite you if you forget it.                | "watch out — if you…", "must happen before…"    |
 
 `learning` and `caveat` are not consolation prizes for when there is no
 decision. They are the highest-value entries for a future reader, because

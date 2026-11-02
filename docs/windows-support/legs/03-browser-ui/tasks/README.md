@@ -38,6 +38,7 @@ Start with `browsers/01-test-env.md`. The independent foundations `runes/01-port
 Execute the complete tree with `/dispatch:autopilot docs/windows-support/legs/03-browser-ui`. This plan is approved; all 11 tasks are still todo.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -49,19 +50,19 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| browsers | 01 | Repair portable browser test fixtures. | todo | > 4 | — |
-| browsers | 02 | Support native browser discovery and lifecycle. | todo | > 4 | browsers/01 |
-| browsers | 03 | Require native browser smoke coverage. | todo | > 4 | browsers/02 |
-| herdr | 01 | Repair Windows test path assumptions. | todo | > 4 | — |
-| herdr | 02 | Support Windows ask and browser CLI boundaries. | todo | > 4 | herdr/01 |
-| platform | 01 | Gate browser and UI portability in CI. | todo | > 4 | browsers/03, runes/03, herdr/02 |
-| platform | 02 | Document support boundaries and owed checks. | todo | > 4 | platform/01 |
-| review | 01 | Verify integrated browser and UI portability. | todo | > 4 | platform/02 |
-| runes | 01 | Separate portable contracts from mod tests. | todo | > 4 | — |
-| runes | 02 | Open and retain runes artifacts across platforms. | todo | > 4 | runes/01 |
-| runes | 03 | Port the explain checker off macOS. | todo | > 4 | runes/02 |
+| Bucket   | NN  | Title                                             | Status | Pass line | Depends on                      |
+| -------- | --- | ------------------------------------------------- | ------ | --------- | ------------------------------- |
+| browsers | 01  | Repair portable browser test fixtures.            | todo   | > 4       | —                               |
+| browsers | 02  | Support native browser discovery and lifecycle.   | todo   | > 4       | browsers/01                     |
+| browsers | 03  | Require native browser smoke coverage.            | todo   | > 4       | browsers/02                     |
+| herdr    | 01  | Repair Windows test path assumptions.             | todo   | > 4       | —                               |
+| herdr    | 02  | Support Windows ask and browser CLI boundaries.   | todo   | > 4       | herdr/01                        |
+| platform | 01  | Gate browser and UI portability in CI.            | todo   | > 4       | browsers/03, runes/03, herdr/02 |
+| platform | 02  | Document support boundaries and owed checks.      | todo   | > 4       | platform/01                     |
+| review   | 01  | Verify integrated browser and UI portability.     | todo   | > 4       | platform/02                     |
+| runes    | 01  | Separate portable contracts from mod tests.       | todo   | > 4       | —                               |
+| runes    | 02  | Open and retain runes artifacts across platforms. | todo   | > 4       | runes/01                        |
+| runes    | 03  | Port the explain checker off macOS.               | todo   | > 4       | runes/02                        |
 
 ## Dependency graph
 
@@ -85,10 +86,11 @@ runes/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
+| Task        | Depends on                      |
+| ----------- | ------------------------------- |
 | platform/01 | browsers/03, runes/03, herdr/02 |
-| review/01 | platform/02 |
+| review/01   | platform/02                     |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

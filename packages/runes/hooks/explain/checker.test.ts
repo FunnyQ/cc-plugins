@@ -30,7 +30,9 @@ const shot = (html: string, mode = "wide", root = "/plugin") =>
   `bun '${root.replaceAll("\\", "/")}/hooks/explain/checker-cli.ts' ${mode} '${html.replaceAll("\\", "/")}'`;
 const task = (page: string, token: string) =>
   `Check this explainer page: ${page}\nYour check token is ${token}.\nWide screenshot: ${shot(page)}\nNarrow screenshot: ${shot(page, "narrow")}`;
-const openedPage = (page: string) => [JSON.stringify({ op: "open", path: page })];
+const openedPage = (page: string) => [
+  JSON.stringify({ op: "open", path: page }),
+];
 const HANDBACK =
   "Do not hand back. Reply with your check token, then OK, FIXED <n>, or FAILED <reason>, as your final message.";
 
@@ -128,25 +130,39 @@ test("the checker is hidden from the model, and the engine's own Agent call pass
 test("Bash allows exactly the two pending commands and revokes them after settlement", async () => {
   const r = await rig();
   await startCheck(r.$, "a", PAGE);
-  const bash = (command: string, agentId: string | undefined = "k1") => r.permission(1, { command }, agentId);
+  const bash = (command: string, agentId: string | undefined = "k1") =>
+    r.permission(1, { command }, agentId);
   expect(await bash(shot(PAGE))).toEqual({ decision: "allow" });
   expect(await bash(shot(PAGE, "narrow"))).toEqual({ decision: "allow" });
-  for (const command of [shot("/etc/passwd.html"), shot(PAGE) + "; echo unsafe", shot(PAGE) + " ", shot(PAGE, "other"), shot(PAGE.replace(".html", "-other.html")), "echo ok"]) {
+  for (const command of [
+    shot("/etc/passwd.html"),
+    shot(PAGE) + "; echo unsafe",
+    shot(PAGE) + " ",
+    shot(PAGE, "other"),
+    shot(PAGE.replace(".html", "-other.html")),
+    "echo ok",
+  ]) {
     expect(await bash(command)).toEqual({ decision: "ask" });
   }
   for (const command of [
     shot(`${DIR}/../x.html`),
     shot(`${DIR}/%2e%2e/x.html`),
     shot(PAGE) + " $HOME",
-    shot(PAGE).replace("'/plugin/hooks/explain/checker-cli.ts'", "/plugin/hooks/explain/checker-cli.ts"),
+    shot(PAGE).replace(
+      "'/plugin/hooks/explain/checker-cli.ts'",
+      "/plugin/hooks/explain/checker-cli.ts",
+    ),
     shot(PAGE) + " --screenshot=/tmp/x.png",
     shot(PAGE) + ` --screenshot=${DIR}/../x.png`,
     shot(PAGE) + " --log-net-log=/tmp/outside.json",
     shot(PAGE) + " https://example.com",
     shot(PAGE) + ` file://${DIR}/repo/other.html`,
     `"${CHROME}" --headless=new https://example.com # file://${PAGE}`,
-  ]) expect(await bash(command)).toEqual({ decision: "ask" });
-  expect(await r.permission(1, { command: shot(PAGE) }, "")).toEqual({ decision: "ask" });
+  ])
+    expect(await bash(command)).toEqual({ decision: "ask" });
+  expect(await r.permission(1, { command: shot(PAGE) }, "")).toEqual({
+    decision: "ask",
+  });
   expect(await bash(shot(PAGE), "o")).toEqual({ decision: "ask" });
   await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} OK` });
   expect(await bash(shot(PAGE))).toEqual({ decision: "ask" });
@@ -205,7 +221,15 @@ let epoch = 0;
 
 // `geometry` is the geometry CLI's stdout; absent, the CLI exits 1, and an Error is a run that cannot start
 const rig = async (
-  opts: { chrome?: boolean; deny?: string; geometry?: string | Error; root?: string; home?: string; windows?: boolean; openError?: boolean | "throw" } = {},
+  opts: {
+    chrome?: boolean;
+    deny?: string;
+    geometry?: string | Error;
+    root?: string;
+    home?: string;
+    windows?: boolean;
+    openError?: boolean | "throw";
+  } = {},
 ) => {
   // checker.ts keeps its pending checks and token counter per module, so each rig starts far enough on to expire the last rig's leftovers
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
@@ -237,8 +261,13 @@ const rig = async (
           const operation = JSON.parse(init!.stdin!);
           if (operation.op === "cleanup-check") removed.push([init!.stdin!]);
           else opened.push([init!.stdin!]);
-          if (operation.op === "open" && opts.openError === "throw") throw new Error("opener refused");
-          return { exitCode: operation.op === "open" && opts.openError ? 7 : 0, stdout: "", stderr: "opener refused" };
+          if (operation.op === "open" && opts.openError === "throw")
+            throw new Error("opener refused");
+          return {
+            exitCode: operation.op === "open" && opts.openError ? 7 : 0,
+            stdout: "",
+            stderr: "opener refused",
+          };
         }
         if (argv[0] === "bun") {
           measured.push(argv);
@@ -285,9 +314,18 @@ const rig = async (
       check: string;
       note?: string;
     };
-  runtime.info = { platform: opts.windows ? "win32" : "darwin", wsl: false, home: opts.home ?? HOME, tmp: "/tmp", chrome: opts.chrome === false ? null : CHROME };
+  runtime.info = {
+    platform: opts.windows ? "win32" : "darwin",
+    wsl: false,
+    home: opts.home ?? HOME,
+    tmp: "/tmp",
+    chrome: opts.chrome === false ? null : CHROME,
+  };
   where.home = opts.home ?? HOME;
-  await registerChecker({ ...$, agent: { ...$.agent, register: async () => ({}) } } as unknown as EngineInterface);
+  await registerChecker({
+    ...$,
+    agent: { ...$.agent, register: async () => ({}) },
+  } as unknown as EngineInterface);
   await turnEnd({});
   opened.length = 0;
   removed.length = 0;
@@ -297,7 +335,9 @@ const rig = async (
   return {
     $,
     permission: (index: number, input: unknown, agentId = "k1") =>
-      hooks["tool.check"]![index]!($, { input, agentId }, async () => ({ decision: "ask" })),
+      hooks["tool.check"]![index]!($, { input, agentId }, async () => ({
+        decision: "ask",
+      })),
     token,
     hooks,
     spawns,
@@ -371,7 +411,8 @@ test("geometry faults go to the checker's task message", async () => {
   });
   await startCheck(r.$, "a", PAGE);
   expect(r.spawns[0]!.prompt).toBe(
-    task(PAGE, r.token(0)) + `\nA geometry check found:\n- 1280: figure 1 "C" overlaps "D"`,
+    task(PAGE, r.token(0)) +
+      `\nA geometry check found:\n- 1280: figure 1 "C" overlaps "D"`,
   );
   expect(r.entry("a")).toEqual(expect.objectContaining({ check: "pending" }));
 });
@@ -380,9 +421,7 @@ test("a geometry check that fails, cannot start, or prints no verdict leaves the
   for (const geometry of [undefined, new Error("bun: not found"), "garbage"]) {
     const r = await rig({ geometry });
     await startCheck(r.$, "a", PAGE);
-    expect(r.spawns[0]!.prompt).toBe(
-      task(PAGE, r.token(0)),
-    );
+    expect(r.spawns[0]!.prompt).toBe(task(PAGE, r.token(0)));
   }
 });
 
@@ -466,10 +505,7 @@ test("two checks answered in reverse order each get their own verdict", async ()
     expect.objectContaining({ check: "fixed", note: "1 fix(es)" }),
   );
   expect(r.entry("b")).toEqual(expect.objectContaining({ check: "ok" }));
-  expect(r.opened).toEqual([
-    openedPage("/p/b"),
-    openedPage("/p/a"),
-  ]);
+  expect(r.opened).toEqual([openedPage("/p/b"), openedPage("/p/a")]);
 });
 
 test("a check times out at the first turn end of any loop after 180 s", async () => {
@@ -512,11 +548,22 @@ test("Windows containment accepts separator and case aliases but rejects parent 
   const r = await rig({ windows: true, home: "C:\\Users\\Q Space" });
   await startCheck(r.$, "a", PAGE);
   for (const index of [2, 3]) {
-    for (const file_path of ["c:/users/q space/.local/share/q-lab/runes/explain/repo/page.html", "C:\\Users\\Q Space\\.local\\share\\q-lab\\runes\\explain\\page.html"]) {
-      expect(await r.permission(index, { file_path })).toEqual({ decision: "allow" });
+    for (const file_path of [
+      "c:/users/q space/.local/share/q-lab/runes/explain/repo/page.html",
+      "C:\\Users\\Q Space\\.local\\share\\q-lab\\runes\\explain\\page.html",
+    ]) {
+      expect(await r.permission(index, { file_path })).toEqual({
+        decision: "allow",
+      });
     }
-    for (const file_path of ["C:/Users/Q Space/.local/share/q-lab/runes/explain/../page.html", "C:/Users/Q Space/.local/share/q-lab/runes/explain-other/page.html", "D:/Users/Q Space/.local/share/q-lab/runes/explain/page.html"]) {
-      expect(await r.permission(index, { file_path })).toEqual({ decision: "ask" });
+    for (const file_path of [
+      "C:/Users/Q Space/.local/share/q-lab/runes/explain/../page.html",
+      "C:/Users/Q Space/.local/share/q-lab/runes/explain-other/page.html",
+      "D:/Users/Q Space/.local/share/q-lab/runes/explain/page.html",
+    ]) {
+      expect(await r.permission(index, { file_path })).toEqual({
+        decision: "ask",
+      });
     }
   }
 });
@@ -535,7 +582,9 @@ test("screenshot commands quote spaces, substitutions and UNC paths while unsafe
     await startCheck(r.$, "a", page);
     for (const mode of ["wide", "narrow"]) {
       const command = shot(page, mode, root);
-      expect(await r.permission(1, { command })).toEqual({ decision: allowed ? "allow" : "ask" });
+      expect(await r.permission(1, { command })).toEqual({
+        decision: allowed ? "allow" : "ask",
+      });
       if (allowed) expect(r.spawns[0]!.prompt).toContain(command);
     }
   }
@@ -544,13 +593,28 @@ test("screenshot commands quote spaces, substitutions and UNC paths while unsafe
 test("all verdicts use shared operations and preserve the verdict when opening fails", async () => {
   for (const openError of [false, true, "throw"] as const)
     for (const outcome of ["ok", "skipped", "failed", "timeout"] as const) {
-      const r = await rig({ chrome: outcome !== "skipped", geometry: outcome === "ok" ? '{"faults":[]}' : undefined, openError });
+      const r = await rig({
+        chrome: outcome !== "skipped",
+        geometry: outcome === "ok" ? '{"faults":[]}' : undefined,
+        openError,
+      });
       await startCheck(r.$, "a", PAGE);
-      if (outcome === "failed") await r.turnEnd({ agentId: "k1", answer: `${r.token(0)} FAILED broken` });
-      if (outcome === "timeout") { r.advance(CHECK_TIMEOUT_MS); await r.turnEnd({}); }
-      expect(r.entry("a").check).toBe(outcome === "timeout" ? "failed" : outcome);
+      if (outcome === "failed")
+        await r.turnEnd({
+          agentId: "k1",
+          answer: `${r.token(0)} FAILED broken`,
+        });
+      if (outcome === "timeout") {
+        r.advance(CHECK_TIMEOUT_MS);
+        await r.turnEnd({});
+      }
+      expect(r.entry("a").check).toBe(
+        outcome === "timeout" ? "failed" : outcome,
+      );
       expect(r.opened).toEqual([openedPage(PAGE)]);
-      expect(r.removed).toEqual([[JSON.stringify({ op: "cleanup-check", page: PAGE })]]);
+      expect(r.removed).toEqual([
+        [JSON.stringify({ op: "cleanup-check", page: PAGE })],
+      ]);
       if (openError) expect(r.entry("a").note).toContain("opener refused");
     }
 });

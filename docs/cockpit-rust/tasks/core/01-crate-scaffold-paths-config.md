@@ -1,6 +1,7 @@
 # CORE-01: Crate scaffold, paths, config
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -139,12 +140,12 @@ Mirror the cases in `packages/monitor/skills/cockpit/scripts/cockpit-home.test.t
 
 > Scale 0–5 per `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | crate does not build, or a path resolves differently from TS | happy-path paths right, but empty-string env, migration, or config key order drifts | every path/env/fallback and config write matches TS byte-for-byte |
-| Test coverage | ×2 | no tests | env overrides tested, fallbacks or migration untested | every override, fallback, migration, config edge (corrupt, array, unknown keys) and `env_int` edge tested, env tests serialized |
-| Interface & readability | ×1 | subcommands hard-wired so later ports must restructure main.rs | stubs work but trailing args rejected or modules tangled | one function per TS resolver, stubs swap out one match arm at a time |
-| Assumptions & docs | ×1 | version hard-coded with no link to plugin.json | deps unpinned or unexplained | versions pinned, `allow(dead_code)` justified, any TS divergence commented |
+| Dimension               | Weight | 0–1 (fail)                                                     | 2–3 (below bar)                                                                     | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | crate does not build, or a path resolves differently from TS   | happy-path paths right, but empty-string env, migration, or config key order drifts | every path/env/fallback and config write matches TS byte-for-byte                                                               |
+| Test coverage           | ×2     | no tests                                                       | env overrides tested, fallbacks or migration untested                               | every override, fallback, migration, config edge (corrupt, array, unknown keys) and `env_int` edge tested, env tests serialized |
+| Interface & readability | ×1     | subcommands hard-wired so later ports must restructure main.rs | stubs work but trailing args rejected or modules tangled                            | one function per TS resolver, stubs swap out one match arm at a time                                                            |
+| Assumptions & docs      | ×1     | version hard-coded with no link to plugin.json                 | deps unpinned or unexplained                                                        | versions pinned, `allow(dead_code)` justified, any TS divergence commented                                                      |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # RUNES-01: Separate portable contracts from mod tests.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -79,12 +80,12 @@ Keep all mod filesystem operations in the fixture's Map and pass plain fixture v
 
 > Use the scale in `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Bun loads the mod kit, fixtures touch the real profile, or defaults conceal missing HOME | Runners are separated but an absence case or process response cannot be represented | Both runners execute independently; explicit HOME absence, USERPROFILE and process outcomes remain isolated without product changes |
-| Test coverage | ×2 | The contract only asserts constants or replaces missing product code with passing stubs | Environment happy paths pass but probe failures or YAML routing are untested | Real child environment/JSON transport and mod fixture absence, platform and error cases are exercised |
-| Interface & readability | ×1 | Fixture additions mix engine objects with Bun-only runtime code | Options work but duplicate platform or process conventions across hosts | Small typed options and callbacks preserve current defaults and use one explicit fixture contract |
-| Assumptions & docs | ×1 | Passing Bun contracts are presented as full Windows mod verification | Runner distinction is documented but baseline or platform limits are omitted | Commands, preserved baseline and the limits of injected platform evidence are explicit |
+| Dimension               | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                                     | 4–5 (pass)                                                                                                                          |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Bun loads the mod kit, fixtures touch the real profile, or defaults conceal missing HOME | Runners are separated but an absence case or process response cannot be represented | Both runners execute independently; explicit HOME absence, USERPROFILE and process outcomes remain isolated without product changes |
+| Test coverage           | ×2     | The contract only asserts constants or replaces missing product code with passing stubs  | Environment happy paths pass but probe failures or YAML routing are untested        | Real child environment/JSON transport and mod fixture absence, platform and error cases are exercised                               |
+| Interface & readability | ×1     | Fixture additions mix engine objects with Bun-only runtime code                          | Options work but duplicate platform or process conventions across hosts             | Small typed options and callbacks preserve current defaults and use one explicit fixture contract                                   |
+| Assumptions & docs      | ×1     | Passing Bun contracts are presented as full Windows mod verification                     | Runner distinction is documented but baseline or platform limits are omitted        | Commands, preserved baseline and the limits of injected platform evidence are explicit                                              |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # BACKEND-03: Retire `start`, strip goal machinery from the CLI kernel
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -47,7 +48,7 @@ stale line-1 `type:"goal"` record in an old log is ignored. Leave that filtering
 These goal/lang/start tests no longer apply (approx line ranges): "writes project-meta.md
 with project_goal" (51–70), "goal record is line 1…" (72–89), "preserves created
 timestamp…" (117–148), "re-running start preserves the decision trail" (186–217), the
-`log_language` meta tests (150–183, 219–244), and the `--provider codex` *start* test
+`log_language` meta tests (150–183, 219–244), and the `--provider codex` _start_ test
 (247–265) — rewrite the provider-routing assertion to use `log`/`scribe` instead of `start`.
 Replace them with a test proving a fresh session can `log`/`scribe` with no prior `start`
 and lands `tracked: true` in the registry.
@@ -72,12 +73,12 @@ and lands `tracked: true` in the registry.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | breaks log/scribe or leaves goal code | removes goals but no-start path broken | goals/start gone, log/scribe/wait/send + auto-register all work |
-| Test coverage | ×2 | tests fail or deleted without replacement | removed only | obsolete tests dropped + no-start auto-register test added |
-| Interface & readability | ×1 | dead helpers left dangling | mostly clean | no orphaned imports/helpers; surgical diff |
-| Assumptions & docs | ×1 | silent removal of shared helper | partial | confirmed no other `readMetaField` consumer before removal |
+| Dimension               | Weight | 0–1 (fail)                                | 2–3 (below bar)                        | 4–5 (pass)                                                      |
+| ----------------------- | ------ | ----------------------------------------- | -------------------------------------- | --------------------------------------------------------------- |
+| Correctness             | ×3     | breaks log/scribe or leaves goal code     | removes goals but no-start path broken | goals/start gone, log/scribe/wait/send + auto-register all work |
+| Test coverage           | ×2     | tests fail or deleted without replacement | removed only                           | obsolete tests dropped + no-start auto-register test added      |
+| Interface & readability | ×1     | dead helpers left dangling                | mostly clean                           | no orphaned imports/helpers; surgical diff                      |
+| Assumptions & docs      | ×1     | silent removal of shared helper           | partial                                | confirmed no other `readMetaField` consumer before removal      |
 
 ## Out of scope
 

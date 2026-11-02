@@ -159,8 +159,7 @@ function highlightCode(text) {
     try {
       JSON.parse(trimmed);
       return hljs.highlight(String(text), { language: "json" }).value;
-    } catch {
-    }
+    } catch {}
   }
   return null;
 }

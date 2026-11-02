@@ -1,6 +1,7 @@
 # LINT-03: template guidance and the existing-tree sweep
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/lint-contract.md`
 > - `../_context/rubric.md`
@@ -10,7 +11,7 @@
 
 ## Goal
 
-New plans are *written* with a closing regression net rather than corrected by the linter afterwards, and
+New plans are _written_ with a closing regression net rather than corrected by the linter afterwards, and
 every existing plan tree under `docs/` has been linted with each real finding recorded instead of quietly
 accepted.
 
@@ -102,16 +103,16 @@ placed outside the generated block rather than inside it.
 status, under the "Sweep results" heading in `tasks/README.md`:
 
 ```markdown
-| Tree | Exit | Finding |
-|---|---|---|
-| `docs/waypoints-skill/tasks` | 0 | — |
-| `docs/some-tree/tasks` | 1 | closing task runs no suite; two other tasks run `bun test …` |
+| Tree                         | Exit | Finding                                                      |
+| ---------------------------- | ---- | ------------------------------------------------------------ |
+| `docs/waypoints-skill/tasks` | 0    | —                                                            |
+| `docs/some-tree/tasks`       | 1    | closing task runs no suite; two other tasks run `bun test …` |
 ```
 
 A failures-only list cannot distinguish "this tree passed" from "this tree was never swept", and a mixed
 pass/fail sweep is the normal case. The ledger settles both: every tree appears exactly once, passes show
 `0` with an em-dash, and each failure carries the rule, the closing task's ref, and the tasks whose suites
-are missing. If every tree passes, the ledger is still written in full — that *is* the explicit "no
+are missing. If every tree passes, the ledger is still written in full — that _is_ the explicit "no
 findings" statement, and it is checkable rather than a claim.
 
 Put a one-line summary in "Known gaps" only when at least one tree fails, pointing at the ledger. Do not
@@ -134,7 +135,7 @@ check guards against an accidental edit, not against a known gap.
 
 ## Acceptance criteria
 
-- [x] The `### \`Final review\`` section of `references/task-template.md` states the regression-net
+- [x] The `### \`Final review\``section of`references/task-template.md` states the regression-net
       requirement, why it applies to the closing task specifically, the recognized runner commands, and
       the docs-only exemption.
 - [x] That section also states that the rule enforces presence rather than reach, and points the reader at
@@ -179,9 +180,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | A historical tree was edited or a box hand-ticked, or the sweep was not actually run. | Docs updated and sweep run, but a finding is unrecorded or a recorded finding is paraphrased away from the real violation. | Both docs updated as specified, every tree swept, every finding recorded verbatim, nothing outside this tree touched. |
-| Test coverage | ×2 | No check that the guidance landed or that the sweep ran. | Greps confirm the docs, but the sweep results are unverified against what was recorded. | Docs confirmed by grep, sweep output reconciled item-by-item with Known gaps, and the regeneration check proves the entries survive `build-readme.ts`. |
-| Interface & readability | ×1 | Guidance dumped as a spec list, or the skill bullet bloated into a paragraph. | Correct content but drifting from the surrounding voice. | Template prose matches its section's voice and length; the skill bullet is one sentence. |
-| Assumptions & docs | ×1 | The no-retro-fit decision is applied without stating why. | Mentioned in passing. | The `completion-state` mechanism and the forbidden hand-tick are both stated as the reason historical trees are reported rather than repaired. |
+| Dimension               | Weight | 0–1                                                                                   | 2–3                                                                                                                        | 4–5                                                                                                                                                    |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | A historical tree was edited or a box hand-ticked, or the sweep was not actually run. | Docs updated and sweep run, but a finding is unrecorded or a recorded finding is paraphrased away from the real violation. | Both docs updated as specified, every tree swept, every finding recorded verbatim, nothing outside this tree touched.                                  |
+| Test coverage           | ×2     | No check that the guidance landed or that the sweep ran.                              | Greps confirm the docs, but the sweep results are unverified against what was recorded.                                    | Docs confirmed by grep, sweep output reconciled item-by-item with Known gaps, and the regeneration check proves the entries survive `build-readme.ts`. |
+| Interface & readability | ×1     | Guidance dumped as a spec list, or the skill bullet bloated into a paragraph.         | Correct content but drifting from the surrounding voice.                                                                   | Template prose matches its section's voice and length; the skill bullet is one sentence.                                                               |
+| Assumptions & docs      | ×1     | The no-retro-fit decision is applied without stating why.                             | Mentioned in passing.                                                                                                      | The `completion-state` mechanism and the forbidden hand-tick are both stated as the reason historical trees are reported rather than repaired.         |

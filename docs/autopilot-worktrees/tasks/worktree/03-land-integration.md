@@ -1,6 +1,7 @@
 # WORKTREE-03: Land results — conflict rebase and park
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/worktree.md`
 > - `../_context/models.md`
@@ -24,6 +25,7 @@ A land conflict no longer ends the task. The orchestrator rebases the task's wor
 ### What already exists
 
 The script already has this worktree layer, and this task builds on it without changing it:
+
 - **`CFG.repoRoot`**: every `worktree.ts` call passes `--repo ${CFG.repoRoot} --slug ${CFG.slug}`.
 - **`withMainLock(fn)`**: the one promise-chain main-tree lock. It wraps every `wt-*` agent call.
 - **`wtCall(label, command, schema)`**: a mechanical haiku agent wrapped in `resilient(...)`, with a `make` that throws on a `null` result. A missing structured result is retried once with a byte-identical command. A second failure throws to the caller, which turns it into `infrastructureFailure(...)`.
@@ -36,8 +38,8 @@ The tree watch, deferral, requalify, and held-back machinery still exist, and th
 
 ### New mechanical agent
 
-| Label | Command | Schema fields (all required) |
-|---|---|---|
+| Label             | Command                                                                      | Schema fields (all required)                        |
+| ----------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
 | `wt-rebase:<ref>` | `bun ${S}/worktree.ts rebase <ref> --repo … --slug … --op a<attempt>-rebase` | `path` string, `base` string, `conflicted` string[] |
 
 Run it through `wtCall` under `withMainLock`. `<attempt>` is the attempt whose land conflicted, so the op id is `a<attempt>-rebase`. A retried rebase repeats the identical command. `worktree.ts` replays a recorded `--op`, so the retry cannot rebase twice.
@@ -60,6 +62,7 @@ Replace the clean-only branch with this handling. The `wt-land` call runs under 
 ### Park
 
 A parked task keeps its worktree and never lands. This covers the attempt cap, an infrastructure failure after `wt-create`, and the interim leak.
+
 - `parkBlocked` and the returned result add the worktree path, taken from `live[ref]`:
   - The parked `reason` ends with the line `Worktree kept at <path>`.
   - The escalation text carries the same `Worktree kept at <path>` line.
@@ -107,12 +110,12 @@ A parked task keeps its worktree and never lands. This covers the attempt cap, a
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Any of: a conflict lands; a rebase runs outside the lock; a retry uses a new `--op`; a conflict recreates the worktree | Conflict rebase works, but the park path loses the worktree path, or `mainFingerprint` moves on a conflict | Conflict → rebase → next attempt, park reporting, and both interim branches match the worktree contract exactly. Every retry replays the same `--op` and `--expect`. |
-| Test coverage | ×2 | No new tests | Conflict-then-clean only | All seven cases are tested, and label order and op ids are asserted |
-| Interface & readability | ×1 | Rebase inlined outside `wtCall`, or conflict feedback built ad hoc | Works, but the land branch is hard to follow | One land-result switch in the script's idiom, reusing `wtCall`, `withMainLock`, and `live` |
-| Assumptions & docs | ×1 | Design notes still describe the clean-only land | Conflict note added, but interim comments missing | The conflict and op-id notes state their why, and each interim branch carries its comment |
+| Dimension               | Weight | 0–1 (fail)                                                                                                             | 2–3 (below bar)                                                                                            | 4–5 (pass)                                                                                                                                                           |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Any of: a conflict lands; a rebase runs outside the lock; a retry uses a new `--op`; a conflict recreates the worktree | Conflict rebase works, but the park path loses the worktree path, or `mainFingerprint` moves on a conflict | Conflict → rebase → next attempt, park reporting, and both interim branches match the worktree contract exactly. Every retry replays the same `--op` and `--expect`. |
+| Test coverage           | ×2     | No new tests                                                                                                           | Conflict-then-clean only                                                                                   | All seven cases are tested, and label order and op ids are asserted                                                                                                  |
+| Interface & readability | ×1     | Rebase inlined outside `wtCall`, or conflict feedback built ad hoc                                                     | Works, but the land branch is hard to follow                                                               | One land-result switch in the script's idiom, reusing `wtCall`, `withMainLock`, and `live`                                                                           |
+| Assumptions & docs      | ×1     | Design notes still describe the clean-only land                                                                        | Conflict note added, but interim comments missing                                                          | The conflict and op-id notes state their why, and each interim branch carries its comment                                                                            |
 
 ## Out of scope
 

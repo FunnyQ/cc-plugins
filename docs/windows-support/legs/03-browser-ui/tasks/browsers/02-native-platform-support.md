@@ -1,6 +1,7 @@
 # BROWSERS-02: Support native browser discovery and lifecycle.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -42,7 +43,11 @@ type PlatformInput = {
   wsl: boolean;
 };
 function browserCandidates(name: BrowserName, input: PlatformInput): string[];
-function browserStateDir(name: BrowserName, platform?: Platform, env?: Record<string, string | undefined>): string;
+function browserStateDir(
+  name: BrowserName,
+  platform?: Platform,
+  env?: Record<string, string | undefined>,
+): string;
 ```
 
 Preserve the existing macOS order: Chrome stable, Canary, Chromium; Firefox Developer Edition, stable, Nightly; Zen's current app bundle. On Windows, derive Chrome's system and per-user locations from ProgramFiles, ProgramFiles(x86) and LOCALAPPDATA. On Linux, WSL included, search the executable names and standard locations specified in the browser context. On WSL, never return a Windows executable; when no Linux candidate exists, add one line to the discovery error telling the user to install a Linux build inside WSL. Keep Firefox and Zen selection independent, while preserving their existing shared Firefox instance registry and command behavior.
@@ -83,12 +88,12 @@ Guard each executable CLI boundary before argument execution, state creation or 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Native discovery fails or cleanup affects unrelated resources | Common installations work but ordering, state compatibility or close failures drift | All native selections, state contracts, owned cleanup and the Safari and Windows Firefox/Zen refusals match the specification |
-| Test coverage | ×2 | Platform branches or lifecycle changes have no regression tests | Happy paths pass but executable rejection, ownership or cleanup ordering is untested | Injected platform tests and command integration assertions cover selection, failure, reuse, refusal and resource ownership |
-| Interface & readability | ×1 | Platform logic is duplicated or shell strings hide execution | Helpers work but callers retain conflicting selection or path rules | Small plugin-local helpers expose explicit platform inputs and keep existing callers coherent |
-| Assumptions & docs | ×1 | Injected tests are presented as proof of real Windows or WSL behavior | Platform limitations are mentioned but verification evidence is ambiguous | Native evidence and injected cases are distinguished, with existing macOS behavior and the support matrix explicit |
+| Dimension               | Weight | 0–1 (fail)                                                            | 2–3 (below bar)                                                                      | 4–5 (pass)                                                                                                                    |
+| ----------------------- | ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Native discovery fails or cleanup affects unrelated resources         | Common installations work but ordering, state compatibility or close failures drift  | All native selections, state contracts, owned cleanup and the Safari and Windows Firefox/Zen refusals match the specification |
+| Test coverage           | ×2     | Platform branches or lifecycle changes have no regression tests       | Happy paths pass but executable rejection, ownership or cleanup ordering is untested | Injected platform tests and command integration assertions cover selection, failure, reuse, refusal and resource ownership    |
+| Interface & readability | ×1     | Platform logic is duplicated or shell strings hide execution          | Helpers work but callers retain conflicting selection or path rules                  | Small plugin-local helpers expose explicit platform inputs and keep existing callers coherent                                 |
+| Assumptions & docs      | ×1     | Injected tests are presented as proof of real Windows or WSL behavior | Platform limitations are mentioned but verification evidence is ambiguous            | Native evidence and injected cases are distinguished, with existing macOS behavior and the support matrix explicit            |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # BACKEND-02: Wire permission routes into the daemon
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/protocol.md`
 >
@@ -36,11 +37,15 @@ import {
 } from "./permission";
 
 // inside fetch(req), alongside the other /api routes:
-if (url.pathname === "/api/permission-request") return handlePermissionRequest(req);
-if (url.pathname === "/api/permission-stream") return handlePermissionStream(req);
-if (url.pathname === "/api/permission-verdict") return handlePermissionVerdict(req);
+if (url.pathname === "/api/permission-request")
+  return handlePermissionRequest(req);
+if (url.pathname === "/api/permission-stream")
+  return handlePermissionStream(req);
+if (url.pathname === "/api/permission-verdict")
+  return handlePermissionVerdict(req);
 if (url.pathname === "/api/permission-pull") return handlePermissionPull(req);
-if (url.pathname === "/api/permission-resolved") return handlePermissionResolved(req);
+if (url.pathname === "/api/permission-resolved")
+  return handlePermissionResolved(req);
 ```
 
 No change to `idleTimeout` (already 255s, which covers the new long-poll). No CORS

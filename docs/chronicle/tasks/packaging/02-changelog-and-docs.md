@@ -1,6 +1,7 @@
 # PACKAGING-02: Changelog and repo docs
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -54,12 +55,12 @@ chronicle is independently versioned (like relay). When updating the "Releasing"
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | wrong format / stale plugin count / unrelated edits | entries present but count or tree drifts | changelog + both CLAUDE.md spots + releasing note correct, count fixed |
-| Trigger & flow correctness | ×2 | docs misdescribe the plugin | mostly right, one detail off | descriptions match the actual skills + soft-dep + independent version |
-| Interface & readability | ×1 | clashes with surrounding style | acceptable | matches existing changelog/tree voice exactly |
-| Assumptions & docs | ×1 | scope creep into adjacent prose | minor extra edits | strictly additive, surgical |
+| Dimension                  | Weight | 0–1 (fail)                                          | 2–3 (below bar)                          | 4–5 (pass)                                                             |
+| -------------------------- | ------ | --------------------------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------- |
+| Correctness                | ×4     | wrong format / stale plugin count / unrelated edits | entries present but count or tree drifts | changelog + both CLAUDE.md spots + releasing note correct, count fixed |
+| Trigger & flow correctness | ×2     | docs misdescribe the plugin                         | mostly right, one detail off             | descriptions match the actual skills + soft-dep + independent version  |
+| Interface & readability    | ×1     | clashes with surrounding style                      | acceptable                               | matches existing changelog/tree voice exactly                          |
+| Assumptions & docs         | ×1     | scope creep into adjacent prose                     | minor extra edits                        | strictly additive, surgical                                            |
 
 ## Out of scope
 

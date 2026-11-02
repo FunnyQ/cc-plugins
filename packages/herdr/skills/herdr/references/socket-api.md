@@ -27,11 +27,11 @@ Weigh one cost against all three. `HERDR_SOCKET_PATH` is a Unix domain socket on
 
 Single-machine medians over 20 warmed iterations, for scale rather than as a promise:
 
-| Call | Socket | CLI |
-|---|---|---|
-| `ping` | 0.08 ms | — |
+| Call         | Socket  | CLI     |
+| ------------ | ------- | ------- |
+| `ping`       | 0.08 ms | —       |
 | `agent.list` | 0.92 ms | 7.39 ms |
-| `pane.list` | 2.70 ms | 9.02 ms |
+| `pane.list`  | 2.70 ms | 9.02 ms |
 
 ## Transport
 
@@ -50,7 +50,7 @@ Connect, write one line, read to the newline, close.
 Send `id`, `method`, and `params`. All three are required — omitting `params` on a no-argument call fails:
 
 ```json
-{"id":"1","method":"ping","params":{}}
+{ "id": "1", "method": "ping", "params": {} }
 ```
 
 ```
@@ -60,9 +60,19 @@ Send `id`, `method`, and `params`. All three are required — omitting `params` 
 Success returns the request's `id` and a `result` whose `type` names the variant:
 
 ```json
-{"id":"1","result":{"type":"pong","version":"0.9.1","protocol":22,
-  "capabilities":{"live_handoff":true,"detached_server_daemon":true,
-    "endpoint_protocol_generation":1}}}
+{
+  "id": "1",
+  "result": {
+    "type": "pong",
+    "version": "0.9.1",
+    "protocol": 22,
+    "capabilities": {
+      "live_handoff": true,
+      "detached_server_daemon": true,
+      "endpoint_protocol_generation": 1
+    }
+  }
+}
 ```
 
 `capabilities.endpoint_protocol_generation` names the endpoint generation the server supports. A client update can leave a compatible server running: the client checks this field and disables only the actions a missing server feature affects, instead of refusing to connect. A server older than endpoint generation 1 needs a one-time upgrade.
@@ -70,7 +80,13 @@ Success returns the request's `id` and a `result` whose `type` names the variant
 Errors return `code` and `message`, both required:
 
 ```json
-{"id":"1","error":{"code":"agent_not_found","message":"agent target nope not found"}}
+{
+  "id": "1",
+  "error": {
+    "code": "agent_not_found",
+    "message": "agent target nope not found"
+  }
+}
 ```
 
 CLI socket commands use `server_not_running` when no compatible server is available. Alternate-screen history reads can use `agent_not_idle` when the target is not safe to scroll. `agent.prompt` returns `agent_blocked` when the target already waits at an approval or question dialog; it sends no text and starts no wait. A prompt that herdr accepted but that produced no lifecycle change within five seconds returns `agent_prompt_stalled`.
@@ -79,7 +95,7 @@ CLI socket commands use `server_not_running` when no compatible server is availa
 
 Gate on `ping` before assuming a shape. Protocol 22 is current here. Treat a supported protocol as a minimum floor unless your client has a verified reason to reject additive future protocols.
 
-**Upgrading the binary does not upgrade the socket.** The server keeps running the version it started with, so `ping` reports the old protocol until it restarts or hands off. Compare `herdr status` client and server versions before you trust a new method. `agent.explain` is the usual casualty: it classifies against the *server's* manifest cache, so a stale server explains with stale rules.
+**Upgrading the binary does not upgrade the socket.** The server keeps running the version it started with, so `ping` reports the old protocol until it restarts or hands off. Compare `herdr status` client and server versions before you trust a new method. `agent.explain` is the usual casualty: it classifies against the _server's_ manifest cache, so a stale server explains with stale rules.
 
 ## Methods
 
@@ -87,23 +103,23 @@ There are 103 methods: `agent.*` (12), `client.*` (2), `client_shell.surface.set
 
 Each CLI subcommand maps to the dotted method of the same name, with flags becoming params. Common mappings:
 
-| CLI | Method | Params |
-|---|---|---|
-| `agent list` | `agent.list` | `{}` |
-| `agent get <t>` | `agent.get` | `{target}` |
-| `agent start <n> --kind K --pane P -- ARGS` | `agent.start` | `{name, kind, pane_id, args, timeout_ms}` |
-| `agent prompt <t> <text> [--wait --until S]` | `agent.prompt` | `{target, text, wait:{until:[…], timeout_ms}}` |
-| `agent wait <t> --until S --timeout MS` | `agent.wait` | `{target, until:[…], timeout_ms}` |
-| `agent read <t> --source S --lines N` | `agent.read` | `{target, source, lines, format, strip_ansi}` |
-| `agent send-keys <t> K…` | `agent.send_keys` | `{target, keys}` |
-| `pane split --direction D` | `pane.split` | `{direction, target_pane_id, workspace_id, cwd, env, ratio, right_click, focus}` |
-| `pane read <id> --source S` | `pane.read` | `{pane_id, source, lines, format, strip_ansi}` |
-| `pane send-keys <id> K…` | `pane.send_keys` | `{pane_id, keys}` |
-| `pane run <id> <cmd>` | `pane.send_input` | `{pane_id, text, keys}` |
-| `pane close <id>` | `pane.close` | `{pane_id}` |
-| `pane list` | `pane.list` | `{workspace_id}` |
-| `tab create` | `tab.create` | `{workspace_id, label, cwd, env, focus}` |
-| `tab list` / `focus` | `tab.list` / `tab.focus` | `{workspace_id}` / `{tab_id}` |
+| CLI                                          | Method                   | Params                                                                           |
+| -------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------- |
+| `agent list`                                 | `agent.list`             | `{}`                                                                             |
+| `agent get <t>`                              | `agent.get`              | `{target}`                                                                       |
+| `agent start <n> --kind K --pane P -- ARGS`  | `agent.start`            | `{name, kind, pane_id, args, timeout_ms}`                                        |
+| `agent prompt <t> <text> [--wait --until S]` | `agent.prompt`           | `{target, text, wait:{until:[…], timeout_ms}}`                                   |
+| `agent wait <t> --until S --timeout MS`      | `agent.wait`             | `{target, until:[…], timeout_ms}`                                                |
+| `agent read <t> --source S --lines N`        | `agent.read`             | `{target, source, lines, format, strip_ansi}`                                    |
+| `agent send-keys <t> K…`                     | `agent.send_keys`        | `{target, keys}`                                                                 |
+| `pane split --direction D`                   | `pane.split`             | `{direction, target_pane_id, workspace_id, cwd, env, ratio, right_click, focus}` |
+| `pane read <id> --source S`                  | `pane.read`              | `{pane_id, source, lines, format, strip_ansi}`                                   |
+| `pane send-keys <id> K…`                     | `pane.send_keys`         | `{pane_id, keys}`                                                                |
+| `pane run <id> <cmd>`                        | `pane.send_input`        | `{pane_id, text, keys}`                                                          |
+| `pane close <id>`                            | `pane.close`             | `{pane_id}`                                                                      |
+| `pane list`                                  | `pane.list`              | `{workspace_id}`                                                                 |
+| `tab create`                                 | `tab.create`             | `{workspace_id, label, cwd, env, focus}`                                         |
+| `tab list` / `focus`                         | `tab.list` / `tab.focus` | `{workspace_id}` / `{tab_id}`                                                    |
 
 Note the shape changes, not just the names. `--env K=V` repeated becomes an `env` **object**. `--until` repeated becomes an `until` **array**. `-- ARGS` becomes `args`. `--no-focus` becomes `focus: false`, which is already the default. On `agent.prompt` the wait flags **nest**: `--wait --until S --timeout MS` becomes one `wait: {until:[…], timeout_ms}` object, and `--wait` alone becomes `wait: {}`. Passing `until` or `timeout_ms` at the top level is a deserialisation error, not a wait.
 
@@ -117,13 +133,13 @@ Result variants you will unwrap: `agent_list.agents`, `agent_info.agent`, `agent
 
 This is the trap. The CLI accepts hyphens; the socket accepts only the underscored variant.
 
-| Enum | Socket values | CLI spelling that differs |
-|---|---|---|
-| `ReadSource` | `visible`, `recent`, `recent_unwrapped`, `detection` | `recent-unwrapped` |
-| `AgentStatus` | `idle`, `working`, `blocked`, `done`, `unknown` | same |
-| `SplitDirection` | `right`, `down` | same |
-| `ReadFormat` | `text`, `ansi` | same |
-| `PaneRightClickTarget` | `herdr`, `pane` | same |
+| Enum                   | Socket values                                        | CLI spelling that differs |
+| ---------------------- | ---------------------------------------------------- | ------------------------- |
+| `ReadSource`           | `visible`, `recent`, `recent_unwrapped`, `detection` | `recent-unwrapped`        |
+| `AgentStatus`          | `idle`, `working`, `blocked`, `done`, `unknown`      | same                      |
+| `SplitDirection`       | `right`, `down`                                      | same                      |
+| `ReadFormat`           | `text`, `ansi`                                       | same                      |
+| `PaneRightClickTarget` | `herdr`, `pane`                                      | same                      |
 
 Passing the CLI spelling returns a deserialisation error, not a friendlier one:
 
@@ -140,23 +156,36 @@ The `keys` array has no enum in the schema, so its vocabulary is not discoverabl
 **Subscribe before you take your initial snapshot.** As of 0.9.0, a subscription starts when the request is accepted and does not replay events retained before that point. `events.subscribe` also holds its connection open, so the snapshot call needs a second connection. To avoid a bootstrap gap: open `events.subscribe` on connection A and wait for `subscription_started`; call `session.snapshot` on connection B while buffering every event connection A delivers; install the snapshot; then apply the buffered events in order. Take the snapshot first, or on the same connection, and any change landing in between never reaches you.
 
 ```json
-{"id":"e","method":"events.subscribe","params":{"subscriptions":[
-  {"type":"pane.agent_status_changed","pane_id":"w2P:p1"},
-  {"type":"pane.updated"}
-]}}
+{
+  "id": "e",
+  "method": "events.subscribe",
+  "params": {
+    "subscriptions": [
+      { "type": "pane.agent_status_changed", "pane_id": "w2P:p1" },
+      { "type": "pane.updated" }
+    ]
+  }
+}
 ```
 
 `subscriptions` is a list of internally-tagged objects, not a list of strings. The first reply confirms the subscription:
 
 ```json
-{"id":"e","result":{"type":"subscription_started"}}
+{ "id": "e", "result": { "type": "subscription_started" } }
 ```
 
 Every line after it is an event, and **carries no `id`**:
 
 ```json
-{"event":"pane.agent_status_changed",
- "data":{"agent":"claude","agent_status":"working","pane_id":"w2P:p1","workspace_id":"w2P"}}
+{
+  "event": "pane.agent_status_changed",
+  "data": {
+    "agent": "claude",
+    "agent_status": "working",
+    "pane_id": "w2P:p1",
+    "workspace_id": "w2P"
+  }
+}
 ```
 
 A client that routes lines by `id` will drop every event. Route on the presence of `event` instead.
@@ -167,11 +196,11 @@ Since 0.9.1, `pane.focused` also fires when any attached client selects a pane b
 
 Most topics take no extra fields. Three do:
 
-| Topic | Required | Optional |
-|---|---|---|
-| `pane.agent_status_changed` | `pane_id` | `agent_status` |
-| `pane.scroll_changed` | `pane_id` | |
-| `pane.output_matched` | `pane_id`, `source`, `match` | `lines`, `strip_ansi` |
+| Topic                       | Required                     | Optional              |
+| --------------------------- | ---------------------------- | --------------------- |
+| `pane.agent_status_changed` | `pane_id`                    | `agent_status`        |
+| `pane.scroll_changed`       | `pane_id`                    |                       |
+| `pane.output_matched`       | `pane_id`, `source`, `match` | `lines`, `strip_ansi` |
 
 Expect volume. A subscription to `pane.updated` on an active session produced 31 lines in 6 seconds.
 

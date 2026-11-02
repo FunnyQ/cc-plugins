@@ -1,6 +1,7 @@
 # ENGINE-08: Stats assembly and fingerprint
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -104,12 +105,12 @@ Time `atlas stats` for Rust and TS on the fixture home (`hyperfine` or three `ti
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Golden `stats key` tests fail on several keys, or key order / Claude fallback / daily merge precedence is wrong | Most keys match; a cost rounding, insights, or data-health status drifts, or the fingerprint misses a watched file | Every golden test passes both ways; fingerprint list identical to TS; clock-derived values follow `TOKEN_ATLAS_NOW_MS` |
-| Test coverage | ×2 | No cargo tests | Happy-path assembly only | Ported TS unit cases plus fingerprint change/no-change tests and the stats-cache fallback |
-| Interface & readability | ×1 | Signatures differ from `engine-api.md`, or parsing runs on the runtime thread | Correct but one giant function with no helpers, or dead helpers | Mirrors `buildStats` helper boundaries; one `spawn_blocking`; clippy clean |
-| Assumptions & docs | ×1 | Silent deviations from TS | Deviations present but uncommented | Each deliberate difference (e.g. fingerprint string format) carries a one-line why; timing numbers reported |
+| Dimension               | Weight | 0–1 (fail)                                                                                                      | 2–3 (below bar)                                                                                                    | 4–5 (pass)                                                                                                             |
+| ----------------------- | ------ | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Golden `stats key` tests fail on several keys, or key order / Claude fallback / daily merge precedence is wrong | Most keys match; a cost rounding, insights, or data-health status drifts, or the fingerprint misses a watched file | Every golden test passes both ways; fingerprint list identical to TS; clock-derived values follow `TOKEN_ATLAS_NOW_MS` |
+| Test coverage           | ×2     | No cargo tests                                                                                                  | Happy-path assembly only                                                                                           | Ported TS unit cases plus fingerprint change/no-change tests and the stats-cache fallback                              |
+| Interface & readability | ×1     | Signatures differ from `engine-api.md`, or parsing runs on the runtime thread                                   | Correct but one giant function with no helpers, or dead helpers                                                    | Mirrors `buildStats` helper boundaries; one `spawn_blocking`; clippy clean                                             |
+| Assumptions & docs      | ×1     | Silent deviations from TS                                                                                       | Deviations present but uncommented                                                                                 | Each deliberate difference (e.g. fingerprint string format) carries a one-line why; timing numbers reported            |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # PACKAGE-03: Changelog and repo docs
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -19,10 +20,12 @@ Record the new plugin in the repo's living docs: a CHANGELOG entry and a concise
 ## Implementation notes
 
 `CHANGELOG.md` — follow the existing Keep a Changelog style already in the file. Add an entry announcing relay `0.1.0`:
+
 - Under an `Added` heading: "relay plugin — cross-harness task delegation (`/relay <codex|opencode|claude> <delegate|review|image>`), a multi-backend superset of odin-codex."
 - Keep wording user-facing, consistent with prior entries. Match whatever version-heading convention the file uses (read it first; do not invent a new format).
 
 `CLAUDE.md` — the file currently describes `monitor` and `dispatch`. Add relay concisely:
+
 - In the "What This Is" list, add a `relay` bullet: one line on cross-harness delegation + the two-layer/strategy design + the capability matrix (image = codex only).
 - In the Architecture tree, add the `packages/relay/` subtree (mirror the layout in `_context/shared.md`).
 - Note the distribution model (Claude/Codex via marketplace; OpenCode via `~/.claude/skills/` symlink) and that version lives in both `plugin.json` files at `0.1.0`.
@@ -48,12 +51,12 @@ Surgical edits only: touch the relay-relevant spots, don't reformat unrelated se
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong format or contradicts manifests | entries present but a detail (version/path/matrix) drifts | CHANGELOG + CLAUDE.md accurate, consistent with manifests, correct format |
-| Test coverage | ×2 | no checks | grep presence only | grep presence + diff-scope + consistency read-through |
-| Interface & readability | ×1 | bloated/reformats unrelated text | minor over-edit | surgical, proportional additions |
-| Assumptions & docs | ×1 | distribution/version omitted | partial | distribution model + version discipline captured |
+| Dimension               | Weight | 0–1 (fail)                            | 2–3 (below bar)                                           | 4–5 (pass)                                                                |
+| ----------------------- | ------ | ------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Correctness             | ×3     | wrong format or contradicts manifests | entries present but a detail (version/path/matrix) drifts | CHANGELOG + CLAUDE.md accurate, consistent with manifests, correct format |
+| Test coverage           | ×2     | no checks                             | grep presence only                                        | grep presence + diff-scope + consistency read-through                     |
+| Interface & readability | ×1     | bloated/reformats unrelated text      | minor over-edit                                           | surgical, proportional additions                                          |
+| Assumptions & docs      | ×1     | distribution/version omitted          | partial                                                   | distribution model + version discipline captured                          |
 
 ## Out of scope
 

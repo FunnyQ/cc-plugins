@@ -88,11 +88,21 @@ A real entry, abridged — note that `reason` is a full argument, not a sentence
 hold a whole Mermaid graph:
 
 ```json
-{"id":"4fbc8de9-f356-440d-9af3-401d977e0f35","type":"decision","kind":"learning",
- "source":"scribe","decision":"Agent(type) whitelist is inert in a subagent definition",
- "reason":"<~400 words of argument>","tradeoff":"","facets":[],"needs_your_call":false,
- "options":[],"files":["packages/chronicle/agents/lawspeaker.md"],
- "diagram":"flowchart TD\n  ...","timestamp":"2026-07-14T09:12:03.441Z"}
+{
+  "id": "4fbc8de9-f356-440d-9af3-401d977e0f35",
+  "type": "decision",
+  "kind": "learning",
+  "source": "scribe",
+  "decision": "Agent(type) whitelist is inert in a subagent definition",
+  "reason": "<~400 words of argument>",
+  "tradeoff": "",
+  "facets": [],
+  "needs_your_call": false,
+  "options": [],
+  "files": ["packages/chronicle/agents/lawspeaker.md"],
+  "diagram": "flowchart TD\n  ...",
+  "timestamp": "2026-07-14T09:12:03.441Z"
+}
 ```
 
 **Why two-pass loading is mandatory.** This repository alone holds roughly 352 entries. Loading
@@ -118,7 +128,7 @@ is the single most damaging failure mode in the whole plan.
 
 ## The inbox model
 
-Position in the filesystem *is* the state. There is no ledger and no database.
+Position in the filesystem _is_ the state. There is no ledger and no database.
 
 - `logs/` holds the unprocessed backlog.
 - `archive/done/` holds sessions that were dispositioned `promote` or `skip`. Both land here: they
@@ -149,20 +159,24 @@ next number is the highest existing number plus one; an empty or missing directo
 - Superseded by: ADR-NNNN (optional)
 
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
 ### Status is implementation state, not review state
 
-| Value | Means | Requires |
-| --- | --- | --- |
-| `Accepted` | Live in the code today | — |
-| `Proposed` | Drafted ahead of the work | — |
-| `Superseded` | Replaced by a named successor | a `Superseded by: ADR-NNNN` line |
-| `Deprecated` | No longer applies, with no successor | no successor link |
+| Value        | Means                                | Requires                         |
+| ------------ | ------------------------------------ | -------------------------------- |
+| `Accepted`   | Live in the code today               | —                                |
+| `Proposed`   | Drafted ahead of the work            | —                                |
+| `Superseded` | Replaced by a named successor        | a `Superseded by: ADR-NNNN` line |
+| `Deprecated` | No longer applies, with no successor | no successor link                |
 
 The conventional ADR lifecycle tracks agreement between people and runs forward: draft `Proposed`,
 review, `Accepted`, then build. This flow runs backward — a candidate only exists because the

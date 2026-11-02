@@ -1,6 +1,7 @@
 # CHANNEL-01: rmcp handshake spike
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -127,12 +128,12 @@ Spike RSS: <n> KB (macOS arm64, idle, stdin open, transport: rmcp|hand-rolled)
 
 > Scale 0–5 per `../_context/rubric.md`. Pass when the weighted average is > 4.0; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Handshake differs from the Bun channel (wrong name, instructions, or capabilities) or a custom notification cannot be sent/received | Handshake matches but one notification direction is unproven, or EOF does not exit | Handshake byte-matches, both notification directions proven, EOF/SIGTERM exit 0, decision recorded |
-| Test coverage | ×2 | No cargo tests; only the contract group was run | Handshake tested, notifications only exercised by hand | Cargo tests for initialize, tools/list, both outbound notifications, inbound permission_request, unknown-notification ignore |
-| Interface & readability | ×1 | Transport details leak into callers | `notify` / `on_notification` exist but carry transport types | The rest of the channel can use `notify` and `on_notification` without knowing which transport won |
-| Assumptions & docs | ×1 | Decision unrecorded, rmcp unpinned | Decision recorded without the version or reason | Decision line names the exact rmcp version and, on fallback, the capability that failed; RSS recorded |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                          | 2–3 (below bar)                                                                    | 4–5 (pass)                                                                                                                   |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Handshake differs from the Bun channel (wrong name, instructions, or capabilities) or a custom notification cannot be sent/received | Handshake matches but one notification direction is unproven, or EOF does not exit | Handshake byte-matches, both notification directions proven, EOF/SIGTERM exit 0, decision recorded                           |
+| Test coverage           | ×2     | No cargo tests; only the contract group was run                                                                                     | Handshake tested, notifications only exercised by hand                             | Cargo tests for initialize, tools/list, both outbound notifications, inbound permission_request, unknown-notification ignore |
+| Interface & readability | ×1     | Transport details leak into callers                                                                                                 | `notify` / `on_notification` exist but carry transport types                       | The rest of the channel can use `notify` and `on_notification` without knowing which transport won                           |
+| Assumptions & docs      | ×1     | Decision unrecorded, rmcp unpinned                                                                                                  | Decision recorded without the version or reason                                    | Decision line names the exact rmcp version and, on fallback, the capability that failed; RSS recorded                        |
 
 ## Out of scope
 

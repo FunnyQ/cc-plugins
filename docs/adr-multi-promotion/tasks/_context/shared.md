@@ -32,15 +32,15 @@ parallel. This change does not alter that protocol. One codifier drafts every gr
 
 Seven files. No task touches a file outside this list.
 
-| File | Owning task family |
-| --- | --- |
-| `packages/chronicle/skills/adr/SKILL.md` | the two `contract` tasks, in order |
-| `packages/chronicle/agents/codifier.md` | one `agents` task |
-| `packages/chronicle/agents/lorekeeper.md` | one `agents` task |
-| `packages/chronicle/agents/barrowkeeper.md` | one `agents` task |
-| `packages/chronicle/agents-codex/codifier.toml` | one `codex` task |
-| `packages/chronicle/agents-codex/lorekeeper.toml` | one `codex` task |
-| `packages/chronicle/agents-codex/barrowkeeper.toml` | one `codex` task |
+| File                                                | Owning task family                 |
+| --------------------------------------------------- | ---------------------------------- |
+| `packages/chronicle/skills/adr/SKILL.md`            | the two `contract` tasks, in order |
+| `packages/chronicle/agents/codifier.md`             | one `agents` task                  |
+| `packages/chronicle/agents/lorekeeper.md`           | one `agents` task                  |
+| `packages/chronicle/agents/barrowkeeper.md`         | one `agents` task                  |
+| `packages/chronicle/agents-codex/codifier.toml`     | one `codex` task                   |
+| `packages/chronicle/agents-codex/lorekeeper.toml`   | one `codex` task                   |
+| `packages/chronicle/agents-codex/barrowkeeper.toml` | one `codex` task                   |
 
 ## Non-goals for every task
 

@@ -33,11 +33,11 @@ channel a notification:
 - **method**: `notifications/claude/channel/permission_request`
 - **params**:
 
-  | field | type | meaning |
-  |---|---|---|
-  | `request_id` | string | 5 lowercase letters from `a–z` minus `l` (so it can't be misread as `1`/`I`). **Must be echoed verbatim** in the verdict. |
-  | `tool_name` | string | e.g. `Bash`, `Write`. |
-  | `description` | string | human-readable summary — identical to the local terminal dialog text. |
+  | field           | type   | meaning                                                                                                                           |
+  | --------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------- |
+  | `request_id`    | string | 5 lowercase letters from `a–z` minus `l` (so it can't be misread as `1`/`I`). **Must be echoed verbatim** in the verdict.         |
+  | `tool_name`     | string | e.g. `Bash`, `Write`.                                                                                                             |
+  | `description`   | string | human-readable summary — identical to the local terminal dialog text.                                                             |
   | `input_preview` | string | the tool's arguments as a JSON string, truncated to ~200 chars (for `Bash` the command; for `Write` the path + a content prefix). |
 
 The channel registers this with `mcp.setRequestHandler` / `setNotificationHandler`
@@ -50,12 +50,12 @@ The channel returns the decision as a notification:
 
 ```ts
 await mcp.notification({
-  method: 'notifications/claude/channel/permission',
+  method: "notifications/claude/channel/permission",
   params: {
-    request_id: '<the exact request_id from the request>',
-    behavior: 'allow' | 'deny',   // 'allow' = let the tool run; 'deny' = same as "No" in the dialog
+    request_id: "<the exact request_id from the request>",
+    behavior: "allow" | "deny", // 'allow' = let the tool run; 'deny' = same as "No" in the dialog
   },
-})
+});
 ```
 
 Claude Code **only accepts a verdict whose `request_id` matches** a pending

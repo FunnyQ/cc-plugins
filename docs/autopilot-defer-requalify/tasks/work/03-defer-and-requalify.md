@@ -1,6 +1,7 @@
 # WORK-03: Defer-and-requalify gate layer
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/orchestrator-anatomy.md`
@@ -31,9 +32,9 @@ The wave tree watch is in place: a per-wave object created just before the wave'
 dispatch and threaded through the guarded wrapper into `executeTask`. It exposes:
 
 ```js
-watch.size      // how many tasks this wave dispatched
-watch.quiet()   // Promise that resolves at the next moment no writer is active
-watch.active()  // how many writers are running right now — takes no argument
+watch.size; // how many tasks this wave dispatched
+watch.quiet(); // Promise that resolves at the next moment no writer is active
+watch.active(); // how many writers are running right now — takes no argument
 ```
 
 Writers are the counted mutation windows: the dev step and the final-review round, the
@@ -42,20 +43,20 @@ adds no new writer and no new member.
 
 `active()` needs no ref argument. A task asking the question has already left the writer set,
 because its own dev step returned before its gate ran, so a non-zero count always means some
-*other* task is writing.
+_other_ task is writing.
 
 ### 1. `GATE_SCHEMA` gains an optional `deferred`
 
 ```js
 const GATE_SCHEMA = {
-  type: 'object',
+  type: "object",
   properties: {
-    passed: { type: 'boolean' },     // every Verification command + Acceptance criterion passed
-    deferred: { type: 'boolean' },   // the red output looks like a sibling's in-flight edits
-    summary: { type: 'string' },     // raw evidence: commands run, exit codes, failing output
+    passed: { type: "boolean" }, // every Verification command + Acceptance criterion passed
+    deferred: { type: "boolean" }, // the red output looks like a sibling's in-flight edits
+    summary: { type: "string" }, // raw evidence: commands run, exit codes, failing output
   },
-  required: ['passed', 'summary'],
-}
+  required: ["passed", "summary"],
+};
 ```
 
 `deferred` stays **out** of `required` on purpose: a verifier that omits it degrades to exactly
@@ -67,14 +68,14 @@ A third gate state is otherwise a button a cheap verifier will press whenever a 
 inconvenient. Every condition below is checked in code, not asked for in prose:
 
 ```js
-const SIBLING_MARKER = 'SUSPECTED SIBLING INTERFERENCE'
+const SIBLING_MARKER = "SUSPECTED SIBLING INTERFERENCE";
 
 const deferralAccepted = (gate, watch) =>
-  gate.passed === false
-  && watch.size > 1
-  && typeof gate.summary === 'string'
-  && gate.summary.includes(SIBLING_MARKER)
-  && watch.active() > 0
+  gate.passed === false &&
+  watch.size > 1 &&
+  typeof gate.summary === "string" &&
+  gate.summary.includes(SIBLING_MARKER) &&
+  watch.active() > 0;
 ```
 
 - **`passed === false`** — a deferral only ever postpones a failure. A gate that claims both a
@@ -83,7 +84,7 @@ const deferralAccepted = (gate, watch) =>
 - **the marker** — forces named evidence into `summary`, which is also what lands in the audit
   trail and in the retry feedback.
 - **`watch.active() > 0`** — the load-bearing one. **Write a why-comment for this one.**
-  Wave size is *historical*: it says this wave once had siblings, not that any of them is
+  Wave size is _historical_: it says this wave once had siblings, not that any of them is
   writing now. Without this check, a verifier whose siblings have all finished gets `quiet()`
   resolving instantly and wins a free re-run of a red command — so a flaky failure, or its own
   genuine one, can pass on the second roll with nothing rewritten in between. That is strictly
@@ -100,25 +101,46 @@ Slot this between the existing `if (!gate)` infrastructure guard and the existin
 `if (!gate.passed)` block:
 
 ```js
-let gate = await agent(verifyPrompt(ref, path, attempt),
-  { label: `verify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
-if (!gate) { /* unchanged infrastructure-failure path */ }
+let gate = await agent(verifyPrompt(ref, path, attempt), {
+  label: `verify:${ref}#${attempt}`,
+  phase: "Execute",
+  model: MODEL.verify,
+  schema: GATE_SCHEMA,
+});
+if (!gate) {
+  /* unchanged infrastructure-failure path */
+}
 
 if (gate.deferred && deferralAccepted(gate, watch)) {
-  await watch.quiet()
-  const requalified = await agent(verifyPrompt(ref, path, attempt, { requalify: true }),
-    { label: `requalify:${ref}#${attempt}`, phase: 'Execute', model: MODEL.verify, schema: GATE_SCHEMA })
+  await watch.quiet();
+  const requalified = await agent(
+    verifyPrompt(ref, path, attempt, { requalify: true }),
+    {
+      label: `requalify:${ref}#${attempt}`,
+      phase: "Execute",
+      model: MODEL.verify,
+      schema: GATE_SCHEMA,
+    },
+  );
   if (!requalified) {
-    const cause = `requalification did not run or did not return a verdict on attempt ${attempt}`
-      + ` — the requalify agent produced no structured result.`
-    return infrastructureFailure(ref, attempt, cause, await parkBlocked(ref, path, cause, watch))
+    const cause =
+      `requalification did not run or did not return a verdict on attempt ${attempt}` +
+      ` — the requalify agent produced no structured result.`;
+    return infrastructureFailure(
+      ref,
+      attempt,
+      cause,
+      await parkBlocked(ref, path, cause, watch),
+    );
   }
   // One defer per attempt: the requalify verdict is final, so its own `deferred`
   // is dropped rather than re-entering this branch.
-  gate = { ...requalified, deferred: false }
+  gate = { ...requalified, deferred: false };
 }
 
-if (!gate.passed) { /* unchanged: push onto attempts[], continue */ }
+if (!gate.passed) {
+  /* unchanged: push onto attempts[], continue */
+}
 ```
 
 Properties this shape buys, all of which the tests must hold:
@@ -177,9 +199,10 @@ is `passed=false`, and `deferred` is ignored on this run.
   pipeline never granted. Refusals are common by design; three of the four guards exist
   precisely to produce them.
 
-  The orchestrator's decision *is* recorded, by the only mark the orchestrator itself controls:
+  The orchestrator's decision _is_ recorded, by the only mark the orchestrator itself controls:
   whether a `requalify:` row follows. A granted deferral shows `FAIL` then a requalify verdict;
   a refused one shows `FAIL` and nothing after it. Both are true.
+
 - The dashboard must learn the new role so requalify rows are parsed and coloured like the gate
   rows they are. That work belongs to a later task in this bucket, not here. Until it lands a
   requalify row renders uncoloured, which is expected and is not a reason to widen this task.
@@ -215,6 +238,7 @@ Cover:
   This is a property of the design, not a gap. A task whose siblings have all finished is
   already verifying against a settled tree, so it has nothing to wait for — which is precisely
   what the guard encodes. State it in the test's name so a later reader does not "fix" it.
+
 - **Writer accounting, proved through the wait.** The tree watch's count has no observable
   effect until something waits on it, so a deferral is the first place its bookkeeping can be
   tested at all. Use the fixture's per-window hold knobs — `doneHolds` for the mark-done step,
@@ -235,7 +259,7 @@ Cover:
 - [x] A deferral consumes no attempt: the same `attempt` number covers both verify calls, and a
       failing requalify falls through to the existing dev-retry `continue`.
 - [x] All four guards — verdict is a failure, wave size above one, `SUSPECTED SIBLING
-      INTERFERENCE` present in `summary`, and another writer live right now — are enforced in
+    INTERFERENCE` present in `summary`, and another writer live right now — are enforced in
       the script itself, not only asked for in prompt text.
 - [x] A rejected deferral is discarded and the gate is handled by its own `passed` value, and no
       requalify agent is spawned in any rejected case.
@@ -264,12 +288,12 @@ Cover:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The live-writer check is absent, any guard lives only in prompt text, or a deferral can turn a non-zero exit into a pass | Three of the four guards are enforced, or all four are present but the live-writer check reads a count sampled after the wait rather than at the verdict, or a deferral consumes an attempt | All four guards enforced in code and evaluated at the verdict, the requalify verdict is final, and no deferral state escapes the task pipeline |
-| Test coverage | ×2 | Only the happy defer→pass path is tested | Guards tested by outcome but nothing asserts the absent requalify agent or the held-writer ordering | Every guard downgrade asserts no second agent spawned, and the held-writer case asserts call ordering, not just the final result |
-| Interface & readability | ×1 | The gate block becomes a nested tangle, or a second parameter is threaded beside the watch | Readable but the guard predicate is inlined and repeated | One named predicate, one object threaded, and the new branch reads in the existing file's idiom |
-| Assumptions & docs | ×1 | The live-writer check carries no explanation | A comment restates what the code does | A why-comment explains the free-re-run hole the live-writer check closes, in the file's existing register |
+| Dimension               | Weight | 0–1 (fail)                                                                                                               | 2–3 (below bar)                                                                                                                                                                             | 4–5 (pass)                                                                                                                                     |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The live-writer check is absent, any guard lives only in prompt text, or a deferral can turn a non-zero exit into a pass | Three of the four guards are enforced, or all four are present but the live-writer check reads a count sampled after the wait rather than at the verdict, or a deferral consumes an attempt | All four guards enforced in code and evaluated at the verdict, the requalify verdict is final, and no deferral state escapes the task pipeline |
+| Test coverage           | ×2     | Only the happy defer→pass path is tested                                                                                 | Guards tested by outcome but nothing asserts the absent requalify agent or the held-writer ordering                                                                                         | Every guard downgrade asserts no second agent spawned, and the held-writer case asserts call ordering, not just the final result               |
+| Interface & readability | ×1     | The gate block becomes a nested tangle, or a second parameter is threaded beside the watch                               | Readable but the guard predicate is inlined and repeated                                                                                                                                    | One named predicate, one object threaded, and the new branch reads in the existing file's idiom                                                |
+| Assumptions & docs      | ×1     | The live-writer check carries no explanation                                                                             | A comment restates what the code does                                                                                                                                                       | A why-comment explains the free-re-run hole the live-writer check closes, in the file's existing register                                      |
 
 ## Out of scope
 

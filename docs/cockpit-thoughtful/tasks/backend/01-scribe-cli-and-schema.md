@@ -1,6 +1,7 @@
 # BACKEND-01: Scribe CLI and schema
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/log-schema.md`
 > - `../_context/rubric.md`
@@ -31,7 +32,7 @@ type DecisionSource = "agent" | "scribe";
 type DecisionRecord = {
   id: string;
   type: "decision";
-  kind?: DecisionKind;     // NEW — default "decision" when absent
+  kind?: DecisionKind; // NEW — default "decision" when absent
   source?: DecisionSource; // NEW — default "agent" when absent
   decision: string;
   reason: string;
@@ -51,6 +52,7 @@ Both optional → old logs deserialize unchanged. In `cmdLog`'s record literal, 
 `parseArgs` keys flags off three sets. Add `"type"`, `"text"`, `"title"` to `SINGLE_FLAGS`.
 
 `--recent` carries an **optional** numeric value and must NOT fall into the generic else-branch (that branch greedily consumes the next token, so `--recent --provider codex` would swallow `--provider`). Special-case `recent` **before** the else-branch: consume a following token only if it matches `/^\d+$/`; otherwise leave N=8 and consume nothing. Either special-case it in `parseArgs` (e.g. a `recent` entry that captures an optional numeric) or parse the scribe argv directly in `cmdScribe` — but the three cases below must all work:
+
 - `cockpit scribe --recent` → N=8
 - `cockpit scribe --recent 3` → N=3
 - `cockpit scribe --recent --provider codex` → N=8, `--provider` intact
@@ -60,20 +62,22 @@ Both optional → old logs deserialize unchanged. In `cmdLog`'s record literal, 
 Mirror `cmdLog` (cockpit.ts ~286–341). Two modes:
 
 **Recent mode** — when `--recent` is present and `--type` is absent:
+
 - Resolve session (`--session || findSession(provider, project)`); if none, print nothing and exit 0 (a fork with no session shouldn't crash).
 - Read the log at `logPathFor(project, sessionId)` if it exists; parse lines; filter `source === "scribe"`; take the last N (default 8); print one compact line each: `${kind} · ${decision || "(untitled)"} · ${timestamp}`. Exit 0.
 
 **Write mode** — when `--type` is present:
+
 - Validate `--type` ∈ `{decision,rationale,learning,caveat}`; else `console.error` + `process.exit(1)`.
 - Require `--text`; else error + exit 1.
-- Resolve session as in `cmdLog` (`--session || findSession(...)`); error + exit 1 if unresolved. **Note**: `findSession` only resolves a *live* harness session. In tests / non-live contexts there is none, so pass an explicit `--session <uuid>`. "Never-started" means **no registry entry / no meta** — the session id itself is still required (explicit or live); auto-register supplies the registry entry, not the id.
+- Resolve session as in `cmdLog` (`--session || findSession(...)`); error + exit 1 if unresolved. **Note**: `findSession` only resolves a _live_ harness session. In tests / non-live contexts there is none, so pass an explicit `--session <uuid>`. "Never-started" means **no registry entry / no meta** — the session id itself is still required (explicit or live); auto-register supplies the registry entry, not the id.
 - Build the record:
 
 ```ts
 const rec: DecisionRecord = {
   id: crypto.randomUUID(),
   type: "decision",
-  kind,                              // validated --type
+  kind, // validated --type
   source: "scribe",
   decision: args.single["title"] || "",
   reason: args.single["text"] || "",
@@ -119,12 +123,12 @@ Add `case "scribe": cmdScribe(parseArgs(rest)); break;` to `main()`'s switch and
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong record shape, no auto-register, or breaks `cmdLog` | writes but misses validation, recent filter, or read-back guard | all modes correct incl. auto-register, validation, dedup list, guard |
-| Test coverage | ×2 | no scribe tests | happy-path write only | write + recent + bad-type + auto-register + backward-compat covered |
-| Interface & readability | ×1 | duplicates `cmdLog` messily, fields drift | works but naming/flow unclear | reuses helpers, mirrors `cmdLog` cleanly, `type` over `interface` |
-| Assumptions & docs | ×1 | silent magic, no compat note | partial | optional-field defaults + no-goal-record choice noted inline |
+| Dimension               | Weight | 0–1 (fail)                                               | 2–3 (below bar)                                                 | 4–5 (pass)                                                           |
+| ----------------------- | ------ | -------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Correctness             | ×3     | wrong record shape, no auto-register, or breaks `cmdLog` | writes but misses validation, recent filter, or read-back guard | all modes correct incl. auto-register, validation, dedup list, guard |
+| Test coverage           | ×2     | no scribe tests                                          | happy-path write only                                           | write + recent + bad-type + auto-register + backward-compat covered  |
+| Interface & readability | ×1     | duplicates `cmdLog` messily, fields drift                | works but naming/flow unclear                                   | reuses helpers, mirrors `cmdLog` cleanly, `type` over `interface`    |
+| Assumptions & docs      | ×1     | silent magic, no compat note                             | partial                                                         | optional-field defaults + no-goal-record choice noted inline         |
 
 ## Out of scope
 

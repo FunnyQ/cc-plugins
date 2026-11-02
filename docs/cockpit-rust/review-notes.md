@@ -57,10 +57,10 @@ All of that is gone now. One crate was added, `futures-core`, and it carries a j
 
 ## Memory goal (from `docs/cockpit-rust/rss.md`)
 
-| Process | Target | Measured | Result |
-| --- | --- | --- | --- |
-| channel | ≤ 10 MB | 9008 KB (8.8 MiB) | **pass** |
-| server | ≤ 30 MB | 11936 KB (11.7 MiB) | **pass** |
+| Process | Target  | Measured            | Result   |
+| ------- | ------- | ------------------- | -------- |
+| channel | ≤ 10 MB | 9008 KB (8.8 MiB)   | **pass** |
+| server  | ≤ 30 MB | 11936 KB (11.7 MiB) | **pass** |
 
 The original `rss.md` from ship/04 never landed: it stayed untracked in the task worktree. This review re-measured with the method in the ship/04 task, and the numbers match what ship/04 logged (9008 / 11616–11808 KB).
 
@@ -136,12 +136,12 @@ Attempt 1 (some of these were reversed in attempt 2, as noted):
 - **efficiency: compare `state.token` rather than re-reading `daemon.json`.** `cli.contract.test.ts:288` pins that a rewritten `daemon.json.token` changes the daemon's own token (TS parity), and `opencode.rs` tests "reads it fresh".
 - **efficiency: memoize gzipped assets.** The cache would keep about 1 MB of compressed assets resident against the 30 MB RSS goal, and ETag revalidation already turns warm loads into 304s. Moving the gzip off the runtime thread fixes the stall this finding cited.
 - **efficiency: keep one OpenCode SQLite connection per stream.** A long-lived handle keeps reading a replaced DB file. Opening per 2 s poll is sub-millisecond.
-- **efficiency: `groups.last()` in `opencode_rows::entries`.** There are at most 50 groups, and the change would tie correctness to the SQL `ORDER BY`. *Reversed in attempt 2, with the dependency commented at the loop.*
+- **efficiency: `groups.last()` in `opencode_rows::entries`.** There are at most 50 groups, and the change would tie correctness to the SQL `ORDER BY`. _Reversed in attempt 2, with the dependency commented at the loop._
 - **efficiency: run the Stop hook's `git diff` and `git status` in parallel.** Concurrent index refreshes race on `index.lock`, and the throttle already gates the probe.
 - **leanness: drop `MIGRATED_TARGETS`.** It is TS parity: each target is migrated once per process while XDG overrides change.
-- **leanness: replace `encode_component` with `reqwest::query`.** `serde_urlencoded` encodes a space as `+`, not `%20`, which is a wire change. *Reversed in attempt 2: both daemons decode `+` and `%20` the same way.*
+- **leanness: replace `encode_component` with `reqwest::query`.** `serde_urlencoded` encodes a space as `+`, not `%20`, which is a wire change. _Reversed in attempt 2: both daemons decode `+` and `%20` the same way._
 - **leanness: drop `build-release.sh --sums`.** `bin/cockpit.test.ts:310` drives it on macOS.
-- **leanness: merge the two `NudgeState` enums, drop `broker_client::Daemon`, merge `transcript.rs`'s route-local `Provider`, and add JSON response helpers.** Each is behaviour-neutral churn across CLI and route code that its contract groups already pass. `Daemon` is a typed required-field view, not a pass-through. Left for a follow-up. *Applied in attempt 2, when both the reuse and leanness lenses raised them again.*
+- **leanness: merge the two `NudgeState` enums, drop `broker_client::Daemon`, merge `transcript.rs`'s route-local `Provider`, and add JSON response helpers.** Each is behaviour-neutral churn across CLI and route code that its contract groups already pass. `Daemon` is a typed required-field view, not a pass-through. Left for a follow-up. _Applied in attempt 2, when both the reuse and leanness lenses raised them again._
 - **leanness: hand-rolled `parse_timestamp`.** Its comment cites JS `Date` day-rollover parity, which `jiff` rejects.
 
 ## Verification (attempt 2, after fixes)

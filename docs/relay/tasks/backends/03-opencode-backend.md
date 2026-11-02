@@ -1,6 +1,7 @@
 # BACKENDS-03: OpenCode backend
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/cli-reference.md`
 > - `../_context/rubric.md`
@@ -25,16 +26,21 @@ Binary `opencode`. Both modes use `strategy = "prompt"` (no native review). Mode
 export const opencodeBackend: Backend = {
   name: "opencode",
   supports: new Set(["delegate", "review"]),
-  strategy() { return "prompt"; },
+  strategy() {
+    return "prompt";
+  },
   invoke(mode, opts) {
     // prompt text comes from the prompt-file (read by relay.ts) and is passed as the message arg
     // argv: ["opencode", "run", "-m", <resolved model>, "--format", "default", <promptText>]
   },
-  parseOutput(raw) { /* see below */ },
+  parseOutput(raw) {
+    /* see below */
+  },
 };
 ```
 
 Output parsing (`cli-reference.md`):
+
 - **v1 uses `--format default`** → `parseOutput` just trims the formatted stdout.
 - Also export a `parseJsonl(raw: string): string` helper that concatenates `.part.text` from lines where `.type === "text"` — used if/when JSON mode is enabled. It must **not** require a terminal `step_finish` line (bug #26855): parse whatever text parts exist, ignore malformed lines.
 
@@ -59,12 +65,12 @@ Read-only guarantee for review is **prompt-based only** (the builder's "Analyze 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong model/argv or JSONL parse breaks on the bug | core ok but override or malformed-line handling drifts | correct per-mode model + override; JSONL parse robust to #26855 |
-| Test coverage | ×2 | no tests | argv only | model resolution + JSONL edge cases (malformed, no terminal event) |
-| Interface & readability | ×1 | spawn in invoke | usable | pure argv/parse; seam for prompt text documented |
-| Assumptions & docs | ×1 | bug/limitation unmentioned | one noted | #26855 + non-enforced read-only both flagged in comments |
+| Dimension               | Weight | 0–1 (fail)                                        | 2–3 (below bar)                                        | 4–5 (pass)                                                         |
+| ----------------------- | ------ | ------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------ |
+| Correctness             | ×3     | wrong model/argv or JSONL parse breaks on the bug | core ok but override or malformed-line handling drifts | correct per-mode model + override; JSONL parse robust to #26855    |
+| Test coverage           | ×2     | no tests                                          | argv only                                              | model resolution + JSONL edge cases (malformed, no terminal event) |
+| Interface & readability | ×1     | spawn in invoke                                   | usable                                                 | pure argv/parse; seam for prompt text documented                   |
+| Assumptions & docs      | ×1     | bug/limitation unmentioned                        | one noted                                              | #26855 + non-enforced read-only both flagged in comments           |
 
 ## Out of scope
 

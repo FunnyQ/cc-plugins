@@ -12,7 +12,7 @@ flightlog, and never writes anything back.
 
 ## Goals
 
-- See which subagents are in flight *right now*, with role, task, attempt, and elapsed time.
+- See which subagents are in flight _right now_, with role, task, attempt, and elapsed time.
 - See the task tree's shape and progress at a glance — buckets, dependencies, what is blocked.
 - See each task's rubric verdict: weighted score against threshold, per-dimension breakdown, hard-fail.
 - Auto-start with `/autopilot` so a run is observable without a second command.
@@ -38,12 +38,12 @@ third attempt.
 
 Every input needed already exists and is machine-readable:
 
-| Data | Source |
-|---|---|
-| Task tree, status, deps, rubric | `loadAllTasks()` in `packages/dispatch/skills/flightplan/scripts/next-ready.ts` → `ParsedTask` |
-| Score verdicts | `ScoreEntry` in `.flightlog/run.jsonl` — `weighted`, `threshold`, `passed`, `hardFailed`, `attempt`, `breakdown[]` |
-| Agent narrative | `NoteEntry` in the same file — `role`, `agentLabel`, `message` |
-| Agent identity | `agentLabel`, following the orchestrator's label taxonomy |
+| Data                            | Source                                                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Task tree, status, deps, rubric | `loadAllTasks()` in `packages/dispatch/skills/flightplan/scripts/next-ready.ts` → `ParsedTask`                     |
+| Score verdicts                  | `ScoreEntry` in `.flightlog/run.jsonl` — `weighted`, `threshold`, `passed`, `hardFailed`, `attempt`, `breakdown[]` |
+| Agent narrative                 | `NoteEntry` in the same file — `role`, `agentLabel`, `message`                                                     |
+| Agent identity                  | `agentLabel`, following the orchestrator's label taxonomy                                                          |
 
 One gap: the flightlog is **finish-only**. An agent appends its entry after it completes, so an
 in-flight agent is invisible and the screen would sit on the last completed state. Every agent in the
@@ -79,12 +79,18 @@ agent's shape.
    - Acceptance: `PRODUCT.md` records the palette, type scale, and anti-goals; every colour in
      `style.css` comes from a named token.
 10. **Task lanes** — bucket columns of task cards with status colour, progress ring, blocked-by badges.
-   - Acceptance: rendering `docs/waypoints-skill/tasks` shows 6 tasks in 3 buckets with correct badges.
+
+- Acceptance: rendering `docs/waypoints-skill/tasks` shows 6 tasks in 3 buckets with correct badges.
+
 11. **Agent fleet** — live rows with role, task, attempt, elapsed, and score meter plus rubric bars.
-   - Acceptance: replaying `docs/chronicle/.flightlog/run.jsonl` renders its score entries with
-     correct weighted value, threshold marker, and hard-fail state.
+
+- Acceptance: replaying `docs/chronicle/.flightlog/run.jsonl` renders its score entries with
+  correct weighted value, threshold marker, and hard-fail state.
+
 12. **Dependency graph** — hand-laid SVG, layered by primary parent, tinted by live status.
-   - Acceptance: no `vendor/` addition; nodes recolour on an SSE event without relayout.
+
+- Acceptance: no `vendor/` addition; nodes recolour on an SSE event without relayout.
+
 13. **Start events in the orchestrator** — every agent prompt logs `--phase start` first.
     - Acceptance: a real fixture flight shows a start entry for dev, verify, judge, and scout, all in
       one `.flightlog/` directory.
@@ -162,23 +168,23 @@ The UI is a strict read layer. It is out-of-band: if the daemon dies mid-flight,
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | flightlog phase events | todo | > 4.0 | — |
-| contract | 02 | fleet and task state derivation | todo | > 4.0 | contract/01 |
-| server | 01 | static file serving | todo | > 4.0 | — |
-| server | 02 | the server process | todo | > 4.0 | server/01, ui/01 |
-| server | 03 | the launcher | todo | > 4.0 | server/02 |
-| server | 04 | tree endpoint | todo | > 4.0 | server/03, contract/02 |
-| server | 05 | fleet event stream | todo | > 4.0 | server/04 |
-| ui | 01 | Hangar design system + shell | todo | > 4.0 | — |
-| ui | 02 | task lanes | todo | > 4.0 | ui/01, server/04 |
-| ui | 03 | agent fleet + score meters | todo | > 4.0 | ui/01, server/05 |
-| ui | 04 | SVG dependency graph | todo | > 4.0 | ui/02, ui/03 |
-| wiring | 01 | orchestrator start events | todo | > 4.0 | contract/01 |
-| wiring | 02 | SKILL.md auto-start | todo | > 4.0 | server/03 |
-| wiring | 03 | fixture flight verification | todo | > 4.0 | wiring/01, wiring/02, ui/03, ui/04 |
-| wiring | 04 | final review 🏁 | todo | > 4.0 | wiring/03, contract/02, server/05, ui/04 |
+| Bucket   | NN  | Title                           | Status | Pass line | Depends on                               |
+| -------- | --- | ------------------------------- | ------ | --------- | ---------------------------------------- |
+| contract | 01  | flightlog phase events          | todo   | > 4.0     | —                                        |
+| contract | 02  | fleet and task state derivation | todo   | > 4.0     | contract/01                              |
+| server   | 01  | static file serving             | todo   | > 4.0     | —                                        |
+| server   | 02  | the server process              | todo   | > 4.0     | server/01, ui/01                         |
+| server   | 03  | the launcher                    | todo   | > 4.0     | server/02                                |
+| server   | 04  | tree endpoint                   | todo   | > 4.0     | server/03, contract/02                   |
+| server   | 05  | fleet event stream              | todo   | > 4.0     | server/04                                |
+| ui       | 01  | Hangar design system + shell    | todo   | > 4.0     | —                                        |
+| ui       | 02  | task lanes                      | todo   | > 4.0     | ui/01, server/04                         |
+| ui       | 03  | agent fleet + score meters      | todo   | > 4.0     | ui/01, server/05                         |
+| ui       | 04  | SVG dependency graph            | todo   | > 4.0     | ui/02, ui/03                             |
+| wiring   | 01  | orchestrator start events       | todo   | > 4.0     | contract/01                              |
+| wiring   | 02  | SKILL.md auto-start             | todo   | > 4.0     | server/03                                |
+| wiring   | 03  | fixture flight verification     | todo   | > 4.0     | wiring/01, wiring/02, ui/03, ui/04       |
+| wiring   | 04  | final review 🏁                 | todo   | > 4.0     | wiring/03, contract/02, server/05, ui/04 |
 
 (Mirrors the table in `tasks/README.md` — keep them in sync. The last row is the **final review** task,
 marked `> **Final review**: true` in its file.)

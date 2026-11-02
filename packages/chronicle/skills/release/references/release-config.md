@@ -19,7 +19,7 @@ Commit the file (it's shared team/session state, not a personal dotfile).
   "workflow": "git-flow",
 
   // Tag template. {version} is required; {component} only in per-component mode.
-  "tag": "v{version}",                         // per-component: "{component}-v{version}"
+  "tag": "v{version}", // per-component: "{component}-v{version}"
 
   "changelog": "CHANGELOG.md",
   "branches": { "develop": "develop", "main": "main" },
@@ -27,11 +27,14 @@ Commit the file (it's shared team/session state, not a personal dotfile).
   // whole-repo bump targets. [] = changelog + tag only (no version file to bump).
   "versionFiles": [
     { "path": "frontend/package.json", "kind": "json" },
-    { "path": "config/application.rb", "pattern": "VERSION\\s*=\\s*[\"']([^\"']+)[\"']" }
+    {
+      "path": "config/application.rb",
+      "pattern": "VERSION\\s*=\\s*[\"']([^\"']+)[\"']",
+    },
   ],
 
   // Optional. Committed build outputs — checked, never rewritten. See below.
-  "artifacts": [{ "path": "bin/workbench", "build": "cargo build --release" }]
+  "artifacts": [{ "path": "bin/workbench", "build": "cargo build --release" }],
 
   // per-component instead uses "components" (see below); omit "versionFiles".
 }
@@ -57,7 +60,7 @@ the config has to name. It uses the same vocabulary as `.chronicle/pr.json`:
   "tag": "v{version}",
   "changelog": "CHANGELOG.md",
   "branches": { "main": "main" },
-  "versionFiles": []
+  "versionFiles": [],
 }
 ```
 
@@ -92,7 +95,10 @@ A Rust crate's version lives in **two** files: `Cargo.toml` and its `Cargo.lock`
 package block. Detection writes both, the lock as a name-anchored pattern:
 
 ```jsonc
-{ "path": "Cargo.lock", "pattern": "name = \"my-crate\"\\nversion = \"([^\"]+)\"" }
+{
+  "path": "Cargo.lock",
+  "pattern": "name = \"my-crate\"\\nversion = \"([^\"]+)\"",
+}
 ```
 
 Never point `kind: "toml"` at a lockfile. A lock carries one `version = "..."` per
@@ -146,11 +152,17 @@ path, which would break the release commit.
       "name": "chronicle",
       "path": "packages/chronicle",
       "versionFiles": [
-        { "path": "packages/chronicle/.claude-plugin/plugin.json", "kind": "json" },
-        { "path": "packages/chronicle/.codex-plugin/plugin.json", "kind": "json" }
-      ]
-    }
-  ]
+        {
+          "path": "packages/chronicle/.claude-plugin/plugin.json",
+          "kind": "json",
+        },
+        {
+          "path": "packages/chronicle/.codex-plugin/plugin.json",
+          "kind": "json",
+        },
+      ],
+    },
+  ],
 }
 ```
 

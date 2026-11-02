@@ -1,6 +1,7 @@
 # SKILLS-03: Relay skill — OpenCode branch
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -112,7 +113,7 @@ Touch no `.ts` file under `packages/relay`. The OpenCode backend at `scripts/bac
 
 ### Runtime facts
 
-This task needs no unresolved runtime fact — the install target and the root rule are frozen decisions, not observations. If the entry-symlink resolution fact (recorded in `../_context/runtime-facts.md` as the cross-directory import question) resolves *negatively*, the install shape changes and this task's paths change with it. Check that fact's status before writing the paths; if it is still `UNRESOLVED`, set `> **Status**: blocked` and stop rather than committing to a path that may move.
+This task needs no unresolved runtime fact — the install target and the root rule are frozen decisions, not observations. If the entry-symlink resolution fact (recorded in `../_context/runtime-facts.md` as the cross-directory import question) resolves _negatively_, the install shape changes and this task's paths change with it. Check that fact's status before writing the paths; if it is still `UNRESOLVED`, set `> **Status**: blocked` and stop rather than committing to a path that may move.
 
 ## Acceptance criteria
 
@@ -138,12 +139,12 @@ This task needs no unresolved runtime fact — the install target and the root r
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Touching any non-`.md` file under `packages/` scores Correctness 0 regardless of everything else.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | OpenCode reader still has no resolvable script path, or the legacy symlink is still presented as a valid option | Path added but the collision reason is missing, so a user keeps both symlinks | Concrete installed path given, legacy symlink re-labelled with its reason stated inline and a removal command, installer named as recommended |
-| Non-regression | ×2 | A `.ts` under `packages/relay` changed, or a Claude/Codex instruction was rewritten or dropped | All instructions present but reordered or condensed, making the Claude path harder to follow | Only `.md` changed; every prior instruction present, in place, and unreworded; the OpenCode block is fenced and skippable |
-| Phrasing consistency | ×1 | Invents its own wording for the skill root rule | Close to the shared rule but drifts on the install target | Uses the shared OpenCode skill root rule verbatim; install target matches the frozen decision |
-| Assumptions & docs | ×1 | Commits to paths without checking the symlink-resolution fact | Fact checked but its bearing on these paths left unstated | Fact status checked, and the file says what changes if it resolves negatively |
+| Dimension            | Weight | 0–1 (fail)                                                                                                      | 2–3 (below bar)                                                                              | 4–5 (pass)                                                                                                                                    |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness          | ×3     | OpenCode reader still has no resolvable script path, or the legacy symlink is still presented as a valid option | Path added but the collision reason is missing, so a user keeps both symlinks                | Concrete installed path given, legacy symlink re-labelled with its reason stated inline and a removal command, installer named as recommended |
+| Non-regression       | ×2     | A `.ts` under `packages/relay` changed, or a Claude/Codex instruction was rewritten or dropped                  | All instructions present but reordered or condensed, making the Claude path harder to follow | Only `.md` changed; every prior instruction present, in place, and unreworded; the OpenCode block is fenced and skippable                     |
+| Phrasing consistency | ×1     | Invents its own wording for the skill root rule                                                                 | Close to the shared rule but drifts on the install target                                    | Uses the shared OpenCode skill root rule verbatim; install target matches the frozen decision                                                 |
+| Assumptions & docs   | ×1     | Commits to paths without checking the symlink-resolution fact                                                   | Fact checked but its bearing on these paths left unstated                                    | Fact status checked, and the file says what changes if it resolves negatively                                                                 |
 
 ## Out of scope
 

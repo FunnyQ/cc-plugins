@@ -1,6 +1,7 @@
 # SKILLS-02: Scribe reference + delete the cockpit-scribe skill
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -22,7 +23,7 @@ global config instead of `project-meta.md`), then delete the standalone `cockpit
 
 **Step 0 — read the source verbatim first.** Open the current
 `packages/monitor/skills/cockpit-scribe/SKILL.md` and copy its full body into the new
-`references/scribe.md` *before* deleting the old skill (the deletion is the last step of
+`references/scribe.md` _before_ deleting the old skill (the deletion is the last step of
 this task). Port it **verbatim** except for the two changes below — do not paraphrase or
 trim the procedure. The structure you are preserving (so you can confirm nothing is lost):
 
@@ -91,12 +92,12 @@ a fork (the `thoughtful` command spawns it), not as a custom subagent_type.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | scribe content lost or old skill left behind | ported but still greps project-meta or wrong CLI path | full port; same-skill path; language via config; old skill deleted |
-| Test coverage | ×2 | no checks | only existence | dir-gone + grep-clean + config-get checks |
-| Interface & readability | ×1 | muddled procedure | acceptable | clean, faithful to original structure |
-| Assumptions & docs | ×1 | fork requirement dropped | partial | states context-inheriting-fork requirement |
+| Dimension               | Weight | 0–1 (fail)                                   | 2–3 (below bar)                                       | 4–5 (pass)                                                         |
+| ----------------------- | ------ | -------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------ |
+| Correctness             | ×3     | scribe content lost or old skill left behind | ported but still greps project-meta or wrong CLI path | full port; same-skill path; language via config; old skill deleted |
+| Test coverage           | ×2     | no checks                                    | only existence                                        | dir-gone + grep-clean + config-get checks                          |
+| Interface & readability | ×1     | muddled procedure                            | acceptable                                            | clean, faithful to original structure                              |
+| Assumptions & docs      | ×1     | fork requirement dropped                     | partial                                               | states context-inheriting-fork requirement                         |
 
 ## Out of scope
 

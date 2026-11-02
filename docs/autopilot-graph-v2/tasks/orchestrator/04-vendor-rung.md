@@ -1,6 +1,7 @@
 # ORCHESTRATOR-04: an opt-in vendor-switch last rung
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/rubric.md`
@@ -21,7 +22,7 @@ rung to fire in a default run — it must be inert there.
 ## Files to create / modify
 
 - `packages/dispatch/skills/autopilot/references/orchestrator.md` (modify) — inside the fenced
-  ```` ```javascript ```` block: a new config field, its resolution, and the dispatch plus cap logic for an
+  ` ```javascript ` block: a new config field, its resolution, and the dispatch plus cap logic for an
   appended external rung.
 - The same file, **outside** the fenced block (modify) — the prose this change makes stale. The
   external-engine gotcha states that the last attempt before the cap escalates to Claude-Opus, which stops
@@ -33,7 +34,7 @@ rung to fire in a default run — it must be inert there.
 
 ## Implementation notes
 
-**Every edit to the executable script must land INSIDE the fenced ```` ```javascript ```` block.** The prose
+**Every edit to the executable script must land INSIDE the fenced ` ```javascript ` block.** The prose
 corrections listed above are the deliberate and only exception — they belong outside the block by
 definition. The fixture locates the script by string search — `doc.indexOf("```javascript")` to the next
 `"\n```"` — and runs the slice through `new Function`, so script logic written in the surrounding prose is
@@ -44,8 +45,12 @@ invisible to both the runtime and the test.
 An external dev engine already ends on a different vendor:
 
 ```js
-const lastShot = attempt >= cap && cap > 1
-if (devEngine && !lastShot) { /* external driver */ } else { /* claude */ }
+const lastShot = attempt >= cap && cap > 1;
+if (devEngine && !lastShot) {
+  /* external driver */
+} else {
+  /* claude */
+}
 ```
 
 A Claude ladder does not. `devModel = attempt >= cap ? MODEL.devEscalated : MODEL.dev` escalates only
@@ -65,9 +70,10 @@ Resolve it once, next to where `devEngine` is resolved:
 // Appended, never substituted: replacing the Opus rung would lose every task that
 // only Opus clears. Null whenever devEngine is already external — that ladder
 // already ends on Claude-Opus, so it is already a vendor switch.
-const lastShotEngine = (!devEngine && CFG.lastShotEngine)
-  ? withModel(CFG.lastShotEngine, CFG.opencodeDevModel)
-  : null
+const lastShotEngine =
+  !devEngine && CFG.lastShotEngine
+    ? withModel(CFG.lastShotEngine, CFG.opencodeDevModel)
+    : null;
 ```
 
 Reuse `withModel` rather than reading `ENGINES` directly. It throws on an unknown key, so a typo in the new
@@ -77,19 +83,19 @@ prompt.
 ### The cap, and the trap that turns "append" into "replace"
 
 ```js
-const cap = finalReview ? FINAL_MAX : MAX + (lastShotEngine ? 1 : 0)
+const cap = finalReview ? FINAL_MAX : MAX + (lastShotEngine ? 1 : 0);
 ```
 
 and in the dev branch:
 
 ```js
 // The appended rung is the final attempt, and only exists on a Claude ladder.
-const vendorRung = !!lastShotEngine && attempt === cap
+const vendorRung = !!lastShotEngine && attempt === cap;
 // The last CLAUDE rung. With an appended rung cap is MAX + 1, so the escalation
 // tier must key off the Claude cap. Keying off `cap` makes `attempt >= cap` false
 // at attempt MAX, so the ladder would run sonnet, sonnet, sonnet, external and
 // Opus would never execute — silently turning this append into a replace.
-const claudeCap = cap - (lastShotEngine ? 1 : 0)
+const claudeCap = cap - (lastShotEngine ? 1 : 0);
 ```
 
 **This is the whole correctness risk in the task.** The existing escalation test reads `attempt >= cap`.
@@ -154,7 +160,7 @@ reporting it as the new feature working.
 - [x] The closing review round's cap and dispatch are unchanged.
 - [x] The fixture can override a named config field, and throws when the named field is absent from the
       script block.
-- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block; the only
+- [x] Every change to the executable script sits inside the fenced ` ```javascript ` block; the only
       edits outside it are the prose corrections listed above.
 - [x] The external-engine gotcha in `orchestrator.md` accounts for a Claude ladder that can now end on an
       external engine, and the new config field's behaviour and default are documented alongside the other
@@ -187,9 +193,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The appended rung silently replaces Opus, or a default-config run changes any label or cap. | The rung works at `MAX: 3` but a boundary is wrong (`MAX: 1`, an external `devEngine`, or the reported attempt number). | Every stated boundary holds, and the Claude-cap keying provably preserves the Opus rung. |
-| Test coverage | ×2 | No test, or tests that would pass without the change. | The final label asserted without pinning the Opus rung — the exact case that hides an append-turned-replace. | Appended rung with Opus pinned, inert-by-default, external-engine inertness, `MAX: 1`, and the override's throw are all covered, and each would fail without the change. |
-| Interface & readability | ×1 | `ENGINES` read directly instead of `withModel`. | Works but the two caps are hard to tell apart at a glance. | `withModel` reused, and `cap` vs the Claude cap named so the distinction is obvious to the next reader. |
-| Assumptions & docs | ×1 | The append-not-replace choice and the Claude-cap trap are left silent. | Noted somewhere. | Both are *why* comments next to the code, and the new config field carries a one-line comment matching the style of its neighbours. |
+| Dimension               | Weight | 0–1                                                                                         | 2–3                                                                                                                     | 4–5                                                                                                                                                                      |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The appended rung silently replaces Opus, or a default-config run changes any label or cap. | The rung works at `MAX: 3` but a boundary is wrong (`MAX: 1`, an external `devEngine`, or the reported attempt number). | Every stated boundary holds, and the Claude-cap keying provably preserves the Opus rung.                                                                                 |
+| Test coverage           | ×2     | No test, or tests that would pass without the change.                                       | The final label asserted without pinning the Opus rung — the exact case that hides an append-turned-replace.            | Appended rung with Opus pinned, inert-by-default, external-engine inertness, `MAX: 1`, and the override's throw are all covered, and each would fail without the change. |
+| Interface & readability | ×1     | `ENGINES` read directly instead of `withModel`.                                             | Works but the two caps are hard to tell apart at a glance.                                                              | `withModel` reused, and `cap` vs the Claude cap named so the distinction is obvious to the next reader.                                                                  |
+| Assumptions & docs      | ×1     | The append-not-replace choice and the Claude-cap trap are left silent.                      | Noted somewhere.                                                                                                        | Both are _why_ comments next to the code, and the new config field carries a one-line comment matching the style of its neighbours.                                      |

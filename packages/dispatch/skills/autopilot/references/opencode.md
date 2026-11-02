@@ -28,7 +28,7 @@ them. Do not report it to the user as an unattended flight.
 
 ## Script root
 
-There is no *"Base directory for this skill"* banner; `CLAUDE_PLUGIN_ROOT` is
+There is no _"Base directory for this skill"_ banner; `CLAUDE_PLUGIN_ROOT` is
 empty. Two paths, stated literally:
 
 - `$SCRIPTS` = `~/.config/opencode/skills/flightplan/scripts` — the shared
@@ -65,8 +65,8 @@ Repeat these steps by hand, one wave at a time:
 4. Spawn a second subagent through the **task tool** in the **judge role**, to
    score the task against its `## Eval rubric`.
 5. Write the judge's rationale to a file, then run `bun $SCRIPTS/score-task.ts
-   <taskfile> <scores.json> --json --log <run.jsonl> --attempt N --agent <label>
-   --rationale-file <rationale.md>` and gate on the printed verdict object. Do
+<taskfile> <scores.json> --json --log <run.jsonl> --attempt N --agent <label>
+--rationale-file <rationale.md>` and gate on the printed verdict object. Do
    not re-derive the weighted average or the hard-fail arithmetic by hand —
    there is exactly one scoring implementation. Skip the rationale file and a
    passing task leaves only a number behind in the trail.

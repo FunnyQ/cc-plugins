@@ -1,6 +1,7 @@
 # MOD-02: Flightdeck pane mod
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -35,10 +36,24 @@ The Claude Code mod feature that opens, refreshes, and draws the flightdeck pane
   - `--latest <dir>`: exit 0 prints `{"plan":"<abs plan dir>"}`; exit 3 means no run log under `<dir>/docs/*/`.
 - **The pure layout module `rows.ts`** (`packages/dispatch/hooks/flightdeck/rows.ts`):
   ```ts
-  export type Seg = { text: string; color?: string; dim?: boolean; ref?: string };
+  export type Seg = {
+    text: string;
+    color?: string;
+    dim?: boolean;
+    ref?: string;
+  };
   export type Line = Seg[];
-  export function docked(s: DeckSnapshot, width: number, now: number, stale: boolean): Line[];
-  export function inline(s: DeckSnapshot, width: number, stale: boolean): Line[];
+  export function docked(
+    s: DeckSnapshot,
+    width: number,
+    now: number,
+    stale: boolean,
+  ): Line[];
+  export function inline(
+    s: DeckSnapshot,
+    width: number,
+    stale: boolean,
+  ): Line[];
   export function clip(line: Line, width: number): Line;
   ```
   A `Seg` with `ref` is a task card and must render pressable. The mod maps segs to `Text` / `Button`; it does no layout of its own.
@@ -85,8 +100,8 @@ State: a module-level `atom` (or atoms) holding `{ plan: string | null; snapshot
    const ran = await next(e);
    if (ran.deny !== undefined || ran.isError) return ran;
    const plan = planArg(e.command);
-   if (plan) await openOn(plan);  // same open path as the command
-   return ran;                     // unchanged
+   if (plan) await openOn(plan); // same open path as the command
+   return ran; // unchanged
    ```
 7. **`ui.render` `{ component: "Pane", requestId: "flightdeck" }`**:
    - No snapshot → one dim line, `message ?? "Loading…"`, passed through the layout module's `clip(line, width)` with the same width the layouts use, so a long stderr path never overflows.
@@ -115,9 +130,17 @@ Import `On` from `claude-code` and `expect, test` from `claude-code/testing`. Th
 ```ts
 on("process.run", (_$, e) => {
   runs.push(e.argv);
-  return { value: { exitCode, stdout, stderr: "", isStdoutTruncated: false, isStderrTruncated: false } } as never;
+  return {
+    value: {
+      exitCode,
+      stdout,
+      stderr: "",
+      isStdoutTruncated: false,
+      isStderrTruncated: false,
+    },
+  } as never;
 });
-on("tool.call", () => ({ result: {}, text: "ok" }) as never);   // the tool's answer beneath the mod
+on("tool.call", () => ({ result: {}, text: "ok" }) as never); // the tool's answer beneath the mod
 ```
 
 Stub `ui.panes`, `ui.open`, `ui.close`, and `clock` (`mock.clock(on)` for `$.clock`) the same way. Cover:
@@ -155,12 +178,12 @@ Stub `ui.panes`, `ui.open`, `ui.close`, and `clock` (`mock.clock(on)` for `$.clo
 
 > Scale 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. Shared bands: `../_context/rubric.md`.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Hands `$` to another file, imports `node:`, writes state in `ui.render`, or a matcher collides with the lint hook | Pane opens and draws, but auto-open fires on errored calls, stale is lost, or the ticker outlives the pane | Every pane decision in `shared.md` holds, including toggle, auto-open, stale, ticker cancel, and the button |
-| Test coverage | ×2 | No mod test | Happy-path open only | Toggle, auto-open success and error, stale, and ticker cancel each have a case; `planArg` covers every quoting form |
-| Interface & readability | ×1 | Layout logic duplicated in the `.tsx` | Mod mixes parsing with rendering | Pure parsing in `deck-command.ts`, layout only through `rows.ts`, the `.tsx` is wiring |
-| Assumptions & docs | ×1 | Magic `2000` / `40` unnamed | Named, but corner-cuts unexplained | Constants named; one-line why comments on the matcher choice and the per-tick invalidate |
+| Dimension               | Weight | 0–1 (fail)                                                                                                        | 2–3 (below bar)                                                                                            | 4–5 (pass)                                                                                                          |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Hands `$` to another file, imports `node:`, writes state in `ui.render`, or a matcher collides with the lint hook | Pane opens and draws, but auto-open fires on errored calls, stale is lost, or the ticker outlives the pane | Every pane decision in `shared.md` holds, including toggle, auto-open, stale, ticker cancel, and the button         |
+| Test coverage           | ×2     | No mod test                                                                                                       | Happy-path open only                                                                                       | Toggle, auto-open success and error, stale, and ticker cancel each have a case; `planArg` covers every quoting form |
+| Interface & readability | ×1     | Layout logic duplicated in the `.tsx`                                                                             | Mod mixes parsing with rendering                                                                           | Pure parsing in `deck-command.ts`, layout only through `rows.ts`, the `.tsx` is wiring                              |
+| Assumptions & docs      | ×1     | Magic `2000` / `40` unnamed                                                                                       | Named, but corner-cuts unexplained                                                                         | Constants named; one-line why comments on the matcher choice and the per-tick invalidate                            |
 
 ## Out of scope
 

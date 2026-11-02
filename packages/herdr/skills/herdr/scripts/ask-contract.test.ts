@@ -66,7 +66,9 @@ describe("createAskRunDir", () => {
           process.platform === "win32"
             ? join(tmpdir(), "q-lab", "herdr", "ask")
             : "/tmp/q-lab/herdr/ask";
-        expect(realpathSync.native(dirname(dir))).toBe(realpathSync.native(root));
+        expect(realpathSync.native(dirname(dir))).toBe(
+          realpathSync.native(root),
+        );
         expect(basename(dir)).toMatch(/^\d+-\d+-[a-f0-9]{8}$/);
         expect((await Bun.file(dir).stat()).isDirectory()).toBe(true);
       }
@@ -132,9 +134,11 @@ describe("ask platform paths", () => {
         askRunPath(undefined, "win32", "C:/Temp"),
       );
       expect(new Set(paths).size).toBe(100);
-      expect(paths.every((path) =>
-        win32.basename(path).startsWith(`123-${process.pid}-`),
-      )).toBe(true);
+      expect(
+        paths.every((path) =>
+          win32.basename(path).startsWith(`123-${process.pid}-`),
+        ),
+      ).toBe(true);
     } finally {
       Date.now = now;
     }
@@ -146,8 +150,12 @@ describe("ask platform paths", () => {
     expect(contract).toContain(result);
     expect(contract).toContain("complete final answer");
     expect(contract).toContain("caller does not read your pane");
-    expect(contract).toContain(`last line must be exactly: ${ASK_RESULT_END_MARKER}`);
+    expect(contract).toContain(
+      `last line must be exactly: ${ASK_RESULT_END_MARKER}`,
+    );
     const answer = "# Answer\n\nFirst paragraph.\n\nSecond paragraph.";
-    expect(extractFinalText(`${answer}\r\n${ASK_RESULT_END_MARKER}\r\n`)).toBe(answer);
+    expect(extractFinalText(`${answer}\r\n${ASK_RESULT_END_MARKER}\r\n`)).toBe(
+      answer,
+    );
   });
 });

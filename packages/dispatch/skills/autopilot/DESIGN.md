@@ -190,6 +190,7 @@ The system is **dark only, monospace by default, and dense**. There is no light 
 The signature move is that **state is lit, not filled**. Each state carries three steps on one hue — lit, base, unlit — separated by value alone. A signalling panel does not fill a segment, it lights one, and holding to value means the panel needs no gradient, no glow, and no shadow to say the same thing, all three of which the world forbids anyway. The rejections are specific: not a node-graph editor (free-angle wires, arrowheads, drag handles), not theatrical space (neon, glow, purple, blur), and not card-based SaaS (roomy padding, pill chips, marketing scale).
 
 **Key Characteristics:**
+
 - One fixed dark ground (`#0e1114`), three surfaces, one 1px rule; no light mode, no theme toggle.
 - Five pinned state colours, each expanded to a lit / base / unlit ramp on its own hue by value alone.
 - Monospace is the body face; the sans face is reserved for two prose slots.
@@ -235,12 +236,12 @@ The panel's own tokens, defined on `.dependency-graph` and used nowhere else on 
 
 Sampled from the approved comps and from the shipped 1440x900 capture, not estimated. The ship is deliberately quieter than both comps, and the reason is one rule: **PRODUCT.md's pinned hue outranks the comp, and the lit step is reached by mixing that hue toward white rather than by adopting the comp's chroma.** Taking the comp's green literally would put a near-neon at the centre of a world whose anti-goals name neon.
 
-| | `b-throat` (rest) | `c-route` (set route) | shipped |
-| --- | --- | --- | --- |
-| ground | `#01080d` | `#0a0b0b` | `#0e1114` |
-| lit done | `#4dc74c` | `#0fa804` | `#82b772` |
-| in flight | `#ffcd03` | absent | `#d19f6c` |
-| unlit track | `#6f7273` | `#414040` | `#293038` |
+|             | `b-throat` (rest) | `c-route` (set route) | shipped   |
+| ----------- | ----------------- | --------------------- | --------- |
+| ground      | `#01080d`         | `#0a0b0b`             | `#0e1114` |
+| lit done    | `#4dc74c`         | `#0fa804`             | `#82b772` |
+| in flight   | `#ffcd03`         | absent                | `#d19f6c` |
+| unlit track | `#6f7273`         | `#414040`             | `#293038` |
 
 Two things this makes visible that neither the comps nor the shipped capture alone would. First, the comps do not agree with each other: `b-throat` rests on a near-black ground with a light `#6f7273` field and a bright `#4dc74c` lit step, while `c-route` drops the field to `#414040` and lights a darker, more saturated `#0fa804`. The shipped panel resolves the two into one ramp and reaches the focus state by opacity instead of by a second palette. Second, `c-route`'s panel contains **no amber and no red pixels at all** — under a set route the comp is literally two colours. The ship keeps state colour on the route's berths, which is the divergence recorded under The Set Route below.
 
@@ -332,7 +333,7 @@ Strokes are `butt`-capped; a crossover joins its roads tangentially and no other
 
 **The One-Curve Rule.** Every line on the panel is horizontal, except the crossover, which is a cubic S confined to one reserved gap. No free angle, and no second curved element without the same argument being made again.
 
-**The Same-Rail Rule.** Every track element shares one stroke weight — 11.9px. A dependency drawn thinner than the road reads as an annotation about the plan rather than as part of it. The rail carried the berth's own height while a berth *was* a length of rail; the two are separate quantities now that the plate stands on it.
+**The Same-Rail Rule.** Every track element shares one stroke weight — 11.9px. A dependency drawn thinner than the road reads as an annotation about the plan rather than as part of it. The rail carried the berth's own height while a berth _was_ a length of rail; the two are separate quantities now that the plate stands on it.
 
 ## Components
 
@@ -340,15 +341,15 @@ Strokes are `butt`-capped; a crossover joins its roads tangentially and no other
 
 The default view, and the deck's centre. A railway NX entrance-exit signalling desk that maps one-to-one onto the flight tree:
 
-| Signalling | Flightplan |
-| --- | --- |
-| running road, named in both gutters | bucket |
-| berth segment on a road | task |
-| S-curve crossover through one gap | a dependency that leaves its own bucket |
-| the running line inside one road | a dependency that stays in its bucket |
-| three-aspect signal head | the gate at a task's entry |
-| cleared / occupied / unset / at danger | done / in-flight / ready / blocked |
-| one route lit end to end | the hovered task's lineage |
+| Signalling                             | Flightplan                              |
+| -------------------------------------- | --------------------------------------- |
+| running road, named in both gutters    | bucket                                  |
+| berth segment on a road                | task                                    |
+| S-curve crossover through one gap      | a dependency that leaves its own bucket |
+| the running line inside one road       | a dependency that stays in its bucket   |
+| three-aspect signal head               | the gate at a task's entry              |
+| cleared / occupied / unset / at danger | done / in-flight / ready / blocked      |
+| one route lit end to end               | the hovered task's lineage              |
 
 - **Roads** are drawn first and run the full pane width at the berth's own weight, so a berth always sits on a line that exists whether or not the plan reaches that far along it. The bucket name is set in mono uppercase at both ends, mirrored, `text-anchor: end` on the left and `start` on the right.
 - **Berths** are plates 26.6px tall with a 2px radius, one shared width across the panel, positioned at dependency depth along their bucket's road. Vertical position is bucket and only bucket — a task never leaves its road, which is what makes a crossover mean "this dependency left its bucket" rather than "the layout needed the room". State is lit rather than filled: a 4.2px leading edge at the full lit value, the plate body a 22% wash of the same hue over ground, and a 45% edge stroke. A plate filled solid at the lit value would put white-on-green text at the one contrast this panel cannot afford at 2am.
@@ -403,6 +404,7 @@ The well is capped and scrolled — 24 lines in a task card, 32 in a fleet row �
 ## Do's and Don'ts
 
 ### Do:
+
 - **Do** express state by lighting one hue to a brighter value — lit, base, unlit — and keep the pinned state colour as the base step.
 - **Do** mix lit steps toward `white` and unlit steps toward `--ground`, both in oklab.
 - **Do** keep every unlit berth's leading edge at least one value step above the rail its plate sits on.
@@ -415,6 +417,7 @@ The well is capped and scrolled — 24 lines in a task card, 32 in a fleet row �
 - **Do** convey depth by stepping `ground` → `surface` → `surface-2` with 1px `rule` hairlines.
 
 ### Don't:
+
 - **Don't** add a gradient, a glow, a drop shadow, a bevel, glassmorphism, or a backdrop blur. The header's zero-blur 1px `box-shadow` is a doubled border, not an exception.
 - **Don't** exceed a 4px corner radius, and never make a pill.
 - **Don't** introduce a sixth state colour, and never use purple, violet, or neon — that register belongs to the cockpit's world.

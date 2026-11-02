@@ -80,14 +80,18 @@ async function settle(
       ...(runtime.info ? { env: childEnv(runtime.info) } : {}),
     });
     if (result.exitCode !== 0)
-      throw new Error(result.stderr.trim() || `${op} exited ${result.exitCode}`);
+      throw new Error(
+        result.stderr.trim() || `${op} exited ${result.exitCode}`,
+      );
   };
   try {
     await operation("open");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await update($, view, (v) =>
-      patchEntry(v, entryId, { note: [r.note, `open failed: ${message}`].filter(Boolean).join("; ") }),
+      patchEntry(v, entryId, {
+        note: [r.note, `open failed: ${message}`].filter(Boolean).join("; "),
+      }),
     );
   } finally {
     await operation("cleanup-check");
@@ -133,7 +137,12 @@ async function measure(
 ): Promise<string[] | undefined> {
   try {
     const run = await $.process.run(
-      ["bun", `${$.plugin.root}/hooks/explain/geometry-cli.ts`, runtime.info!.chrome!, path],
+      [
+        "bun",
+        `${$.plugin.root}/hooks/explain/geometry-cli.ts`,
+        runtime.info!.chrome!,
+        path,
+      ],
       { timeoutMs: GEOMETRY_TIMEOUT_MS },
     );
     const { faults } = JSON.parse(run.stdout) as { faults?: unknown };
@@ -164,8 +173,9 @@ export async function startCheck(
   const root = $.plugin.root.replaceAll("\\", "/");
   const page = path.replaceAll("\\", "/");
   const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
-  const commands = ["wide", "narrow"].map(mode =>
-    `bun ${quote(`${root}/hooks/explain/checker-cli.ts`)} ${mode} ${quote(page)}`,
+  const commands = ["wide", "narrow"].map(
+    (mode) =>
+      `bun ${quote(`${root}/hooks/explain/checker-cli.ts`)} ${mode} ${quote(page)}`,
   );
   const spawned = await $.agent.spawn({
     subagentType: CHECKER,
@@ -196,12 +206,16 @@ const inside = (path: string) => {
     root = root.toLowerCase();
     path = path.toLowerCase();
   }
-  return root !== "" && !path.split("/").includes("..") &&
-    !root.split("/").includes("..") && path.startsWith(root + "/");
+  return (
+    root !== "" &&
+    !path.split("/").includes("..") &&
+    !root.split("/").includes("..") &&
+    path.startsWith(root + "/")
+  );
 };
 
 const allowsBash = (command: string) =>
-  [...pending.values()].some(p => p.commands.includes(command));
+  [...pending.values()].some((p) => p.commands.includes(command));
 
 type TurnComplete = Hook<"turn.complete">;
 

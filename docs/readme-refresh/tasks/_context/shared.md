@@ -9,13 +9,13 @@ Read this before any task in this tree. It is the same for every task.
 
 The marketplace ships five plugins, each versioned independently under `packages/`:
 
-| Plugin | Skills |
-|---|---|
-| `monitor` | `usage-dashboard`, `cockpit`, `install` |
-| `dispatch` | `preflight`, `flightplan`, `autopilot`, `waypoints` |
-| `relay` | `relay` |
-| `chronicle` | `commit`, `pr`, `release`, `install` |
-| `herdr` | `herdr` |
+| Plugin      | Skills                                              |
+| ----------- | --------------------------------------------------- |
+| `monitor`   | `usage-dashboard`, `cockpit`, `install`             |
+| `dispatch`  | `preflight`, `flightplan`, `autopilot`, `waypoints` |
+| `relay`     | `relay`                                             |
+| `chronicle` | `commit`, `pr`, `release`, `install`                |
+| `herdr`     | `herdr`                                             |
 
 Both marketplace registries — `.claude-plugin/marketplace.json` (Claude) and
 `.agents/plugins/marketplace.json` (Codex) — register all five. Neither registry carries a `version`

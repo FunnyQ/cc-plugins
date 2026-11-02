@@ -82,12 +82,12 @@ by hand over a fallback surface.
 
 Read the command's exit code:
 
-| Exit | Meaning | What to do |
-| --- | --- | --- |
-| `0` | The user submitted. | Parse the response JSON from stdout after the first line, which is the written HTML path. |
-| `2` | Bad arguments. | Fix the call. Never report a usage error as a user decision. |
-| `3` | No browser. | Take the fallback cascade below. |
-| `4` | Timed out after 30 minutes. | Tell the user the gate expired and re-run the same command. The payload file is unchanged. |
+| Exit | Meaning                     | What to do                                                                                 |
+| ---- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `0`  | The user submitted.         | Parse the response JSON from stdout after the first line, which is the written HTML path.  |
+| `2`  | Bad arguments.              | Fix the call. Never report a usage error as a user decision.                               |
+| `3`  | No browser.                 | Take the fallback cascade below.                                                           |
+| `4`  | Timed out after 30 minutes. | Tell the user the gate expired and re-run the same command. The payload file is unchanged. |
 
 **Do not call `cockpit wait` for either gate, and do not log `needs_your_call`.**
 The wait only succeeds while the user's `answer-here` switch is on and a tab is
@@ -155,7 +155,11 @@ back over. Gate 2's response follows this schema:
   "verdicts": [
     { "proposedPath": "docs/adr/0027-....md", "verdict": "approve" },
     { "proposedPath": "docs/adr/0028-....md", "verdict": "drop" },
-    { "proposedPath": "docs/adr/0029-....md", "verdict": "approve", "draftText": "..." }
+    {
+      "proposedPath": "docs/adr/0029-....md",
+      "verdict": "approve",
+      "draftText": "..."
+    }
   ]
 }
 ```
@@ -175,15 +179,15 @@ child that has to find a script starts searching the plugin cache — that is th
 caller's bug. Never pass a `$`-prefixed token: nothing sets that variable in the
 child's shell, so its command silently runs against `/`.
 
-| Input | Path |
-| --- | --- |
-| `triagePath` | `<skill dir>/scripts/triage.ts` |
-| `bodyFetchPath` | `<skill dir>/scripts/collect-adr-context.ts` |
-| `plannerPath` | `<skill dir>/scripts/archive-plan.ts` |
-| `templatePath` | `<skill dir>/references/adr-template.md` |
-| `commitPath` | `<skill dir>/scripts/adr-commit.ts` |
-| `gatePagePath` | `<skill dir>/scripts/gate-page.ts` |
-| `archiveStalePath` | `<skill dir>/scripts/archive-stale.ts` |
+| Input              | Path                                         |
+| ------------------ | -------------------------------------------- |
+| `triagePath`       | `<skill dir>/scripts/triage.ts`              |
+| `bodyFetchPath`    | `<skill dir>/scripts/collect-adr-context.ts` |
+| `plannerPath`      | `<skill dir>/scripts/archive-plan.ts`        |
+| `templatePath`     | `<skill dir>/references/adr-template.md`     |
+| `commitPath`       | `<skill dir>/scripts/adr-commit.ts`          |
+| `gatePagePath`     | `<skill dir>/scripts/gate-page.ts`           |
+| `archiveStalePath` | `<skill dir>/scripts/archive-stale.ts`       |
 
 The codifier takes `bodyFetchPath`, `templatePath`, and `gate2Path`
 (`<runDir>/gate2.json`). The barrowkeeper takes `commitPath` and `planPath`, plus
@@ -226,6 +230,7 @@ This is the primary entry point.
    out of `batches`, with its result already on disk. `prescreened` counts those
    clusters, and `jev` is the line to show the user. Show that line. When
    `batches` is empty, spawn no judge and go straight to the merge.
+
 2. Judge the batches per **Judging the batches** below.
 3. Merge and cross-check per **Merging and the archive plan** below, then present
    every disposition at gate 1 from `<runDir>/gate1.json`. A triage is done when
@@ -261,6 +266,7 @@ This is the primary entry point.
 
    Re-run the contradiction check and the group-count check after any correction
    the user makes — a fix to one contradiction can introduce another.
+
 4. After the user confirms, archive each session by **`watch` wins**: a session
    behind any `watch` candidate archives to the watched bucket, and every other
    session archives to `done`. Gate 1 is the first re-merge trigger. If it
@@ -290,9 +296,11 @@ This is the primary entry point.
      ]
    }
    ```
+
    Spawn the codifier (`subagent_type: "chronicle:codifier"`) with `groups`,
    `bodyFetchPath`, `templatePath`, and `gate2Path`. It replies with the path and a
    draft count; serve that file at gate 2 without reading it.
+
 6. After gate 2, run the verdict fold. When the reply came back over a fallback
    surface, write it to `<runDir>/gate2-response.json` first and pass
    `--response` with that path:
@@ -306,6 +314,7 @@ This is the primary entry point.
    draft order, with the user's edited `draftText` winning over the codifier's, and
    prints `newAdrsPath`. When every verdict was `drop`, `newAdrsPath` is `null`:
    the run promoted nothing.
+
 7. A gate-2 `drop` defers a group. Its candidates were `promote` at gate 1, so
    the plan already assigned their source sessions `target: "done"`. If nothing
    corrects that, the dropped decision archives to `done` unrecorded and leaves
@@ -315,6 +324,7 @@ This is the primary entry point.
    group's entries at `decision: "watch"` to `<runDir>/gate2-drops.json` and
    printed it as `dropsPath`; when it is not `null`, re-merge per **Merging and the
    archive plan**.
+
 8. Spawn the barrowkeeper (`subagent_type: "chronicle:barrowkeeper"`) with
    `commitPath`, `planPath`, and `newAdrsPath` when it is not `null`. Relay its
    JSON result.
@@ -390,7 +400,11 @@ row carries one, and ignores `group` and `conflictResolutions`:
 ```json
 {
   "dispositions": [
-    { "entryIds": ["id-1"], "decision": "watch", "reason": "Same ground as the skipped 'X' in batch 3." }
+    {
+      "entryIds": ["id-1"],
+      "decision": "watch",
+      "reason": "Same ground as the skipped 'X' in batch 3."
+    }
   ]
 }
 ```
@@ -482,10 +496,10 @@ drop it from every later run.
 When the user asks what `archive` would move, run the same command without
 `--apply`. The output keeps its shape and says `would move`.
 
-| Exit | Meaning |
-| --- | --- |
-| `0` | Every trail was processed. A trail with nothing to move or skip prints no line. |
-| `1` | Bad arguments, no trail at the cwd, or a trail whose plan the archiver refused. Each failing trail's error is on stderr, and the other trails were still processed. |
+| Exit | Meaning                                                                                                                                                             |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`  | Every trail was processed. A trail with nothing to move or skip prints no line.                                                                                     |
+| `1`  | Bad arguments, no trail at the cwd, or a trail whose plan the archiver refused. Each failing trail's error is on stderr, and the other trails were still processed. |
 
 A `live` skip is not a failure. The planner and the archiver both refuse a log
 written in the last ten minutes, and the next `archive` run moves it.

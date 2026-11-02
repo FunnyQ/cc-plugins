@@ -4,10 +4,10 @@ Measured 2026-09-30 on Darwin arm64 (Apple M1 Max) with the release build of `pa
 
 The file ship/04 wrote was left untracked in its worktree and never landed. review/01 re-ran the measurement below; the numbers agree with what ship/04 logged (channel 9008 KB, server 11616–11808 KB).
 
-| Process | Target | Measured (max of 5 × 1 s `ps -o rss=`) | Result |
-| --- | --- | --- | --- |
-| channel (`cockpit channel`, idle, inbox poll parked) | ≤ 10 MB (10240 KB) | 9008 KB (8.8 MiB) | pass |
-| server (`cockpit server`, dashboard loaded, one transcript SSE open) | ≤ 30 MB (30720 KB) | 11936 KB (11.7 MiB) | pass |
+| Process                                                              | Target             | Measured (max of 5 × 1 s `ps -o rss=`) | Result |
+| -------------------------------------------------------------------- | ------------------ | -------------------------------------- | ------ |
+| channel (`cockpit channel`, idle, inbox poll parked)                 | ≤ 10 MB (10240 KB) | 9008 KB (8.8 MiB)                      | pass   |
+| server (`cockpit server`, dashboard loaded, one transcript SSE open) | ≤ 30 MB (30720 KB) | 11936 KB (11.7 MiB)                    | pass   |
 
 The Bun versions measured about 55 MB (channel) and 86 MB (server) on the same day.
 

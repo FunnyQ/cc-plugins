@@ -1,6 +1,7 @@
 # PR-02: request-creator script
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -28,20 +29,29 @@ type CreateInput = {
   provider: "github" | "gitlab";
   title: string;
   body: string;
-  base: string;   // target branch
-  head: string;   // source branch
+  base: string; // target branch
+  head: string; // source branch
   draft: boolean;
 };
 
 type CreateResult =
   | { ok: true; url: string }
-  | { ok: false; reason: "missing-cli" | "no-remote" | "cli-error"; message: string };
+  | {
+      ok: false;
+      reason: "missing-cli" | "no-remote" | "cli-error";
+      message: string;
+    };
 
 // Injectable runner so tests don't spawn real processes.
-type Runner = (cmd: string[]) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
+type Runner = (
+  cmd: string[],
+) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
-export function buildArgs(input: CreateInput): string[]   // pure — the gh/glab argv
-export async function createRequest(input: CreateInput, run: Runner): Promise<CreateResult>
+export function buildArgs(input: CreateInput): string[]; // pure — the gh/glab argv
+export async function createRequest(
+  input: CreateInput,
+  run: Runner,
+): Promise<CreateResult>;
 ```
 
 ### Command shapes (pure `buildArgs`)
@@ -81,12 +91,12 @@ The CLI default entry (`import.meta.main`) reads a JSON `CreateInput` from argv/
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | wrong argv / throws on missing CLI | works for github but gitlab flags wrong, or error mapping coarse | correct argv both providers, all failure reasons mapped, URL parsed |
-| Test coverage | ×2 | no tests | only buildArgs | buildArgs both providers + all createRequest branches via mocked runner |
-| Interface & readability | ×1 | spawn hard-wired, untestable | injectable but messy | clean Runner injection, pure buildArgs, typed result union |
-| Assumptions & docs | ×1 | failure modes silent | partial | each reason documented, install hint included |
+| Dimension               | Weight | 0–1 (fail)                         | 2–3 (below bar)                                                  | 4–5 (pass)                                                              |
+| ----------------------- | ------ | ---------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Correctness             | ×4     | wrong argv / throws on missing CLI | works for github but gitlab flags wrong, or error mapping coarse | correct argv both providers, all failure reasons mapped, URL parsed     |
+| Test coverage           | ×2     | no tests                           | only buildArgs                                                   | buildArgs both providers + all createRequest branches via mocked runner |
+| Interface & readability | ×1     | spawn hard-wired, untestable       | injectable but messy                                             | clean Runner injection, pure buildArgs, typed result union              |
+| Assumptions & docs      | ×1     | failure modes silent               | partial                                                          | each reason documented, install hint included                           |
 
 ## Out of scope
 

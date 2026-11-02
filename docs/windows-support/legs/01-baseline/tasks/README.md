@@ -36,6 +36,7 @@ tasks/
 Start with `monitor/01-hook-entry.md` and `platform/01-line-endings.md`; they are independent. `platform/03-windows-docs.md` can run beside them.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,13 +48,13 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| monitor | 01 | Hook entry | todo | > 4 | — |
-| platform | 01 | Line endings | todo | > 4 | — |
-| platform | 02 | CI workflow | todo | > 4 | platform/01, monitor/01 |
-| platform | 03 | Windows docs | todo | > 4 | — |
-| review | 01 | Final review | todo | > 4 | platform/02, platform/03 |
+| Bucket   | NN  | Title        | Status | Pass line | Depends on               |
+| -------- | --- | ------------ | ------ | --------- | ------------------------ |
+| monitor  | 01  | Hook entry   | todo   | > 4       | —                        |
+| platform | 01  | Line endings | todo   | > 4       | —                        |
+| platform | 02  | CI workflow  | todo   | > 4       | platform/01, monitor/01  |
+| platform | 03  | Windows docs | todo   | > 4       | —                        |
+| review   | 01  | Final review | todo   | > 4       | platform/02, platform/03 |
 
 ## Dependency graph
 
@@ -71,10 +72,11 @@ platform/03
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| platform/02 | monitor/01 |
-| review/01 | platform/02, platform/03 |
+| Task        | Depends on               |
+| ----------- | ------------------------ |
+| platform/02 | monitor/01               |
+| review/01   | platform/02, platform/03 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

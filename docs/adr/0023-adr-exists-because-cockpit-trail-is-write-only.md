@@ -25,12 +25,12 @@ produced an artifact that outlived its own writing session. ADR is therefore
 cockpit's first durable read path: it consumes the trail rather than
 competing with it. This also draws a clean boundary:
 
-| Repository | Owns | Lifetime |
-|---|---|---|
-| cockpit trail | raw in-the-moment decisions | expires; it is raw material |
-| ADR | cross-release architectural commitments | permanent, has a lifecycle |
-| CLAUDE.md | how the repo works now | always describes the present |
-| `memory/` | harness behavior and pitfalls | follows the harness, not the code |
+| Repository    | Owns                                    | Lifetime                          |
+| ------------- | --------------------------------------- | --------------------------------- |
+| cockpit trail | raw in-the-moment decisions             | expires; it is raw material       |
+| ADR           | cross-release architectural commitments | permanent, has a lifecycle        |
+| CLAUDE.md     | how the repo works now                  | always describes the present      |
+| `memory/`     | harness behavior and pitfalls           | follows the harness, not the code |
 
 Explicitly out of scope: moving `memory/` content into ADR. It mixes genuine
 harness facts (which belong in `memory/`) with project decisions that were

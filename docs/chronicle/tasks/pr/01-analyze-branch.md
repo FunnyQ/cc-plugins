@@ -1,6 +1,7 @@
 # PR-01: analyze-branch script
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -29,11 +30,11 @@ type Provider = "github" | "gitlab" | "unknown";
 type BranchMaterial = {
   provider: Provider;
   remoteUrl: string | null;
-  base: string;          // resolved base branch (e.g. "develop" or "main")
-  head: string;          // current branch
-  mergeBase: string;     // sha
+  base: string; // resolved base branch (e.g. "develop" or "main")
+  head: string; // current branch
+  mergeBase: string; // sha
   commits: { sha: string; subject: string; body: string }[]; // base..HEAD
-  diffStat: string;      // `git diff --stat base...HEAD`
+  diffStat: string; // `git diff --stat base...HEAD`
   decisions: DecisionRecord[]; // cockpit, possibly empty
 };
 ```
@@ -45,11 +46,11 @@ type BranchMaterial = {
 //   git@github.com:org/repo.git → "github"
 //   https://gitlab.com/org/repo.git → "gitlab"
 //   self-hosted gitlab (host contains "gitlab") → "gitlab"; unknown host → "unknown"
-export function detectProvider(remoteUrl: string | null): Provider
+export function detectProvider(remoteUrl: string | null): Provider;
 
 // Match a cockpit registry entry's `project` path to the current repo root.
 // Normalize trailing slashes; compare resolved absolute paths.
-export function projectMatches(entryProject: string, repoRoot: string): boolean
+export function projectMatches(entryProject: string, repoRoot: string): boolean;
 
 // Scope cockpit decisions to THIS branch's life. Two filters, ANDed:
 //  1. time: record.timestamp >= sinceISO (the branch's FIRST commit time, not the
@@ -60,7 +61,7 @@ export function branchDecisions(
   records: DecisionRecord[],
   changedFiles: string[],
   sinceISO: string,
-): DecisionRecord[]
+): DecisionRecord[];
 ```
 
 `DecisionRecord` shape is in `../_context/shared.md` (cockpit section). Reuse it; do not invent a new shape.
@@ -114,12 +115,12 @@ Any read/parse failure inside the harvest degrades to "no decisions", never abor
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.2 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×4 | wrong base/merge-base, or cockpit absence throws | gathers data but provider or time-filter wrong on an edge | correct base resolution, provider detection, soft harvest, time-filter, de-dup |
-| Test coverage | ×2 | no tests | one function | all three pure fns + ssh/https/self-host + cutoff edges |
-| Interface & readability | ×1 | I/O tangled into logic | usable but impure fns untested | pure fns isolated + exported, git/fs at edges |
-| Assumptions & docs | ×1 | base-branch guess unexplained | partial | base fallback chain + soft-fail policy documented |
+| Dimension               | Weight | 0–1 (fail)                                       | 2–3 (below bar)                                           | 4–5 (pass)                                                                     |
+| ----------------------- | ------ | ------------------------------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Correctness             | ×4     | wrong base/merge-base, or cockpit absence throws | gathers data but provider or time-filter wrong on an edge | correct base resolution, provider detection, soft harvest, time-filter, de-dup |
+| Test coverage           | ×2     | no tests                                         | one function                                              | all three pure fns + ssh/https/self-host + cutoff edges                        |
+| Interface & readability | ×1     | I/O tangled into logic                           | usable but impure fns untested                            | pure fns isolated + exported, git/fs at edges                                  |
+| Assumptions & docs      | ×1     | base-branch guess unexplained                    | partial                                                   | base fallback chain + soft-fail policy documented                              |
 
 ## Out of scope
 

@@ -10,7 +10,7 @@ Show per-agent, per-task, and whole-plan token usage in flightdeck by reading th
 per-agent transcripts Claude Code already writes for every Workflow-spawned agent.
 
 **"Per-role" is delivered by the per-agent figure, not by a role aggregate.** A fleet
-row *is* one agent, identified by role, task ref, and attempt, so a Tokens column on
+row _is_ one agent, identified by role, task ref, and attempt, so a Tokens column on
 that row answers "what did the judge burn on this task" directly. A panel that sums
 every judge across the whole plan is a different feature and is out of scope — see
 Non-goals.
@@ -29,7 +29,7 @@ only needs to be found, tailed, attributed, and rendered.
 - **No dollar cost.** Pricing lives in `monitor`, and the task contract forbids
   cross-plugin imports. Duplicating a price table is a separate decision.
 - **No cache-read / cache-write in the UI.** The reader captures all four counters
-  (they arrive in one `usage` object — filtering them out would be *more* code), but
+  (they arrive in one `usage` object — filtering them out would be _more_ code), but
   only `output` and `input` are rendered.
 - **No codex / opencode token capture.** Those run as subprocesses and their usage
   lands in `~/.codex/`, not in any Claude transcript. Those rows render `N/A`, never `0`.
@@ -67,7 +67,7 @@ shaped the architecture:
    - Acceptance: for a plan dir that has run, the reader returns one entry per agent
      transcript that names that plan, drawn from every matching workflow directory;
      it returns an empty list for a plan that never ran, for a missing projects
-     directory, and for a projects directory that does not exist *yet*.
+     directory, and for a projects directory that does not exist _yet_.
    - Directories are an implementation detail, not an output. Nothing in this feature
      exposes a list of directories — the only contract is the per-agent list.
 2. **Incremental tail** — read only bytes appended since the last pass.
@@ -161,13 +161,13 @@ docs/<slug>/                       ~/.claude/projects/<repo-slug>/
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| work | 01 | transcript-source | todo | > 4.0 | — |
-| work | 02 | usage-attribution | todo | > 4.0 | work/01 |
-| work | 03 | sse-wiring | todo | > 4.0 | work/02 |
-| work | 04 | dashboard-rendering | todo | > 4.0 | work/03 |
-| review | 01 | final review 🏁 | todo | > 4.0 | work/04 |
+| Bucket | NN  | Title               | Status | Pass line | Depends on |
+| ------ | --- | ------------------- | ------ | --------- | ---------- |
+| work   | 01  | transcript-source   | todo   | > 4.0     | —          |
+| work   | 02  | usage-attribution   | todo   | > 4.0     | work/01    |
+| work   | 03  | sse-wiring          | todo   | > 4.0     | work/02    |
+| work   | 04  | dashboard-rendering | todo   | > 4.0     | work/03    |
+| review | 01  | final review 🏁     | todo   | > 4.0     | work/04    |
 
 **The chain is linear on purpose.** An earlier draft ran the reader and the attribution
 layer in parallel, since the type contract is frozen up front. That is a trap: both

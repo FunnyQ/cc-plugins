@@ -36,6 +36,7 @@ tasks/
 Start with `contract/01-launcher-harness.md` and `core/01-crate-scaffold-paths-config.md` — both are foundation tasks with no dependencies and can run in parallel.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,34 +48,34 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| channel | 01 | rmcp handshake spike | todo | > 4 | core/01, contract/03 |
-| channel | 02 | Full channel | todo | > 4 | channel/01, core/03, server/01 |
-| cli | 01 | Trail and config subcommands | todo | > 4 | core/03, contract/04 |
-| cli | 02 | Wait, send, restart | todo | > 4 | cli/01, server/05 |
-| contract | 01 | Launcher harness | todo | > 4 | — |
-| contract | 02 | Daemon HTTP contract | todo | > 4 | contract/01 |
-| contract | 03 | Channel MCP contract | todo | > 4 | contract/01 |
-| contract | 04 | CLI and hook contract | todo | > 4 | contract/01 |
-| core | 01 | Crate scaffold, paths, config | todo | > 4 | — |
-| core | 02 | Registry, log root, daemon lifecycle | todo | > 4 | core/01 |
-| core | 03 | Shared find-session and nudge-toggle | todo | > 4 | core/02 |
-| hooks | 01 | Session-start hook | todo | > 4 | core/03, contract/04 |
-| hooks | 02 | Stop hook | todo | > 4 | hooks/01, core/03 |
-| review | 01 | Final review | todo | > 4 | ship/04 |
-| server | 01 | Server foundation, startup, static | todo | > 4 | core/02, core/03, contract/02 |
-| server | 02 | Log stream and SSE tailer | todo | > 4 | server/01 |
-| server | 03 | Transcript stream and history | todo | > 4 | server/02, server/08 |
-| server | 04 | Broker, inbox, send-message | todo | > 4 | server/01 |
-| server | 05 | Permission relay | todo | > 4 | server/04, server/02 |
-| server | 06 | Codex control and send | todo | > 4 | server/01 |
-| server | 07 | OpenCode send | todo | > 4 | server/01 |
-| server | 08 | Views, sessions, design system | todo | > 4 | server/01, server/04 |
-| ship | 01 | sh shim and download | todo | > 4 | core/01 |
-| ship | 02 | CI release workflow | todo | > 4 | ship/01 |
-| ship | 03 | Wire plugins to the shim | todo | > 4 | ship/01, channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
-| ship | 04 | Delete TS, update docs, measure RSS | todo | > 4 | ship/02, ship/03 |
+| Bucket   | NN  | Title                                | Status | Pass line | Depends on                                                                                   |
+| -------- | --- | ------------------------------------ | ------ | --------- | -------------------------------------------------------------------------------------------- |
+| channel  | 01  | rmcp handshake spike                 | todo   | > 4       | core/01, contract/03                                                                         |
+| channel  | 02  | Full channel                         | todo   | > 4       | channel/01, core/03, server/01                                                               |
+| cli      | 01  | Trail and config subcommands         | todo   | > 4       | core/03, contract/04                                                                         |
+| cli      | 02  | Wait, send, restart                  | todo   | > 4       | cli/01, server/05                                                                            |
+| contract | 01  | Launcher harness                     | todo   | > 4       | —                                                                                            |
+| contract | 02  | Daemon HTTP contract                 | todo   | > 4       | contract/01                                                                                  |
+| contract | 03  | Channel MCP contract                 | todo   | > 4       | contract/01                                                                                  |
+| contract | 04  | CLI and hook contract                | todo   | > 4       | contract/01                                                                                  |
+| core     | 01  | Crate scaffold, paths, config        | todo   | > 4       | —                                                                                            |
+| core     | 02  | Registry, log root, daemon lifecycle | todo   | > 4       | core/01                                                                                      |
+| core     | 03  | Shared find-session and nudge-toggle | todo   | > 4       | core/02                                                                                      |
+| hooks    | 01  | Session-start hook                   | todo   | > 4       | core/03, contract/04                                                                         |
+| hooks    | 02  | Stop hook                            | todo   | > 4       | hooks/01, core/03                                                                            |
+| review   | 01  | Final review                         | todo   | > 4       | ship/04                                                                                      |
+| server   | 01  | Server foundation, startup, static   | todo   | > 4       | core/02, core/03, contract/02                                                                |
+| server   | 02  | Log stream and SSE tailer            | todo   | > 4       | server/01                                                                                    |
+| server   | 03  | Transcript stream and history        | todo   | > 4       | server/02, server/08                                                                         |
+| server   | 04  | Broker, inbox, send-message          | todo   | > 4       | server/01                                                                                    |
+| server   | 05  | Permission relay                     | todo   | > 4       | server/04, server/02                                                                         |
+| server   | 06  | Codex control and send               | todo   | > 4       | server/01                                                                                    |
+| server   | 07  | OpenCode send                        | todo   | > 4       | server/01                                                                                    |
+| server   | 08  | Views, sessions, design system       | todo   | > 4       | server/01, server/04                                                                         |
+| ship     | 01  | sh shim and download                 | todo   | > 4       | core/01                                                                                      |
+| ship     | 02  | CI release workflow                  | todo   | > 4       | ship/01                                                                                      |
+| ship     | 03  | Wire plugins to the shim             | todo   | > 4       | ship/01, channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
+| ship     | 04  | Delete TS, update docs, measure RSS  | todo   | > 4       | ship/02, ship/03                                                                             |
 
 ## Dependency graph
 
@@ -113,18 +114,19 @@ core/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| server/01 | core/02, core/03, contract/02 |
-| cli/02 | server/05 |
-| cli/01 | core/03, contract/04 |
-| channel/02 | core/03, server/01 |
-| channel/01 | core/01, contract/03 |
-| hooks/02 | core/03 |
-| hooks/01 | core/03, contract/04 |
-| review/01 | ship/04 |
-| ship/03 | channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
-| ship/01 | core/01 |
+| Task       | Depends on                                                                          |
+| ---------- | ----------------------------------------------------------------------------------- |
+| server/01  | core/02, core/03, contract/02                                                       |
+| cli/02     | server/05                                                                           |
+| cli/01     | core/03, contract/04                                                                |
+| channel/02 | core/03, server/01                                                                  |
+| channel/01 | core/01, contract/03                                                                |
+| hooks/02   | core/03                                                                             |
+| hooks/01   | core/03, contract/04                                                                |
+| review/01  | ship/04                                                                             |
+| ship/03    | channel/02, server/03, server/05, server/06, server/07, server/08, cli/02, hooks/02 |
+| ship/01    | core/01                                                                             |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

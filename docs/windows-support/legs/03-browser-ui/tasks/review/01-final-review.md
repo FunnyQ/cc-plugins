@@ -1,6 +1,7 @@
 # REVIEW-01: Verify integrated browser and UI portability.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/windows.md`
@@ -87,13 +88,13 @@ Apply only narrow integration fixes. Add regression coverage for a discovered de
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Integration < 4 or Goal coverage < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration | ×3 | Plugin boundaries fail together or cleanup affects unrelated resources. | Happy paths compose but cross-OS paths, ownership or checker failures drift. | Discovery, actions, checking, CLI boundaries and cleanup compose with their specified failure behavior. |
-| Goal coverage | ×3 | A required platform behavior is absent or skipped as success. | Main behavior works but a native smoke, Safari refusal or evidence boundary is missing. | Every required behavior has appropriate automated evidence or an explicit approved owed-human limitation. |
-| No regressions | ×2 | Final-state tests fail or macOS behavior changes unintentionally. | Narrow checks pass but final fixes lack regression coverage. | Final suites and real native smoke pass after fixes, with existing macOS behavior and prior CI gates preserved. |
-| Consistency | ×1 | Documentation, tests and owed statuses contradict implementation. | Claims mostly align but versions, commands or unverified environments remain ambiguous. | Support claims, command results and persistent owed evidence describe the same final state. |
-| Leanness | ×1 | New generic layers, unused configuration or duplicate cross-plugin code obscure ownership. | Correct fixes retain avoidable abstractions or unrelated changes. | Narrow helpers address demonstrated platform needs without unused options, generic transports or unrelated scope. |
+| Dimension      | Weight | 0–1 (fail)                                                                                 | 2–3 (below bar)                                                                         | 4–5 (pass)                                                                                                        |
+| -------------- | ------ | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Integration    | ×3     | Plugin boundaries fail together or cleanup affects unrelated resources.                    | Happy paths compose but cross-OS paths, ownership or checker failures drift.            | Discovery, actions, checking, CLI boundaries and cleanup compose with their specified failure behavior.           |
+| Goal coverage  | ×3     | A required platform behavior is absent or skipped as success.                              | Main behavior works but a native smoke, Safari refusal or evidence boundary is missing. | Every required behavior has appropriate automated evidence or an explicit approved owed-human limitation.         |
+| No regressions | ×2     | Final-state tests fail or macOS behavior changes unintentionally.                          | Narrow checks pass but final fixes lack regression coverage.                            | Final suites and real native smoke pass after fixes, with existing macOS behavior and prior CI gates preserved.   |
+| Consistency    | ×1     | Documentation, tests and owed statuses contradict implementation.                          | Claims mostly align but versions, commands or unverified environments remain ambiguous. | Support claims, command results and persistent owed evidence describe the same final state.                       |
+| Leanness       | ×1     | New generic layers, unused configuration or duplicate cross-plugin code obscure ownership. | Correct fixes retain avoidable abstractions or unrelated changes.                       | Narrow helpers address demonstrated platform needs without unused options, generic transports or unrelated scope. |
 
 ## Out of scope
 

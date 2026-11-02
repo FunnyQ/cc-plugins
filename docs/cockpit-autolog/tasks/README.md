@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,19 +48,19 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| backend | 01 | Global log_language config module | todo | > 4 | — |
-| backend | 02 | `cockpit config` CLI subcommand | todo | > 4 | backend/01 |
-| backend | 03 | Retire `start`, strip goal machinery from the CLI kernel | todo | > 4 | backend/02 |
-| backend | 04 | Strip goal readers from registry + project-info | todo | > 4 | backend/03 |
-| docs | 01 | Update CLAUDE.md + CHANGELOG | todo | > 4 | backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04 |
-| docs | 02 | Final review — whole-system gate | todo | > 4 | backend/01, backend/02, backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04, docs/01 |
-| frontend | 01 | Remove goal rendering from the dashboard | todo | > 4 | backend/03 |
-| skills | 01 | Thin SKILL.md router + pilot reference | todo | > 4 | backend/02, backend/03, skills/02 |
-| skills | 02 | Scribe reference + delete the cockpit-scribe skill | todo | > 4 | backend/02 |
-| skills | 03 | Thoughtful command + delete the thoughtful skill | todo | > 4 | skills/01, skills/02 |
-| skills | 04 | SessionStart hook that auto-enables thoughtful (Claude) | todo | > 4 | skills/03 |
+| Bucket   | NN  | Title                                                    | Status | Pass line | Depends on                                                                                                       |
+| -------- | --- | -------------------------------------------------------- | ------ | --------- | ---------------------------------------------------------------------------------------------------------------- |
+| backend  | 01  | Global log_language config module                        | todo   | > 4       | —                                                                                                                |
+| backend  | 02  | `cockpit config` CLI subcommand                          | todo   | > 4       | backend/01                                                                                                       |
+| backend  | 03  | Retire `start`, strip goal machinery from the CLI kernel | todo   | > 4       | backend/02                                                                                                       |
+| backend  | 04  | Strip goal readers from registry + project-info          | todo   | > 4       | backend/03                                                                                                       |
+| docs     | 01  | Update CLAUDE.md + CHANGELOG                             | todo   | > 4       | backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04                                  |
+| docs     | 02  | Final review — whole-system gate                         | todo   | > 4       | backend/01, backend/02, backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04, docs/01 |
+| frontend | 01  | Remove goal rendering from the dashboard                 | todo   | > 4       | backend/03                                                                                                       |
+| skills   | 01  | Thin SKILL.md router + pilot reference                   | todo   | > 4       | backend/02, backend/03, skills/02                                                                                |
+| skills   | 02  | Scribe reference + delete the cockpit-scribe skill       | todo   | > 4       | backend/02                                                                                                       |
+| skills   | 03  | Thoughtful command + delete the thoughtful skill         | todo   | > 4       | skills/01, skills/02                                                                                             |
+| skills   | 04  | SessionStart hook that auto-enables thoughtful (Claude)  | todo   | > 4       | skills/03                                                                                                        |
 
 ## Dependency graph
 
@@ -83,13 +84,14 @@ backend/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| frontend/01 | backend/03 |
-| docs/02 | backend/01, backend/02, backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04 |
-| docs/01 | backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04 |
-| skills/02 | backend/02 |
-| skills/01 | backend/02, backend/03 |
+| Task        | Depends on                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------- |
+| frontend/01 | backend/03                                                                                              |
+| docs/02     | backend/01, backend/02, backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04 |
+| docs/01     | backend/03, backend/04, frontend/01, skills/01, skills/02, skills/03, skills/04                         |
+| skills/02   | backend/02                                                                                              |
+| skills/01   | backend/02, backend/03                                                                                  |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

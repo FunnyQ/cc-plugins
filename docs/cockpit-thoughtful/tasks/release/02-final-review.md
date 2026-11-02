@@ -1,6 +1,7 @@
 # RELEASE-02: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/log-schema.md`
 > - `../_context/rubric.md`
@@ -53,12 +54,12 @@ This is the holistic gate — per-task rubrics already scored each piece; this c
 
 > Scale: 0–5 per dimension; weighted average > 4.0 to pass; Integration / does it compose < 4 is an automatic veto. These axes are holistic (not a re-score of individual tasks).
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Integration / does it compose | ×3 | pieces don't connect end-to-end | works but a seam is rough (e.g. fork can't find CLI) | trigger→fork→scribe→dashboard flows cleanly |
-| Meets the PLAN goal | ×2 | goal unmet | partially (e.g. needs `cockpit start`) | no-goal auto-logging fully delivered |
-| Consistency | ×1 | skills/CLI/docs disagree | minor drift | skills, CLI surface, schema, versions all aligned |
-| No regressions | ×1 | breaks manual log or old logs | small parity gaps | tests green, legacy + manual paths intact |
+| Dimension                     | Weight | 0–1 (fail)                      | 2–3 (below bar)                                      | 4–5 (pass)                                        |
+| ----------------------------- | ------ | ------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Integration / does it compose | ×3     | pieces don't connect end-to-end | works but a seam is rough (e.g. fork can't find CLI) | trigger→fork→scribe→dashboard flows cleanly       |
+| Meets the PLAN goal           | ×2     | goal unmet                      | partially (e.g. needs `cockpit start`)               | no-goal auto-logging fully delivered              |
+| Consistency                   | ×1     | skills/CLI/docs disagree        | minor drift                                          | skills, CLI surface, schema, versions all aligned |
+| No regressions                | ×1     | breaks manual log or old logs   | small parity gaps                                    | tests green, legacy + manual paths intact         |
 
 ## Out of scope
 

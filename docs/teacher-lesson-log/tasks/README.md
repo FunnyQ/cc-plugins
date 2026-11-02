@@ -36,6 +36,7 @@ tasks/
 Start with `work/01-lessons-db-and-record-cli.md`. Once it lands, `work/02` and `work/03` touch disjoint files and can run in parallel.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,12 +48,12 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| review | 01 | final review 🏁 | todo | > 4 | work/02, work/03 |
-| work | 01 | lessons-db-and-record-cli | todo | > 4 | — |
-| work | 02 | record-attempts-from-the-mod | todo | > 4 | work/01 |
-| work | 03 | label-and-stats-cli | todo | > 4 | work/01 |
+| Bucket | NN  | Title                        | Status | Pass line | Depends on       |
+| ------ | --- | ---------------------------- | ------ | --------- | ---------------- |
+| review | 01  | final review 🏁              | todo   | > 4       | work/02, work/03 |
+| work   | 01  | lessons-db-and-record-cli    | todo   | > 4       | —                |
+| work   | 02  | record-attempts-from-the-mod | todo   | > 4       | work/01          |
+| work   | 03  | label-and-stats-cli          | todo   | > 4       | work/01          |
 
 ## Dependency graph
 
@@ -69,9 +70,10 @@ work/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
+| Task      | Depends on       |
+| --------- | ---------------- |
 | review/01 | work/02, work/03 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

@@ -1,6 +1,7 @@
 # CLI-03: Cross-format fix hint in the Mermaid lint
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -69,7 +70,7 @@ Match the tag-open form, not the bare word. `/<svg[\s>]/i` requires a whitespace
 When the pattern matches, return the SVG-flavoured message instead. It must state three things: that the source looks like SVG, that its root element is preceded by something else, and the two ways to fix it. Use this wording:
 
 ```ts
-`first line "${first ?? ""}" is not a Mermaid diagram type, but the source contains an "<svg" tag — this looks like SVG whose root element is preceded by other content. Delete everything before "<svg", or pass the file directly with --diagram @path.svg`
+`first line "${first ?? ""}" is not a Mermaid diagram type, but the source contains an "<svg" tag — this looks like SVG whose root element is preceded by other content. Delete everything before "<svg", or pass the file directly with --diagram @path.svg`;
 ```
 
 Keep it in the same `what's wrong — how to fix` voice as every other message in the file. It is user-facing text an agent will act on, so the fix half must be executable as written.
@@ -107,12 +108,12 @@ A Mermaid source whose first line is already broken **and** which embeds a liter
 
 > Scale and dimension definitions: see `../_context/rubric.md`. Each dimension 0–5; weighted average >= 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | the branch never fires, or fires on the bare word `svg` | fires on the canonical prefixed-SVG case but the message omits one of the two fixes, or the early-return property is broken so a downstream rule runs | fires exactly on a tag-open match, returns one message naming both fixes, and returns immediately with no downstream rule executed |
-| Backward compatibility | ×2 | an existing lint message changed, or a downstream rule now runs on the early-return path | the typo message survives but a pre-existing test needed editing to pass | every existing message is byte-identical, every pre-existing test passes untouched, and the lint still never throws |
-| Test coverage | ×2 | no new test | only the happy fire case is asserted | asserts the fire, the bare-word no-fire, the unchanged typo message, and the single-message property under a doubly-broken source |
-| Interface & readability | ×1 | the regex is inlined at the call site with no rationale | the branch works but reads as an unexplained special case | the pattern is a named constant, and a comment explains why the tag-open form is required and why the flag alternative was rejected |
+| Dimension               | Weight | 0–1 (fail)                                                                               | 2–3 (below bar)                                                                                                                                       | 4–5 (pass)                                                                                                                          |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | the branch never fires, or fires on the bare word `svg`                                  | fires on the canonical prefixed-SVG case but the message omits one of the two fixes, or the early-return property is broken so a downstream rule runs | fires exactly on a tag-open match, returns one message naming both fixes, and returns immediately with no downstream rule executed  |
+| Backward compatibility  | ×2     | an existing lint message changed, or a downstream rule now runs on the early-return path | the typo message survives but a pre-existing test needed editing to pass                                                                              | every existing message is byte-identical, every pre-existing test passes untouched, and the lint still never throws                 |
+| Test coverage           | ×2     | no new test                                                                              | only the happy fire case is asserted                                                                                                                  | asserts the fire, the bare-word no-fire, the unchanged typo message, and the single-message property under a doubly-broken source   |
+| Interface & readability | ×1     | the regex is inlined at the call site with no rationale                                  | the branch works but reads as an unexplained special case                                                                                             | the pattern is a named constant, and a comment explains why the tag-open form is required and why the flag alternative was rejected |
 
 ## Out of scope
 

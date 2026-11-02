@@ -86,7 +86,13 @@ const rig = async (
 ) => {
   let now = (epoch += 10 * CHECK_TIMEOUT_MS);
   where.home = HOME;
-  runtime.info = { platform: "darwin", wsl: false, home: HOME, tmp: "/tmp", chrome: "/test/chrome" };
+  runtime.info = {
+    platform: "darwin",
+    wsl: false,
+    home: HOME,
+    tmp: "/tmp",
+    chrome: "/test/chrome",
+  };
   let explain: ExplainView = { entries: opts.entries ?? [], isRunning: false };
   let version = 1;
   const files = new Map<string, string>([
@@ -237,8 +243,7 @@ const rig = async (
     files,
     turnEnd,
     view: () => explain,
-    token: (i: number) =>
-      spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!,
+    token: (i: number) => spawns[i]!.prompt.match(/token is (c\d+)\./)![1]!,
     setNow: (n: number) => (now = n),
   };
 };
@@ -328,7 +333,9 @@ test("an html reply with a diagram renders it in a bun child, after the entry la
   );
   await explainPress(r.$);
   const entry = r.view().entries[0] as Extract<ExplainEntry, { kind: "html" }>;
-  const bun = r.runs.filter((a) => a[0] === "bun" && !a[1]?.endsWith("platform-cli.ts"));
+  const bun = r.runs.filter(
+    (a) => a[0] === "bun" && !a[1]?.endsWith("platform-cli.ts"),
+  );
   expect(bun[0]).toEqual([
     "bun",
     "/plugin/hooks/explain/pele-cli.ts",
@@ -455,7 +462,8 @@ test("an unanswered fork sets the error, stores nothing, and clears isRunning", 
   expect(r.view()).toEqual({
     entries: [],
     isRunning: false,
-    error: "send a message first: after a resume or /clear there is nothing to explain yet",
+    error:
+      "send a message first: after a resume or /clear there is nothing to explain yet",
   });
   r.replies.push({ isAnswered: false, reason: "api-error", status: 529 });
   await explainPress(r.$);
@@ -737,7 +745,10 @@ test("failed platform mkdir reports the failure and stores the summary fallback"
   const r = await rig({ mkdirFails: true });
   r.replies.push(answered(htmlReply));
   await explainPress(r.$);
-  expect(r.view().entries[0]).toMatchObject({ kind: "text", body: "It flows." });
+  expect(r.view().entries[0]).toMatchObject({
+    kind: "text",
+    body: "It flows.",
+  });
   expect(r.view().error).toContain("mkdir: access denied");
   expect(r.spawns).toHaveLength(0);
 });

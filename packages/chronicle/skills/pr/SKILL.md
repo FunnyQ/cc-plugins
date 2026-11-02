@@ -95,7 +95,8 @@ optional Mermaid overview diagram, and the `CreateResult` contract — lives the
    If no structured question tool is available, ask in plain text and resume only after
    the answer. If the user already stated the answer in the current request ("no review
    needed", "skip review"), take it and skip the question.
-3. **Distill the `contextBrief`** — a tight summary of *why* this branch exists,
+
+3. **Distill the `contextBrief`** — a tight summary of _why_ this branch exists,
    drawn from this conversation (the Storykeeper can't see the chat).
    This is the only "why" it gets beyond the cockpit trail and commits.
 4. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:

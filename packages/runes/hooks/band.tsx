@@ -117,25 +117,25 @@ export const band = (on: On) => {
       !lesson || !term
         ? undefined
         : bubble(
-        { Box: term.Box, Text: term.Text },
-        {
-          key: "teacher",
-          color: TEACHER_COLOR,
-          icon: TEACHER_ICON,
-          title: "Your English Teacher",
-          side: "left",
-          bar: false,
-          inner,
-          rows: [
-            [
-              "teacher:0",
-              <term.Button plain onPress={toLesson}>
-                {`${first.map((r) => r.text).join("")}${rest.length ? "…" : ""} ↑`}
-              </term.Button>,
-            ],
-          ],
-        },
-      );
+            { Box: term.Box, Text: term.Text },
+            {
+              key: "teacher",
+              color: TEACHER_COLOR,
+              icon: TEACHER_ICON,
+              title: "Your English Teacher",
+              side: "left",
+              bar: false,
+              inner,
+              rows: [
+                [
+                  "teacher:0",
+                  <term.Button plain onPress={toLesson}>
+                    {`${first.map((r) => r.text).join("")}${rest.length ? "…" : ""} ↑`}
+                  </term.Button>,
+                ],
+              ],
+            },
+          );
     const withNotice = (node: ReturnType<typeof row>) =>
       notice ? (
         <Box key="teacher-band" flexDirection="column">

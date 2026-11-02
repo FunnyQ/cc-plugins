@@ -21,7 +21,7 @@
 - No new npm dependency in any task. Everything needed is already vendored or auto-installed.
 - Frontend modules are plain ES modules with no build step. Whatever you write in `dashboard/dist/modules/*.js` is what ships.
 - Keep every DOM-bound import **lazy** inside `dashboard/dist/modules/diagram.js`. The module's static surface must stay importable under plain Bun with no DOM — `scripts/diagram-theme.test.ts` enforces this by importing it directly. Anything needing `document`, `DOMParser`, or DOMPurify is loaded inside a function, not at module top level.
-- Comment *why*, never *what*. The existing files in this skill are dense with rationale comments explaining non-obvious constraints; match that density when you encode a constraint.
+- Comment _why_, never _what_. The existing files in this skill are dense with rationale comments explaining non-obvious constraints; match that density when you encode a constraint.
 - Build the smallest thing that satisfies the task. Do not add a layer, option, or abstraction unless a stated requirement fails without it.
 - Change only the lines the task requires.
 

@@ -1,6 +1,7 @@
 # BROWSERS-03: Require native browser smoke coverage.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/browsers.md`
@@ -79,12 +80,12 @@ Keep injection local to the smoke runner rather than adding a transport framewor
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Missing browsers pass or unrelated instances are closed | Happy-path actions run but content, PNG or cleanup failures can pass | Every required native browser is mandatory, the Windows refusal is asserted, separate CLI processes verify behavior, and failures plus owned cleanup are enforced |
-| Test coverage | ×2 | Only real-browser happy paths exist | Missing-browser or cleanup tests omit a failure class | Deterministic tests cover each absent prerequisite, the Windows refusal, preflight, action/content/PNG failures, timeouts and owned cleanup; real smoke proves the composed sequence |
-| Interface & readability | ×1 | Shell strings or a generic transport layer hide operations | Runner is usable but dependencies and error flow are unclear | Small typed injection points expose actual argv, deadlines, results and cleanup ownership |
-| Assumptions & docs | ×1 | Optional skips are presented as CI evidence | Versions or native-versus-WSL limits are implicit | Commands report measured native paths/versions and preserve explicit Safari opt-in and owed Zen/WSL evidence |
+| Dimension               | Weight | 0–1 (fail)                                                 | 2–3 (below bar)                                                      | 4–5 (pass)                                                                                                                                                                           |
+| ----------------------- | ------ | ---------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Missing browsers pass or unrelated instances are closed    | Happy-path actions run but content, PNG or cleanup failures can pass | Every required native browser is mandatory, the Windows refusal is asserted, separate CLI processes verify behavior, and failures plus owned cleanup are enforced                    |
+| Test coverage           | ×2     | Only real-browser happy paths exist                        | Missing-browser or cleanup tests omit a failure class                | Deterministic tests cover each absent prerequisite, the Windows refusal, preflight, action/content/PNG failures, timeouts and owned cleanup; real smoke proves the composed sequence |
+| Interface & readability | ×1     | Shell strings or a generic transport layer hide operations | Runner is usable but dependencies and error flow are unclear         | Small typed injection points expose actual argv, deadlines, results and cleanup ownership                                                                                            |
+| Assumptions & docs      | ×1     | Optional skips are presented as CI evidence                | Versions or native-versus-WSL limits are implicit                    | Commands report measured native paths/versions and preserve explicit Safari opt-in and owed Zen/WSL evidence                                                                         |
 
 ## Out of scope
 

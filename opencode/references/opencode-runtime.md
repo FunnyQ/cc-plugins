@@ -38,9 +38,9 @@ $ bun run /tmp/…/skills/cockpit/scripts/find-session.ts --help
 
 **Observation** — a module at `<fake-repo>/opencode/plugin.ts`, symlinked to `<cfg>/plugin/q-lab.ts`, exporting `import.meta.dir`:
 
-| How it was loaded | `import.meta.dir` |
-|---|---|
-| `await import("<cfg>/plugin/q-lab.ts")` | `<fake-repo>/opencode` |
+| How it was loaded                                                                      | `import.meta.dir`      |
+| -------------------------------------------------------------------------------------- | ---------------------- |
+| `await import("<cfg>/plugin/q-lab.ts")`                                                | `<fake-repo>/opencode` |
 | `Bun.Glob("{plugin,plugins}/*.{ts,js}")` with `followSymlinks: true`, then `import(f)` | `<fake-repo>/opencode` |
 
 The second case mirrors what the loader actually does. Both give the **realpath**.
@@ -83,7 +83,7 @@ explore (subagent)     general (subagent)
 
 **Decision**: autopilot's manual wave loop spawns `general` for both the dev role and the judge role, carrying an inline role prompt. **No `dev` or `judge` agent definitions are needed**, so the installer's target list stays unchanged and nothing ripples into its tests or the README.
 
-**The built-in `general` subagent cannot spawn.** Tested at `subagent_depth` 2, 3 and 4 — a `general` subagent asked to call `task` got *"Model tried to call unavailable tool 'task'. Available tools: bash, edit, glob, grep, read, skill, todowrite, webfetch, write."* Raising the depth does not grant it.
+**The built-in `general` subagent cannot spawn.** Tested at `subagent_depth` 2, 3 and 4 — a `general` subagent asked to call `task` got _"Model tried to call unavailable tool 'task'. Available tools: bash, edit, glob, grep, read, skill, todowrite, webfetch, write."_ Raising the depth does not grant it.
 
 **A custom agent declaring `permission.task: allow` can.** A probe agent with that permission spawned a child and got `NESTED-SPAWN-OK` back. So `permission.task: allow` is load-bearing exactly as specified for the three chronicle orchestrators — without it they are silently unable to spawn. Custom agents are discovered from `.opencode/agents/` (plural).
 

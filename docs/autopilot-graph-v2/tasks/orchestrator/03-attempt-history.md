@@ -1,6 +1,7 @@
 # ORCHESTRATOR-03: cross-attempt retry history
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/orchestrator-contract.md`
 > - `../_context/rubric.md`
@@ -18,7 +19,7 @@ This change is **unconditional** — every run gets it, with no config field and
 ## Files to create / modify
 
 - `packages/dispatch/skills/autopilot/references/orchestrator.md` (modify) — inside the fenced
-  ```` ```javascript ```` block: replace the single overwritten feedback string with an ordered attempt
+  ` ```javascript ` block: replace the single overwritten feedback string with an ordered attempt
   record, and render the whole history into the retry prompts.
 - `packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts` (modify) — capture each agent
   call's prompt, and cover the multi-attempt history.
@@ -28,7 +29,7 @@ nothing outside the block goes stale. If you find prose that does describe it, u
 
 ## Implementation notes
 
-**Every edit to the executable script must land INSIDE the fenced ```` ```javascript ```` block.** The
+**Every edit to the executable script must land INSIDE the fenced ` ```javascript ` block.** The
 fixture locates the script by string search — `doc.indexOf("```javascript")` to the next `"\n```"` — and
 runs the slice through `new Function`. A change written in the prose around the block is invisible to both
 the runtime and the test, and will look like it worked.
@@ -64,7 +65,7 @@ re-breaking B — and burns its whole ladder.
 // just the last: with only the newest rejection visible, attempt 3 cannot know
 // that attempt 1 already tried the same fix, so the ladder oscillates instead of
 // converging.
-const attempts = []   // [{ n, model, gateSummary, rationale, weighted, hardFailed, missing }]
+const attempts = []; // [{ n, model, gateSummary, rationale, weighted, hardFailed, missing }]
 ```
 
 Field contract — all seven fields on every record, because two different rejection shapes share it:
@@ -89,23 +90,28 @@ those annotations are silently lost — a feedback regression, not a cosmetic on
 ```js
 // Reproduces today's two feedback strings verbatim, so the prompt text a retry
 // sees does not regress — only its scope widens.
-const rejectionOf = (a) => a.weighted !== null
-  ? `Rubric score ${a.weighted.toFixed(2)} did not pass`
-    + (a.hardFailed ? ' (hard-fail veto)' : '')
-    + (a.missing.length ? ` (missing dims: ${a.missing.join(', ')})` : '')
-    + `:\n${a.rationale}`
-  : `Binary gate failed (verification/acceptance):\n${a.gateSummary ?? 'no output'}`
+const rejectionOf = (a) =>
+  a.weighted !== null
+    ? `Rubric score ${a.weighted.toFixed(2)} did not pass` +
+      (a.hardFailed ? " (hard-fail veto)" : "") +
+      (a.missing.length ? ` (missing dims: ${a.missing.join(", ")})` : "") +
+      `:\n${a.rationale}`
+    : `Binary gate failed (verification/acceptance):\n${a.gateSummary ?? "no output"}`;
 
 const renderHistory = (attempts) => {
-  if (attempts.length === 0) return ''
-  const last = attempts[attempts.length - 1]
-  const prior = attempts.slice(0, -1)
-  return rejectionOf(last)
-    + (prior.length
-        ? `\n\nEARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:\n`
-          + prior.map(a => `- attempt ${a.n} (ran on ${a.model}): ${rejectionOf(a)}`).join('\n')
-        : '')
-}
+  if (attempts.length === 0) return "";
+  const last = attempts[attempts.length - 1];
+  const prior = attempts.slice(0, -1);
+  return (
+    rejectionOf(last) +
+    (prior.length
+      ? `\n\nEARLIER ATTEMPTS on this task — already tried and rejected. Do not repeat them:\n` +
+        prior
+          .map((a) => `- attempt ${a.n} (ran on ${a.model}): ${rejectionOf(a)}`)
+          .join("\n")
+      : "")
+  );
+};
 ```
 
 Thread `renderHistory(attempts)` into the **same argument slot** the prompts already use. The three prompt
@@ -135,7 +141,7 @@ Record the literal string `'final-review'` for those attempts. Not the fixer's m
 - The fixer model names only the fixer, and would claim the round was one Opus attempt, hiding the fan-out.
 - A list would make `model` a different type for one branch, and the field is rendered into a prompt
   sentence (`ran on ${a.model}`) where a list reads as noise.
-- `'final-review'` is honest and stable: it says which *kind* of round produced the rejection, which is the
+- `'final-review'` is honest and stable: it says which _kind_ of round produced the rejection, which is the
   only thing a retry can act on. The lens breakdown already lives in the flightlog, where audit detail
   belongs.
 
@@ -180,7 +186,7 @@ Extend `runOrchestrator` to record `{ label, prompt }` per call and return that 
 - [x] The three prompt-builder signatures are unchanged — the history rides the existing argument slot.
 - [x] The fixture records each agent call's prompt as well as its label, and the existing `labels` array is
       still returned unchanged.
-- [x] Every change to the executable script sits inside the fenced ```` ```javascript ```` block.
+- [x] Every change to the executable script sits inside the fenced ` ```javascript ` block.
 
 ## Verification
 
@@ -208,9 +214,9 @@ Anchors and scoring notes are in `../_context/rubric.md`; the bar below is the o
 > Score each dimension 0–5. Pass needs a weighted average **> 4.0** on the 0–5 scale.
 > `Correctness < 4` is an automatic veto regardless of the average.
 
-| Dimension | Weight | 0–1 | 2–3 | 4–5 |
-|---|---|---|---|---|
-| Correctness | ×3 | The rendered prompt duplicates a preamble, drops an annotation, or a record is missing fields. | The history renders but a shape is wrong (a closing-review `model`, a first-attempt empty case, or a null-field case). | Both rejection shapes, all seven fields, the closing-review label, and the first-attempt empty case all behave exactly as specified. |
-| Test coverage | ×2 | No test, or tests that would pass without the change. | Happy path only, or the history asserted without prompt capture. | Multi-attempt ordering, both rejection shapes, the veto annotations, the closing-review label, and the empty first attempt are all covered, and each test would fail without the change. |
-| Interface & readability | ×1 | The history threaded through a new prompt parameter, or the renderer duplicating framing the prompts already own. | Works but the record's two shapes are hard to tell apart. | Prompt signatures unchanged, one small renderer, and the two rejection shapes obvious from the code. |
-| Assumptions & docs | ×1 | The body-only rendering contract and the `'final-review'` choice are left silent. | Noted somewhere. | Both are *why* comments next to the code, and the record's null-vs-populated field contract is stated where the record is declared. |
+| Dimension               | Weight | 0–1                                                                                                               | 2–3                                                                                                                    | 4–5                                                                                                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | The rendered prompt duplicates a preamble, drops an annotation, or a record is missing fields.                    | The history renders but a shape is wrong (a closing-review `model`, a first-attempt empty case, or a null-field case). | Both rejection shapes, all seven fields, the closing-review label, and the first-attempt empty case all behave exactly as specified.                                                     |
+| Test coverage           | ×2     | No test, or tests that would pass without the change.                                                             | Happy path only, or the history asserted without prompt capture.                                                       | Multi-attempt ordering, both rejection shapes, the veto annotations, the closing-review label, and the empty first attempt are all covered, and each test would fail without the change. |
+| Interface & readability | ×1     | The history threaded through a new prompt parameter, or the renderer duplicating framing the prompts already own. | Works but the record's two shapes are hard to tell apart.                                                              | Prompt signatures unchanged, one small renderer, and the two rejection shapes obvious from the code.                                                                                     |
+| Assumptions & docs      | ×1     | The body-only rendering contract and the `'final-review'` choice are left silent.                                 | Noted somewhere.                                                                                                       | Both are _why_ comments next to the code, and the record's null-vs-populated field contract is stated where the record is declared.                                                      |

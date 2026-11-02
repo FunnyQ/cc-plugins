@@ -1,6 +1,7 @@
 # SERVER-02: the server process
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -56,8 +57,8 @@ export type DaemonInfo = {
   plan: string;
 };
 
-export function recordPath(): string;                       // XDG-aware
-export function readRecord(): Partial<DaemonInfo> | null;   // null when absent or unparseable
+export function recordPath(): string; // XDG-aware
+export function readRecord(): Partial<DaemonInfo> | null; // null when absent or unparseable
 export function writeRecord(info: DaemonInfo): void;
 export function removeRecord(): void;
 ```
@@ -119,10 +120,10 @@ next launch try to supersede a dead pid.
 - [x] Confirm the containment check is actually reached. curl collapses dot segments before sending, so
       a bare traversal URL becomes `/etc/passwd` and a 404 would prove nothing. Use `--path-as-is`, and
       check the encoded form too:
-      ```bash
-      curl -s -o /dev/null -w '%{http_code}\n' --path-as-is 'localhost:5757/../../../etc/passwd'
-      curl -s -o /dev/null -w '%{http_code}\n' 'localhost:5757/%2e%2e%2f%2e%2e%2fetc/passwd'
-      ```
+      `bash
+    curl -s -o /dev/null -w '%{http_code}\n' --path-as-is 'localhost:5757/../../../etc/passwd'
+    curl -s -o /dev/null -w '%{http_code}\n' 'localhost:5757/%2e%2e%2f%2e%2e%2fetc/passwd'
+    `
       Both → `404`.
 - [x] Confirm the record exists and names this process:
       `cat "${XDG_DATA_HOME:-$HOME/.local/share}/q-lab/flightdeck/daemon.json" | jq '.port, .plan'`
@@ -135,12 +136,12 @@ next launch try to supersede a dead pid.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Runs on import, binds a public interface, or writes the record before binding | Serves correctly but a corrupt record throws, or a busy port is retried instead of reported | Import-safe, loopback only, record written after bind and removed on both signals, static delegated |
-| Test coverage | ×2 | No tests | Record round-trip only | Record round-trip, corrupt-record tolerance, XDG path override, route wiring, and the suite provably binds nothing |
-| Interface & readability | ×1 | Record shape and I/O inlined in the server | Extracted but the server still reimplements static logic | Record module standalone and importable by a launcher, static module reused, thin `main()` |
-| Assumptions & docs | ×1 | The record path is a bare literal | Named but unexplained | Comments explain why the record is written after bind and why a busy port is reported rather than retried |
+| Dimension               | Weight | 0–1 (fail)                                                                    | 2–3 (below bar)                                                                             | 4–5 (pass)                                                                                                         |
+| ----------------------- | ------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | Runs on import, binds a public interface, or writes the record before binding | Serves correctly but a corrupt record throws, or a busy port is retried instead of reported | Import-safe, loopback only, record written after bind and removed on both signals, static delegated                |
+| Test coverage           | ×2     | No tests                                                                      | Record round-trip only                                                                      | Record round-trip, corrupt-record tolerance, XDG path override, route wiring, and the suite provably binds nothing |
+| Interface & readability | ×1     | Record shape and I/O inlined in the server                                    | Extracted but the server still reimplements static logic                                    | Record module standalone and importable by a launcher, static module reused, thin `main()`                         |
+| Assumptions & docs      | ×1     | The record path is a bare literal                                             | Named but unexplained                                                                       | Comments explain why the record is written after bind and why a busy port is reported rather than retried          |
 
 ## Out of scope
 

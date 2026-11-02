@@ -1,6 +1,7 @@
 # UI-01: Permission modal
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/protocol.md`
 >
@@ -32,7 +33,7 @@ Build the modal as a **self-contained, content-agnostic overlay** (title, body
 slot, action buttons, close lifecycle) with the permission-specific content passed
 in — so a later effort can reuse it for `needs_your_call` without touching the
 existing `needs_your_call` flow. Do not hard-wire it to the `awaitingCall` HUD;
-it may *echo* that visual language (the "your turn" glow) but owns its own DOM.
+it may _echo_ that visual language (the "your turn" glow) but owns its own DOM.
 
 ### Data source
 

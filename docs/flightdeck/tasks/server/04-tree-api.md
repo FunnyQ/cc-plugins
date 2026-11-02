@@ -1,6 +1,7 @@
 # SERVER-04: the tree endpoint
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -131,12 +132,12 @@ Nothing from the monitor package.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Derived state is wrong, or a missing log errors | Correct payload but a parse error blanks the response, or results are cached | Payload matches the spec, all three degradation paths handled, always fresh |
-| Test coverage | ×2 | No tests | Happy path only | Payload builder against fixtures, missing log, parse errors, title fallback, empty tree, empty bucket, fully unparseable bucket |
-| Interface & readability | ×1 | Loading and shaping tangled; tests need a server | Split but the builder still touches disk | Pure `buildTreePayload`, impure `loadPlan`, route body trivial |
-| Assumptions & docs | ×1 | No note on the absence of caching | Mentions it without the reason | Explains why the tree is re-read per request and why parse errors return 200 |
+| Dimension               | Weight | 0–1 (fail)                                       | 2–3 (below bar)                                                              | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ------------------------------------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Derived state is wrong, or a missing log errors  | Correct payload but a parse error blanks the response, or results are cached | Payload matches the spec, all three degradation paths handled, always fresh                                                     |
+| Test coverage           | ×2     | No tests                                         | Happy path only                                                              | Payload builder against fixtures, missing log, parse errors, title fallback, empty tree, empty bucket, fully unparseable bucket |
+| Interface & readability | ×1     | Loading and shaping tangled; tests need a server | Split but the builder still touches disk                                     | Pure `buildTreePayload`, impure `loadPlan`, route body trivial                                                                  |
+| Assumptions & docs      | ×1     | No note on the absence of caching                | Mentions it without the reason                                               | Explains why the tree is re-read per request and why parse errors return 200                                                    |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # SCRIPTS-02: waypoints advance verb
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -29,9 +30,9 @@ export type Roadmap = { title: string; legs: Leg[] };
 // Leg has: num, nn, slug, status, title (milestone name, before the em dash),
 //          doneState (after the em dash), landedDate?, outcome?
 // advance must preserve `title` (and every untouched leg) through serialization.
-export function parseRoadmap(md: string): Roadmap
-export function serializeRoadmap(roadmap: Roadmap): string
-export function assertSingleActive(roadmap: Roadmap): void
+export function parseRoadmap(md: string): Roadmap;
+export function serializeRoadmap(roadmap: Roadmap): string;
+export function assertSingleActive(roadmap: Roadmap): void;
 ```
 
 Add the `advance` verb to the existing `main()` dispatch. Keep new logic in **pure** helpers; only `main()`
@@ -40,7 +41,7 @@ reads the filesystem, computes today's date, prints, and writes.
 ### `draftOutcome` (pure, deterministic seed)
 
 ```ts
-export function draftOutcome(runlog: string, planOverview: string): string
+export function draftOutcome(runlog: string, planOverview: string): string;
 ```
 
 The human refines the result via `--outcome`, but the seed must be deterministic and testable. Fixed
@@ -67,7 +68,11 @@ draftOutcome("", "")            → "landed (no RUNLOG summary available)"
 ### `advanceRoadmap` (pure transition)
 
 ```ts
-export function advanceRoadmap(roadmap: Roadmap, outcome: string, date: string): Roadmap
+export function advanceRoadmap(
+  roadmap: Roadmap,
+  outcome: string,
+  date: string,
+): Roadmap;
 ```
 
 - Active `[~]` → `[x]`, appending `· landed <date> · outcome: <outcome>` to its pointer/continuation line.
@@ -110,12 +115,12 @@ with a guaranteed active leg, it does not itself handle the zero-active case.
 
 > Scale and shared dimensions: see `../_context/rubric.md` (dimension set A — code tasks). Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | advance transition or draft cascade wrong | happy path works but no-pending / dry-run / gate edges drift | cascade + transition + write-gate all correct per spec, edges handled |
-| Test coverage | ×2 | no advance tests | one branch only | all four draft branches + advance with/without pending + round-trip |
-| Interface & readability | ×1 | write logic tangled, filesystem in helpers | works but helpers impure | pure `draftOutcome`/`advanceRoadmap`, thin `main()` reusing the core helpers |
-| Assumptions & docs | ×1 | `Date.now()` in a helper, magic thresholds | some assumptions unstated | date injected, truncation/fallbacks documented, deterministic |
+| Dimension               | Weight | 0–1 (fail)                                 | 2–3 (below bar)                                              | 4–5 (pass)                                                                   |
+| ----------------------- | ------ | ------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Correctness             | ×3     | advance transition or draft cascade wrong  | happy path works but no-pending / dry-run / gate edges drift | cascade + transition + write-gate all correct per spec, edges handled        |
+| Test coverage           | ×2     | no advance tests                           | one branch only                                              | all four draft branches + advance with/without pending + round-trip          |
+| Interface & readability | ×1     | write logic tangled, filesystem in helpers | works but helpers impure                                     | pure `draftOutcome`/`advanceRoadmap`, thin `main()` reusing the core helpers |
+| Assumptions & docs      | ×1     | `Date.now()` in a helper, magic thresholds | some assumptions unstated                                    | date injected, truncation/fallbacks documented, deterministic                |
 
 ## Out of scope
 

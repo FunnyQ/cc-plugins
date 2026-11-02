@@ -1,6 +1,7 @@
 # BACKEND-01: Global log_language config module
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -76,12 +77,12 @@ real `~/.config`. Restore the env var in a `finally`/`afterEach`.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong path or throws on missing file | round-trips but default/edge cases drift | exact path, never throws, English fallback + key-merge correct |
-| Test coverage | ×2 | no tests | only happy round-trip | covers missing/corrupt/blank + merge + XDG override |
-| Interface & readability | ×1 | side-effects tangled, unclear types | usable but unclear | pure read fns, clear `type`s, single resolution point |
-| Assumptions & docs | ×1 | path divergence unexplained | partial note | comment flags the XDG/house-style deviation |
+| Dimension               | Weight | 0–1 (fail)                           | 2–3 (below bar)                          | 4–5 (pass)                                                     |
+| ----------------------- | ------ | ------------------------------------ | ---------------------------------------- | -------------------------------------------------------------- |
+| Correctness             | ×3     | wrong path or throws on missing file | round-trips but default/edge cases drift | exact path, never throws, English fallback + key-merge correct |
+| Test coverage           | ×2     | no tests                             | only happy round-trip                    | covers missing/corrupt/blank + merge + XDG override            |
+| Interface & readability | ×1     | side-effects tangled, unclear types  | usable but unclear                       | pure read fns, clear `type`s, single resolution point          |
+| Assumptions & docs      | ×1     | path divergence unexplained          | partial note                             | comment flags the XDG/house-style deviation                    |
 
 ## Out of scope
 

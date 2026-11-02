@@ -14,7 +14,10 @@ export type PlatformOperation =
   | { op: "cleanup-check"; page: string };
 
 export const runtime: { info: RuntimeInfo | undefined } = { info: undefined };
-export const platformCommand = (root: string) => ["bun", `${root}/hooks/platform-cli.ts`];
+export const platformCommand = (root: string) => [
+  "bun",
+  `${root}/hooks/platform-cli.ts`,
+];
 export const scratchRoot = (info: RuntimeInfo) =>
   info.platform === "win32"
     ? `${info.tmp.replace(/[\\/]$/, "")}/q-lab/runes`
@@ -35,10 +38,15 @@ export const resolveRuntime = (
   if (platform !== "darwin" && platform !== "linux" && platform !== "win32")
     throw new Error(`unsupported platform: ${platform}`);
   const home = env.HOME || (platform === "win32" ? env.USERPROFILE : undefined);
-  if (!home) throw new Error("could not resolve home: HOME (or USERPROFILE on Windows) is empty");
+  if (!home)
+    throw new Error(
+      "could not resolve home: HOME (or USERPROFILE on Windows) is empty",
+    );
   return {
     platform,
-    wsl: platform === "linux" && (!!env.WSL_DISTRO_NAME || /microsoft/i.test(version)),
+    wsl:
+      platform === "linux" &&
+      (!!env.WSL_DISTRO_NAME || /microsoft/i.test(version)),
     home,
     tmp,
     chrome: null,
@@ -50,17 +58,30 @@ export const parseOperation = (input: string): PlatformOperation => {
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new Error("expected an operation object");
   const data = value as Record<string, unknown>;
-  const path = (v: unknown): v is string => typeof v === "string" && v.length > 0 && !v.includes("\0");
+  const path = (v: unknown): v is string =>
+    typeof v === "string" && v.length > 0 && !v.includes("\0");
   const keys = (...names: string[]) =>
-    Object.keys(data).length === names.length && names.every(name => Object.hasOwn(data, name));
+    Object.keys(data).length === names.length &&
+    names.every((name) => Object.hasOwn(data, name));
   if (data.op === "info" && keys("op")) return { op: "info" };
   if (data.op === "mkdir" && keys("op", "directory") && path(data.directory))
     return { op: "mkdir", directory: data.directory };
   if (data.op === "open" && keys("op", "path") && path(data.path))
     return { op: "open", path: data.path };
-  if (data.op === "trash" && keys("op", "paths") && Array.isArray(data.paths) && data.paths.length > 0 && data.paths.every(path))
+  if (
+    data.op === "trash" &&
+    keys("op", "paths") &&
+    Array.isArray(data.paths) &&
+    data.paths.length > 0 &&
+    data.paths.every(path)
+  )
     return { op: "trash", paths: data.paths };
-  if (data.op === "cleanup-check" && keys("op", "page") && path(data.page) && /\.html$/.test(data.page))
+  if (
+    data.op === "cleanup-check" &&
+    keys("op", "page") &&
+    path(data.page) &&
+    /\.html$/.test(data.page)
+  )
     return { op: "cleanup-check", page: data.page };
   throw new Error(`unknown operation or invalid payload: ${String(data.op)}`);
 };

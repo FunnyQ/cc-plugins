@@ -116,14 +116,14 @@ docs/myapp/
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| scripts | 01 | waypoints-cli-core (parse · active · leg-scaffold) | todo | > 4.0 | — |
-| scripts | 02 | waypoints-advance | todo | > 4.0 | scripts/01 |
-| skill | 01 | waypoints-skill-md | todo | > 4.0 | scripts/01, scripts/02 |
-| integration | 01 | flightplan-waypoint-mode | todo | > 4.0 | scripts/01, scripts/02 |
-| integration | 02 | plugin-metadata-bump | todo | > 4.0 | skill/01, integration/01 |
-| integration | 03 | final-review | todo | > 4.0 | scripts/01, scripts/02, skill/01, integration/01, integration/02 |
+| Bucket      | NN  | Title                                              | Status | Pass line | Depends on                                                       |
+| ----------- | --- | -------------------------------------------------- | ------ | --------- | ---------------------------------------------------------------- |
+| scripts     | 01  | waypoints-cli-core (parse · active · leg-scaffold) | todo   | > 4.0     | —                                                                |
+| scripts     | 02  | waypoints-advance                                  | todo   | > 4.0     | scripts/01                                                       |
+| skill       | 01  | waypoints-skill-md                                 | todo   | > 4.0     | scripts/01, scripts/02                                           |
+| integration | 01  | flightplan-waypoint-mode                           | todo   | > 4.0     | scripts/01, scripts/02                                           |
+| integration | 02  | plugin-metadata-bump                               | todo   | > 4.0     | skill/01, integration/01                                         |
+| integration | 03  | final-review                                       | todo   | > 4.0     | scripts/01, scripts/02, skill/01, integration/01, integration/02 |
 
 (Mirrors `tasks/README.md`. The last row is the **final review** task, marked `> **Final review**: true`; its `Depends on` reaches every other task.)
 

@@ -36,6 +36,7 @@ tasks/
 <!-- Edit this with the first task to pick up, e.g. `ui/01-fixture-shell.md`. -->
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,21 +48,21 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| backends | 01 | Capability gate | todo | > 4 | core/01 |
-| backends | 02 | Codex backend | todo | > 4 | core/01 |
-| backends | 03 | OpenCode backend | todo | > 4 | core/01 |
-| backends | 04 | Claude backend | todo | > 4 | core/01 |
-| backends | 05 | Relay entry point | todo | > 4 | backends/01, backends/02, backends/03, backends/04, core/03 |
-| core | 01 | Types and shared utilities | todo | > 4 | — |
-| core | 02 | Context collector | todo | > 4 | — |
-| core | 03 | Relay prompt builder | todo | > 4 | core/01, core/02 |
-| package | 01 | SKILL.md and references | todo | > 4 | backends/05 |
-| package | 02 | Manifests and marketplace registration | todo | > 4 | backends/05 |
-| package | 03 | Changelog and repo docs | todo | > 4 | package/02 |
-| package | 04 | Backend alias commands | todo | > 4 | package/01 |
-| package | 99 | Final review | todo | > 4 | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05, package/01, package/02, package/03, package/04 |
+| Bucket   | NN  | Title                                  | Status | Pass line | Depends on                                                                                                                                 |
+| -------- | --- | -------------------------------------- | ------ | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| backends | 01  | Capability gate                        | todo   | > 4       | core/01                                                                                                                                    |
+| backends | 02  | Codex backend                          | todo   | > 4       | core/01                                                                                                                                    |
+| backends | 03  | OpenCode backend                       | todo   | > 4       | core/01                                                                                                                                    |
+| backends | 04  | Claude backend                         | todo   | > 4       | core/01                                                                                                                                    |
+| backends | 05  | Relay entry point                      | todo   | > 4       | backends/01, backends/02, backends/03, backends/04, core/03                                                                                |
+| core     | 01  | Types and shared utilities             | todo   | > 4       | —                                                                                                                                          |
+| core     | 02  | Context collector                      | todo   | > 4       | —                                                                                                                                          |
+| core     | 03  | Relay prompt builder                   | todo   | > 4       | core/01, core/02                                                                                                                           |
+| package  | 01  | SKILL.md and references                | todo   | > 4       | backends/05                                                                                                                                |
+| package  | 02  | Manifests and marketplace registration | todo   | > 4       | backends/05                                                                                                                                |
+| package  | 03  | Changelog and repo docs                | todo   | > 4       | package/02                                                                                                                                 |
+| package  | 04  | Backend alias commands                 | todo   | > 4       | package/01                                                                                                                                 |
+| package  | 99  | Final review                           | todo   | > 4       | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05, package/01, package/02, package/03, package/04 |
 
 ## Dependency graph
 
@@ -87,16 +88,17 @@ core/02
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| backends/02 | core/01 |
-| backends/01 | core/01 |
-| backends/03 | core/01 |
-| backends/05 | core/03 |
-| backends/04 | core/01 |
-| package/02 | backends/05 |
-| package/01 | backends/05 |
-| package/99 | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05 |
+| Task        | Depends on                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| backends/02 | core/01                                                                                    |
+| backends/01 | core/01                                                                                    |
+| backends/03 | core/01                                                                                    |
+| backends/05 | core/03                                                                                    |
+| backends/04 | core/01                                                                                    |
+| package/02  | backends/05                                                                                |
+| package/01  | backends/05                                                                                |
+| package/99  | core/01, core/02, core/03, backends/01, backends/02, backends/03, backends/04, backends/05 |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

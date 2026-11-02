@@ -1,6 +1,7 @@
 # DECK-02: Derive node state from the event trail
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -44,7 +45,8 @@ if (validity.kind === "invalid") state = "invalid";
 else if (task.status === "done") state = "done";
 else if (task.status === "blocked") state = "blocked";
 else if (task.status === "in-progress") state = "in-progress";
-else if (task.status === "todo" && hasOpenStart(aggregate)) state = "in-progress";
+else if (task.status === "todo" && hasOpenStart(aggregate))
+  state = "in-progress";
 else if (task.status === "todo" && blockedBy.length === 0) state = "ready";
 else state = "blocked";
 ```
@@ -72,12 +74,12 @@ by position in the trail**, which is write order — not by timestamp. Two agent
 finishing in the same second produce equal `ts` values, so a timestamp sort has
 no defined winner while trail order always does.
 
-| Latest state entry | → `status` | → `validity` |
-|---|---|---|
-| `done` | `"done"` | `{kind: "complete"}` |
-| `blocked` | `"blocked"` | `{kind: "unfinished", status: "blocked"}` |
-| `failed` | left as loaded | `{kind: "invalid", rule: "failed", reason: <entry message>}` |
-| none | left as loaded | left as loaded |
+| Latest state entry | → `status`     | → `validity`                                                 |
+| ------------------ | -------------- | ------------------------------------------------------------ |
+| `done`             | `"done"`       | `{kind: "complete"}`                                         |
+| `blocked`          | `"blocked"`    | `{kind: "unfinished", status: "blocked"}`                    |
+| `failed`           | left as loaded | `{kind: "invalid", rule: "failed", reason: <entry message>}` |
+| none               | left as loaded | left as loaded                                               |
 
 For `failed`, the entry's `message` is the reason. When it is absent, use a
 stated fallback — `"agent reported failure with no message"` — rather than an
@@ -87,7 +89,7 @@ reads as a rendering bug.
 Two cases produce an error instead of a mapping:
 
 - **An unknown state value.** The node reads `invalid`
-  (`{kind: "invalid", rule: "unknown-state", reason: ...}`) *and* an error is
+  (`{kind: "invalid", rule: "unknown-state", reason: ...}`) _and_ an error is
   reported. Both, not one: a value nobody recognises must not quietly leave the
   node looking ready.
 - **An entry of any kind whose `task` names no node in the graph.** An error is
@@ -100,7 +102,7 @@ Two cases produce an error instead of a mapping:
   run in which nothing ever happened. So the membership check runs over every
   parsed entry, once, before the mapping — one error per distinct unknown ref,
   not one per entry, or a chatty agent drowns the panel's error list. The state
-  *mapping* still concerns state entries alone; only the check is broad.
+  _mapping_ still concerns state entries alone; only the check is broad.
 
   That last point looks like a hole in the completeness guarantee and is not.
   If every declared node is `done` and one event names a node nobody declared,
@@ -117,15 +119,15 @@ Two cases produce an error instead of a mapping:
 This table is the whole argument for why a mapping is sufficient. The last three
 rows are handled by the ladder with no help from this task at all.
 
-| Situation | `status` | `validity` | Ladder result |
-|---|---|---|---|
-| `done` declared | `"done"` | complete | `done` |
-| `blocked` declared | `"blocked"` | unfinished | `blocked` |
-| `failed` declared | `"todo"` | invalid | `invalid` |
-| unknown state value | `"todo"` | invalid | `invalid` |
-| no entry, unclosed `start` note | `"todo"` | unfinished | `in-progress` |
-| no entry, a dependency not complete | `"todo"` | unfinished | `blocked` |
-| no entry, nothing unmet | `"todo"` | unfinished | `ready` |
+| Situation                           | `status`    | `validity` | Ladder result |
+| ----------------------------------- | ----------- | ---------- | ------------- |
+| `done` declared                     | `"done"`    | complete   | `done`        |
+| `blocked` declared                  | `"blocked"` | unfinished | `blocked`     |
+| `failed` declared                   | `"todo"`    | invalid    | `invalid`     |
+| unknown state value                 | `"todo"`    | invalid    | `invalid`     |
+| no entry, unclosed `start` note     | `"todo"`    | unfinished | `in-progress` |
+| no entry, a dependency not complete | `"todo"`    | unfinished | `blocked`     |
+| no entry, nothing unmet             | `"todo"`    | unfinished | `ready`       |
 
 ### Trap: `null` is not `"todo"`
 
@@ -229,13 +231,13 @@ cannot slip through unasserted.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A second state ladder was written, or the mapping produces a state the table does not call for | The three known values map correctly but an error case throws, last-write-wins is timestamp-ordered, or the `null` trap is unhandled | Every row of the mapping table holds, both error cases return data, trail order decides, and the open-start count is clean |
-| Backward compatibility | ×2 | The shared state ladder's behaviour changed, or the autopilot suite fails | The ladder was widened without proving the task-file path's output is identical | The ladder is untouched in behaviour, the autopilot suite passes unchanged, and the task-file path produces identical output |
-| Test coverage | ×2 | No test, or tests that pass with the mapping deleted | Happy path only — the three known values, no error cases, no equal-`ts` case | Every listed case covered, including the two asserted through the derived view rather than the mapping's output |
-| Interface & readability | ×1 | Impure, mutates its input, or smuggles I/O into a pure function | Works but the mapping is buried in a loop with no comment saying why it is a mapping and not a ladder | One pure function, clear types, and a comment recording the `null` decision |
-| Assumptions & docs | ×1 | The `null` decision is unrecorded, or the `failed` fallback string is an unexplained literal | The decision is made but the reason is not written down | Both traps are recorded in one line each, at the code that depends on them |
+| Dimension               | Weight | 0–1 (fail)                                                                                     | 2–3 (below bar)                                                                                                                      | 4–5 (pass)                                                                                                                   |
+| ----------------------- | ------ | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A second state ladder was written, or the mapping produces a state the table does not call for | The three known values map correctly but an error case throws, last-write-wins is timestamp-ordered, or the `null` trap is unhandled | Every row of the mapping table holds, both error cases return data, trail order decides, and the open-start count is clean   |
+| Backward compatibility  | ×2     | The shared state ladder's behaviour changed, or the autopilot suite fails                      | The ladder was widened without proving the task-file path's output is identical                                                      | The ladder is untouched in behaviour, the autopilot suite passes unchanged, and the task-file path produces identical output |
+| Test coverage           | ×2     | No test, or tests that pass with the mapping deleted                                           | Happy path only — the three known values, no error cases, no equal-`ts` case                                                         | Every listed case covered, including the two asserted through the derived view rather than the mapping's output              |
+| Interface & readability | ×1     | Impure, mutates its input, or smuggles I/O into a pure function                                | Works but the mapping is buried in a loop with no comment saying why it is a mapping and not a ladder                                | One pure function, clear types, and a comment recording the `null` decision                                                  |
+| Assumptions & docs      | ×1     | The `null` decision is unrecorded, or the `failed` fallback string is an unexplained literal   | The decision is made but the reason is not written down                                                                              | Both traps are recorded in one line each, at the code that depends on them                                                   |
 
 ## Out of scope
 

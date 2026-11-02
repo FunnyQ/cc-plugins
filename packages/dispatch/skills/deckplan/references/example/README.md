@@ -45,21 +45,21 @@ Use a new directory for this walkthrough so copying the fixture cannot overwrite
 
 4. Check the five panels below. Switch between the lanes and dependency graph views; expand a task or fleet row to inspect details.
 
-   | Panel | Check | Regression symptom |
-   | --- | --- | --- |
-   | Lanes panel | Read lanes as `scout`, `build`, `audit`; find both scout nodes, both build nodes, and the audit node under their respective lanes. | Lanes are alphabetised as `audit`, `build`, `scout`, or nodes appear under the wrong lane. |
-   | Dependency graph | Find the crossover from `scout/01` to `build/01` and the edge from `build/01` to `build/02`. | The cross-lane edge is missing. |
-   | State of each node | Match every node to the state table below. | A node's displayed state contradicts its trail, such as the recovered scout remaining invalid. |
-   | Fleet table | Find five agent rows: scout dev attempts 1 and 2, scout judge attempt 2, build dev attempt 1, and audit dev attempt 1. Inspect the judge's passing 4.5 score, threshold marker at 4 on the five-point scale (`>= 4` in the trail), and accuracy 5 / coverage 4 breakdown. | The retry row is missing, or the score verdict is absent. |
-   | Counts in the header | Find total 5, done 1, in progress 1, ready 1, blocked 1, invalid 1. | Invalid is omitted or the run is presented as complete. |
+   | Panel                | Check                                                                                                                                                                                                                                                                     | Regression symptom                                                                             |
+   | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+   | Lanes panel          | Read lanes as `scout`, `build`, `audit`; find both scout nodes, both build nodes, and the audit node under their respective lanes.                                                                                                                                        | Lanes are alphabetised as `audit`, `build`, `scout`, or nodes appear under the wrong lane.     |
+   | Dependency graph     | Find the crossover from `scout/01` to `build/01` and the edge from `build/01` to `build/02`.                                                                                                                                                                              | The cross-lane edge is missing.                                                                |
+   | State of each node   | Match every node to the state table below.                                                                                                                                                                                                                                | A node's displayed state contradicts its trail, such as the recovered scout remaining invalid. |
+   | Fleet table          | Find five agent rows: scout dev attempts 1 and 2, scout judge attempt 2, build dev attempt 1, and audit dev attempt 1. Inspect the judge's passing 4.5 score, threshold marker at 4 on the five-point scale (`>= 4` in the trail), and accuracy 5 / coverage 4 breakdown. | The retry row is missing, or the score verdict is absent.                                      |
+   | Counts in the header | Find total 5, done 1, in progress 1, ready 1, blocked 1, invalid 1.                                                                                                                                                                                                       | Invalid is omitted or the run is presented as complete.                                        |
 
-   | Node | Displayed state | Evidence |
-   | --- | --- | --- |
-   | `scout/01` Inventory repository | Complete (`done`) | A later `done` declaration supersedes the first attempt's `failed` declaration. |
-   | `scout/02` Survey documentation | Ready | No entries and no dependencies. |
-   | `build/01` Draft repository guide | In flight (`in-progress`) | Opening note with no closing note; upstream scout is complete. |
-   | `build/02` Review repository guide | Blocked | Its prerequisite `build/01` is incomplete; no blocked state is declared. |
-   | `audit/01` Check license evidence | Invalid | Explicit `failed` declaration with a reason, followed by an agent end note. |
+   | Node                               | Displayed state           | Evidence                                                                        |
+   | ---------------------------------- | ------------------------- | ------------------------------------------------------------------------------- |
+   | `scout/01` Inventory repository    | Complete (`done`)         | A later `done` declaration supersedes the first attempt's `failed` declaration. |
+   | `scout/02` Survey documentation    | Ready                     | No entries and no dependencies.                                                 |
+   | `build/01` Draft repository guide  | In flight (`in-progress`) | Opening note with no closing note; upstream scout is complete.                  |
+   | `build/02` Review repository guide | Blocked                   | Its prerequisite `build/01` is incomplete; no blocked state is declared.        |
+   | `audit/01` Check license evidence  | Invalid                   | Explicit `failed` declaration with a reason, followed by an agent end note.     |
 
    Expect no historical token spend from this fabricated identifier and trail: the fixture ships no transcripts.
 
@@ -90,11 +90,11 @@ Stop the foreground server with Ctrl-C when finished inspecting the fixture, or 
 
 7. Replace the script's three absolute configuration paths:
 
-   | Field | Substitute |
-   | --- | --- |
-   | `CFG.runDir` | The run directory under your data directory, containing the identifier and `.flightlog/run.jsonl`. |
+   | Field           | Substitute                                                                                                 |
+   | --------------- | ---------------------------------------------------------------------------------------------------------- |
+   | `CFG.runDir`    | The run directory under your data directory, containing the identifier and `.flightlog/run.jsonl`.         |
    | `CFG.flightlog` | The installed flightplan skill's `scripts/flightlog.ts`, which may live in a separate plugin installation. |
-   | `CFG.repoRoot` | The repository the agents inspect; use the exact value in the copied graph's `repoRoot`. |
+   | `CFG.repoRoot`  | The repository the agents inspect; use the exact value in the copied graph's `repoRoot`.                   |
 
    Resolve `~` and shell variables before inserting these literals.
    Adapt the five work descriptions — the second argument of each `node(...)` call — to your repository. The prompt around them is built once by `node`, so the announce command, the state command, the end note, and the label always name the same node; change the ref in one place only.

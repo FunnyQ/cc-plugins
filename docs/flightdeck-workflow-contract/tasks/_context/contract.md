@@ -66,9 +66,9 @@ Written once by the author, before the run. Never edited by an agent.
       "blocks": ["verify/01"],
 
       // Optional, default false. Exactly one node may set it.
-      "finalReview": false
-    }
-  ]
+      "finalReview": false,
+    },
+  ],
 }
 ```
 
@@ -119,9 +119,9 @@ autopilot uses. Two kinds exist today:
 ```ts
 export type ScoreEntry = {
   kind: "score";
-  ts: string;                 // ISO timestamp
-  task: string;                // node ref, e.g. "build/01"
-  attempt: number;              // 1-based
+  ts: string; // ISO timestamp
+  task: string; // node ref, e.g. "build/01"
+  attempt: number; // 1-based
   agentLabel?: string;
   weighted: number;
   passed: boolean;
@@ -137,10 +137,10 @@ export type NoteEntry = {
   kind: "note";
   ts: string;
   task: string;
-  role: string;                 // free-form: dev / verify / judge / …
+  role: string; // free-form: dev / verify / judge / …
   attempt?: number;
   agentLabel?: string;
-  phase?: "start" | "end";      // absent means "end", for back-compat
+  phase?: "start" | "end"; // absent means "end", for back-compat
   message: string;
 };
 ```
@@ -270,11 +270,11 @@ Detection runs once, when the directory is first read. Everything downstream
 reads this field and never re-derives it from a file's presence. Three
 behaviours depend on it, and each is wrong under the other source:
 
-| | `"tasks"` | `"graph"` |
-|---|---|---|
-| Bucket list | sorted; directory order is meaningless | declared order, verbatim |
-| Empty lane | not drawn as a road | drawn as a road |
-| Run-id membership check | never applies | applies; a missing `run.id` attributes nothing |
+|                         | `"tasks"`                              | `"graph"`                                      |
+| ----------------------- | -------------------------------------- | ---------------------------------------------- |
+| Bucket list             | sorted; directory order is meaningless | declared order, verbatim                       |
+| Empty lane              | not drawn as a road                    | drawn as a road                                |
+| Run-id membership check | never applies                          | applies; a missing `run.id` attributes nothing |
 
 The empty-lane row is the one that looks harmless and is not. A task tree can
 hold a bucket directory with no task files in it, so feeding its bucket list to
@@ -296,10 +296,10 @@ export type NodeValidity =
 
 export type GraphNode = {
   ref: string;
-  bucket: string;              // the lane
-  nn: string;                   // zero-padded, kept as a string
+  bucket: string; // the lane
+  nn: string; // zero-padded, kept as a string
   title: string;
-  status: string | null;         // raw declared status; null when none
+  status: string | null; // raw declared status; null when none
   dependsOn: string[];
   blocks: string[];
   finalReview: boolean;
@@ -361,7 +361,7 @@ workflow that ignores these conventions still renders — its token figures just
 read `N/A`. Three facts, all in
 `packages/dispatch/skills/autopilot/scripts/usage-source.ts`:
 
-1. **Membership.** `decideMembership` reads an agent transcript's *first*
+1. **Membership.** `decideMembership` reads an agent transcript's _first_
    message and requires it to contain the run directory's absolute path,
    matched at segment boundaries. Every prompt must therefore mention
    `~/.local/share/q-lab/flightdeck/<slug>` — which it does for free, because

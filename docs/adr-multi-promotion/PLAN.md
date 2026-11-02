@@ -123,12 +123,12 @@ main agent (owns both gates, pre-allocates ADR numbers)
 
 Four contract edges change shape:
 
-| Edge | Before | After |
-| --- | --- | --- |
-| Gate-1 response | `dispositions[]`, free-text `notes` | `dispositions[]` with optional `group` |
-| Main agent → `draft` | `candidateIds` | `groups[]` with `groupId`, `entryIds`, `adrNumber` |
-| Codifier → gate 2 | `{ draftText, proposedPath }` | `drafts[]` |
-| Gate 2 → `commit` | `newAdr` | `newAdrs[]` |
+| Edge                 | Before                              | After                                              |
+| -------------------- | ----------------------------------- | -------------------------------------------------- |
+| Gate-1 response      | `dispositions[]`, free-text `notes` | `dispositions[]` with optional `group`             |
+| Main agent → `draft` | `candidateIds`                      | `groups[]` with `groupId`, `entryIds`, `adrNumber` |
+| Codifier → gate 2    | `{ draftText, proposedPath }`       | `drafts[]`                                         |
+| Gate 2 → `commit`    | `newAdr`                            | `newAdrs[]`                                        |
 
 ## Bucketing
 
@@ -149,17 +149,17 @@ Four contract edges change shape:
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| contract | 01 | gate-protocols | todo | > 4.0 | — |
-| contract | 02 | batch-mechanics | todo | > 4.0 | contract/01 |
-| agents | 01 | codifier-drafts-n-records | todo | > 4.0 | — |
-| agents | 02 | lorekeeper-batch-phases | todo | > 4.0 | — |
-| agents | 03 | barrowkeeper-batch-write | todo | > 4.0 | — |
-| codex | 01 | codifier-toml-mirror | todo | > 4.0 | agents/01 |
-| codex | 02 | lorekeeper-toml-mirror | todo | > 4.0 | agents/02 |
-| codex | 03 | barrowkeeper-toml-mirror | todo | > 4.0 | agents/03 |
-| review | 01 | final review 🏁 | todo | > 4.0 | contract/02, codex/01, codex/02, codex/03 |
+| Bucket   | NN  | Title                     | Status | Pass line | Depends on                                |
+| -------- | --- | ------------------------- | ------ | --------- | ----------------------------------------- |
+| contract | 01  | gate-protocols            | todo   | > 4.0     | —                                         |
+| contract | 02  | batch-mechanics           | todo   | > 4.0     | contract/01                               |
+| agents   | 01  | codifier-drafts-n-records | todo   | > 4.0     | —                                         |
+| agents   | 02  | lorekeeper-batch-phases   | todo   | > 4.0     | —                                         |
+| agents   | 03  | barrowkeeper-batch-write  | todo   | > 4.0     | —                                         |
+| codex    | 01  | codifier-toml-mirror      | todo   | > 4.0     | agents/01                                 |
+| codex    | 02  | lorekeeper-toml-mirror    | todo   | > 4.0     | agents/02                                 |
+| codex    | 03  | barrowkeeper-toml-mirror  | todo   | > 4.0     | agents/03                                 |
+| review   | 01  | final review 🏁           | todo   | > 4.0     | contract/02, codex/01, codex/02, codex/03 |
 
 (Mirrors the table in `tasks/README.md` — keep them in sync. The last row is the **final
 review** task, marked `> **Final review**: true` in its file; its `Depends on` reaches

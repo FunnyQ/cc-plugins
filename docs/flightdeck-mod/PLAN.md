@@ -101,13 +101,13 @@ packages/dispatch/
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| data | 01 | deck-snapshot CLI | todo | > 4.0 | — |
-| mod | 01 | pane layout rows | todo | > 4.0 | data/01 |
-| mod | 02 | flightdeck pane mod | todo | > 4.0 | data/01, mod/01 |
-| mod | 03 | docs for the pane | todo | > 4.0 | mod/02 |
-| review | 01 | final review 🏁 | todo | > 4.0 | data/01, mod/01, mod/02, mod/03 |
+| Bucket | NN  | Title               | Status | Pass line | Depends on                      |
+| ------ | --- | ------------------- | ------ | --------- | ------------------------------- |
+| data   | 01  | deck-snapshot CLI   | todo   | > 4.0     | —                               |
+| mod    | 01  | pane layout rows    | todo   | > 4.0     | data/01                         |
+| mod    | 02  | flightdeck pane mod | todo   | > 4.0     | data/01, mod/01                 |
+| mod    | 03  | docs for the pane   | todo   | > 4.0     | mod/02                          |
+| review | 01  | final review 🏁     | todo   | > 4.0     | data/01, mod/01, mod/02, mod/03 |
 
 Run options: review engine Codex, depth Standard.
 

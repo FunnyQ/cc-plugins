@@ -1,6 +1,7 @@
 # CODEX-02: Lorekeeper TOML mirror
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -215,12 +216,12 @@ been rewritten instead of compressed.
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted
 > average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the Markdown source, or the draft return literal still shows the singular `draftText`/`proposedPath` pair | Field names match but the `newAdr` refusal is missing, or the collect-phase `adrIndex` was deleted along with the draft-phase one | `groups`, `newAdrs`, and `drafts` match the source character for character, the refusal names `newAdr` and its reason, and the collect-phase `adrIndex` survives |
-| Completeness | ×2 | An edit was skipped, so one paragraph still describes a single-record commit | All four edits landed but a preserved rule was dropped, for example a selector name or the no-promotion reason | All four edits landed and every preserved rule, refusal, and selector name is still present |
-| Readability | ×1 | The brief was reorganized into headed sections or bullet lists, so a reader diffing the two files sees a rewrite | Dense prose kept, but the paragraph order shifted or the word budget was exceeded | Dense prose in the original voice, 6 paragraphs in the original order, inside the 382-word ceiling |
-| Assumptions and docs | ×1 | The mirror states a rule the contract does not define, for example a rollback or a renumbering step | The refusal or the batch cap is stated with no reason, so a later editor cannot tell it is load-bearing | Every new rule carries the failure it prevents, and nothing beyond the frozen contract was invented |
+| Dimension            | Weight | 0–1 (fail)                                                                                                                          | 2–3 (below bar)                                                                                                                   | 4–5 (pass)                                                                                                                                                       |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name differs from the Markdown source, or the draft return literal still shows the singular `draftText`/`proposedPath` pair | Field names match but the `newAdr` refusal is missing, or the collect-phase `adrIndex` was deleted along with the draft-phase one | `groups`, `newAdrs`, and `drafts` match the source character for character, the refusal names `newAdr` and its reason, and the collect-phase `adrIndex` survives |
+| Completeness         | ×2     | An edit was skipped, so one paragraph still describes a single-record commit                                                        | All four edits landed but a preserved rule was dropped, for example a selector name or the no-promotion reason                    | All four edits landed and every preserved rule, refusal, and selector name is still present                                                                      |
+| Readability          | ×1     | The brief was reorganized into headed sections or bullet lists, so a reader diffing the two files sees a rewrite                    | Dense prose kept, but the paragraph order shifted or the word budget was exceeded                                                 | Dense prose in the original voice, 6 paragraphs in the original order, inside the 382-word ceiling                                                               |
+| Assumptions and docs | ×1     | The mirror states a rule the contract does not define, for example a rollback or a renumbering step                                 | The refusal or the batch cap is stated with no reason, so a later editor cannot tell it is load-bearing                           | Every new rule carries the failure it prevents, and nothing beyond the frozen contract was invented                                                              |
 
 ## Out of scope
 

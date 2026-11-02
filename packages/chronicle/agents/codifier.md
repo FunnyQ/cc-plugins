@@ -69,6 +69,7 @@ the command runs against `/`.
 
    Partition the returned records back to their groups by entry ID. A record belongs to
    the group whose `entryIds` holds its ID.
+
 3. Read the supplied template at `templatePath` once. The template does not change
    between groups.
 4. Draft the complete record for each group against that template. A multi-member group

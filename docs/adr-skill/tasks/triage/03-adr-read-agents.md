@@ -1,6 +1,7 @@
 # TRIAGE-03: Write the orchestrator and the two read-only agents
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -25,11 +26,11 @@ Match the frontmatter shape the existing chronicle agents already use: `name`, `
 
 ### Frontmatter values
 
-| Agent | model | effort | tools | Role |
-|---|---|---|---|---|
-| `lorekeeper` | sonnet | medium | `["Agent", "Read"]` | Runs one phase per invocation, spawning that phase's children and keeping their output inside its own subtree. Owns no confirmation gate. |
-| `gleaner` | haiku | low | `["Bash", "Read"]` | Runs the trail collector and the record index reader; returns the payload path, counts, and the index. Read-only. |
-| `reckoner` | sonnet | high | `["Bash", "Read"]` | Clusters the skeleton payload by decision, pulls bodies for the shortlist only, dispositions, and produces the archive plan. Writes nothing to the trail. |
+| Agent        | model  | effort | tools               | Role                                                                                                                                                      |
+| ------------ | ------ | ------ | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lorekeeper` | sonnet | medium | `["Agent", "Read"]` | Runs one phase per invocation, spawning that phase's children and keeping their output inside its own subtree. Owns no confirmation gate.                 |
+| `gleaner`    | haiku  | low    | `["Bash", "Read"]`  | Runs the trail collector and the record index reader; returns the payload path, counts, and the index. Read-only.                                         |
+| `reckoner`   | sonnet | high   | `["Bash", "Read"]`  | Clusters the skeleton payload by decision, pulls bodies for the shortlist only, dispositions, and produces the archive plan. Writes nothing to the trail. |
 
 The `description` field follows the house pattern: what the agent does, then who spawns it, then what it refuses. For example, `"Chronicle's ADR gleaner. Runs the trail collector and returns the skeleton payload path plus counts. Spawned by chronicle:lorekeeper — read-only, never opens entry bodies."`
 
@@ -75,11 +76,11 @@ After the frontmatter:
 
 A subagent invocation ends the moment it returns. So "spawn the children in order" and "return to the main agent between phases so the gate can happen there" cannot both describe one invocation — the first return would end the run, and the flow would stop dead after the first gate. Write it as **three separate invocations**, each self-contained, with the state passed back in explicitly:
 
-| Phase | lorekeeper spawns | Returns to the main agent |
-|---|---|---|
+| Phase     | lorekeeper spawns          | Returns to the main agent                                                                               |
+| --------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `collect` | `gleaner`, then `reckoner` | the candidate list, the conflicts, the `assignments` array, and the path to the serialized archive plan |
-| `draft` | the drafting agent | the draft text and the proposed target path |
-| `commit` | the writing agent | what was written, what was archived, and what was refused |
+| `draft`   | the drafting agent         | the draft text and the proposed target path                                                             |
+| `commit`  | the writing agent          | what was written, what was archived, and what was refused                                               |
 
 Gate 1 sits between `collect` and `draft`; gate 2 between `draft` and `commit`. The main agent holds both, and it holds the state across them — lorekeeper carries nothing between invocations and must not assume it did.
 
@@ -98,16 +99,27 @@ The index belongs here rather than in the judging agent, and the reason is the p
 Return shape:
 
 ```json
-{ "hasTrail": true, "payloadPath": "/tmp/...", "sessionCount": 63, "skeletonCount": 352,
-  "adrIndex": { "dir": "...", "exists": true, "adrs": [], "nextNumber": 1,
-                "brokenLinks": [], "skipped": [] } }
+{
+  "hasTrail": true,
+  "payloadPath": "/tmp/...",
+  "sessionCount": 63,
+  "skeletonCount": 352,
+  "adrIndex": {
+    "dir": "...",
+    "exists": true,
+    "adrs": [],
+    "nextNumber": 1,
+    "brokenLinks": [],
+    "skipped": []
+  }
+}
 ```
 
 ### reckoner
 
 Receives the payload path plus the ADR index. Clusters **by decision, not by session**: one decision discussed across four sessions is one candidate, not four. Applies the promotion threshold in full.
 
-Its work runs in **two phases, and the split is load-bearing.** Skeletons carry `id`, `sessionId`, `kind`, `decision`, `timestamp`, and `files` — enough to see that several entries are about the same decision, and nothing more. But one of the two mandatory threshold signals is *"the rejected alternatives and tradeoffs are not recoverable from the code alone"*, and those live in the `reason` and `tradeoff` fields the collector deliberately strips. Judging the threshold from skeletons alone would mean guessing at exactly the evidence the threshold asks about. The same goes for spotting genuinely conflicting entries: two titles can look compatible and argue opposite conclusions.
+Its work runs in **two phases, and the split is load-bearing.** Skeletons carry `id`, `sessionId`, `kind`, `decision`, `timestamp`, and `files` — enough to see that several entries are about the same decision, and nothing more. But one of the two mandatory threshold signals is _"the rejected alternatives and tradeoffs are not recoverable from the code alone"_, and those live in the `reason` and `tradeoff` fields the collector deliberately strips. Judging the threshold from skeletons alone would mean guessing at exactly the evidence the threshold asks about. The same goes for spotting genuinely conflicting entries: two titles can look compatible and argue opposite conclusions.
 
 So: cluster from skeletons, shortlist the clusters that plausibly clear the bar, then run the trail collector's body fetch for **those candidate ids only**, and disposition against the full text. This is what two-pass loading was for — it bounds the bodies loaded to the shortlist rather than to all 352 entries, which is a different thing from never loading any. State the bound in the agent file: if the shortlist is large enough that its bodies would not fit, narrow it and say so in the output rather than judging blind.
 
@@ -129,11 +141,19 @@ Return shape:
 ```json
 {
   "candidates": [
-    { "title": "...", "disposition": "promote", "reason": "...",
-      "entryIds": ["..."], "sessionIds": ["..."], "matchesAdr": null }
+    {
+      "title": "...",
+      "disposition": "promote",
+      "reason": "...",
+      "entryIds": ["..."],
+      "sessionIds": ["..."],
+      "matchesAdr": null
+    }
   ],
   "conflicts": [{ "summary": "...", "entryIds": ["...", "..."] }],
-  "assignments": [{ "sessionId": "...", "target": "watch", "from": "inbox", "why": "..." }],
+  "assignments": [
+    { "sessionId": "...", "target": "watch", "from": "inbox", "why": "..." }
+  ],
   "planPath": "/tmp/chronicle/adr/plan-1754438400000-51234.json"
 }
 ```
@@ -142,7 +162,7 @@ Return shape:
 
 Judgment is per candidate; archiving moves whole session files. A single session routinely feeds several candidates, and they will not agree — one entry lands in a `promote` cluster while another lands in a `watch` one. Without a stated rule the target is whatever the agent happened to write last, which is not a design.
 
-The rule: **`watch` wins.** A session goes to the watched bucket if *any* candidate drawn from it is dispositioned `watch`; otherwise it goes to `done`. The asymmetry is deliberate and follows from what each bucket costs when it is wrong. A session wrongly sent to `done` is gone from triage forever, taking its unsettled evidence with it. A session wrongly sent to `watch` costs one extra look the next time matching evidence arrives. Only one of those is recoverable.
+The rule: **`watch` wins.** A session goes to the watched bucket if _any_ candidate drawn from it is dispositioned `watch`; otherwise it goes to `done`. The asymmetry is deliberate and follows from what each bucket costs when it is wrong. A session wrongly sent to `done` is gone from triage forever, taking its unsettled evidence with it. A session wrongly sent to `watch` costs one extra look the next time matching evidence arrives. Only one of those is recoverable.
 
 Three consequences to state in the agent file. A `promote` and a `skip` in the same session both resolve to `done`, so the `why` should name the promoted candidate when there is one. A session that fed no candidate at all still gets a row, targeting `done`, because triaging a session means dispositioning everything in it and entries not promoted are implicitly skipped. And every row carries `from` — `"inbox"` for a fresh session, `"watch"` for one the wake condition pulled back — because a woken session that is now settled has to move out of the watched bucket, and the archiver will not infer that.
 
@@ -150,7 +170,7 @@ Three consequences to state in the agent file. A `promote` and a `skip` in the s
 
 After emitting `assignments`, `reckoner` runs `archive-plan.ts --assignments <its own output>` and returns the resulting plan path alongside the candidates. That script is the planner half of the archive flow; the applier is a different file, and this agent never touches it.
 
-This has to happen *before* the first gate. The archiver refuses `--apply` without an approved plan and refuses to recompute one from raw assignments, so a plan produced after approval would be an object no human ever saw. Planning touches nothing under `.cockpit/` — it stats files and writes JSON to a temp path — so it stays inside reckoner's read-only remit.
+This has to happen _before_ the first gate. The archiver refuses `--apply` without an approved plan and refuses to recompute one from raw assignments, so a plan produced after approval would be an object no human ever saw. Planning touches nothing under `.cockpit/` — it stats files and writes JSON to a temp path — so it stays inside reckoner's read-only remit.
 
 The plan path then travels through both gates **unchanged**. The main agent holds it; the writing agent receives that exact path. Regenerating it at commit time would defeat the approval, and the archiver's re-stat at apply time is what covers the staleness the delay introduces.
 
@@ -182,12 +202,12 @@ The plan path then travels through both gates **unchanged**. The main agent hold
 
 This task ships no unit tests, so read "Test coverage" as **instruction coverage**: does each file state its failure and refusal behaviour, not just its happy path?
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4 (pass) | 5 |
-|---|---|---|---|---|---|
-| Correctness | ×3 | A scoped `Agent(...)` tools entry, a `Write` on any of these three, a gate written into an agent file, or an orchestrator that runs all phases in one invocation. | The topology is right but a contract is vague — the phase carry-over is unstated, or the plan is produced after the gate. | Frontmatter matches the table; three phases with explicit carry-over; the threshold and the folding rule reproduced exactly; the plan produced before the gate. | Also anticipates a failure the spec did not name — an empty shortlist, a payload larger than the shortlist bound. |
-| Test coverage | ×2 | No refusals stated anywhere. | Refusals stated for one agent, implied for the others. | Every agent states what it may run, what it refuses, and what it does when its input is missing. | The refusals read as decidable checks rather than as advice. |
-| Interface & readability | ×1 | Return shapes absent or inconsistent between files. | Shapes present but fields drift between the emitter and the consumer. | Each file carries an `## Output` JSON block, and the fields line up across the chain. | A reader can trace one field end to end without opening a script. |
-| Assumptions & docs | ×1 | The scoped-tools trap and the gate placement are unexplained, so a later editor undoes them. | Noted but not justified. | Both carry the reason they exist, in one sentence each. | The reasons are specific enough to survive a rewrite by someone who disagrees. |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                                        | 2–3 (below bar)                                                                                                           | 4 (pass)                                                                                                                                                        | 5                                                                                                                 |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A scoped `Agent(...)` tools entry, a `Write` on any of these three, a gate written into an agent file, or an orchestrator that runs all phases in one invocation. | The topology is right but a contract is vague — the phase carry-over is unstated, or the plan is produced after the gate. | Frontmatter matches the table; three phases with explicit carry-over; the threshold and the folding rule reproduced exactly; the plan produced before the gate. | Also anticipates a failure the spec did not name — an empty shortlist, a payload larger than the shortlist bound. |
+| Test coverage           | ×2     | No refusals stated anywhere.                                                                                                                                      | Refusals stated for one agent, implied for the others.                                                                    | Every agent states what it may run, what it refuses, and what it does when its input is missing.                                                                | The refusals read as decidable checks rather than as advice.                                                      |
+| Interface & readability | ×1     | Return shapes absent or inconsistent between files.                                                                                                               | Shapes present but fields drift between the emitter and the consumer.                                                     | Each file carries an `## Output` JSON block, and the fields line up across the chain.                                                                           | A reader can trace one field end to end without opening a script.                                                 |
+| Assumptions & docs      | ×1     | The scoped-tools trap and the gate placement are unexplained, so a later editor undoes them.                                                                      | Noted but not justified.                                                                                                  | Both carry the reason they exist, in one sentence each.                                                                                                         | The reasons are specific enough to survive a rewrite by someone who disagrees.                                    |
 
 ## Out of scope
 

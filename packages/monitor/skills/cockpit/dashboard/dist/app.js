@@ -525,8 +525,7 @@ export const store = reactive({
       );
       if (!r.ok) return;
       this.answerHere = (await r.json()).answer_here === true;
-    } catch {
-    }
+    } catch {}
   },
 
   async toggleAnswerHere() {

@@ -1,6 +1,7 @@
 # SKILLS-01: cockpit-scribe skill
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/log-schema.md`
 > - `../_context/rubric.md`
@@ -50,10 +51,10 @@ description: >-
 3. **Dedup** — run `bun <cli> scribe --recent` and read the printed list; do not re-log material already covered there.
 4. **Choose lenses and write** — for each genuinely worth-recording insight, pick a `kind`:
    - `decision` — a choice made between real alternatives.
-   - `rationale` — *why* a non-obvious piece of code is the way it is.
+   - `rationale` — _why_ a non-obvious piece of code is the way it is.
    - `learning` — what the pilot should take away (a teachable result/pattern).
    - `caveat` — a trap, precondition, or sharp edge to remember.
-   Then: `bun <cli> scribe --type <kind> --title "<short headline>" --text "<body, markdown>"`.
+     Then: `bun <cli> scribe --type <kind> --title "<short headline>" --text "<body, markdown>"`.
 5. **Consolidate, don't spam** — bias to a few entries per logical chunk, NOT one per file or per step. If nothing meets the bar, write nothing and end.
 6. **Language** — write `--title`/`--text` in the project's `log_language` (read `<project>/.cockpit/project-meta.md`'s `log_language` field; default English, otherwise match the conversation language).
 7. **End quietly** — this is a fire-and-forget fork; the side effect is the written log. No summary needed.
@@ -83,12 +84,12 @@ Entries are for a future reader skimming the decision trail: concrete, terse, no
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto. (Here "Test coverage" = Instruction clarity, per the shared rubric.)
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | wrong CLI surface or missing dedup/diff step | covers writing but flags/kinds drift from contract | every command matches the contract; dedup + diff + language all present |
-| Test coverage (instruction clarity) | ×2 | a fork would get stuck/guess | executable but ambiguous in spots | unambiguous, ordered, fork can run start-to-finish |
-| Interface & readability | ×1 | rambling, no structure | usable but verbose | tight, skimmable, well-sectioned |
-| Assumptions & docs | ×1 | assumes `CLAUDE_PLUGIN_ROOT`, no language note | partial | path-resolution + language + consolidation all flagged |
+| Dimension                           | Weight | 0–1 (fail)                                     | 2–3 (below bar)                                    | 4–5 (pass)                                                              |
+| ----------------------------------- | ------ | ---------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------- |
+| Correctness                         | ×3     | wrong CLI surface or missing dedup/diff step   | covers writing but flags/kinds drift from contract | every command matches the contract; dedup + diff + language all present |
+| Test coverage (instruction clarity) | ×2     | a fork would get stuck/guess                   | executable but ambiguous in spots                  | unambiguous, ordered, fork can run start-to-finish                      |
+| Interface & readability             | ×1     | rambling, no structure                         | usable but verbose                                 | tight, skimmable, well-sectioned                                        |
+| Assumptions & docs                  | ×1     | assumes `CLAUDE_PLUGIN_ROOT`, no language note | partial                                            | path-resolution + language + consolidation all flagged                  |
 
 ## Out of scope
 

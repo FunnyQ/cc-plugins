@@ -1,6 +1,7 @@
 # UI-04: SVG dependency graph
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/hangar.md`
@@ -119,13 +120,13 @@ content of the top section only; the fleet table below is untouched and its stre
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Hangs on a cycle, or nodes move on a state-only change | Lays out correctly but draws only primary-parent edges, or ordering is unstable | Correct layering, all edges drawn, stable ordering, cycle-safe, positions frozen across state changes |
-| Design fidelity | ×2 | Adds a library, or invents colours and shapes | Uses tokens but shapes or edge weight drift from the system | Rectangles within the radius ceiling, state colours matching the lane cards, no vendor addition |
-| Test coverage | ×2 | No checks on the layout function | Ran the app once | Chain, diamond, disconnected, and cycle cases checked, plus the positions-unchanged check |
-| Interface & readability | ×1 | Layout math inlined in the render path | Extracted but impure | `layoutGraph` pure and separately callable, render reads its output |
-| Assumptions & docs | ×1 | The cycle guard is unexplained | Present but unexplained | Comments explain the pass cap and why layout is recomputed only on structural change |
+| Dimension               | Weight | 0–1 (fail)                                             | 2–3 (below bar)                                                                 | 4–5 (pass)                                                                                            |
+| ----------------------- | ------ | ------------------------------------------------------ | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Hangs on a cycle, or nodes move on a state-only change | Lays out correctly but draws only primary-parent edges, or ordering is unstable | Correct layering, all edges drawn, stable ordering, cycle-safe, positions frozen across state changes |
+| Design fidelity         | ×2     | Adds a library, or invents colours and shapes          | Uses tokens but shapes or edge weight drift from the system                     | Rectangles within the radius ceiling, state colours matching the lane cards, no vendor addition       |
+| Test coverage           | ×2     | No checks on the layout function                       | Ran the app once                                                                | Chain, diamond, disconnected, and cycle cases checked, plus the positions-unchanged check             |
+| Interface & readability | ×1     | Layout math inlined in the render path                 | Extracted but impure                                                            | `layoutGraph` pure and separately callable, render reads its output                                   |
+| Assumptions & docs      | ×1     | The cycle guard is unexplained                         | Present but unexplained                                                         | Comments explain the pass cap and why layout is recomputed only on structural change                  |
 
 ## Out of scope
 

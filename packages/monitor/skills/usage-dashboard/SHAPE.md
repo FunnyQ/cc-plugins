@@ -15,11 +15,13 @@ Token Atlas is a cost-ledger dashboard for local Claude Code and Codex usage. Us
 ## Design Direction
 
 ### Light Mode: "Dawn"
+
 A warm, paper-light working surface framed by a bold sunrise wave at the top. The wave is the only high-saturation color; everything below it is restrained (muted neutrals, subtle grid lines, white space). The mood is "unfolding a map at the first light of day—calm, oriented, trustworthy."
 
 Key visual anchors: **Big Sur default wallpaper** (organic curves, violet→magenta→coral→orange→amber→sky), **Linear app** (flat surfaces, generous spacing, single-hue focus groups), **Stripe** (dense tables, semantic color hierarchy).
 
 ### Dark Mode: "Dusk"
+
 The same surface and typography scale, but with a **dusk-blue working surface** (oklch(22% 0.036 270)) and the wave becomes a **dusk-sky gradient** (violet→indigo→magenta, cooler than dawn). The mood is "reviewing the day's work under evening light—introspective, measured."
 
 Text remains white (or very light warm). Charts use the same sunrise spectrum for Claude and a cool dusk palette for Codex, so the same data looks subtly different depending on theme.
@@ -65,18 +67,22 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 ## Key States
 
 ### Loading
+
 - Spinner or skeleton cards until `/api/stats` responds
 - Hero band shows loading placeholder
 
 ### Error
+
 - Large error message, no data rendered
 - Refresh button prominent
 
 ### Empty
+
 - Cards and charts show "No data for this filter"
 - Budget setup guidance if no config exists
 
 ### No selection / filters applied
+
 - Provider filter defaults to "All"
 - Range filter defaults to "Last 7 days"
 - Trend chart shows top 5 models by default
@@ -85,37 +91,44 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 ## Interaction Model
 
 ### Provider & Range filters (hero band)
+
 - Segmented control: All / Claude / Codex (mutually exclusive)
 - Dropdown: 7 days / 30 days / 90 days / All time
 - Clicking either filter re-fetches `/api/stats?provider=...&range=...` and updates all metrics
 
 ### Theme toggle (hero band, right side)
+
 - Button with icon: ☼ (dawn) / ☾ (dusk)
 - First load respects `prefers-color-scheme`
 - User override persists in `localStorage["token-atlas.theme"]`
 - Toggles `[data-theme="dark"]` on `<html>`
 
 ### Refresh (hero band)
+
 - Button disabled while loading or refreshing
 - On click, fetches fresh `/api/stats` snapshot
 - Useful if user suspects stale cache
 
 ### Export (hero band, dropdown menu)
+
 - Options: Current view JSON, Models CSV, Projects CSV
 - Respects current filters (provider, range)
 
 ### Project detail modal
+
 - Clicking a project row (in rank, ledger, or top-3 card) opens a modal
 - Shows project metadata, model breakdown table, trend note (not yet available)
 - Close with button, Escape key, or click outside
 
 ### Trend chart interactivity
+
 - Toggles: All models / Top 5 models
 - Toggles: Tokens / Cost
 - Checkboxes: Individual model visibility
 - Checkbox unchecking persists to `localStorage["token-atlas.selectedModels"]`
 
 ### Tables
+
 - Clickable rows for project detail (no hover highlight; only focus ring)
 - Inline meters (cost share vs highest) with tooltips
 - Responsive: columns stack under breakpoints
@@ -123,12 +136,14 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 ## Content Requirements
 
 ### Hero band
+
 - **Brand name & logo** (Token Atlas, small icon)
 - **Period label** (e.g., "Last 7 days", "2024-11-01 to 2024-11-07")
 - **Cost metric** (large, bold white or near-black: `$1,234.56`)
 - **Delta** (if previous period available: `↑ 12% · vs last 7 days` or `↓ 8% · vs last 30 days`)
 
 ### KPI cards
+
 - **Estimated cost:** total usage-based estimate
 - **Tokens:** total input + output + cache reads/writes + reasoning
 - **Interactions:** Claude messages + Codex threads
@@ -136,6 +151,7 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 - Each card shows delta vs previous period (↑ / ↓, pct + context label)
 
 ### Daily trend chart
+
 - **X-axis:** dates, labels every 7 days or aligned to week start
 - **Y-axis:** tokens or cost (auto-scale)
 - **Legend:** colored dots + model names, check/uncheck to toggle
@@ -144,35 +160,41 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 - **Tooltip:** dark background (chart-tooltip-bg), white text, shows model name + value + date
 
 ### Model distribution donut
+
 - **Center label:** "123 models" or "All time"
 - **Legend:** color swatch + model name + pct + absolute value
 - **Hover:** tooltip shows exact pct
 - **Colors:** sunrise spectrum (coral, amber, gold, violet, magenta), mapped from data
 
 ### Cost table
+
 - **Columns:** Model, Source, Input, Output, Cache read, Cache write, Reasoning, Cost
 - **Inline meter:** cost share vs highest (0–100% fill, same color as model mark)
 - **Badges:** "ext" for external models (OpenRouter, etc.)
 - **Footer:** pricing confidence summary, fallback models if any
 
 ### Monthly budget meter
+
 - **Track:** background (surface-2)
 - **Fill:** ramp from amber → orange → coral → magenta (based on usage %)
 - **Label:** "$X of $Y" + "N% used"
 - **Stats below:** Remaining, Projected, Projected use %
 
 ### Token composition bar
+
 - **Segments:** sky / coral / amber / orange / violet (input / output / cache-read / cache-write / reasoning)
 - **Width:** each segment scaled to % of total tokens
 - **Legend:** below bar, showing label + count + %
 
 ### Activity heatmap
+
 - **Grid:** 7 rows (days of week), 24 columns (hours of day)
 - **Color ramp:** violet (cold) → magenta (warm) → no hotter end (stops before coral)
 - **Labeling:** Hours on top (0, 3, 6, ...), Days on left (Mon, Tue, ...)
 - **Cells:** `title="Monday 14:00 · 1,234 tokens"`, no interaction
 
 ### Activity calendar
+
 - **Layout:** ISO week grid (52–53 columns for full year, Sat–Sun on right)
 - **Color ramp:** coral (few) → orange (moderate) → amber (high) — warm sunset end
 - **Month labels:** Jan, Feb, ... (each above its first week)
@@ -180,6 +202,7 @@ Text remains white (or very light warm). Charts use the same sunrise spectrum fo
 - **Cells:** small squares, `title="2024-11-15 · 5 interactions"`, no interaction
 
 ### Project detail modal
+
 - **Header:** Project name + path (code), close button
 - **Metadata:** First seen, Last seen, Tokens, Cost
 - **Split:** Claude tokens + cost, Codex tokens + cost

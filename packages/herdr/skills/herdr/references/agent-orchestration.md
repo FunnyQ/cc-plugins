@@ -2,7 +2,7 @@
 
 This document is verified against herdr 0.9.3. This skill is the source of truth. If a command here fails against the installed CLI, check `herdr --help` for the current flags.
 
-Use this when Claude is running *inside* a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
+Use this when Claude is running _inside_ a herdr-managed pane and needs to control herdr itself. This includes inspecting sibling panes, splitting panes, spawning other agents, and coordinating with them over the CLI. This is a live-session operational guide. See `cli.md` for the full command and flag syntax.
 
 ## Precondition
 
@@ -13,7 +13,7 @@ Before you do any of this, confirm `HERDR_ENV=1` is set in the environment. If i
 - **Workspaces** are project contexts. Each workspace has one or more tabs. A workspace's label defaults to the first tab's root pane (usually the repo name).
 - **Tabs** are subcontexts inside a workspace. Each tab has one or more panes.
 - **Panes** are terminal splits inside a tab. Each pane runs its own process: a shell, an agent, a server, or a log stream.
-- **Agent status** (`agent_status` field): `idle`, `working`, `blocked`, `done`, `unknown`. `idle` means the agent will accept input *and* its tab has already been seen in the focused UI. `done` is that same ready state after unseen background work finished; focusing the tab, pane, or agent marks it seen, but a CLI read never does. Each TUI client tracks viewed completions independently, so one client's Done badge can differ from another client's and from the CLI. `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present that herdr cannot classify — it never proves completion. Plain shells exist as panes too. The sidebar's agent section only surfaces detected agents.
+- **Agent status** (`agent_status` field): `idle`, `working`, `blocked`, `done`, `unknown`. `idle` means the agent will accept input _and_ its tab has already been seen in the focused UI. `done` is that same ready state after unseen background work finished; focusing the tab, pane, or agent marks it seen, but a CLI read never does. Each TUI client tracks viewed completions independently, so one client's Done badge can differ from another client's and from the CLI. `blocked` means herdr recognized an approval or question UI. `unknown` means an agent is present that herdr cannot classify — it never proves completion. Plain shells exist as panes too. The sidebar's agent section only surfaces detected agents.
 - **IDs are stable opaque handles.** Workspace, tab, and pane ids look like `w1`, `w1:t1`, and `w1:p1`. A pane moved across workspaces receives a new id; continue with `result.move_result.pane.pane_id` or the live agent name. The old id stays at `result.move_result.previous_pane_id`, but it resolves only for the moved process's own inherited context. Do not reuse it as a target.
 - **Agent kinds are a fixed list.** Run `herdr agent` to print the installed kinds before you pass `--kind`. Do not guess a kind from an integration name; `herdr integration install` covers names that `--kind` rejects.
 
@@ -32,6 +32,7 @@ Since 0.9.2, new panes set `TERM_PROGRAM=herdr` and `TERM_PROGRAM_VERSION`, and 
 ## Recipes
 
 **Run a server, and wait until it is ready:**
+
 ```bash
 NEW_PANE=$(herdr pane split --current --direction right --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$NEW_PANE" "npm run dev"
@@ -40,6 +41,7 @@ herdr pane read "$NEW_PANE" --source recent --lines 20
 ```
 
 **Run tests in a separate pane, then inspect the result:**
+
 ```bash
 NEW_PANE=$(herdr pane split --current --direction down --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr pane run "$NEW_PANE" "cargo test"
@@ -48,17 +50,19 @@ herdr pane read "$NEW_PANE" --source recent --lines 30
 ```
 
 **Spawn a new agent, and hand it a task.** First create the destination pane. Then launch a known agent kind in it:
+
 ```bash
 REVIEWER_PANE=$(herdr pane split --current --direction right --cwd "$PWD" --no-focus | python3 -c 'import sys,json; print(json.load(sys.stdin)["result"]["pane"]["pane_id"])')
 herdr agent start reviewer --kind claude --pane "$REVIEWER_PANE"
 herdr agent prompt reviewer "review the test coverage in src/api/" --wait --timeout 120000
 ```
 
-`agent start` returns only after the new pane shell and the agent's first-run prompt are ready. Add no settle wait *after* it. Do add one *before* it: `pane split` returns as soon as the pane exists, and calling `agent start` back-to-back fails with `agent_pane_busy` most of the time — 13 of 20 measured on 0.8.2 with real agents. herdr waits out a pane held by a foreground command, but not one whose shell has yet to spawn. The refusal is immediate (~115ms), and one 150ms retry clears it; a clean start instead takes ~4.4s to reach `idle`. Retry that one error, fail fast on every other, and do not conclude the race is gone because a probe with ~100ms of slack in it never saw one. A start that returns `agent_not_ready` saw `blocked` during startup: the name still works for `agent read` and `agent send-keys`, so read the pane and clear the dialog before you prompt. Append native agent arguments after `--`; omit the separator when there are none.
+`agent start` returns only after the new pane shell and the agent's first-run prompt are ready. Add no settle wait _after_ it. Do add one _before_ it: `pane split` returns as soon as the pane exists, and calling `agent start` back-to-back fails with `agent_pane_busy` most of the time — 13 of 20 measured on 0.8.2 with real agents. herdr waits out a pane held by a foreground command, but not one whose shell has yet to spawn. The refusal is immediate (~115ms), and one 150ms retry clears it; a clean start instead takes ~4.4s to reach `idle`. Retry that one error, fail fast on every other, and do not conclude the race is gone because a probe with ~100ms of slack in it never saw one. A start that returns `agent_not_ready` saw `blocked` during startup: the name still works for `agent read` and `agent send-keys`, so read the pane and clear the dialog before you prompt. Append native agent arguments after `--`; omit the separator when there are none.
 
 `agent prompt --wait` already settles on `idle`, `done`, or `blocked`. Do not restate that set with `--until`. When the agent is not already working, `--wait` first requires observed `working` or `blocked` activity within five seconds; an unrelated `idle`, `done`, or session change does not complete the wait. It returns `agent_prompt_stalled` when no activity appears, and `timeout` when the caller's timeout expires first. The caller timeout includes submission time. Read the agent with `agent get` and `agent read` after either result: neither proves the prompt went undelivered, so do not resubmit blind.
 
 **Coordinate with another agent (block until it is done, then read its output):**
+
 ```bash
 herdr pane list
 OTHER_PANE="<pane_id_from_fresh_list>"
@@ -69,6 +73,7 @@ herdr pane read "$OTHER_PANE" --source recent --lines 100
 Wait on both states. An agent whose tab the user focused settles at `idle`, not `done`, so a `--until done` wait alone hangs until the timeout.
 
 **Watch a sibling pane robustly.** Read what is already there before you wait, so you do not miss output that arrived before the wait started:
+
 ```bash
 herdr pane list
 SIBLING_PANE="<pane_id_from_fresh_list>"

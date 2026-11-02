@@ -101,7 +101,10 @@ describe("owned lifecycle", () => {
       const events: string[] = [];
       await shutdown(root, owned, {
         alive: () => alive,
-        details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
+        details: () => ({
+          command: `firefox -profile ${owned.profile}`,
+          identity: null,
+        }),
         busy: () => false,
         kill: () => {
           events.push("terminate");
@@ -123,7 +126,10 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
+          details: () => ({
+            command: `firefox -profile ${owned.profile}`,
+            identity: null,
+          }),
           busy: () => false,
           kill: () => {},
           timeoutMs: 1,
@@ -142,7 +148,10 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          details: () => ({ command: "unrelated --normal-profile", identity: null }),
+          details: () => ({
+            command: "unrelated --normal-profile",
+            identity: null,
+          }),
           busy: () => false,
           kill: () => {
             killed = true;
@@ -164,7 +173,10 @@ describe("owned lifecycle", () => {
       await expect(
         shutdown(root, owned, {
           alive: () => true,
-          details: () => ({ command: `firefox -profile ${owned.profile}`, identity: "reused-start" }),
+          details: () => ({
+            command: `firefox -profile ${owned.profile}`,
+            identity: "reused-start",
+          }),
           busy: () => false,
           kill: () => {
             killed = true;
@@ -218,7 +230,10 @@ describe("owned lifecycle", () => {
       await shutdown(root, owned, {
         alive: () => alive,
         busy: () => false,
-        details: () => ({ command: `firefox -profile ${owned.profile}`, identity: null }),
+        details: () => ({
+          command: `firefox -profile ${owned.profile}`,
+          identity: null,
+        }),
         close: async () => {
           alive = false;
         },
@@ -310,7 +325,11 @@ describe("executable discovery", () => {
       }),
     ).toThrow("Snap builds of chrome are not supported");
     expect(
-      resolveBinary("firefox", ["/snap/firefox/current/usr/lib/firefox/firefox", "/usr/bin/firefox"], options),
+      resolveBinary(
+        "firefox",
+        ["/snap/firefox/current/usr/lib/firefox/firefox", "/usr/bin/firefox"],
+        options,
+      ),
     ).toBe("/usr/bin/firefox");
   });
 
@@ -320,10 +339,21 @@ describe("executable discovery", () => {
       const wrapper = join(root, "firefox");
       writeFileSync(wrapper, '#!/bin/sh\nexec /snap/bin/firefox "$@"\n');
       const launcher = join(root, "chromium-browser");
-      writeFileSync(launcher, '#!/bin/sh\nexec /usr/lib/chromium/chromium "$@"\n');
-      const options = { platform: "linux", wsl: false, validate: () => true } as const;
-      expect(() => resolveBinary("firefox", [wrapper], options)).toThrow("Snap builds of firefox are not supported");
-      expect(resolveBinary("chrome", [wrapper, launcher], options)).toBe(launcher);
+      writeFileSync(
+        launcher,
+        '#!/bin/sh\nexec /usr/lib/chromium/chromium "$@"\n',
+      );
+      const options = {
+        platform: "linux",
+        wsl: false,
+        validate: () => true,
+      } as const;
+      expect(() => resolveBinary("firefox", [wrapper], options)).toThrow(
+        "Snap builds of firefox are not supported",
+      );
+      expect(resolveBinary("chrome", [wrapper, launcher], options)).toBe(
+        launcher,
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -397,7 +427,12 @@ test("a live browser under a CJK and spaced state path verifies its real process
   const root = mkdtempSync(join(import.meta.dir, ".使用者 Q-"));
   const profile = newProfile(root);
   const child = Bun.spawn(
-    [process.execPath, "-e", "setInterval(() => {}, 1000)", `--user-data-dir=${profile.profile}`],
+    [
+      process.execPath,
+      "-e",
+      "setInterval(() => {}, 1000)",
+      `--user-data-dir=${profile.profile}`,
+    ],
     { stdio: ["ignore", "ignore", "ignore"] },
   );
   try {

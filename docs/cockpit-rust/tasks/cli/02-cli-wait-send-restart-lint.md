@@ -1,6 +1,7 @@
 # CLI-02: Wait, send, restart
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -121,12 +122,12 @@ pub fn classify_daemon(pid: Option<i64>, root: Option<&str>, my_root: &str, is_a
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Wrong exit code for any of 0/1/3/4, or restart leaves two daemons | Happy paths pass, but reconnect-on-drop, a non-2xx, or the foreign-root retry drifts from TS | All three groups pass against Rust and TS; the exit-code contract and stderr text are exact |
-| Test coverage | ×2 | No cargo tests | `classify_daemon` only | `classify_daemon`, URL encoding, and call-id resolution all covered, plus the contract groups |
-| Interface & readability | ×1 | HTTP and polling logic tangled with parsing; `unwrap` on responses | Works, but `wait` and `send` duplicate daemon reads | One daemon reader and one call resolver, shared; `classify_daemon` is pure |
-| Assumptions & docs | ×1 | Undocumented new crate | The restart spawn difference is unexplained | The spawn difference, `COCKPIT_WAIT_MAX_MS`, and any new crate are each justified in one line |
+| Dimension               | Weight | 0–1 (fail)                                                         | 2–3 (below bar)                                                                              | 4–5 (pass)                                                                                    |
+| ----------------------- | ------ | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Wrong exit code for any of 0/1/3/4, or restart leaves two daemons  | Happy paths pass, but reconnect-on-drop, a non-2xx, or the foreign-root retry drifts from TS | All three groups pass against Rust and TS; the exit-code contract and stderr text are exact   |
+| Test coverage           | ×2     | No cargo tests                                                     | `classify_daemon` only                                                                       | `classify_daemon`, URL encoding, and call-id resolution all covered, plus the contract groups |
+| Interface & readability | ×1     | HTTP and polling logic tangled with parsing; `unwrap` on responses | Works, but `wait` and `send` duplicate daemon reads                                          | One daemon reader and one call resolver, shared; `classify_daemon` is pure                    |
+| Assumptions & docs      | ×1     | Undocumented new crate                                             | The restart spawn difference is unexplained                                                  | The spawn difference, `COCKPIT_WAIT_MAX_MS`, and any new crate are each justified in one line |
 
 ## Out of scope
 

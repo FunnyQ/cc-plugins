@@ -99,7 +99,11 @@ describe("directory", () => {
 describe("tell", () => {
   test("never types into a shell or into itself", async () => {
     const { run, calls } = fakeRunner((cmd) =>
-      cmd[1] === "ls" ? LS : cmd[1] === "get" ? { address: cmd[3], status: { state: "idle" } } : { sent: true },
+      cmd[1] === "ls"
+        ? LS
+        : cmd[1] === "get"
+          ? { address: cmd[3], status: { state: "idle" } }
+          : { sent: true },
     );
     const herd = createHerdApp(run, { selfPaneId: "t46" });
     await expect(
@@ -110,7 +114,11 @@ describe("tell", () => {
 
   test("sends to a matched live agent through hc send", async () => {
     const { run, calls } = fakeRunner((cmd) =>
-      cmd[1] === "ls" ? LS : cmd[1] === "get" ? { address: cmd[3], status: { state: "idle" } } : { sent: true },
+      cmd[1] === "ls"
+        ? LS
+        : cmd[1] === "get"
+          ? { address: cmd[3], status: { state: "idle" } }
+          : { sent: true },
     );
     const res = await createHerdApp(run, { selfPaneId: "t46" }).tell(
       "personal-assistant",
@@ -211,7 +219,9 @@ describe("ask", () => {
 
 describe("runtimeFor", () => {
   test("old herdr wins when its pane env is present", () => {
-    expect(runtimeFor({ HERDR_ENV: "1", HC_TERMINAL_ID: "t1" }, "spawn")).toEqual({
+    expect(
+      runtimeFor({ HERDR_ENV: "1", HC_TERMINAL_ID: "t1" }, "spawn"),
+    ).toEqual({
       kind: "herdr",
     });
   });
@@ -221,7 +231,9 @@ describe("runtimeFor", () => {
       kind: "app",
       self: "t1",
     });
-    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "spawn")).toHaveProperty("error");
+    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "spawn")).toHaveProperty(
+      "error",
+    );
   });
 
   test("refuses outside both", () => {
@@ -247,7 +259,17 @@ describe("slash commands and paths", () => {
     );
     await createHerdApp(run, { selfPaneId: "t46" }).send("t9", "/rc on");
     expect(calls.at(-1)).toEqual([
-      "hc", "keys", "--json", "t9", "/", "r", "c", "space", "o", "n", "enter",
+      "hc",
+      "keys",
+      "--json",
+      "t9",
+      "/",
+      "r",
+      "c",
+      "space",
+      "o",
+      "n",
+      "enter",
     ]);
   });
 
@@ -255,14 +277,21 @@ describe("slash commands and paths", () => {
     const folder = mkdtempSync(join(tmpdir(), "herd-app-path-"));
     const { run, calls } = fakeRunner((cmd) => {
       if (cmd[1] === "ls") return LS;
-      if (cmd[0] === "herdr-app") return { space: "sp1", tab: "tb1", terminal: "t9" };
+      if (cmd[0] === "herdr-app")
+        return { space: "sp1", tab: "tb1", terminal: "t9" };
       return {};
     });
-    const res = await createHerdApp(run, { selfPaneId: "t46" }).tell(folder, "go", {
-      registryPath: noRegistry,
-    });
+    const res = await createHerdApp(run, { selfPaneId: "t46" }).tell(
+      folder,
+      "go",
+      {
+        registryPath: noRegistry,
+      },
+    );
     expect(res.spawned?.cwd).toBe(folder);
-    expect(JSON.parse(calls.find((c) => c[0] === "herdr-app")![3]!).folder).toBe(folder);
+    expect(
+      JSON.parse(calls.find((c) => c[0] === "herdr-app")![3]!).folder,
+    ).toBe(folder);
   });
 });
 
@@ -270,10 +299,18 @@ describe("spawn through the q-saddle layout CLI", () => {
   test("opens the project with the default tab layout, the harness in its agent pane", async () => {
     const { run, calls } = fakeRunner((cmd) =>
       cmd[0] === "node"
-        ? { space: "sp1", tab: "tb1", agent_terminal: "t9", panes: { agent: "p1" } }
+        ? {
+            space: "sp1",
+            tab: "tb1",
+            agent_terminal: "t9",
+            panes: { agent: "p1" },
+          }
         : {},
     );
-    const herd = createHerdApp(run, { selfPaneId: "t46", layoutCli: "/m/cli.js" });
+    const herd = createHerdApp(run, {
+      selfPaneId: "t46",
+      layoutCli: "/m/cli.js",
+    });
     const res = await herd.spawn({
       role: "acme",
       agent: "codex",
@@ -284,10 +321,15 @@ describe("spawn through the q-saddle layout CLI", () => {
     });
     expect(calls).toEqual([
       [
-        "node", "/m/cli.js", "open",
-        "--folder", "/p/acme",
-        "--name", "acme",
-        "--agent-argv", JSON.stringify(["codex", "--no-daemon", "do it"]),
+        "node",
+        "/m/cli.js",
+        "open",
+        "--folder",
+        "/p/acme",
+        "--name",
+        "acme",
+        "--agent-argv",
+        JSON.stringify(["codex", "--no-daemon", "do it"]),
       ],
     ]);
     expect(res).toMatchObject({ name: "t9", workspaceId: "sp1", tabId: "tb1" });
@@ -298,14 +340,21 @@ describe("spawn through the q-saddle layout CLI", () => {
     const run: AppRunner = async (cmd) => {
       calls.push(cmd);
       if (cmd[0] === "node")
-        return { stdout: JSON.stringify({ error: "no config" }), stderr: "", code: 2 };
+        return {
+          stdout: JSON.stringify({ error: "no config" }),
+          stderr: "",
+          code: 2,
+        };
       return {
         stdout: JSON.stringify({ space: "sp2", tab: "tb2", terminal: "t8" }),
         stderr: "",
         code: 0,
       };
     };
-    const res = await createHerdApp(run, { selfPaneId: "t46", layoutCli: "/m/cli.js" }).spawn({
+    const res = await createHerdApp(run, {
+      selfPaneId: "t46",
+      layoutCli: "/m/cli.js",
+    }).spawn({
       role: "acme",
       agent: "claude",
       cwd: "/p/acme",

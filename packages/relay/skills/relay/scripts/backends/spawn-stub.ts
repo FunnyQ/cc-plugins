@@ -10,10 +10,7 @@ export const SPAWN_PROMPT_PIECES = ["hi", "%", "&", '"', "\n"];
  * returns what the stub received. On win32 the stub is a `.cmd` shim, the
  * shape npm installs codex and opencode as.
  */
-export function spawnStub(
-  argv: string[],
-  stdin: string | undefined,
-): string {
+export function spawnStub(argv: string[], stdin: string | undefined): string {
   const dir = mkdtempSync(join(tmpdir(), "relay-stub-"));
   try {
     const out = join(dir, "stdin.txt");

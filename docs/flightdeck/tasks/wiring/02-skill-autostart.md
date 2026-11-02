@@ -1,6 +1,7 @@
 # WIRING-02: skill auto-start and the retired invariant
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -110,12 +111,12 @@ Tell the user the URL in the confirmation output so they can reopen it after clo
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | The launch lands in the scout step, or the stale claim survives | All three edits made but the launch passes the wrong directory, or the step tells the executor to strip the launcher's own readiness check | Invariant retired, both paths resolved and named, launch placed after confirmation with the plan dir, readiness ownership stated correctly |
-| Test coverage | ×2 | No checks run | Grepped for the stale claim only | Every Verification command run, including the diff-scope read and the by-hand path check |
-| Interface & readability | ×1 | New step clashes with the file's numbering or voice | Readable but the two path variables are easy to confuse | Distinct names, consistent voice, the step reads like the ones around it |
-| Assumptions & docs | ×1 | No reason given for the placement | States the placement without the reason | Explains why after confirmation and not in scout, and why readiness belongs to the launcher rather than the skill |
+| Dimension               | Weight | 0–1 (fail)                                                      | 2–3 (below bar)                                                                                                                            | 4–5 (pass)                                                                                                                                 |
+| ----------------------- | ------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | The launch lands in the scout step, or the stale claim survives | All three edits made but the launch passes the wrong directory, or the step tells the executor to strip the launcher's own readiness check | Invariant retired, both paths resolved and named, launch placed after confirmation with the plan dir, readiness ownership stated correctly |
+| Test coverage           | ×2     | No checks run                                                   | Grepped for the stale claim only                                                                                                           | Every Verification command run, including the diff-scope read and the by-hand path check                                                   |
+| Interface & readability | ×1     | New step clashes with the file's numbering or voice             | Readable but the two path variables are easy to confuse                                                                                    | Distinct names, consistent voice, the step reads like the ones around it                                                                   |
+| Assumptions & docs      | ×1     | No reason given for the placement                               | States the placement without the reason                                                                                                    | Explains why after confirmation and not in scout, and why readiness belongs to the launcher rather than the skill                          |
 
 ## Out of scope
 

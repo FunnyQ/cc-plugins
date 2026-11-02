@@ -53,11 +53,22 @@ Write the file once before the run, so the topology exists when the first event 
       // OPTIONAL, default: []. Advisory only; never determines readiness.
       "blocks": ["build/01"],
       // OPTIONAL, default: false. At most one node may be the final review.
-      "finalReview": false
+      "finalReview": false,
     },
-    { "ref": "build/01", "lane": "build", "title": "Extract the resolver", "dependsOn": ["scout/01"] },
-    { "ref": "build/02", "lane": "build", "title": "Review the result", "dependsOn": ["build/01"], "finalReview": true }
-  ]
+    {
+      "ref": "build/01",
+      "lane": "build",
+      "title": "Extract the resolver",
+      "dependsOn": ["scout/01"],
+    },
+    {
+      "ref": "build/02",
+      "lane": "build",
+      "title": "Review the result",
+      "dependsOn": ["build/01"],
+      "finalReview": true,
+    },
+  ],
 }
 ```
 

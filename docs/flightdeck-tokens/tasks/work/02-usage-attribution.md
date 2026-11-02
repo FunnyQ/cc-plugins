@@ -1,6 +1,7 @@
 # WORK-02: Usage Attribution
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/types.md`
@@ -69,7 +70,7 @@ changes, and the failure is a silently empty pairing rather than an error.
 A `FleetRow` does not carry its identity string, so rebuild it:
 
 ```ts
-fleetIdentity(row.ref ?? "", row.role, row.attempt)
+fleetIdentity(row.ref ?? "", row.role, row.attempt);
 ```
 
 `row.ref` is safe to use as the task ref. The aggregator sets it as
@@ -195,12 +196,12 @@ export function addCounts(into: TokenCounts, from: TokenCounts): void;
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Pairs by array order, or the role vocabularies are never reconciled so nothing ever pairs; the conservation invariant does not hold | Nearest-time pairing works on the simple case but ties are non-deterministic, or a null timestamp sorts as epoch zero and wins comparisons | Nearest-time greedy pairing with a deterministic tie-break; null timestamps pair last; surplus on either side handled; conservation holds on all four counters |
-| Test coverage | ×2 | No tests, or only a single 1:1 group | Happy path plus one edge; the invariant and the determinism claim are untested | Covers 1:1, 5×5 out-of-order, surplus in both directions, timestamp ties, null task, the invariant, both empty inputs, and non-mutation of frozen inputs |
-| Interface & readability | ×1 | Reads the filesystem, calls the clock, or mutates its arguments | Pure but the pairing is one long function with the grouping, sorting, and rollup interleaved | Pure data-in / data-out; grouping, pairing, and rollup are separately named and separately testable; the identity helper is reused, not copied |
-| Assumptions & docs | ×1 | The role mapping is a bare table with no explanation of why the two vocabularies differ | Assumptions made but not written down | The role-vocabulary drift, the greedy-not-optimal choice, and the undefined-versus-zero distinction each carry a one-line comment naming the reason |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                          | 2–3 (below bar)                                                                                                                            | 4–5 (pass)                                                                                                                                                     |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Pairs by array order, or the role vocabularies are never reconciled so nothing ever pairs; the conservation invariant does not hold | Nearest-time pairing works on the simple case but ties are non-deterministic, or a null timestamp sorts as epoch zero and wins comparisons | Nearest-time greedy pairing with a deterministic tie-break; null timestamps pair last; surplus on either side handled; conservation holds on all four counters |
+| Test coverage           | ×2     | No tests, or only a single 1:1 group                                                                                                | Happy path plus one edge; the invariant and the determinism claim are untested                                                             | Covers 1:1, 5×5 out-of-order, surplus in both directions, timestamp ties, null task, the invariant, both empty inputs, and non-mutation of frozen inputs       |
+| Interface & readability | ×1     | Reads the filesystem, calls the clock, or mutates its arguments                                                                     | Pure but the pairing is one long function with the grouping, sorting, and rollup interleaved                                               | Pure data-in / data-out; grouping, pairing, and rollup are separately named and separately testable; the identity helper is reused, not copied                 |
+| Assumptions & docs      | ×1     | The role mapping is a bare table with no explanation of why the two vocabularies differ                                             | Assumptions made but not written down                                                                                                      | The role-vocabulary drift, the greedy-not-optimal choice, and the undefined-versus-zero distinction each carry a one-line comment naming the reason            |
 
 ## Out of scope
 

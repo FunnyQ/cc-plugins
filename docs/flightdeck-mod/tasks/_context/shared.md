@@ -33,10 +33,11 @@ Flightdeck is dispatch's read-only run viewer for an autopilot task tree or a Wo
 The snapshot CLI prints exactly this JSON on stdout; the pane renders exactly this. It lives in `packages/dispatch/hooks/flightdeck/types.ts` (type-only, no imports), and both sides import it from there.
 
 ```ts
-export type DeckState = "done" | "in-progress" | "ready" | "blocked" | "invalid";
+export type DeckState =
+  "done" | "in-progress" | "ready" | "blocked" | "invalid";
 
 export type DeckTask = {
-  ref: string;            // "bucket/NN", or the graph node id
+  ref: string; // "bucket/NN", or the graph node id
   title: string;
   state: DeckState;
   attempts: number;
@@ -44,7 +45,7 @@ export type DeckTask = {
 };
 
 export type DeckAgent = {
-  role: string;           // FleetRow.role
+  role: string; // FleetRow.role
   ref: string | null;
   attempt: number | null;
   label: string;
@@ -53,17 +54,24 @@ export type DeckAgent = {
 
 export type DeckSnapshot = {
   deckSource: "tasks" | "graph";
-  plan: string;           // absolute plan dir
+  plan: string; // absolute plan dir
   slug: string;
   planTitle: string;
-  counts: { total: number; done: number; inProgress: number; ready: number; blocked: number; invalid: number };
-  buckets: { name: string; done: number; total: number }[];  // TreePayload.buckets order
-  waves: string[][];      // waves[0] = wave 1; refs in TreePayload.tasks order
-  unschedulable: string[];// refs no layer reaches (cycle, dangling dep), sorted
+  counts: {
+    total: number;
+    done: number;
+    inProgress: number;
+    ready: number;
+    blocked: number;
+    invalid: number;
+  };
+  buckets: { name: string; done: number; total: number }[]; // TreePayload.buckets order
+  waves: string[][]; // waves[0] = wave 1; refs in TreePayload.tasks order
+  unschedulable: string[]; // refs no layer reaches (cycle, dangling dep), sorted
   currentWave: number | null; // 1-based: lowest wave holding a non-done task; null when no wave holds one (all done, or only unschedulable work left)
   tasks: Record<string, DeckTask>;
-  agents: DeckAgent[];    // FleetRow.status === "in-flight" only, startedAt ascending
-  errors: number;         // TreePayload.errors.length
+  agents: DeckAgent[]; // FleetRow.status === "in-flight" only, startedAt ascending
+  errors: number; // TreePayload.errors.length
 };
 ```
 
@@ -80,13 +88,13 @@ export type DeckSnapshot = {
 - **Width**: every line the pane draws fits the pane width. One clip rule applies to every line: a line within the width is unchanged; otherwise keep the first `width - 1` columns across the segments in order, append `…` to the segment holding the last kept column, and drop the rest (`[{text:"1234"},{text:"x"}]` at width 4 → `123…`). At width 1 the line is `…`; below 1 it is empty. A clipped card keeps its `ref`, so it stays pressable.
 - **Card**: `<ref> <glyph><attempts if > 1>`, for example `api/01 ●2`. Glyphs and colours:
 
-  | State | Glyph | Colour |
-  |---|---|---|
-  | done | `✓` | `#3fb950` |
-  | in-progress | `●` | `#d29922` |
-  | ready | `○` | default text |
-  | blocked | `·` | dim |
-  | invalid | `✗` | `#f85149` |
+  | State       | Glyph | Colour       |
+  | ----------- | ----- | ------------ |
+  | done        | `✓`   | `#3fb950`    |
+  | in-progress | `●`   | `#d29922`    |
+  | ready       | `○`   | default text |
+  | blocked     | `·`   | dim          |
+  | invalid     | `✗`   | `#f85149`    |
 
 - Pressing a card toasts `ref · title · state · attempt N · score W/T passed|failed` (score part omitted when `score` is null).
 - `/flightdeck [planDir]` toggles the pane; `/flightdeck close` closes it. The bare form resolves the plan with the CLI's `--latest <repo root>`.

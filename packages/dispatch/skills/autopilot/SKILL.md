@@ -31,7 +31,7 @@ autopilot  → execute the tree with a quality loop   ← you are here
 
 ## How orchestration works (read this before running)
 
-Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent to call Workflow is a *sanctioned opt-in*. Invoking `/autopilot` lets you call Workflow directly, **without the user typing "workflow"**.
+Autopilot uses the **Workflow tool**. A skill whose instructions tell the agent to call Workflow is a _sanctioned opt-in_. Invoking `/autopilot` lets you call Workflow directly, **without the user typing "workflow"**.
 
 > **OpenCode only**: there is no Workflow tool. Skip the rest of this section and follow `~/.config/opencode/skills/autopilot/references/opencode.md` instead — a hand-driven wave loop over the task tool. The path is absolute because OpenCode prints no skill base-directory banner.
 
@@ -43,7 +43,7 @@ Three hard constraints shape the design:
 
 1. **The Workflow orchestrator script has no filesystem access.** It also **cannot `import`** our scripts. Anything that reads or writes disk — running `next-ready.ts`, editing a task's `Status`, appending to the flightlog — must run inside a tool-capable **agent** in the workflow. The orchestrator JS must never do this work.
 2. **There is exactly one scoring implementation.** The rubric judge runs `score-task.ts --json --log`. The orchestrator gates on that printed verdict object. Do not duplicate the weighted-average or hard-fail arithmetic in the Workflow script.
-3. **The orchestrator can't pause for input.** On a task that can't pass, it parks the task and keeps going. Escalation to the user happens *after* the workflow returns. See Escalation below.
+3. **The orchestrator can't pause for input.** On a task that can't pass, it parks the task and keeps going. Escalation to the user happens _after_ the workflow returns. See Escalation below.
 
 ## Resume one task at a chosen step (`--task <ref> --from <step>`)
 
@@ -67,7 +67,7 @@ It prints `resume --from <step> --attempt <n>` with the evidence that chose it. 
 
 Two rules govern what it will and will not suggest, and both are deliberate:
 
-- **It never suggests `judge`.** Skipping the binary gate means a person performed it and signed for it — a human decision no trail can make. And the judge grounds correctness in the verifier's *raw* evidence, which lives only in the orchestrator's memory and dies with the run; the trail keeps the verifier's one-line message, not its output. So `verify` is the earliest point the trail can honestly support.
+- **It never suggests `judge`.** Skipping the binary gate means a person performed it and signed for it — a human decision no trail can make. And the judge grounds correctness in the verifier's _raw_ evidence, which lives only in the orchestrator's memory and dies with the run; the trail keeps the verifier's one-line message, not its output. So `verify` is the earliest point the trail can honestly support.
 - **It restarts at `dev` when a gate or judge rejected the work.** That is not the run dying — it is a verdict on real code, and restarting above it would take rejected work as satisfied. The output says so on a `note` line. Only a person who has since satisfied the failing items may override, with `--from verify --attest <file>`.
 
 Then scout what a single task needs and bake it into `CFG`:
@@ -88,7 +88,7 @@ Then scout what a single task needs and bake it into `CFG`:
 
 Before touching Workflow, gather the work-list in the main conversation:
 
-1. **Resolve both scripts paths once**, from the skill's load-time *"Base directory for this skill"* banner: `<base>/../flightplan/scripts` is `$SCRIPTS` (the shared tools autopilot borrows), `<base>/scripts` is `$OWN`. Both must be absolute. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash — never use it for either path. `$SCRIPTS` is also what you bake into `CFG.scriptsDir` in Step 3.
+1. **Resolve both scripts paths once**, from the skill's load-time _"Base directory for this skill"_ banner: `<base>/../flightplan/scripts` is `$SCRIPTS` (the shared tools autopilot borrows), `<base>/scripts` is `$OWN`. Both must be absolute. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash — never use it for either path. `$SCRIPTS` is also what you bake into `CFG.scriptsDir` in Step 3.
 2. Resolve the plan dir **as an absolute path**. The user names a slug or a path; the tree lives at `docs/<slug>/tasks/`. Capture the real repo root with `git rev-parse --show-toplevel`, and build `tasksDir`, `planPath`, and `logFile` from it (`<root>/docs/<slug>/...`). Bake them into `CFG` in Step 3. These paths MUST be absolute — Workflow agents share no cwd. See "Why every path is absolute" in `references/orchestrator.md`.
    Set `CFG.repoRoot` to the absolute repo root already captured by `git rev-parse --show-toplevel`.
 3. Read `docs/<slug>/PLAN.md` for the goal and the bucketing. Final review scores against "did we meet the PLAN goal", so the orchestrator needs that goal in hand as `CFG.planGoal`.
@@ -98,21 +98,27 @@ Before touching Workflow, gather the work-list in the main conversation:
    ```
    A non-zero exit means the tree is malformed — the printed `invalid` array names each offending task and why; run `lint-task.ts` and fix it before flying. If `counts.done === counts.total`, the tree is already done — report that and stop before Step 2. If `ready` is empty while tasks remain unfinished, reset any stale `in-progress` task to `todo` first.
 5. **Lint the whole tree before flying:**
+
    ```bash
    bun $SCRIPTS/lint-task.ts docs/<slug>/tasks
    ```
+
    The in-flight lint at `orchestrator.md` step 6 only ever sees one task file, and the flightplan Edit/Write hook only ran on files written in this repo — neither reaches a plan authored by an older flightplan or by hand. Run it here so a defect fails in the conversation instead of parking a correct task three attempts later.
 
    **Act on a `[serial-undeclared]` advisory before flying.** Check PLAN.md and `_context/` for serial execution or lock requirements without a `> **Max parallel**:` header. Under Claude Code, lower **Max parallel** only when tasks share an **external live resource** that a worktree cannot isolate: a live device, a LaunchAgent or service that a verification reinstalls, or a local database that a migration rewrites. For that external live resource, set `> **Max parallel**: 1`. Under Claude Code, keep a shared build target uncapped because each task builds in its own worktree. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). When `Depends on` edges already sequence every conflict, write `unlimited` or omit the line. Read the header through the scout every wave.
 
    **Fix a `scope-git-status` violation in the task file.** A whole-tree `git status` gate fails a correct task as soon as a sibling in the same wave leaves its own edits uncommitted; narrow the command with a `--` pathspec listing that task's own files. Do not fly a tree with violations outstanding.
+
 6. **Capture the base ref** for the Final review diff scope:
+
    ```bash
    git rev-parse HEAD
    ```
+
    Bake this as `CFG.baseRef`. The Final review lenses read `git diff <baseRef>..HEAD`, because the working-tree diff is empty after inter-wave commits.
 
    **Keep `commitBetweenWaves: true` and do not ask about it.** When PLAN.md or a task says the user commits after the run, read that as a rule for the task agents, which already never commit. It does not switch off the orchestrator's inter-wave and post-loop commits, which give each wave one revertable checkpoint. The user can squash or reword the commits after `CFG.baseRef` once the run ends. Set `commitBetweenWaves: false` only when the user says so in this conversation.
+
 7. Decide `maxAttempts` (default **3**, per task) and `finalReviewMaxAttempts` (default **2**, the Final review round). Confirm the rest of the model policy only if the user wants to change it.
 8. Version-check whichever external CLIs Step 2 will offer — an external dev engine and the closing review round both shell out to them:
    ```bash
@@ -135,6 +141,7 @@ The split is not cosmetic. Neither codex-model question is worth asking until th
 - **Codex review model** (`CFG.codexReviewModel`) — **Relay config** (default), **gpt-6-astra**, or **gpt-6.1-sol** — ask **only when the cross-vendor reviewer resolved to codex**, which is the default, so a default flight does get asked. This is the model that reviews the branch diff.
 
   **Relay config** leaves the field empty. Both the headless wrapper and a relay live pane then read `models.codex.delegate` / `models.codex.review` from `~/.config/q-lab/cc-plugins/relay/config.json`. When that entry is unset, they fall back to `codex-run.ts`'s default: sol writes, astra reviews. Before asking, read that file and put the model it resolves to in the option label, so the user sees what "Relay config" means. Any other pick is written to the field and beats relay's config for this flight only. The wrapper defaults differ on purpose: the cheap model writes, the strong one reviews. A reviewer weaker than the author rubber-stamps its own blind spots. Offering astra for dev costs real money at a higher rate; never present it as the cheaper pick.
+
 - **Live panes** (`CFG.liveDevEngine`, `CFG.liveReviewEngine`) — only when `HERDR_ENV=1` + `relay.ts` resolved, ask this in the second call, `multiSelect`: which steps run in a visible herdr live pane via relay, defaulting to neither (headless). Offer the **dev delegate** option only when the chosen dev engine is external — a Claude dev step has no delegate to make live. Always offer the **closing cross-vendor review** option; the review lens is external on every flight. Each picked step sets its own flag.
 
 The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.codexDevModel`, `CFG.codexReviewModel`, `CFG.reviewLensModel`, `CFG.liveDevEngine`, and `CFG.liveReviewEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
@@ -260,20 +267,20 @@ The rest of this document is reference material.
 
 Tune the default choices in the orchestrator's `MODEL` table. Keep dev and judge in separate agent calls so scoring uses independent context.
 
-| Role | Model / effort | Why |
-|---|---|---|
-| **Dev** | opus / low | Implement the task cheaply; the task's gate and judge catch what low effort misses. |
-| **Dev — last Claude rung** | opus / high, or the task's dev choice with effort +1 | Spend verification effort after earlier attempts fail. |
-| **Dev — external driver** | opus / low | Turn the task file into the external CLI's instruction file, then drive the CLI. Writing that file is judgment: a weaker driver paraphrased a rule out of it. |
-| **Binary gate and drift re-verify** | opus / low | Check acceptance criteria and command output before scoring. |
-| **Rubric judge** | opus / medium | Score the rubric against the gate's evidence. |
-| **Commit (inter-wave + post-loop)** | opus / low | Group changes and write the commit message. |
-| **Final review — cross-vendor lens** | sonnet / low | Drive the external CLI that performs the review. |
-| **Final review — quality lenses** | `CFG.reviewLensModel` (default opus) / high | Hunt reuse, leanness, and efficiency issues with independent context. |
-| **Final review — fixer** | opus / medium | Apply findings the high-effort lenses already found. |
-| **Scout / park** | sonnet / low | Read readiness, or park a task, repairing a malformed Status line. |
-| **Mark-done / worktree calls** | haiku / low | Relay the result of `mark-done.ts` or `worktree.ts`; a structured failure retries on opus. |
-| **Structured retry** | opus / medium | Recover a failed structured call with a complete model and effort choice. |
+| Role                                 | Model / effort                                       | Why                                                                                                                                                           |
+| ------------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dev**                              | opus / low                                           | Implement the task cheaply; the task's gate and judge catch what low effort misses.                                                                           |
+| **Dev — last Claude rung**           | opus / high, or the task's dev choice with effort +1 | Spend verification effort after earlier attempts fail.                                                                                                        |
+| **Dev — external driver**            | opus / low                                           | Turn the task file into the external CLI's instruction file, then drive the CLI. Writing that file is judgment: a weaker driver paraphrased a rule out of it. |
+| **Binary gate and drift re-verify**  | opus / low                                           | Check acceptance criteria and command output before scoring.                                                                                                  |
+| **Rubric judge**                     | opus / medium                                        | Score the rubric against the gate's evidence.                                                                                                                 |
+| **Commit (inter-wave + post-loop)**  | opus / low                                           | Group changes and write the commit message.                                                                                                                   |
+| **Final review — cross-vendor lens** | sonnet / low                                         | Drive the external CLI that performs the review.                                                                                                              |
+| **Final review — quality lenses**    | `CFG.reviewLensModel` (default opus) / high          | Hunt reuse, leanness, and efficiency issues with independent context.                                                                                         |
+| **Final review — fixer**             | opus / medium                                        | Apply findings the high-effort lenses already found.                                                                                                          |
+| **Scout / park**                     | sonnet / low                                         | Read readiness, or park a task, repairing a malformed Status line.                                                                                            |
+| **Mark-done / worktree calls**       | haiku / low                                          | Relay the result of `mark-done.ts` or `worktree.ts`; a structured failure retries on opus.                                                                    |
+| **Structured retry**                 | opus / medium                                        | Recover a failed structured call with a complete model and effort choice.                                                                                     |
 
 A task's `> **Models**:` header overrides dev, verify, judge, and fix for that task.
 
@@ -281,9 +288,9 @@ On the last Claude dev rung, run opus/high. When the task's Models header names 
 
 ## Grounding the score
 
-The **correctness** dimension must be grounded in **real verification**, not the judge's vibe. The binary gate agent actually runs the task's `## Verification` commands and checks its `## Acceptance criteria`; its pass/fail result and raw output go to the rubric judge, which scores correctness against *that evidence*. The gate must pass before the judge runs at all, so a high correctness score can never sit on top of a failed verification.
+The **correctness** dimension must be grounded in **real verification**, not the judge's vibe. The binary gate agent actually runs the task's `## Verification` commands and checks its `## Acceptance criteria`; its pass/fail result and raw output go to the rubric judge, which scores correctness against _that evidence_. The gate must pass before the judge runs at all, so a high correctness score can never sit on top of a failed verification.
 
-**Two carve-outs, both declared by a person, never decided by an agent.** A gate item tagged `(human)` in the task file is skipped by the verifier, reported as pending, and surfaced at the end of the run — the plan's author declared that no command can perform it, and `lint-task.ts` refuses a gate section whose items are *all* tagged, so the verifier always keeps real work. A `--from judge` resume replaces the verifier's evidence with a signed attestation file, and the judge is told to treat every item that file does not name as unverified. An agent may never widen either carve-out: a verifier that finds an item hard to run must let it fail, because an item nobody can check is a plan defect.
+**Two carve-outs, both declared by a person, never decided by an agent.** A gate item tagged `(human)` in the task file is skipped by the verifier, reported as pending, and surfaced at the end of the run — the plan's author declared that no command can perform it, and `lint-task.ts` refuses a gate section whose items are _all_ tagged, so the verifier always keeps real work. A `--from judge` resume replaces the verifier's evidence with a signed attestation file, and the judge is told to treat every item that file does not name as unverified. An agent may never widen either carve-out: a verifier that finds an item hard to run must let it fail, because an item nobody can check is a plan defect.
 
 ## Escalation — park & continue, then resume
 
@@ -318,7 +325,7 @@ How the orchestrator decides to park — the quality-vs-infrastructure split, th
 
 Everything lands in `docs/<slug>/.flightlog/`. It is **gitignored** via a self-ignore (`.flightlog/.gitignore` containing `*`). This directory is created automatically on first write; no user setup is needed.
 
-- **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label> --rationale-file <its-rationale.md>`. Deterministic, guaranteed each cycle. The rationale file is why a *passing* verdict keeps its evidence — without it the trail records a weighted number and nothing that justifies it.
+- **Score verdicts** — the rubric-judge agent runs `score-task.ts <taskfile> <scores.json> --log docs/<slug>/.flightlog/run.jsonl --attempt N --agent <its-label> --rationale-file <its-rationale.md>`. Deterministic, guaranteed each cycle. The rationale file is why a _passing_ verdict keeps its evidence — without it the trail records a weighted number and nothing that justifies it.
 - **Narrative** — Dev / judge / final-review agents run `flightlog.ts log <run.jsonl> --task <ref> --role <role> --attempt N --agent <label> --message "..."` to record what they did.
 - **Review findings** — the Final review lenses write their raw findings to `.flightlog/review/attempt-N/<lens>.md` (`<reviewEngine>` / reuse / leanness / efficiency). These persist as the artifact behind each closing-round verdict.
 - **Report** — `flightlog.ts report <run.jsonl>` renders `RUNLOG.md`, grouped by task in chronological order. A verdict that carries a rationale folds it into a collapsed `<details>` block under its line.

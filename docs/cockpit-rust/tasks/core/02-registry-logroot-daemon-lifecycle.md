@@ -1,6 +1,7 @@
 # CORE-02: Registry, log root, daemon lifecycle
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -171,12 +172,12 @@ Use `tempfile` dirs, a real `git init` for log-root cases (skip gracefully if gi
 
 > Scale 0–5 per `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | walk-up crosses the git root, or registry rewrite drops entries/keys | main paths right, but trailing-newline, key order, TTL reap, or unversioned-root rule drifts | every rule above matches TS, file bytes identical |
-| Test coverage | ×2 | no tests | happy paths only | every case from the six named TS tests mirrored, incl. corrupt files and symlinked tmp |
-| Interface & readability | ×1 | modules reach into each other's files or re-resolve paths | usable but TS rule order obscured | one module per TS module, pure functions with injected `alive` / `git_root` |
-| Assumptions & docs | ×1 | silent divergence from TS | divergences exist but uncommented | no-lock corner-cut and every deliberate difference carry a one-line comment |
+| Dimension               | Weight | 0–1 (fail)                                                           | 2–3 (below bar)                                                                              | 4–5 (pass)                                                                             |
+| ----------------------- | ------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | walk-up crosses the git root, or registry rewrite drops entries/keys | main paths right, but trailing-newline, key order, TTL reap, or unversioned-root rule drifts | every rule above matches TS, file bytes identical                                      |
+| Test coverage           | ×2     | no tests                                                             | happy paths only                                                                             | every case from the six named TS tests mirrored, incl. corrupt files and symlinked tmp |
+| Interface & readability | ×1     | modules reach into each other's files or re-resolve paths            | usable but TS rule order obscured                                                            | one module per TS module, pure functions with injected `alive` / `git_root`            |
+| Assumptions & docs      | ×1     | silent divergence from TS                                            | divergences exist but uncommented                                                            | no-lock corner-cut and every deliberate difference carry a one-line comment            |
 
 ## Out of scope
 

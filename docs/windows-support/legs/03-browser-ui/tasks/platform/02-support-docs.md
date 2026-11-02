@@ -1,6 +1,7 @@
 # PLATFORM-02: Document support boundaries and owed checks.
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/browsers.md`
@@ -89,12 +90,12 @@ Use additional rows when distinct environments need separate evidence. Mark a ch
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Documentation promises unsupported networking or treats unperformed checks as passed. | Common support claims are correct but a platform boundary or output-path rule is ambiguous. | Every support claim matches implemented discovery, execution, opener and verification boundaries. |
-| Test coverage | ×2 | Commands are unverified or refer to missing entrypoints. | Commands exist but evidence layers or prerequisite failures are not checked. | Documented prerequisite and isolated-contract commands run, referenced paths resolve, and failed/missing evidence stays explicit. |
-| Interface & readability | ×1 | Repeated or conflicting instructions obscure prerequisites and next actions. | Commands are usable but platform caveats or ledger fields require interpretation. | Concise platform instructions and exact commands lead to an explicit check, environment and result. |
-| Assumptions & docs | ×1 | A helper test or ticked human checkbox is presented as real-device proof. | Owed checks exist but omit an environment, evidence field or inherited debt. | The complete owed ledger separates actual runs, injected tests, native CI and unperformed human checks while preserving earlier debts. |
+| Dimension               | Weight | 0–1 (fail)                                                                            | 2–3 (below bar)                                                                             | 4–5 (pass)                                                                                                                             |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Documentation promises unsupported networking or treats unperformed checks as passed. | Common support claims are correct but a platform boundary or output-path rule is ambiguous. | Every support claim matches implemented discovery, execution, opener and verification boundaries.                                      |
+| Test coverage           | ×2     | Commands are unverified or refer to missing entrypoints.                              | Commands exist but evidence layers or prerequisite failures are not checked.                | Documented prerequisite and isolated-contract commands run, referenced paths resolve, and failed/missing evidence stays explicit.      |
+| Interface & readability | ×1     | Repeated or conflicting instructions obscure prerequisites and next actions.          | Commands are usable but platform caveats or ledger fields require interpretation.           | Concise platform instructions and exact commands lead to an explicit check, environment and result.                                    |
+| Assumptions & docs      | ×1     | A helper test or ticked human checkbox is presented as real-device proof.             | Owed checks exist but omit an environment, evidence field or inherited debt.                | The complete owed ledger separates actual runs, injected tests, native CI and unperformed human checks while preserving earlier debts. |
 
 ## Out of scope
 

@@ -1,6 +1,7 @@
 # ENGINE-02: Rollup DB schema, migrations, and pre-rust backup
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -50,25 +51,25 @@ pub struct LedgerModelRow { pub path: String, pub session_key: String, pub model
 
 Accessors are `pub(crate)`, one per TS export, with the same SQL:
 
-| TS | Rust | SQL behavior |
-|---|---|---|
-| `getMeta` | `get_meta(&Connection, key) -> Result<Option<String>>` | `SELECT value FROM meta WHERE key = ?` |
-| `setMeta` | `set_meta(conn, key, value)` | `INSERT … ON CONFLICT(key) DO UPDATE SET value = excluded.value` |
-| `getIngestedFile` | `get_ingested_file(conn, path) -> Result<Option<IngestedFile>>` | selects `path, bytes_parsed, mtime_ms` |
-| `upsertIngestedFile` | `upsert_ingested_file(conn, &IngestedFile, updated_at: i64)` | upsert on `path`, sets all three plus `updated_at` |
-| `hasSeenRequest` / `markSeenRequest` | `has_seen_request(conn, key)` / `mark_seen_request(conn, key, path)` | `INSERT OR IGNORE` |
-| `clearSeenRequestsForFile` | `clear_seen_requests_for_file(conn, path)` | `DELETE … WHERE path = ?` |
-| `hasSeenToolCall` / `markSeenToolCall` | `has_seen_tool_call(conn, session_key, key)` / `mark_seen_tool_call(…)` | keyed `(session_key, tool_key)`, `INSERT OR IGNORE` |
-| `pruneSeenToolCalls` | `prune_seen_tool_calls(conn)` | `DELETE FROM seen_tool_calls WHERE session_key NOT IN (SELECT session_key FROM session_ledger)` |
-| `addHourlyRow` | `add_hourly_row(conn, &HourlyRow)` | **additive** upsert: every count column `= col + excluded.col` |
-| `allHourlyRows` | `all_hourly_rows(conn) -> Result<Vec<HourlyRow>>` | no `ORDER BY` (same as TS) |
-| `rewindRollup` | `rewind_rollup(conn)` | `UPDATE ingested_files SET bytes_parsed = 0`, then `DELETE FROM seen_tool_calls`. It **never** touches `seen_requests`. |
-| `clearIngestedFile` | `clear_ingested_file(conn, path)` | delete by path |
-| `clearLedgerForFile` | `clear_ledger_for_file(conn, path)` | deletes that path from `session_ledger` **and** `session_model_usage` |
-| `addLedgerRow` | `add_ledger_row(conn, &LedgerFileRow)` | copy the TS upsert verbatim, including the `CASE` that keeps the earliest non-zero `project_ts_ms`, `last_ts_ms = MAX(…)`, and additive `interactions` / `tool_calls` |
-| `addLedgerModelRow` | `add_ledger_model_row(conn, &LedgerModelRow)` | additive upsert on `(path, session_key, model)` |
-| `allLedgerRows` | `all_ledger_rows(conn)` | `ORDER BY project_ts_ms, path` |
-| `allLedgerModelRows` | `all_ledger_model_rows(conn)` | no order |
+| TS                                     | Rust                                                                    | SQL behavior                                                                                                                                                          |
+| -------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `getMeta`                              | `get_meta(&Connection, key) -> Result<Option<String>>`                  | `SELECT value FROM meta WHERE key = ?`                                                                                                                                |
+| `setMeta`                              | `set_meta(conn, key, value)`                                            | `INSERT … ON CONFLICT(key) DO UPDATE SET value = excluded.value`                                                                                                      |
+| `getIngestedFile`                      | `get_ingested_file(conn, path) -> Result<Option<IngestedFile>>`         | selects `path, bytes_parsed, mtime_ms`                                                                                                                                |
+| `upsertIngestedFile`                   | `upsert_ingested_file(conn, &IngestedFile, updated_at: i64)`            | upsert on `path`, sets all three plus `updated_at`                                                                                                                    |
+| `hasSeenRequest` / `markSeenRequest`   | `has_seen_request(conn, key)` / `mark_seen_request(conn, key, path)`    | `INSERT OR IGNORE`                                                                                                                                                    |
+| `clearSeenRequestsForFile`             | `clear_seen_requests_for_file(conn, path)`                              | `DELETE … WHERE path = ?`                                                                                                                                             |
+| `hasSeenToolCall` / `markSeenToolCall` | `has_seen_tool_call(conn, session_key, key)` / `mark_seen_tool_call(…)` | keyed `(session_key, tool_key)`, `INSERT OR IGNORE`                                                                                                                   |
+| `pruneSeenToolCalls`                   | `prune_seen_tool_calls(conn)`                                           | `DELETE FROM seen_tool_calls WHERE session_key NOT IN (SELECT session_key FROM session_ledger)`                                                                       |
+| `addHourlyRow`                         | `add_hourly_row(conn, &HourlyRow)`                                      | **additive** upsert: every count column `= col + excluded.col`                                                                                                        |
+| `allHourlyRows`                        | `all_hourly_rows(conn) -> Result<Vec<HourlyRow>>`                       | no `ORDER BY` (same as TS)                                                                                                                                            |
+| `rewindRollup`                         | `rewind_rollup(conn)`                                                   | `UPDATE ingested_files SET bytes_parsed = 0`, then `DELETE FROM seen_tool_calls`. It **never** touches `seen_requests`.                                               |
+| `clearIngestedFile`                    | `clear_ingested_file(conn, path)`                                       | delete by path                                                                                                                                                        |
+| `clearLedgerForFile`                   | `clear_ledger_for_file(conn, path)`                                     | deletes that path from `session_ledger` **and** `session_model_usage`                                                                                                 |
+| `addLedgerRow`                         | `add_ledger_row(conn, &LedgerFileRow)`                                  | copy the TS upsert verbatim, including the `CASE` that keeps the earliest non-zero `project_ts_ms`, `last_ts_ms = MAX(…)`, and additive `interactions` / `tool_calls` |
+| `addLedgerModelRow`                    | `add_ledger_model_row(conn, &LedgerModelRow)`                           | additive upsert on `(path, session_key, model)`                                                                                                                       |
+| `allLedgerRows`                        | `all_ledger_rows(conn)`                                                 | `ORDER BY project_ts_ms, path`                                                                                                                                        |
+| `allLedgerModelRows`                   | `all_ledger_model_rows(conn)`                                           | no order                                                                                                                                                              |
 
 Copy each SQL string from `rollup-db.ts` character for character. The upsert arithmetic is the contract.
 
@@ -153,12 +154,12 @@ The black-box golden tests `rollup migrate v2`, `rollup refuse newer`, and `roll
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Any of these: a migration loses rows, a newer version is written to, `seen_requests` is cleared, or the backup overwrites an existing `.bak` | Happy path migrates, but the backup order, the `.v99.bak` parity, the `writer` placement inside the transaction, or the exact upsert arithmetic drifts from the TS | Every step matches the pinned sequence; SQL is copied verbatim; the refused DB keeps every row, its schema, and its meta values (the WAL header may change), with only the `.pre-rust.bak` (when `writer` was unset) and the TS-parity `.v<N>.bak` added |
-| Test coverage | ×2 | No tests, or only a fresh-DB test | Migrations tested; backup idempotence, refusal, or accessor arithmetic untested | All eight acceptance cases plus the PRAGMA checks run under `cargo test`, each on its own temp DB |
-| Interface & readability | ×1 | Signatures differ from `engine-api.md`, or `unwrap` is used on SQLite results | Signatures match, but accessors are hidden behind a one-caller abstraction or named unlike their TS counterparts | One `pub(crate)` fn per TS accessor with the snake_case name; public items exactly as frozen; clippy clean |
-| Assumptions & docs | ×1 | The Rust-only backup is uncommented | Backup present, but why it runs first or why errors are swallowed is unexplained | One-line why-comments on the pre-rust-first ordering, the swallowed backup errors, and the `writer` key being Rust-only |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                   | 2–3 (below bar)                                                                                                                                                    | 4–5 (pass)                                                                                                                                                                                                                                               |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Any of these: a migration loses rows, a newer version is written to, `seen_requests` is cleared, or the backup overwrites an existing `.bak` | Happy path migrates, but the backup order, the `.v99.bak` parity, the `writer` placement inside the transaction, or the exact upsert arithmetic drifts from the TS | Every step matches the pinned sequence; SQL is copied verbatim; the refused DB keeps every row, its schema, and its meta values (the WAL header may change), with only the `.pre-rust.bak` (when `writer` was unset) and the TS-parity `.v<N>.bak` added |
+| Test coverage           | ×2     | No tests, or only a fresh-DB test                                                                                                            | Migrations tested; backup idempotence, refusal, or accessor arithmetic untested                                                                                    | All eight acceptance cases plus the PRAGMA checks run under `cargo test`, each on its own temp DB                                                                                                                                                        |
+| Interface & readability | ×1     | Signatures differ from `engine-api.md`, or `unwrap` is used on SQLite results                                                                | Signatures match, but accessors are hidden behind a one-caller abstraction or named unlike their TS counterparts                                                   | One `pub(crate)` fn per TS accessor with the snake_case name; public items exactly as frozen; clippy clean                                                                                                                                               |
+| Assumptions & docs      | ×1     | The Rust-only backup is uncommented                                                                                                          | Backup present, but why it runs first or why errors are swallowed is unexplained                                                                                   | One-line why-comments on the pre-rust-first ordering, the swallowed backup errors, and the `writer` key being Rust-only                                                                                                                                  |
 
 ## Out of scope
 

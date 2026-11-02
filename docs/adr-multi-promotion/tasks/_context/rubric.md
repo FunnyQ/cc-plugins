@@ -31,12 +31,12 @@ low.
 
 ## Shared dimensions
 
-| Dimension | Weight | What it looks at |
-| --- | --- | --- |
-| Contract fidelity | ×3 | Every payload shape, field name, and rule matches `contract.md` exactly. No stale singular field survives in the edited file. |
-| Completeness | ×2 | Every item the task's `## Files to create / modify` and `## Acceptance criteria` name is done. No half-converted section. |
-| Readability | ×1 | The edited text follows the STE-lite rules in `shared.md`, and reads as one voice with the surrounding file. |
-| Assumptions and docs | ×1 | Non-obvious rules carry their reason. Nothing invents a behavior `contract.md` does not define. |
+| Dimension            | Weight | What it looks at                                                                                                              |
+| -------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | Every payload shape, field name, and rule matches `contract.md` exactly. No stale singular field survives in the edited file. |
+| Completeness         | ×2     | Every item the task's `## Files to create / modify` and `## Acceptance criteria` name is done. No half-converted section.     |
+| Readability          | ×1     | The edited text follows the STE-lite rules in `shared.md`, and reads as one voice with the surrounding file.                  |
+| Assumptions and docs | ×1     | Non-obvious rules carry their reason. Nothing invents a behavior `contract.md` does not define.                               |
 
 ## Anchors that apply everywhere
 

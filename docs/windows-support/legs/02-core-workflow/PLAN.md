@@ -88,22 +88,22 @@ review/01    final review
 
 ## Task index
 
-| Bucket    | NN  | Title                 | Status | Pass line | Depends on                                                 |
-| --------- | --- | --------------------- | ------ | --------- | ---------------------------------------------------------- |
-| chronicle | 01  | test-env              | todo   | > 4.0     | —                                                          |
-| chronicle | 02  | product-fixes         | todo   | > 4.0     | chronicle/01                                               |
-| chronicle | 03  | codex-home-fallback   | todo   | > 4.0     | chronicle/01                                               |
-| dispatch  | 01  | test-env              | todo   | > 4.0     | —                                                          |
-| dispatch  | 02  | path-handling         | todo   | > 4.0     | dispatch/01                                                |
-| dispatch  | 03  | spawn-and-worktree    | todo   | > 4.0     | dispatch/02                                                |
-| guard     | 01  | test-env              | todo   | > 4.0     | —                                                          |
-| guard     | 02  | product-fixes         | todo   | > 4.0     | guard/01                                                   |
-| relay     | 01  | test-env              | todo   | > 4.0     | —                                                          |
-| relay     | 02  | product-fixes         | todo   | > 4.0     | relay/01                                                   |
-| platform  | 01  | opencode-layer        | todo   | > 4.0     | dispatch/02                                                |
+| Bucket    | NN  | Title                 | Status | Pass line | Depends on                                                               |
+| --------- | --- | --------------------- | ------ | --------- | ------------------------------------------------------------------------ |
+| chronicle | 01  | test-env              | todo   | > 4.0     | —                                                                        |
+| chronicle | 02  | product-fixes         | todo   | > 4.0     | chronicle/01                                                             |
+| chronicle | 03  | codex-home-fallback   | todo   | > 4.0     | chronicle/01                                                             |
+| dispatch  | 01  | test-env              | todo   | > 4.0     | —                                                                        |
+| dispatch  | 02  | path-handling         | todo   | > 4.0     | dispatch/01                                                              |
+| dispatch  | 03  | spawn-and-worktree    | todo   | > 4.0     | dispatch/02                                                              |
+| guard     | 01  | test-env              | todo   | > 4.0     | —                                                                        |
+| guard     | 02  | product-fixes         | todo   | > 4.0     | guard/01                                                                 |
+| relay     | 01  | test-env              | todo   | > 4.0     | —                                                                        |
+| relay     | 02  | product-fixes         | todo   | > 4.0     | relay/01                                                                 |
+| platform  | 01  | opencode-layer        | todo   | > 4.0     | dispatch/02                                                              |
 | platform  | 02  | ci-required-and-smoke | todo   | > 4.0     | chronicle/02, chronicle/03, dispatch/03, guard/02, relay/02, platform/01 |
-| platform  | 03  | docs                  | todo   | > 4.0     | —                                                          |
-| review    | 01  | final review 🏁       | todo   | > 4.0     | platform/02, platform/03                                   |
+| platform  | 03  | docs                  | todo   | > 4.0     | —                                                                        |
+| review    | 01  | final review 🏁       | todo   | > 4.0     | platform/02, platform/03                                                 |
 
 Run options: all four lenses on Codex · Standard tier (14 tasks, 6 buckets) · no design phase.
 

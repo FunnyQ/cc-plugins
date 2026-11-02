@@ -58,12 +58,12 @@ Write exactly this one line, followed by a trailing newline, and nothing else:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension               | Weight | 0–1 (fail)                                                  | 2–3 (below bar)                                                              | 4–5 (pass)                                                                                             |
-| ----------------------- | ------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Correctness             | ×3     | File missing, wrong rule, or another file's content changed | Rule present but extra lines/rules, or a check stages or resets the index  | Exactly `* text=auto eol=lf`; index check lists nothing; shim reports `text: auto` and `eol: lf`; the index is never touched |
-| Test coverage           | ×2     | No check run                                                | Content checked, but the `autocrlf=true` checkout simulation not run         | All four Verification commands run and pass              |
-| Interface & readability | ×1     | Extra rules, comments, or per-path overrides with no caller | One redundant rule                                                           | One line, nothing else                                                                                 |
-| Assumptions & docs      | ×1     | Claims about Windows checkout unverified                    | Simulation run but its result not reported | Simulation evidence reported; any unexpected renormalized path reported, not fixed                     |
+| Dimension               | Weight | 0–1 (fail)                                                  | 2–3 (below bar)                                                           | 4–5 (pass)                                                                                                                   |
+| ----------------------- | ------ | ----------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | File missing, wrong rule, or another file's content changed | Rule present but extra lines/rules, or a check stages or resets the index | Exactly `* text=auto eol=lf`; index check lists nothing; shim reports `text: auto` and `eol: lf`; the index is never touched |
+| Test coverage           | ×2     | No check run                                                | Content checked, but the `autocrlf=true` checkout simulation not run      | All four Verification commands run and pass                                                                                  |
+| Interface & readability | ×1     | Extra rules, comments, or per-path overrides with no caller | One redundant rule                                                        | One line, nothing else                                                                                                       |
+| Assumptions & docs      | ×1     | Claims about Windows checkout unverified                    | Simulation run but its result not reported                                | Simulation evidence reported; any unexpected renormalized path reported, not fixed                                           |
 
 ## Out of scope
 

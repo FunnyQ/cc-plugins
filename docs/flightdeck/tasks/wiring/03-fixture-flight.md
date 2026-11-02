@@ -1,6 +1,7 @@
 # WIRING-03: fixture flight verification
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/data-model.md`
 > - `../_context/rubric.md`
@@ -132,7 +133,7 @@ at the end — the in-flight states are exactly what a post-hoc log inspection c
 
 ### If the flight exposes a defect
 
-Finding defects is the point of this task, not a failure of it. But fixing *everything* they touch is
+Finding defects is the point of this task, not a failure of it. But fixing _everything_ they touch is
 not this task's job, and treating it that way would let one task quietly absorb half the plan.
 
 Split what you find:
@@ -177,9 +178,9 @@ evidence file and stop rather than repairing another component's work from insid
       `find docs/flightdeck-fixture -type d -name .flightlog` → exactly one path.
 - [x] Confirm start entries were written for **every** instrumented role. The balance check below cannot
       catch a role that emitted neither a start nor an end, so assert presence separately:
-      ```bash
-      jq -r 'select(.phase == "start") | .role' docs/flightdeck-fixture/.flightlog/run.jsonl | sort -u
-      ```
+      `bash
+    jq -r 'select(.phase == "start") | .role' docs/flightdeck-fixture/.flightlog/run.jsonl | sort -u
+    `
       → must include all five of `scout`, `dev`, `verify`, `judge`, `review`. The fixture's closing review
       round is what produces `review`, which is why the fixture needs a real final-review task rather than
       two work tasks alone.
@@ -189,19 +190,19 @@ evidence file and stop rather than repairing another component's work from insid
       not, record that in the evidence file and move on.
 - [x] Assert start and end pairing mechanically. This must **fail** on an orphan, not merely print rows
       for eyeballing:
-      ```bash
-      jq -e -s '
-        map(select(.kind == "note"))
-        | group_by(.agentLabel)
-        | map({
-            label: .[0].agentLabel,
-            starts: (map(select(.phase == "start")) | length),
-            ends:   (map(select(.phase != "start")) | length)
-          })
-        | map(select(.starts != .ends))
-        | if length == 0 then true else (., false) end
-      ' docs/flightdeck-fixture/.flightlog/run.jsonl
-      ```
+      `bash
+    jq -e -s '
+      map(select(.kind == "note"))
+      | group_by(.agentLabel)
+      | map({
+          label: .[0].agentLabel,
+          starts: (map(select(.phase == "start")) | length),
+          ends:   (map(select(.phase != "start")) | length)
+        })
+      | map(select(.starts != .ends))
+      | if length == 0 then true else (., false) end
+    ' docs/flightdeck-fixture/.flightlog/run.jsonl
+    `
       Exit status `0` means every label balanced. A non-zero exit prints the offending labels with their
       counts; an unbalanced label is an agent that will render as permanently in flight.
 - [x] Confirm the run log excludes start entries:
@@ -219,12 +220,12 @@ evidence file and stop rather than repairing another component's work from insid
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | No real flight was run, or the trail split and was not fixed | Flew but only checked the log afterwards, or repaired another component's code from inside this task | A real flight was watched live, every observation confirmed, wiring defects fixed and re-flown clean, other defects recorded and handed on |
-| Test coverage | ×2 | No post-run checks | Ran one or two checks | Every Verification command run, plus the full suites green afterwards |
-| Interface & readability | ×1 | Fixture is elaborate or left behind | Fixture removed but the evidence record is thin | Fixture minimal and removed, evidence record short, factual, and complete |
-| Assumptions & docs | ×1 | No evidence record was committed | Record exists but omits defects or verification output | Record carries observations, pasted output, and each defect with cause, fix, and whether a re-flight followed |
+| Dimension               | Weight | 0–1 (fail)                                                   | 2–3 (below bar)                                                                                      | 4–5 (pass)                                                                                                                                 |
+| ----------------------- | ------ | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | No real flight was run, or the trail split and was not fixed | Flew but only checked the log afterwards, or repaired another component's code from inside this task | A real flight was watched live, every observation confirmed, wiring defects fixed and re-flown clean, other defects recorded and handed on |
+| Test coverage           | ×2     | No post-run checks                                           | Ran one or two checks                                                                                | Every Verification command run, plus the full suites green afterwards                                                                      |
+| Interface & readability | ×1     | Fixture is elaborate or left behind                          | Fixture removed but the evidence record is thin                                                      | Fixture minimal and removed, evidence record short, factual, and complete                                                                  |
+| Assumptions & docs      | ×1     | No evidence record was committed                             | Record exists but omits defects or verification output                                               | Record carries observations, pasted output, and each defect with cause, fix, and whether a re-flight followed                              |
 
 ## Out of scope
 

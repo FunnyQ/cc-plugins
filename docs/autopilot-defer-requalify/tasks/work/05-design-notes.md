@@ -1,6 +1,7 @@
 # WORK-05: Design notes for the restore ban and the defer gate
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 > - `../_context/orchestrator-anatomy.md`
@@ -39,11 +40,11 @@ Before writing a word, read at least four existing entries in that section end t
 share a shape that the two new entries must follow:
 
 - A **bolded lede sentence** that states the rule or the failure outright.
-- Then dense prose that names the *concrete* failure, explains why the obvious alternative is
+- Then dense prose that names the _concrete_ failure, explains why the obvious alternative is
   wrong, and — where one exists — cites the live run where the failure was observed, by its run
   id or by what the agent actually did.
 - No bullet-within-bullet decomposition, no headings, no restating what the code does. The
-  house rule is *why, never what*.
+  house rule is _why, never what_.
 
 Two neighbouring entries are especially close in subject and are the best models: the one
 beginning "Only the commit agents commit", including its indented follow-on paragraph about the
@@ -67,7 +68,7 @@ Substance to carry:
 - The restore-family ban originally reached only the three prompts whose agents write source,
   because it was scoped to the idea of a "writer". Universal Bash access is what breaks that
   proxy: the verifier, the rubric judge, the review lenses and the commit agents all hold Bash
-  too, so role never bounded who *could* run the command.
+  too, so role never bounded who _could_ run the command.
 - But Bash access is not the replacement boundary either, and the entry must say so — every
   Workflow agent has it, including three prompts that are excluded on purpose. The boundary is
   **command discretion**: whether the prompt hands the agent a decision about what to run. The
@@ -92,7 +93,7 @@ Substance to carry:
 - Why this is defense-in-depth and not enforcement, stated plainly so nobody mistakes it for a
   guarantee: Workflow `agent()` accepts no tool allowlist, and agent-frontmatter tool lists do
   not constrain Workflow subagents. A `git` wrapper on `PATH` is bypassed by an absolute path.
-  Comparing the tree before and after only *detects* damage that `reset --hard` has already
+  Comparing the tree before and after only _detects_ damage that `reset --hard` has already
   made unrecoverable. Worktree isolation would blind the verifier to the uncommitted edits it
   exists to verify. The prompt is the only lever the script has.
 
@@ -167,12 +168,12 @@ Substance to carry:
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | An entry misstates the mechanism — e.g. describes the defer as waiving a failure, or the quiet signal as a one-shot barrier — or edits land inside the fence | Both entries present and accurate, but one reads as a summary of what the code does rather than why, or drops a rejected alternative | Both entries accurate about the mechanism, each naming its concrete failure and its rejected alternative, in the section's own register |
-| Test coverage | ×2 | The suite is left failing, or the placement check was never run | Suite green, but placement confirmed only by eye rather than by the command | Suite green **and** the fence-boundary command run and reported. This is a docs task: there are no new test cases to write, and adding some would be out of scope |
-| Interface & readability | ×1 | Sub-bullets, headings, or a new formatting convention introduced into the section | Correct shape but padded — restates the code, or repeats a neighbouring entry | Bolded lede plus dense prose, matching the surrounding entries closely enough to be indistinguishable in style |
-| Assumptions & docs | ×1 | The defense-in-depth limit or the residual race is omitted, leaving the reader with a false guarantee | Limits mentioned but vague about what they cost | Every limit stated plainly: what the ban cannot enforce, what a deferral cannot prove, and what happens when the tree is dirty again on the re-run |
+| Dimension               | Weight | 0–1 (fail)                                                                                                                                                   | 2–3 (below bar)                                                                                                                      | 4–5 (pass)                                                                                                                                                        |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | An entry misstates the mechanism — e.g. describes the defer as waiving a failure, or the quiet signal as a one-shot barrier — or edits land inside the fence | Both entries present and accurate, but one reads as a summary of what the code does rather than why, or drops a rejected alternative | Both entries accurate about the mechanism, each naming its concrete failure and its rejected alternative, in the section's own register                           |
+| Test coverage           | ×2     | The suite is left failing, or the placement check was never run                                                                                              | Suite green, but placement confirmed only by eye rather than by the command                                                          | Suite green **and** the fence-boundary command run and reported. This is a docs task: there are no new test cases to write, and adding some would be out of scope |
+| Interface & readability | ×1     | Sub-bullets, headings, or a new formatting convention introduced into the section                                                                            | Correct shape but padded — restates the code, or repeats a neighbouring entry                                                        | Bolded lede plus dense prose, matching the surrounding entries closely enough to be indistinguishable in style                                                    |
+| Assumptions & docs      | ×1     | The defense-in-depth limit or the residual race is omitted, leaving the reader with a false guarantee                                                        | Limits mentioned but vague about what they cost                                                                                      | Every limit stated plainly: what the ban cannot enforce, what a deferral cannot prove, and what happens when the tree is dirty again on the re-run                |
 
 ## Out of scope
 

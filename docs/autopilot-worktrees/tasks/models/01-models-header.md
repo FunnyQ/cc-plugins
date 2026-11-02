@@ -1,6 +1,7 @@
 # MODELS-01: Parse and lint the Models task header
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/models.md`
 > - `../_context/rubric.md`
@@ -34,7 +35,10 @@ export type ModelChoice = { model: ModelName; effort: Effort | null };
 export type TaskModels = Partial<Record<ModelRole, ModelChoice>>;
 
 /** Pure: parse the value after `**Models**:`. Invalid entries are dropped from `models` and described in `errors`. */
-export function parseModels(value: string): { models: TaskModels; errors: string[] };
+export function parseModels(value: string): {
+  models: TaskModels;
+  errors: string[];
+};
 ```
 
 Add three fields to `ParsedTask`, next to `finalReview`:
@@ -68,28 +72,28 @@ modelErrors: string[];
 
 Examples:
 
-| Header value | `models` | `errors` |
-|---|---|---|
-| `dev=opus/high, verify=sonnet` | `{ dev: {model:"opus",effort:"high"}, verify: {model:"sonnet",effort:null} }` | `[]` |
-| `judge = opus / xhigh` | `{ judge: {model:"opus",effort:"xhigh"} }` | `[]` |
-| `dev=opus, dev=sonnet` | `{ dev: {model:"opus",effort:null} }` | 1 duplicate-role message |
-| `scout=haiku` | `{}` | 1 unknown-role message |
+| Header value                   | `models`                                                                      | `errors`                 |
+| ------------------------------ | ----------------------------------------------------------------------------- | ------------------------ |
+| `dev=opus/high, verify=sonnet` | `{ dev: {model:"opus",effort:"high"}, verify: {model:"sonnet",effort:null} }` | `[]`                     |
+| `judge = opus / xhigh`         | `{ judge: {model:"opus",effort:"xhigh"} }`                                    | `[]`                     |
+| `dev=opus, dev=sonnet`         | `{ dev: {model:"opus",effort:null} }`                                         | 1 duplicate-role message |
+| `scout=haiku`                  | `{}`                                                                          | 1 unknown-role message   |
 
 ### Parity fixtures
 
 The orchestrator's in-script parser must agree with `parseTask()` on this exact list. Both accept with the same map, or both reject. Pin every row through `parseTask()` here. The orchestrator test repeats the same list against its own copy.
 
-| # | Header value | Result |
-|---|---|---|
-| 1 | `dev=opus/high, verify=sonnet` | `{ dev: {model:"opus",effort:"high"}, verify: {model:"sonnet",effort:null} }` |
-| 2 | `judge = opus / xhigh` | `{ judge: {model:"opus",effort:"xhigh"} }` |
-| 3 | `dev=opus,` | `{ dev: {model:"opus",effort:null} }` |
-| 4 | ` dev=sonnet/low , verify=haiku ` | `{ dev: {model:"sonnet",effort:"low"}, verify: {model:"haiku",effort:null} }` |
-| 5 | `dev=opus, dev=sonnet` | rejected (duplicate role) |
-| 6 | `dev=gpt5` | rejected (unknown model) |
-| 7 | `dev=Opus` | rejected (malformed) |
-| 8 | *(empty)* | rejected (empty value) |
-| 9 | `dev=opus/high/max` | rejected (malformed) |
+| #   | Header value                    | Result                                                                        |
+| --- | ------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | `dev=opus/high, verify=sonnet`  | `{ dev: {model:"opus",effort:"high"}, verify: {model:"sonnet",effort:null} }` |
+| 2   | `judge = opus / xhigh`          | `{ judge: {model:"opus",effort:"xhigh"} }`                                    |
+| 3   | `dev=opus,`                     | `{ dev: {model:"opus",effort:null} }`                                         |
+| 4   | `dev=sonnet/low , verify=haiku` | `{ dev: {model:"sonnet",effort:"low"}, verify: {model:"haiku",effort:null} }` |
+| 5   | `dev=opus, dev=sonnet`          | rejected (duplicate role)                                                     |
+| 6   | `dev=gpt5`                      | rejected (unknown model)                                                      |
+| 7   | `dev=Opus`                      | rejected (malformed)                                                          |
+| 8   | _(empty)_                       | rejected (empty value)                                                        |
+| 9   | `dev=opus/high/max`             | rejected (malformed)                                                          |
 
 ### Lint rule `models` (`lint-task.ts`, inside `lintFile()`)
 
@@ -139,12 +143,12 @@ The orchestrator's in-script parser must agree with `parseTask()` on this exact 
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | a valid header misparses, or a violation class is not reported | the happy path works, but a class (duplicate, empty value, `fix` placement, case) slips through or a clean header is flagged | every row of the examples table and every violation class behaves exactly as specified; `parseTask()` exposes both `models` and `modelsRaw`; `ReadyRef` carries `modelsRaw` only, in both output modes |
-| Test coverage | ×2 | no new tests | valid header tested, but some violation classes, `modelsRaw`, or the next-ready output are untested | each violation class, the absent header, `modelsRaw` as written, `fix` on final vs non-final, and both next-ready modes (raw value present, `null`, no `models` key) are asserted |
-| Interface & readability | ×1 | parsing smuggled into lint, or types redeclared in several files | works, but the types are loose (`string` instead of the unions) or the parse is not a pure function | one exported pure `parseModels()`, union types exported once from `parse-task.ts`; lint consumes the parsed map and next-ready passes the raw string through |
-| Assumptions & docs | ×1 | usage comments left stale | the `next-ready.ts` usage comment is not updated | usage comments and doc comments name the new field; the "first entry wins on duplicate" rule is commented |
+| Dimension               | Weight | 0–1 (fail)                                                       | 2–3 (below bar)                                                                                                              | 4–5 (pass)                                                                                                                                                                                             |
+| ----------------------- | ------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Correctness             | ×3     | a valid header misparses, or a violation class is not reported   | the happy path works, but a class (duplicate, empty value, `fix` placement, case) slips through or a clean header is flagged | every row of the examples table and every violation class behaves exactly as specified; `parseTask()` exposes both `models` and `modelsRaw`; `ReadyRef` carries `modelsRaw` only, in both output modes |
+| Test coverage           | ×2     | no new tests                                                     | valid header tested, but some violation classes, `modelsRaw`, or the next-ready output are untested                          | each violation class, the absent header, `modelsRaw` as written, `fix` on final vs non-final, and both next-ready modes (raw value present, `null`, no `models` key) are asserted                      |
+| Interface & readability | ×1     | parsing smuggled into lint, or types redeclared in several files | works, but the types are loose (`string` instead of the unions) or the parse is not a pure function                          | one exported pure `parseModels()`, union types exported once from `parse-task.ts`; lint consumes the parsed map and next-ready passes the raw string through                                           |
+| Assumptions & docs      | ×1     | usage comments left stale                                        | the `next-ready.ts` usage comment is not updated                                                                             | usage comments and doc comments name the new field; the "first entry wins on duplicate" rule is commented                                                                                              |
 
 ## Out of scope
 

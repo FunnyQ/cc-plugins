@@ -14,18 +14,19 @@ This design makes the work visible and take-over-able. It also sidesteps headles
 
 Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 
-| Backend | TUI binary | `--model` mapping | `--dangerous` (YOLO) mapping |
-|---|---|---|---|
-| codex | `codex` (`CODEX_BIN`) | `-m <model>` | `--dangerously-bypass-approvals-and-sandbox` |
-| claude | `claude` | `--model <model>`, plus `--effort <level>` | `--dangerously-skip-permissions` |
-| opencode | `opencode` | `-m <model>` | `--auto` (auto-approve permissions not explicitly denied) |
+| Backend  | TUI binary            | `--model` mapping                          | `--dangerous` (YOLO) mapping                              |
+| -------- | --------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| codex    | `codex` (`CODEX_BIN`) | `-m <model>`                               | `--dangerously-bypass-approvals-and-sandbox`              |
+| claude   | `claude`              | `--model <model>`, plus `--effort <level>` | `--dangerously-skip-permissions`                          |
+| opencode | `opencode`            | `-m <model>`                               | `--auto` (auto-approve permissions not explicitly denied) |
 
 `--dangerous` is a **uniform YOLO switch** across all three live backends. It lets an **unattended** run proceed without stopping on approval prompts.
 
-Without `--dangerous`, relay passes no approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a *visible* live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
+Without `--dangerous`, relay passes no approval-bypass flag. The TUI's own approval prompts then surface **in the pane**, where a human can answer them — the point of a _visible_ live pane. So `--dangerous` means fire-and-forget; no flag means supervised. `image` has no live path (codex `invokeLive("image")` returns null).
 
 Caveats on the uniformity (see the opencode section below for details):
-- opencode's `--auto` is **not a full bypass**: it auto-approves only what is *not explicitly denied* — config `deny` rules (and built-in deny patterns) still block. codex's flag bypasses everything.
+
+- opencode's `--auto` is **not a full bypass**: it auto-approves only what is _not explicitly denied_ — config `deny` rules (and built-in deny patterns) still block. codex's flag bypasses everything.
 - **Headless `run` has no human to prompt.** Without `--auto`, opencode auto-rejects approval requests instead of asking. So on the headless path `--dangerous` → `--auto` too, and a non-dangerous headless run silently loses approval-gated operations (it does not abort).
 
 codex is the exception on the sandbox axis: its live launch passes `-s danger-full-access` even when not dangerous. The approval prompts stay, only the filesystem/network sandbox goes. See the codex section below for why.
@@ -63,6 +64,7 @@ codex exec -s danger-full-access -o <lastfile> -
 > Verified against codex-cli 0.147.0.
 
 Dangerous opt-in (only if user explicitly asks):
+
 ```bash
 codex exec --dangerously-bypass-approvals-and-sandbox -o <lastfile> -
 ```
@@ -119,7 +121,7 @@ opencode run --format json -- "<read-only review prompt>"
 There is no native review. The prompt must instruct "analyze only, do not modify files."
 
 Read-only is prompt-level only, and opencode's default permissions allow `edit`
-— a headless review *could* write files if the model ignores the instruction.
+— a headless review _could_ write files if the model ignores the instruction.
 Hard read-only is possible via an agent profile that denies `edit`/`bash`
 (`--agent <name>` with `permission` deny rules) but relay does not wire one in:
 the profile would have to exist in every machine's opencode config. Create a
@@ -136,6 +138,7 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 ### Output parsing
 
 **Used:** `--format json` produces JSONL (one event per line: `step_start`, `text`, `step_finish`). The answer lives in the `text` events; relay's `parseJsonl` concatenates every `part.text` from lines where `type === "text"`.
+
 - Equivalent to: `jq -r 'select(.type=="text") | .part.text'`
 - Why not `--format default`: that stream interleaves the answer with TUI and progress noise, so a naive trim returns garbage. JSON gives a clean, structured extraction.
 - KNOWN BUG #26855: `run --format json` can exit before it emits the terminal `step_finish` event. `parseJsonl` never blocks on a terminal event — it just concatenates whatever `text` parts arrived, so this is a non-issue.

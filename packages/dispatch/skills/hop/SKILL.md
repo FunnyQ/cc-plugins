@@ -18,7 +18,7 @@ argument-hint: "[topic]"
 
 A short flight you fly yourself: interview, plan, execute — all in this session, no handoff. `flightplan` is the long haul, where the plan is frozen to disk and someone else flies it.
 
-`preflight` is the tier above: it captures *what you want* before anyone decides how to build it. If the user wants the work done now, this skill is the right one.
+`preflight` is the tier above: it captures _what you want_ before anyone decides how to build it. If the user wants the work done now, this skill is the right one.
 
 ## Why Plan Mode and AskUserQuestion Matter
 
@@ -76,11 +76,11 @@ Ask via `AskUserQuestion` whether to run the review. Recommend running it when t
 
 When the user accepts, ask two more `AskUserQuestion` rounds. First ask the harness: `claude` (recommended), `codex`, or `opencode`. Then ask the model, with options for the chosen harness:
 
-| Harness | Command | Model options | Extra flag |
-| --- | --- | --- | --- |
-| claude | `/relay:claude-cli` | `opus` (recommended), `sonnet` | `--effort high` |
-| codex | `/relay:codex` | `default` (recommended) | none |
-| opencode | `/relay:opencode` | `default` (recommended) | none |
+| Harness  | Command             | Model options                  | Extra flag      |
+| -------- | ------------------- | ------------------------------ | --------------- |
+| claude   | `/relay:claude-cli` | `opus` (recommended), `sonnet` | `--effort high` |
+| codex    | `/relay:codex`      | `default` (recommended)        | none            |
+| opencode | `/relay:opencode`   | `default` (recommended)        | none            |
 
 `default` means omit `--model`, so relay resolves the model from its own config and suggestions. A model typed through "Other" passes through verbatim.
 
@@ -100,23 +100,30 @@ Fix every finding you can confirm. Report the rest to the user with your reason 
 # <Topic>
 
 ## Overview
+
 [1-2 sentence summary of what we're building/writing and why]
 
 ## Context
+
 [Problem being solved, current situation]
 
 ## Requirements
+
 [Structured list from interview — mark MVP vs later if applicable]
 
 ## Constraints
+
 [Technical limitations, timeline, scope boundaries]
 
 ## Design
+
 [impeccable → mock.html before execution — omit this section when the interview skipped it]
 
 ## Implementation Plan
+
 [Step-by-step plan with enough detail to execute — file names, key decisions, order of operations]
 
 ## Open Questions
+
 [Unknowns that surfaced during interview, if any — omit this section if none]
 ```

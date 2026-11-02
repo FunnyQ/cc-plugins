@@ -133,7 +133,11 @@ describe("liveGate", () => {
 
   it("goes live in a herdr-app terminal through hc", () => {
     expect(
-      liveGate({ ...base, env: { HC_TERMINAL_ID: "t46" }, herdScriptPath: HC_CLIENT }),
+      liveGate({
+        ...base,
+        env: { HC_TERMINAL_ID: "t46" },
+        herdScriptPath: HC_CLIENT,
+      }),
     ).toEqual({ live: true });
   });
 
@@ -616,11 +620,19 @@ describe("runLive", () => {
       resultAppearsAtGet: 2,
       resultContent: `# Result\n${RESULT_END_MARKER}\n`,
       callerAgents: [],
-      clientLocation: { workspaceId: "sp1", tabId: "tb1", paneId: "t46", source: "env" },
+      clientLocation: {
+        workspaceId: "sp1",
+        tabId: "tb1",
+        paneId: "t46",
+        source: "env",
+      },
     });
 
     expect((await run()).ok).toBe(true);
-    const spawn = calls.find((c) => c.verb === "spawn")!.args[0] as Record<string, unknown>;
+    const spawn = calls.find((c) => c.verb === "spawn")!.args[0] as Record<
+      string,
+      unknown
+    >;
     expect(spawn.workspace).toBe("sp1");
   });
 
@@ -629,7 +641,12 @@ describe("runLive", () => {
       statuses: ["working"],
       waitTimeoutMs: 20_000,
       herdScriptPath: HC_CLIENT,
-      clientLocation: { workspaceId: "sp1", tabId: "tb1", paneId: "t46", source: "env" },
+      clientLocation: {
+        workspaceId: "sp1",
+        tabId: "tb1",
+        paneId: "t46",
+        source: "env",
+      },
     });
 
     const result = await run();

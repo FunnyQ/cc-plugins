@@ -1,6 +1,7 @@
 # AGENTS-02: Lorekeeper batch phase contracts
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -84,7 +85,11 @@ Replace the singular draft-phase output block with the array form:
 {
   "phase": "draft",
   "drafts": [
-    { "groupId": "g1", "draftText": "...", "proposedPath": "docs/adr/0027-....md" }
+    {
+      "groupId": "g1",
+      "draftText": "...",
+      "proposedPath": "docs/adr/0027-....md"
+    }
   ]
 }
 ```
@@ -167,12 +172,12 @@ alone.
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted
 > average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the frozen contract, or `candidateIds` survives | Shapes match but the `newAdr` refusal, the never-send-`[]` rule, or the same-order rule is missing | `groups`, `drafts`, and `newAdrs` match the contract exactly, and each rule names the failure it prevents |
-| Completeness | ×2 | The Require list or the output block is untouched | The `draft` phase is converted while the `commit` phase still reads `newAdr`, or the Output prose still binds one draft | Require list, steps, output block, commit inputs, spawn step, and Output prose are all converted |
-| Readability | ×1 | A heading was added or re-leveled, or the frontmatter changed | Correct content with sentences over 25 words, stacked em dashes, or a new term for `group` | Reads as one voice with the rest of the file and obeys the STE-lite rules |
-| Assumptions and docs | ×1 | Invents a behavior the frozen contract does not define, such as one Codifier per group | A rule lands with no reason, so a later editor cannot tell it is load-bearing | Every new rule carries its reason, and the preserved rules stay verbatim in meaning |
+| Dimension            | Weight | 0–1 (fail)                                                                             | 2–3 (below bar)                                                                                                         | 4–5 (pass)                                                                                                |
+| -------------------- | ------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Contract fidelity    | ×3     | A field name differs from the frozen contract, or `candidateIds` survives              | Shapes match but the `newAdr` refusal, the never-send-`[]` rule, or the same-order rule is missing                      | `groups`, `drafts`, and `newAdrs` match the contract exactly, and each rule names the failure it prevents |
+| Completeness         | ×2     | The Require list or the output block is untouched                                      | The `draft` phase is converted while the `commit` phase still reads `newAdr`, or the Output prose still binds one draft | Require list, steps, output block, commit inputs, spawn step, and Output prose are all converted          |
+| Readability          | ×1     | A heading was added or re-leveled, or the frontmatter changed                          | Correct content with sentences over 25 words, stacked em dashes, or a new term for `group`                              | Reads as one voice with the rest of the file and obeys the STE-lite rules                                 |
+| Assumptions and docs | ×1     | Invents a behavior the frozen contract does not define, such as one Codifier per group | A rule lands with no reason, so a later editor cannot tell it is load-bearing                                           | Every new rule carries its reason, and the preserved rules stay verbatim in meaning                       |
 
 ## Out of scope
 

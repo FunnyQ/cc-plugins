@@ -46,6 +46,7 @@ The first wave is three parallel foundation tasks with no dependencies:
 `runtime/01` is the one to read first — it establishes how the module invokes the existing shell hooks instead of reimplementing them, which is the decision the rest of the tree is shaped around.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -57,20 +58,20 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| assets | 01 | Chronicle agents in OpenCode format | todo | > 4 | — |
-| assets | 02 | Monitor commands in OpenCode format | todo | > 4 | — |
-| docs | 01 | README and CLAUDE.md | todo | > 4 | skills/01, skills/02, skills/03, skills/04, skills/05, skills/06 |
-| review | 01 | Final review | todo | > 4 | docs/01 |
-| runtime | 01 | OpenCode plugin module | todo | > 4 | — |
-| runtime | 02 | OpenCode installer | todo | > 4 | runtime/01, assets/01, assets/02 |
-| skills | 01 | Monitor skills — OpenCode branches | todo | > 4 | runtime/02 |
-| skills | 02 | Dispatch skills — OpenCode branches | todo | > 4 | runtime/02 |
-| skills | 03 | Relay skill — OpenCode branch | todo | > 4 | runtime/02 |
-| skills | 04 | Chronicle skills — OpenCode branches | todo | > 4 | runtime/02, assets/01 |
-| skills | 05 | Herdr skills — OpenCode branches | todo | > 4 | runtime/02 |
-| skills | 06 | Autopilot — OpenCode parity | todo | > 4 | runtime/02 |
+| Bucket  | NN  | Title                                | Status | Pass line | Depends on                                                       |
+| ------- | --- | ------------------------------------ | ------ | --------- | ---------------------------------------------------------------- |
+| assets  | 01  | Chronicle agents in OpenCode format  | todo   | > 4       | —                                                                |
+| assets  | 02  | Monitor commands in OpenCode format  | todo   | > 4       | —                                                                |
+| docs    | 01  | README and CLAUDE.md                 | todo   | > 4       | skills/01, skills/02, skills/03, skills/04, skills/05, skills/06 |
+| review  | 01  | Final review                         | todo   | > 4       | docs/01                                                          |
+| runtime | 01  | OpenCode plugin module               | todo   | > 4       | —                                                                |
+| runtime | 02  | OpenCode installer                   | todo   | > 4       | runtime/01, assets/01, assets/02                                 |
+| skills  | 01  | Monitor skills — OpenCode branches   | todo   | > 4       | runtime/02                                                       |
+| skills  | 02  | Dispatch skills — OpenCode branches  | todo   | > 4       | runtime/02                                                       |
+| skills  | 03  | Relay skill — OpenCode branch        | todo   | > 4       | runtime/02                                                       |
+| skills  | 04  | Chronicle skills — OpenCode branches | todo   | > 4       | runtime/02, assets/01                                            |
+| skills  | 05  | Herdr skills — OpenCode branches     | todo   | > 4       | runtime/02                                                       |
+| skills  | 06  | Autopilot — OpenCode parity          | todo   | > 4       | runtime/02                                                       |
 
 ## Dependency graph
 
@@ -95,17 +96,18 @@ runtime/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
-| runtime/02 | assets/01, assets/02 |
-| docs/01 | skills/01, skills/02, skills/03, skills/04, skills/05, skills/06 |
-| review/01 | docs/01 |
-| skills/02 | runtime/02 |
-| skills/06 | runtime/02 |
-| skills/01 | runtime/02 |
-| skills/05 | runtime/02 |
-| skills/04 | runtime/02, assets/01 |
-| skills/03 | runtime/02 |
+| Task       | Depends on                                                       |
+| ---------- | ---------------------------------------------------------------- |
+| runtime/02 | assets/01, assets/02                                             |
+| docs/01    | skills/01, skills/02, skills/03, skills/04, skills/05, skills/06 |
+| review/01  | docs/01                                                          |
+| skills/02  | runtime/02                                                       |
+| skills/06  | runtime/02                                                       |
+| skills/01  | runtime/02                                                       |
+| skills/05  | runtime/02                                                       |
+| skills/04  | runtime/02, assets/01                                            |
+| skills/03  | runtime/02                                                       |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps
@@ -115,15 +117,15 @@ runtime/01
 - ~~**S17 can grow the build.**~~ **Cleared.** `opencode agent list` reports two built-in subagents, `explore` and `general`. The wave loop spawns `general` with an inline role prompt, so no new agent definitions are needed and the 32-target count stands.
 - **`export const id` in the plugin module blocks it from loading entirely (S18).** The module evaluates, nothing errors, and every hook does nothing. Export the plugin function and nothing else. This is the tree's most expensive trap and `runtime/01` gates on it.
 - **Tool arguments are on the second handler parameter (S5)** — `output.args.command`, not `input.args.command`. Reading the wrong one returns `undefined` and silently disables both hooks.
-- **`subagent_depth` defaults to 1, and the failure is silent.** The published config schema says so outright: *"Defaults to 1, which prevents subagents from launching subagents."* So chronicle's orchestrators are broken on every fresh install until the installer raises it, and the symptom is an orchestrator that stops with no error naming the config.
+- **`subagent_depth` defaults to 1, and the failure is silent.** The published config schema says so outright: _"Defaults to 1, which prevents subagents from launching subagents."_ So chronicle's orchestrators are broken on every fresh install until the installer raises it, and the symptom is an orchestrator that stops with no error naming the config.
 - **Cockpit's OpenCode send bridge already exists and is unverified.** `opencode-send.ts` ships and is wired at `cockpit-server.ts:227`, but nobody has confirmed the round-trip against a live OpenCode session, and it requires the TUI to have been started with a port. `docs/01` documents that precondition; `review/01` proves it. If S13 shows the bridge is broken, that is a bug report, not this build's scope.
-- **The `bun test packages/` baseline is 1840 pass / 0 fail.** A few of those tests are environment-sensitive — a fresh clone or a non-git working directory can flip one. Judge on *new* failures, not on raw green/red; record your own baseline before editing.
+- **The `bun test packages/` baseline is 1840 pass / 0 fail.** A few of those tests are environment-sensitive — a fresh clone or a non-git working directory can flip one. Judge on _new_ failures, not on raw green/red; record your own baseline before editing.
 - **Two claims in the tree are corrections, not additions.** `skills/03` re-labels the README's `~/.claude/skills/relay` symlink as legacy, and `docs/01` fixes CLAUDE.md's send-routing paragraph. Everything else under `packages/` is strictly additive.
 - **Review coverage.** Three review passes ran against the OpenCode engine (deepseek-v4-pro). The final pass raised no P1 that reproduced: its one P1 was a `bun test packages/` failure observed only in the reviewer's fresh clone, which does not occur in this working tree.
 
 ## Known gaps — added by `review/01`
 
-- **`review/01`'s `git diff main` gates are vacuous as written.** Every wave committed straight onto `main`, so `main` *is* `HEAD` and the diff is empty by construction. The real non-regression check compares against the branch point, `3b5c0e0`. Run against that, the gate is genuinely green: only `.md` files under `packages/` changed, no `plugin.json`, no `CHANGELOG.md`, and the two shell hooks, the chronicle agents and the monitor commands are byte-identical.
+- **`review/01`'s `git diff main` gates are vacuous as written.** Every wave committed straight onto `main`, so `main` _is_ `HEAD` and the diff is empty by construction. The real non-regression check compares against the branch point, `3b5c0e0`. Run against that, the gate is genuinely green: only `.md` files under `packages/` changed, no `plugin.json`, no `CHANGELOG.md`, and the two shell hooks, the chronicle agents and the monitor commands are byte-identical.
 
 - **`session.idle` never fired the scribe nudge before this review.** The module spawned `scribe-nudge.ts` with no stdin. That script parses its session id and cwd from stdin and returns immediately when the parse fails, so the ported behavior was dead on arrival while looking wired. Fixed: the handler now passes `{session_id, cwd}` from the event and the plugin context. Verified live — the nudge produces a reminder with the payload and nothing without it.
 

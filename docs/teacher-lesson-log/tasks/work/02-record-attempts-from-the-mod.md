@@ -68,7 +68,11 @@ Every prompt the teacher asks Jev about leaves exactly one attempt record, spawn
   ```ts
   on("prompt.submit", { origin: { kind: "composer" } }, async ($, e, next) => {
     const r = await next(e);
-    if (!("drop" in r)) teacher.submit(r.text, $.session.id().catch(() => undefined));
+    if (!("drop" in r))
+      teacher.submit(
+        r.text,
+        $.session.id().catch(() => undefined),
+      );
     return r;
   });
   ```

@@ -41,6 +41,7 @@ The chain `01 → 02 → 03` is strictly sequential: all three edit the same fen
 and `05` may share a wave.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -52,14 +53,14 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| work | 01 | Restore-family ban across every command-discretion prompt | todo | > 4 | — |
-| work | 02 | Wave tree-watch and writer accounting | todo | > 4 | work/01 |
-| work | 03 | Defer-and-requalify gate layer | todo | > 4 | work/02 |
-| work | 04 | Requalify rows in the fleet dashboard | todo | > 4 | work/03 |
-| work | 05 | Design notes for the restore ban and the defer gate | todo | > 4 | work/03 |
-| work | 06 | Final review | todo | > 4 | work/04, work/05 |
+| Bucket | NN  | Title                                                     | Status | Pass line | Depends on       |
+| ------ | --- | --------------------------------------------------------- | ------ | --------- | ---------------- |
+| work   | 01  | Restore-family ban across every command-discretion prompt | todo   | > 4       | —                |
+| work   | 02  | Wave tree-watch and writer accounting                     | todo   | > 4       | work/01          |
+| work   | 03  | Defer-and-requalify gate layer                            | todo   | > 4       | work/02          |
+| work   | 04  | Requalify rows in the fleet dashboard                     | todo   | > 4       | work/03          |
+| work   | 05  | Design notes for the restore ban and the defer gate       | todo   | > 4       | work/03          |
+| work   | 06  | Final review                                              | todo   | > 4       | work/04, work/05 |
 
 ## Dependency graph
 
@@ -82,7 +83,7 @@ work/01
   still meet a dirty tree. It then fails strictly — which is the pre-existing behaviour, never
   worse. Removing this would need a write lease across agents, which the Workflow model cannot
   express. Deliberate; do not "fix" it by widening what a verifier may waive.
-- **A deferral proves concurrency, never causation.** The guard proves some *other* task was
+- **A deferral proves concurrency, never causation.** The guard proves some _other_ task was
   writing; it cannot prove that task caused the failure. The strict re-run is what makes a
   wrong attribution cheap rather than dangerous.
 - **Whole-suite gates on tasks that share a wave remain unsatisfiable-by-luck.** A criterion

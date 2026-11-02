@@ -16,16 +16,16 @@ find "$SCRATCH" -name '*.jsonl' -exec touch -t 202601010000 {} +
 
 For `watch-wake`, copy the base fixture first, then copy exactly one variant into the same scratch directory. Never install both variants in one run.
 
-| Case name | What to run | Expected result | Verified |
-| --- | --- | --- | --- |
-| `empty-repo` | Run `/chronicle:adr triage` from the scratch copy. | Report an empty inbox, exit 0, and do not create `.cockpit/`. | [ ] |
-| `single-decision` | Run `/chronicle:adr triage` from the scratch copy. | Return exactly one candidate with disposition `promote`; the reason cites both coordinated scope and the cost of reversal. | [ ] |
-| `spread-decision` | Run `/chronicle:adr triage` from the scratch copy. | Return one clustered candidate with evidence from all four sessions, not four candidates. | [ ] |
-| `local-detail` | Run `/chronicle:adr triage` from the scratch copy. | Mark every entry `skip` or `watch`; promote nothing. | [ ] |
-| `already-recorded` | Run `/chronicle:adr triage` from the scratch copy. | Mark the decision `skip` and name `docs/adr/0001-centralize-authorization-policy.md`; do not draft a duplicate. | [ ] |
-| `watch-wake` matching variant | Copy the base and `variant-matching`, then run `/chronicle:adr triage`. | Pull `session-watched` back into consideration and re-judge it with `session-trigger`. | [ ] |
-| `watch-wake` quiet variant | Copy the base and `variant-quiet`, then run `/chronicle:adr triage`. | Leave `session-watched` asleep and omit it from candidates. | [ ] |
-| Conflicting evidence | Inspect the `spread-decision` result. | Surface the rejected opposite conclusion in `session-004` for human judgment; do not silently prefer the newer entry. | [ ] |
+| Case name                     | What to run                                                             | Expected result                                                                                                            | Verified |
+| ----------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------- |
+| `empty-repo`                  | Run `/chronicle:adr triage` from the scratch copy.                      | Report an empty inbox, exit 0, and do not create `.cockpit/`.                                                              | [ ]      |
+| `single-decision`             | Run `/chronicle:adr triage` from the scratch copy.                      | Return exactly one candidate with disposition `promote`; the reason cites both coordinated scope and the cost of reversal. | [ ]      |
+| `spread-decision`             | Run `/chronicle:adr triage` from the scratch copy.                      | Return one clustered candidate with evidence from all four sessions, not four candidates.                                  | [ ]      |
+| `local-detail`                | Run `/chronicle:adr triage` from the scratch copy.                      | Mark every entry `skip` or `watch`; promote nothing.                                                                       | [ ]      |
+| `already-recorded`            | Run `/chronicle:adr triage` from the scratch copy.                      | Mark the decision `skip` and name `docs/adr/0001-centralize-authorization-policy.md`; do not draft a duplicate.            | [ ]      |
+| `watch-wake` matching variant | Copy the base and `variant-matching`, then run `/chronicle:adr triage`. | Pull `session-watched` back into consideration and re-judge it with `session-trigger`.                                     | [ ]      |
+| `watch-wake` quiet variant    | Copy the base and `variant-quiet`, then run `/chronicle:adr triage`.    | Leave `session-watched` asleep and omit it from candidates.                                                                | [ ]      |
+| Conflicting evidence          | Inspect the `spread-decision` result.                                   | Surface the rejected opposite conclusion in `session-004` for human judgment; do not silently prefer the newer entry.      | [ ]      |
 
 ## Why the setup matters
 

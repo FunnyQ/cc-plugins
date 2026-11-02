@@ -1,6 +1,7 @@
 # PROMOTE-01: Validate a written ADR
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/trail-and-adr.md`
 > - `../_context/rubric.md`
@@ -58,23 +59,27 @@ export type Severity = "error" | "warning";
 
 export type Violation = {
   rule:
-    | "filename"          // does not match NNNN-<kebab-title>.md
-    | "id-mismatch"       // the H1 id does not match the filename's number
-    | "missing-section"   // one of the five required sections is absent
-    | "bad-status"        // status is absent or outside the four allowed values
-    | "bad-date"          // date is absent or not YYYY-MM-DD
-    | "superseded-no-link"// Superseded without a Superseded by line
+    | "filename" // does not match NNNN-<kebab-title>.md
+    | "id-mismatch" // the H1 id does not match the filename's number
+    | "missing-section" // one of the five required sections is absent
+    | "bad-status" // status is absent or outside the four allowed values
+    | "bad-date" // date is absent or not YYYY-MM-DD
+    | "superseded-no-link" // Superseded without a Superseded by line
     | "deprecated-linked" // Deprecated carrying a successor link
-    | "link-missing"      // references an ADR id with no file
-    | "link-not-mutual"   // supersession declared in only one direction
-    | "self-link"         // references its own id
-    | "empty-evidence";   // the Evidence section has no entries
+    | "link-missing" // references an ADR id with no file
+    | "link-not-mutual" // supersession declared in only one direction
+    | "self-link" // references its own id
+    | "empty-evidence"; // the Evidence section has no entries
   severity: Severity;
   path: string;
   detail: string;
 };
 
-export type ValidateResult = { checked: number; violations: Violation[]; ok: boolean };
+export type ValidateResult = {
+  checked: number;
+  violations: Violation[];
+  ok: boolean;
+};
 
 /** Pure. Validates one already-parsed ADR against the rules that need no directory context. */
 export function validateOne(content: string, path: string): Violation[];
@@ -103,9 +108,13 @@ headings, in any valid ADR:
 
 ```md
 ## Context
+
 ## Considered alternatives
+
 ## Decision
+
 ## Consequences
+
 ## Evidence
 ```
 
@@ -114,18 +123,18 @@ A missing heading is one `missing-section` violation per absent heading, with th
 
 ### The four statuses and the lifecycle rules
 
-| Status | Link requirement |
-| --- | --- |
-| `Accepted` | none |
-| `Proposed` | none |
+| Status       | Link requirement                                                            |
+| ------------ | --------------------------------------------------------------------------- |
+| `Accepted`   | none                                                                        |
+| `Proposed`   | none                                                                        |
 | `Superseded` | **requires** a `Superseded by: ADR-NNNN` line, whose target must also exist |
-| `Deprecated` | **must not** carry a successor link |
+| `Deprecated` | **must not** carry a successor link                                         |
 
 The two lifecycle rules are easy to invert, so state them as separate rule names rather than one
 generic check:
 
 - `superseded-no-link` — the status is `Superseded` and there is no `Superseded by:` line at all.
-  Nothing more. Whether the named successor *exists* is a different question, answerable only with
+  Nothing more. Whether the named successor _exists_ is a different question, answerable only with
   the directory in hand, and it already has its own rule — a link that names an absent id is
   `link-missing`, reported by `validateDir`. Folding the two together would put a rule that needs
   sibling files inside a function that is specified as pure, and would report one defect twice.
@@ -211,19 +220,19 @@ It creates nothing. It writes nothing. It never renames.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average ≥ 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A lifecycle rule is inverted, or a repository with no ADRs is reported as failing | Catches missing sections and bad statuses, but gets a lifecycle rule backwards, treats `empty-evidence` as an error, or throws on an absent directory | All eleven rules fire on the right input, both lifecycle inversions are distinguished, and empty or missing directories exit 0 |
-| Test coverage | ×2 | No tests, or only a single happy-path case | One case per rule name but no clean-file case, and no test that an empty directory passes | A case per rule, both lifecycle inversions, a clean ADR producing nothing, and the empty-directory and `--file` paths |
-| Interface & readability | ×1 | `validateOne` reaches the filesystem, or rules are stringly-typed instead of the union | Types are present but violations carry unstructured messages instead of a `rule` field | `validateOne` is pure, the `Violation` union is exhaustive, and the split against the index reader is obvious from the code |
-| Assumptions & docs | ×1 | The severity split is unexplained, so a later reader "fixes" the warning into an error | The severity split is noted but not justified | A comment states why `empty-evidence` is a warning, and why `--file` skips the cross-file link rules while still firing `self-link` |
+| Dimension               | Weight | 0–1 (fail)                                                                             | 2–3 (below bar)                                                                                                                                       | 4–5 (pass)                                                                                                                          |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A lifecycle rule is inverted, or a repository with no ADRs is reported as failing      | Catches missing sections and bad statuses, but gets a lifecycle rule backwards, treats `empty-evidence` as an error, or throws on an absent directory | All eleven rules fire on the right input, both lifecycle inversions are distinguished, and empty or missing directories exit 0      |
+| Test coverage           | ×2     | No tests, or only a single happy-path case                                             | One case per rule name but no clean-file case, and no test that an empty directory passes                                                             | A case per rule, both lifecycle inversions, a clean ADR producing nothing, and the empty-directory and `--file` paths               |
+| Interface & readability | ×1     | `validateOne` reaches the filesystem, or rules are stringly-typed instead of the union | Types are present but violations carry unstructured messages instead of a `rule` field                                                                | `validateOne` is pure, the `Violation` union is exhaustive, and the split against the index reader is obvious from the code         |
+| Assumptions & docs      | ×1     | The severity split is unexplained, so a later reader "fixes" the warning into an error | The severity split is noted but not justified                                                                                                         | A comment states why `empty-evidence` is a warning, and why `--file` skips the cross-file link rules while still firing `self-link` |
 
 ## Out of scope
 
 - Repairing violations — Deferred. Reason: this script reports; a human or the drafting agent fixes,
   and a validator that rewrites files would become a second writer in a plan that deliberately has
   exactly one.
-- Judging whether an ADR's content is *good* — Deferred. Reason: that is what the promotion
+- Judging whether an ADR's content is _good_ — Deferred. Reason: that is what the promotion
   threshold and the human confirmation gate are for, and no script can do it.
 - Renumbering or renaming files — Deferred. Reason: nothing here writes, and renumbering would break
   every `Supersedes` link already pointing at the old id.

@@ -16,11 +16,11 @@ argument-hint: "[topic]"
 
 # Preflight
 
-Capture what the user wants *before* anyone decides how to build it. One file, `docs/<slug>/INTENT.md`, then stop. This is the first tier of the dispatch ladder.
+Capture what the user wants _before_ anyone decides how to build it. One file, `docs/<slug>/INTENT.md`, then stop. This is the first tier of the dispatch ladder.
 
 ## Route first
 
-**If the user wants the work done, this is the wrong skill.** Preflight refuses to decide *how* and never executes, so a request that means "figure this out and build it" gets a file and no code — a silent no-op from the user's point of view.
+**If the user wants the work done, this is the wrong skill.** Preflight refuses to decide _how_ and never executes, so a request that means "figure this out and build it" gets a file and no code — a silent no-op from the user's point of view.
 
 Check before Step 1. Hand off by name, in one line, and stop:
 
@@ -29,11 +29,11 @@ Check before Step 1. Hand off by name, in one line, and stop:
 - Wants a multi-milestone roadmap → **`waypoints`**
 - Wants the want written down and nothing else → stay here.
 
-Ambiguous? Ask once: *"record the idea, or spec it out properly now?"*
+Ambiguous? Ask once: _"record the idea, or spec it out properly now?"_
 
 ## Setup
 
-`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time *"Base directory for this skill"* banner and set `SCRIPTS="<base-dir>/../flightplan/scripts"` — the collision check is flightplan's script, shared rather than duplicated.
+`CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Take the skill's load-time _"Base directory for this skill"_ banner and set `SCRIPTS="<base-dir>/../flightplan/scripts"` — the collision check is flightplan's script, shared rather than duplicated.
 
 **OpenCode only**: there is no banner. Set `SCRIPTS=~/.config/opencode/skills/flightplan/scripts`.
 
@@ -42,7 +42,7 @@ Ambiguous? Ask once: *"record the idea, or spec it out properly now?"*
 PLAN.md already has `Overview`, `Goals`, `Non-goals`, `Context`, and `Open questions`, so an INTENT.md that only restates them is dead weight. Two things it does that PLAN.md structurally cannot:
 
 1. **Capture now, spec later.** Minutes, when there is no time for a full interview. The idea survives without committing to a solution.
-2. **Ordering.** PLAN.md's `Overview` / `Goals` are written *after* the solution is already in the author's head, so they get retro-fitted to it and goal drift becomes invisible. A frozen INTENT.md is the only baseline that catches it.
+2. **Ordering.** PLAN.md's `Overview` / `Goals` are written _after_ the solution is already in the author's head, so they get retro-fitted to it and goal drift becomes invisible. A frozen INTENT.md is the only baseline that catches it.
 
 **The value is the timestamp, not the file.** Everything below protects that.
 
@@ -66,7 +66,7 @@ bun "$SCRIPTS"/scaffold.ts --check <slug>
 
 ### Step 2 — Interview short
 
-Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today. Anything about *how* goes into `Open questions` (capture rule 1). Recommend an answer to every question you *do* ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
+Three to six `AskUserQuestion` rounds, one to two questions each. Cover problem, outcome, who and what it touches, constraints, and the boundary as it looks today. Anything about _how_ goes into `Open questions` (capture rule 1). Recommend an answer to every question you _do_ ask, first option marked `(Recommended)`, so the user reacts instead of designing from scratch.
 
 ### Step 3 — Draft INTENT.md in the conversation
 

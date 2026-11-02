@@ -1,6 +1,7 @@
 # UI-01: Dashboard kind, source, and empty-state
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/log-schema.md`
 > - `../_context/rubric.md`
@@ -40,16 +41,22 @@ Reader defaults: treat absent fields as `rec.kind || "decision"` and `rec.source
 
 ### Kind label
 
-Give non-decision kinds a small uppercase label so the lens reads at a glance. **Before adding one, grep `style.css` for any existing `.decision-card__decision::before` (or similar) that already injects a label on every card** — if one exists, extend *that* rule per kind (don't add a second inline label, or cards get a double header). Pick ONE mechanism (preferably the existing `::before` if present, gated by the `is-kind-*` class) and wire it consistently in both files. Keep `decision` kind at its current appearance (default/baseline) so legacy cards don't change.
+Give non-decision kinds a small uppercase label so the lens reads at a glance. **Before adding one, grep `style.css` for any existing `.decision-card__decision::before` (or similar) that already injects a label on every card** — if one exists, extend _that_ rule per kind (don't add a second inline label, or cards get a double header). Pick ONE mechanism (preferably the existing `::before` if present, gated by the `is-kind-*` class) and wire it consistently in both files. Keep `decision` kind at its current appearance (default/baseline) so legacy cards don't change.
 
 ### `style.css` (Night Flight tokens — reuse, don't invent colors)
 
 Available tokens (from `:root`): `--aurora` (cool accent), `--positive` (green), `--danger` (caution), `--signal` (warm reserve, used by open calls), `--edge` (border), `--ink-muted` (dim text), `--font-mono`. Add a left-border accent per kind plus the badge:
 
 ```css
-.decision-card.is-kind-rationale { border-left: 3px solid var(--aurora); }
-.decision-card.is-kind-learning  { border-left: 3px solid var(--positive); }
-.decision-card.is-kind-caveat    { border-left: 3px solid var(--danger); }
+.decision-card.is-kind-rationale {
+  border-left: 3px solid var(--aurora);
+}
+.decision-card.is-kind-learning {
+  border-left: 3px solid var(--positive);
+}
+.decision-card.is-kind-caveat {
+  border-left: 3px solid var(--danger);
+}
 /* is-kind-decision: no extra accent — preserves current look */
 
 .decision-card__source-badge {
@@ -99,12 +106,12 @@ In `renderEmptyState()`'s `isUntracked()` branch, update only the CTA line (keep
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | breaks existing cards or misreads fields | renders new fields but legacy/default drifts | kind + scribe badge + empty-state all correct, legacy untouched |
-| Test coverage | ×2 | not viewed at all | one kind eyeballed | all kinds + scribe + legacy + empty-state verified in a running dashboard |
-| Interface & readability | ×1 | hardcoded colors, messy classes | works but off-system | uses Night Flight tokens, class naming matches `decision-card__*` |
-| Assumptions & docs | ×1 | silent visual churn on defaults | partial | default/legacy parity explicitly preserved |
+| Dimension               | Weight | 0–1 (fail)                               | 2–3 (below bar)                              | 4–5 (pass)                                                                |
+| ----------------------- | ------ | ---------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| Correctness             | ×3     | breaks existing cards or misreads fields | renders new fields but legacy/default drifts | kind + scribe badge + empty-state all correct, legacy untouched           |
+| Test coverage           | ×2     | not viewed at all                        | one kind eyeballed                           | all kinds + scribe + legacy + empty-state verified in a running dashboard |
+| Interface & readability | ×1     | hardcoded colors, messy classes          | works but off-system                         | uses Night Flight tokens, class naming matches `decision-card__*`         |
+| Assumptions & docs      | ×1     | silent visual churn on defaults          | partial                                      | default/legacy parity explicitly preserved                                |
 
 ## Out of scope
 

@@ -107,7 +107,11 @@ cap check after any correction, the same way the consistency check re-runs.
 ```json
 {
   "drafts": [
-    { "groupId": "g1", "draftText": "...", "proposedPath": "docs/adr/0027-....md" }
+    {
+      "groupId": "g1",
+      "draftText": "...",
+      "proposedPath": "docs/adr/0027-....md"
+    }
   ]
 }
 ```
@@ -130,7 +134,11 @@ Rules:
   "verdicts": [
     { "proposedPath": "docs/adr/0027-....md", "verdict": "approve" },
     { "proposedPath": "docs/adr/0028-....md", "verdict": "drop" },
-    { "proposedPath": "docs/adr/0029-....md", "verdict": "approve", "draftText": "..." }
+    {
+      "proposedPath": "docs/adr/0029-....md",
+      "verdict": "approve",
+      "draftText": "..."
+    }
   ]
 }
 ```
@@ -182,7 +190,13 @@ Path collision, before any write:
 Validation error, after the writes landed:
 
 ```json
-{ "success": false, "reason": "validation-error", "newAdrPaths": [], "violations": [], "archived": false }
+{
+  "success": false,
+  "reason": "validation-error",
+  "newAdrPaths": [],
+  "violations": [],
+  "archived": false
+}
 ```
 
 `newAdrPaths` is always present on every shape that carries it, and it is always an array.

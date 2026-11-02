@@ -36,6 +36,7 @@ tasks/
 Start with the four foundation tasks in parallel: `chronicle/01-test-env.md`, `dispatch/01-test-env.md`, `guard/01-test-env.md`, `relay/01-test-env.md` (plus `platform/03-docs.md`, which depends on nothing). By hand, take `dispatch/01-test-env.md` first: dispatch is the longest chain.
 
 <!-- flightplan:generated:start -->
+
 ## Status conventions
 
 Each task header has a `> **Status**: <status>` line. Executors update it as they go:
@@ -47,22 +48,22 @@ Each task header has a `> **Status**: <status>` line. Executors update it as the
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| chronicle | 01 | Honest chronicle tests on Windows | todo | > 4 | — |
-| chronicle | 02 | Fix chronicle's Windows product bugs | todo | > 4 | chronicle/01 |
-| chronicle | 03 | Codex home fallback on Windows | todo | > 4 | chronicle/01 |
-| dispatch | 01 | Honest dispatch tests on Windows | todo | > 4 | — |
-| dispatch | 02 | Windows path handling in dispatch | todo | > 4 | dispatch/01 |
-| dispatch | 03 | Spawn safety and worktrees on Windows | todo | > 4 | dispatch/02 |
-| guard | 01 | Honest guard tests on Windows | todo | > 4 | — |
-| guard | 02 | Fix guard's Windows product bugs | todo | > 4 | guard/01 |
-| platform | 01 | OpenCode layer on Windows | todo | > 4 | dispatch/02 |
-| platform | 02 | CI required suites and smoke job | todo | > 4 | chronicle/02, chronicle/03, dispatch/03, guard/02, relay/02, platform/01 |
-| platform | 03 | Windows docs for the core plugins | todo | > 4 | — |
-| relay | 01 | Honest relay tests on Windows | todo | > 4 | — |
-| relay | 02 | Fix relay's Windows product bugs | todo | > 4 | relay/01 |
-| review | 01 | Final review 🏁 | todo | > 4 | platform/02, platform/03 |
+| Bucket    | NN  | Title                                 | Status | Pass line | Depends on                                                               |
+| --------- | --- | ------------------------------------- | ------ | --------- | ------------------------------------------------------------------------ |
+| chronicle | 01  | Honest chronicle tests on Windows     | todo   | > 4       | —                                                                        |
+| chronicle | 02  | Fix chronicle's Windows product bugs  | todo   | > 4       | chronicle/01                                                             |
+| chronicle | 03  | Codex home fallback on Windows        | todo   | > 4       | chronicle/01                                                             |
+| dispatch  | 01  | Honest dispatch tests on Windows      | todo   | > 4       | —                                                                        |
+| dispatch  | 02  | Windows path handling in dispatch     | todo   | > 4       | dispatch/01                                                              |
+| dispatch  | 03  | Spawn safety and worktrees on Windows | todo   | > 4       | dispatch/02                                                              |
+| guard     | 01  | Honest guard tests on Windows         | todo   | > 4       | —                                                                        |
+| guard     | 02  | Fix guard's Windows product bugs      | todo   | > 4       | guard/01                                                                 |
+| platform  | 01  | OpenCode layer on Windows             | todo   | > 4       | dispatch/02                                                              |
+| platform  | 02  | CI required suites and smoke job      | todo   | > 4       | chronicle/02, chronicle/03, dispatch/03, guard/02, relay/02, platform/01 |
+| platform  | 03  | Windows docs for the core plugins     | todo   | > 4       | —                                                                        |
+| relay     | 01  | Honest relay tests on Windows         | todo   | > 4       | —                                                                        |
+| relay     | 02  | Fix relay's Windows product bugs      | todo   | > 4       | relay/01                                                                 |
+| review    | 01  | Final review 🏁                       | todo   | > 4       | platform/02, platform/03                                                 |
 
 ## Dependency graph
 
@@ -89,11 +90,12 @@ relay/01
 
 <!-- Add a third column (Why) by hand if the rationale would help executors. -->
 
-| Task | Depends on |
-|---|---|
+| Task        | Depends on                                                  |
+| ----------- | ----------------------------------------------------------- |
 | platform/02 | chronicle/02, chronicle/03, dispatch/03, guard/02, relay/02 |
-| platform/01 | dispatch/02 |
-| review/01 | platform/02, platform/03 |
+| platform/01 | dispatch/02                                                 |
+| review/01   | platform/02, platform/03                                    |
+
 <!-- flightplan:generated:end -->
 
 ## Known gaps

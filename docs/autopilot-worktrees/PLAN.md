@@ -40,19 +40,19 @@ Autopilot plans keep declaring `> **Max parallel**: 1`. Every task runs in one s
    - Acceptance: `parse-task.ts` returns the parsed map, `lint-task.ts` rejects a bad role, model, or effort and a misplaced `fix`, and `next-ready.ts` ready items carry `modelsRaw` (the header value as written, or `null`). The scout carries it as a required structured field, and the orchestrator parses it.
 2. **Default role map.** Every value is `{model, effort}`.
 
-   | Role | Default |
-   |---|---|
-   | dev, first to second-to-last attempt | opus / medium |
-   | dev, last Claude rung | the dev entry with effort raised one step (so opus / high by default) |
-   | verify, and the drift re-verify (`reverify`) | opus / low |
-   | judge | opus / medium |
-   | fix | opus / high |
-   | commit | opus / low |
-   | structuredRetry | opus / medium |
-   | devExternal, scout, mark-done, park | haiku (no effort set) |
-   | reviewLens | unchanged (`CFG.reviewLensModel`) |
-
+   | Role                                         | Default                                                               |
+   | -------------------------------------------- | --------------------------------------------------------------------- |
+   | dev, first to second-to-last attempt         | opus / medium                                                         |
+   | dev, last Claude rung                        | the dev entry with effort raised one step (so opus / high by default) |
+   | verify, and the drift re-verify (`reverify`) | opus / low                                                            |
+   | judge                                        | opus / medium                                                         |
+   | fix                                          | opus / high                                                           |
+   | commit                                       | opus / low                                                            |
+   | structuredRetry                              | opus / medium                                                         |
+   | devExternal, scout, mark-done, park          | haiku (no effort set)                                                 |
+   | reviewLens                                   | unchanged (`CFG.reviewLensModel`)                                     |
    - Acceptance: orchestrator tests assert the model and effort passed to `agent()` for each role.
+
 3. **Per-task override.** A task's `Models` entry replaces that role's default. The last dev rung raises the task's dev effort one step, and `max` stays `max`. `lastShotEngine` and `devEngine` behave as they do today.
    - Acceptance: a test with `dev=sonnet/low` produces sonnet/low, sonnet/low, then sonnet/medium.
 4. **`worktree.ts`** in `flightplan/scripts/` has these subcommands:
@@ -130,19 +130,19 @@ run start/end: sweep (keep blocked/parked)
 
 ## Task index
 
-| Bucket | NN | Title | Status | Pass line | Depends on |
-|---|---|---|---|---|---|
-| models | 01 | models-header | todo | > 4.0 | — |
-| models | 02 | role-map | todo | > 4.0 | models/01 |
-| worktree | 01 | worktree-script | todo | > 4.0 | — |
-| worktree | 02 | pipeline-isolation | todo | > 4.0 | worktree/01, models/02 |
-| worktree | 03 | land-integration | todo | > 4.0 | worktree/02 |
-| worktree | 04 | drift-reverify | todo | > 4.0 | worktree/03 |
-| worktree | 05 | leak-abort-resume | todo | > 4.0 | worktree/04 |
-| worktree | 06 | remove-sibling-machinery | todo | > 4.0 | worktree/05 |
-| docs | 01 | flightplan-docs | todo | > 4.0 | models/01 |
-| docs | 02 | autopilot-docs | todo | > 4.0 | worktree/06 |
-| review | 01 | final review 🏁 | todo | > 4.0 | docs/01, docs/02 |
+| Bucket   | NN  | Title                    | Status | Pass line | Depends on             |
+| -------- | --- | ------------------------ | ------ | --------- | ---------------------- |
+| models   | 01  | models-header            | todo   | > 4.0     | —                      |
+| models   | 02  | role-map                 | todo   | > 4.0     | models/01              |
+| worktree | 01  | worktree-script          | todo   | > 4.0     | —                      |
+| worktree | 02  | pipeline-isolation       | todo   | > 4.0     | worktree/01, models/02 |
+| worktree | 03  | land-integration         | todo   | > 4.0     | worktree/02            |
+| worktree | 04  | drift-reverify           | todo   | > 4.0     | worktree/03            |
+| worktree | 05  | leak-abort-resume        | todo   | > 4.0     | worktree/04            |
+| worktree | 06  | remove-sibling-machinery | todo   | > 4.0     | worktree/05            |
+| docs     | 01  | flightplan-docs          | todo   | > 4.0     | models/01              |
+| docs     | 02  | autopilot-docs           | todo   | > 4.0     | worktree/06            |
+| review   | 01  | final review 🏁          | todo   | > 4.0     | docs/01, docs/02       |
 
 Engine **Codex**, depth **Deep** (re-cut once, at pass 5).
 

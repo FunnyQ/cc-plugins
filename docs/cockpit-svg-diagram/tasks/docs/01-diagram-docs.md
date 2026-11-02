@@ -1,6 +1,7 @@
 # DOCS-01: Authoring reference for the SVG escape hatch
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/diagram-pipeline.md`
 > - `../_context/rubric.md`
@@ -26,7 +27,7 @@ This unit of work edits documentation. The one exception is the drift-guard test
 
 ### The framing is a requirement, not a suggestion
 
-Mermaid stays the documented default. Introduce raw SVG only *after* the reader has been told that Mermaid is the normal path. Present raw SVG as an escape hatch with an enumerated set of cases.
+Mermaid stays the documented default. Introduce raw SVG only _after_ the reader has been told that Mermaid is the normal path. Present raw SVG as an escape hatch with an enumerated set of cases.
 
 The reason is concrete and worth stating in the document itself: an agent that hits one Mermaid syntax error must not flee into hand-written SVG. The existing document already tells authors to correct a failing Mermaid source and re-run rather than dropping the diagram; the SVG section must not quietly offer an easier exit from that instruction.
 
@@ -71,23 +72,23 @@ The SVG is inlined into the card's DOM, so CSS custom properties inherit into it
 
 Publish this token table. Every value comes from the constant the renderer exports (`NIGHT_FLIGHT_TOKENS` in `packages/monitor/skills/cockpit/dashboard/dist/modules/diagram.js`), so read that constant and copy it value for value rather than transcribing from here:
 
-| Token | Hex | Reads as |
-|---|---|---|
-| `--space` | `#0e101f` | card surface |
-| `--hull` | `#171929` | raised panel |
-| `--hull-2` | `#222537` | raised panel, one step up |
-| `--edge` | `#393c4d` | borders |
-| `--starlight` | `#edeef4` | primary ink |
-| `--ink-muted` | `#a8aab6` | secondary ink |
-| `--ink-faint` | `#777988` | lines, arrows |
-| `--aurora` | `#2ad7d7` | the cool navigation accent |
-| `--signal` | `#feb354` | the one warm reserve |
-| `--positive` | `#4fd6a3` | success |
-| `--danger` | `#e5605f` | failure |
+| Token         | Hex       | Reads as                   |
+| ------------- | --------- | -------------------------- |
+| `--space`     | `#0e101f` | card surface               |
+| `--hull`      | `#171929` | raised panel               |
+| `--hull-2`    | `#222537` | raised panel, one step up  |
+| `--edge`      | `#393c4d` | borders                    |
+| `--starlight` | `#edeef4` | primary ink                |
+| `--ink-muted` | `#a8aab6` | secondary ink              |
+| `--ink-faint` | `#777988` | lines, arrows              |
+| `--aurora`    | `#2ad7d7` | the cool navigation accent |
+| `--signal`    | `#feb354` | the one warm reserve       |
+| `--positive`  | `#4fd6a3` | success                    |
+| `--danger`    | `#e5605f` | failure                    |
 
 Note that a downloaded SVG carries these declarations with it, so `var(--…)` and `currentColor` still resolve in a standalone file.
 
-**Guard the table with a test, not with good intentions.** A hand-copied table is a second source of truth, and calling the constant "the single source" while maintaining a copy by hand is exactly how the two drift. Add `packages/monitor/skills/cockpit/scripts/diagram-docs.test.ts`: read `references/diagram.md`, parse the token table's `| \`--name\` | \`#hex\` |` rows, import `NIGHT_FLIGHT_TOKENS` from `dashboard/dist/modules/diagram.js`, and assert the two sets are equal in both directions — no token in the table that is missing from the constant, and none in the constant that is missing from the table. The importable-under-plain-Bun discipline the diagram module already keeps is what makes this test possible with no DOM.
+**Guard the table with a test, not with good intentions.** A hand-copied table is a second source of truth, and calling the constant "the single source" while maintaining a copy by hand is exactly how the two drift. Add `packages/monitor/skills/cockpit/scripts/diagram-docs.test.ts`: read `references/diagram.md`, parse the token table's `| \`--name\` | \`#hex\` |`rows, import`NIGHT_FLIGHT_TOKENS`from`dashboard/dist/modules/diagram.js`, and assert the two sets are equal in both directions — no token in the table that is missing from the constant, and none in the constant that is missing from the table. The importable-under-plain-Bun discipline the diagram module already keeps is what makes this test possible with no DOM.
 
 ### What gets stripped
 
@@ -111,7 +112,7 @@ Explain the behaviour, and the one condition attached to it:
 - Therefore a rule written in an unusual form may silently vanish. Advise keeping selectors plain — element, class, and id selectors, without exotic syntax.
 - `@keyframes` rules are dropped. An animation name is not a selector, so it cannot be scoped, and a global registration could retime an animation elsewhere in the dashboard. An animated SVG therefore renders as its static first frame. Do not rely on CSS animation in a decision-card diagram.
 
-Explain *why* the scoping exists, in one sentence: a `<style>` element inside an inlined SVG is a document-level style element, so an unscoped `rect { … }` rule would repaint the whole dashboard.
+Explain _why_ the scoping exists, in one sentence: a `<style>` element inside an inlined SVG is a document-level style element, so an unscoped `rect { … }` rule would repaint the whole dashboard.
 
 ### Always set a `viewBox`
 
@@ -202,11 +203,11 @@ Apply these to every sentence written into the three files:
 
 > Every dimension is scored 0–5. Weighted average >= 4.0 to pass. `Accuracy vs shipped behaviour < 4` is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Accuracy vs shipped behaviour | ×3 | Documents a token, flag, or error message that does not exist in the code; the token table disagrees with the exported constant | Claims are broadly right but at least one was transcribed from the spec rather than checked against the code; the worked example was never run through the lint | Every claim was checked against the file that implements it; the worked example lints clean |
-| Actionability for an agent author | ×2 | An agent cannot tell which format to use, or does not learn that remote references are stripped | The cases are listed but the anti-pattern or the stripping consequences are vague | An agent can decide Mermaid vs SVG without reading the source, and knows before writing what will be removed |
-| Concision & style-guide fit | ×1 | Rambling prose; the term for one thing varies between sentences; the file's existing voice is broken | Readable but padded, or the condition trails the instruction | One instruction per sentence starting with a verb; condition before instruction; one term per thing; voice matches the surrounding file |
+| Dimension                         | Weight | 0–1 (fail)                                                                                                                      | 2–3 (below bar)                                                                                                                                                 | 4–5 (pass)                                                                                                                              |
+| --------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Accuracy vs shipped behaviour     | ×3     | Documents a token, flag, or error message that does not exist in the code; the token table disagrees with the exported constant | Claims are broadly right but at least one was transcribed from the spec rather than checked against the code; the worked example was never run through the lint | Every claim was checked against the file that implements it; the worked example lints clean                                             |
+| Actionability for an agent author | ×2     | An agent cannot tell which format to use, or does not learn that remote references are stripped                                 | The cases are listed but the anti-pattern or the stripping consequences are vague                                                                               | An agent can decide Mermaid vs SVG without reading the source, and knows before writing what will be removed                            |
+| Concision & style-guide fit       | ×1     | Rambling prose; the term for one thing varies between sentences; the file's existing voice is broken                            | Readable but padded, or the condition trails the instruction                                                                                                    | One instruction per sentence starting with a verb; condition before instruction; one term per thing; voice matches the surrounding file |
 
 ## Out of scope
 

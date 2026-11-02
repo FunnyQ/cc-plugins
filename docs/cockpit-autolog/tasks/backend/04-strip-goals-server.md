@@ -1,6 +1,7 @@
 # BACKEND-04: Strip goal readers from registry + project-info
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -53,7 +54,7 @@ so the dashboard API no longer carries `sessionGoal` / `projectGoal` / project-p
   fixtures that called `start(...)` with goals to instead seed via `log`/`scribe`.
 - `project-info.test.ts`: drop the `seedMeta` goal/prose helper usage and the
   `projectGoal`/`meta` assertions (~70–121); keep token/instruction-file assertions.
-- `call-log.test.ts`: the `type:"goal"` fixture (~line 6) is fine to keep as a *legacy*
+- `call-log.test.ts`: the `type:"goal"` fixture (~line 6) is fine to keep as a _legacy_
   record the call-log reader must skip — keep that "ignores a goal-only log" test as a
   regression guard for backward tolerance.
 
@@ -74,12 +75,12 @@ so the dashboard API no longer carries `sessionGoal` / `projectGoal` / project-p
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | payloads still carry goal/prose or readers throw | fields removed but a reader/handler left dangling | all goal/prose readers + fields gone; legacy goal record tolerated |
-| Test coverage | ×2 | tests fail | obsolete tests removed only | assertions updated + legacy-tolerance regression kept |
-| Interface & readability | ×1 | orphaned imports/types | mostly clean | no dead code; types trimmed cleanly |
-| Assumptions & docs | ×1 | unverified payload shape | partial | confirmed no consumer of removed fields remains server-side |
+| Dimension               | Weight | 0–1 (fail)                                       | 2–3 (below bar)                                   | 4–5 (pass)                                                         |
+| ----------------------- | ------ | ------------------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------ |
+| Correctness             | ×3     | payloads still carry goal/prose or readers throw | fields removed but a reader/handler left dangling | all goal/prose readers + fields gone; legacy goal record tolerated |
+| Test coverage           | ×2     | tests fail                                       | obsolete tests removed only                       | assertions updated + legacy-tolerance regression kept              |
+| Interface & readability | ×1     | orphaned imports/types                           | mostly clean                                      | no dead code; types trimmed cleanly                                |
+| Assumptions & docs      | ×1     | unverified payload shape                         | partial                                           | confirmed no consumer of removed fields remains server-side        |
 
 ## Out of scope
 

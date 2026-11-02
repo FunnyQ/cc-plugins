@@ -244,10 +244,22 @@ side by side).
 ```ts
 export const PANE = "runes-explain";
 export async function explainPress($: EngineInterface): Promise<void>; // the button
-export async function explainAsk($: EngineInterface, text: string): Promise<void>; // the Input's onSubmit
-export async function explainPick($: EngineInterface, topic: string): Promise<void>; // an ask option Button
-export async function explainSelect($: EngineInterface, id: string): Promise<void>; // a history row
-export async function explainReopen($: EngineInterface, id: string): Promise<void>; // an html entry's "open again"
+export async function explainAsk(
+  $: EngineInterface,
+  text: string,
+): Promise<void>; // the Input's onSubmit
+export async function explainPick(
+  $: EngineInterface,
+  topic: string,
+): Promise<void>; // an ask option Button
+export async function explainSelect(
+  $: EngineInterface,
+  id: string,
+): Promise<void>; // a history row
+export async function explainReopen(
+  $: EngineInterface,
+  id: string,
+): Promise<void>; // an html entry's "open again"
 export function explainHooks(on: On): void; // checker(on), and nothing else that collides
 ```
 

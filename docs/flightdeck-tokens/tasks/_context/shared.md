@@ -12,7 +12,7 @@ All work in this plan happens inside
   import from `packages/monitor/`, `packages/chronicle/`, `packages/relay/`, or
   `packages/herdr/`. Importing from a sibling skill inside `dispatch` is fine and is
   already done: `autopilot/scripts/` imports from `../../flightplan/scripts/lib/`.
-- Comment *why*, never *what*. One line. The existing files in this directory model the
+- Comment _why_, never _what_. One line. The existing files in this directory model the
   tone — see the block comment on `FleetStatus` in `fleet.ts`.
 
 ## Frontend
@@ -101,14 +101,20 @@ object on stdout:
 
 ```jsonc
 {
-  "planDir": "/tmp/…/plan",          // a real plan dir with tasks/ and .flightlog/run.jsonl
+  "planDir": "/tmp/…/plan", // a real plan dir with tasks/ and .flightlog/run.jsonl
   "projectsRoot": "/tmp/…/projects", // a synthetic ~/.claude/projects tree
-  "expected": {                       // the numbers the fixture was built to produce
-    "totals": { "input": 300, "output": 3000, "cacheRead": 30000, "cacheWrite": 3000 },
+  "expected": {
+    // the numbers the fixture was built to produce
+    "totals": {
+      "input": 300,
+      "output": 3000,
+      "cacheRead": 30000,
+      "cacheWrite": 3000,
+    },
     "byTask": { "work/01": { "…": 0 } },
     "agentCount": 2,
-    "rowsWithoutUsage": 1             // proves the unavailable-versus-zero distinction
-  }
+    "rowsWithoutUsage": 1, // proves the unavailable-versus-zero distinction
+  },
 }
 ```
 

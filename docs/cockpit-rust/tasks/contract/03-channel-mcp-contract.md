@@ -1,6 +1,7 @@
 # CONTRACT-03: Channel MCP contract
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -25,6 +26,7 @@ A black-box bun suite that drives `cockpit channel` over real stdio JSON-RPC aga
 `contract/launcher.ts` exports `command(proc, argv)`, `underTest`, `SCRIPTS_DIR`, `PLUGIN_ROOT`.
 
 `contract/fixtures.ts` exports:
+
 - `makeHomes()`, `freePort()`, `baseEnv(h, extra)`
 - `makeProviderFixtures(h)`, `fixtureEnv(f)`
 - `startDaemon`, `stopDaemon`, `run`, `readJsonl`, `cleanup`
@@ -45,7 +47,9 @@ The channel spawns `cockpit-server.ts --no-open` with no `--port`, and today `pa
 return DEFAULT_PORT;
 // after — env override, same validity rule as --port
 const envPort = parseInt(process.env.COCKPIT_SERVER_PORT || "", 10);
-return Number.isFinite(envPort) && envPort > 0 && envPort < 65536 ? envPort : DEFAULT_PORT;
+return Number.isFinite(envPort) && envPort > 0 && envPort < 65536
+  ? envPort
+  : DEFAULT_PORT;
 ```
 
 `--port` still wins. `ensureServer` in `cockpit-channel.ts` spawns `bun <server> --no-open` with `{detached: true, stdio: "ignore"}` and no `env` option, so the server inherits the channel's environment and `COCKPIT_SERVER_PORT` set on the channel reaches it.
@@ -120,12 +124,12 @@ return Number.isFinite(envPort) && envPort > 0 && envPort < 65536 ? envPort : DE
 
 > Scale 0–5 (see `../_context/rubric.md`); weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Fails against TS, or talks to the channel through the SDK instead of raw stdio | Green, but the capability or notification shapes are only loosely checked | Green against TS; exact method names, param shapes, and capability keys pinned over raw stdio |
-| Test coverage | ×2 | Handshake only | Handshake + inbox; permission, lifecycle, or spawn is thin | All 5 groups, including the fallback handler, backoff survival, and `ensureServer` spawn on a free port |
-| Interface & readability | ×1 | Ad-hoc string parsing everywhere | A client helper exists but hides failures | A small typed JSON-RPC client and stub daemon that a reader can follow; deadlines on every wait |
-| Assumptions & docs | ×1 | Stub responses invented | Stub shapes right but unsourced | Each stub response names the TS handler it mimics; pinned quirks commented |
+| Dimension               | Weight | 0–1 (fail)                                                                     | 2–3 (below bar)                                                           | 4–5 (pass)                                                                                              |
+| ----------------------- | ------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Fails against TS, or talks to the channel through the SDK instead of raw stdio | Green, but the capability or notification shapes are only loosely checked | Green against TS; exact method names, param shapes, and capability keys pinned over raw stdio           |
+| Test coverage           | ×2     | Handshake only                                                                 | Handshake + inbox; permission, lifecycle, or spawn is thin                | All 5 groups, including the fallback handler, backoff survival, and `ensureServer` spawn on a free port |
+| Interface & readability | ×1     | Ad-hoc string parsing everywhere                                               | A client helper exists but hides failures                                 | A small typed JSON-RPC client and stub daemon that a reader can follow; deadlines on every wait         |
+| Assumptions & docs      | ×1     | Stub responses invented                                                        | Stub shapes right but unsourced                                           | Each stub response names the TS handler it mimics; pinned quirks commented                              |
 
 ## Out of scope
 

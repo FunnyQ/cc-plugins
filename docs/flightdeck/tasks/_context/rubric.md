@@ -25,7 +25,7 @@ description.
   something" is a 2.
 - **Interface & readability ×1** — are the exported types and signatures clear? Is I/O kept out of the
   pure functions? Would the next reader understand it without asking?
-- **Assumptions & docs ×1** — are non-obvious decisions explained in a comment giving the *reason*?
+- **Assumptions & docs ×1** — are non-obvious decisions explained in a comment giving the _reason_?
   Are magic numbers named? Are unresolved assumptions flagged rather than buried?
 
 ## The `ui` bucket adds one dimension
@@ -41,7 +41,7 @@ The `ui` bucket's total weight is therefore 9, not 7. The threshold and veto are
 
 Weighted average = Σ(score × weight) ÷ Σ(weight), on the same 0–5 scale.
 
-A task passes when the weighted average is **> 4.0** *and* no veto fires.
+A task passes when the weighted average is **> 4.0** _and_ no veto fires.
 
 **Hard-fail veto: `Correctness < 4` is an automatic veto.** A task that does not actually work cannot
 be rescued by strong tests or a tidy interface.

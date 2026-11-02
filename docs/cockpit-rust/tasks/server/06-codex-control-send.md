@@ -1,6 +1,7 @@
 # SERVER-06: Codex control and send
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -94,12 +95,12 @@ impl Transport {
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Duplicate turns sent, or requests hang without timeout | Happy path works; fallback ordering, steer/start choice, or report fields drift | Fallback, no-resend-after-submit, steer/start, timeouts, and report shape match TS |
-| Test coverage | ×2 | Contract group not run on Rust | Group passes; transports untested | Group passes on both; `cargo test` drives both transports against fakes, including the post-submit failure path |
-| Interface & readability | ×1 | Two copies of the request/notification bookkeeping | Shared, but transport details leak into `run_probe` | One transport type, `run_probe` reads like the TS sequence |
-| Assumptions & docs | ×1 | Protocol differences between transports undocumented | Present but unexplained | The missing `jsonrpc` field on the socket and the detached completion wait carry one-line whys |
+| Dimension               | Weight | 0–1 (fail)                                             | 2–3 (below bar)                                                                 | 4–5 (pass)                                                                                                      |
+| ----------------------- | ------ | ------------------------------------------------------ | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Duplicate turns sent, or requests hang without timeout | Happy path works; fallback ordering, steer/start choice, or report fields drift | Fallback, no-resend-after-submit, steer/start, timeouts, and report shape match TS                              |
+| Test coverage           | ×2     | Contract group not run on Rust                         | Group passes; transports untested                                               | Group passes on both; `cargo test` drives both transports against fakes, including the post-submit failure path |
+| Interface & readability | ×1     | Two copies of the request/notification bookkeeping     | Shared, but transport details leak into `run_probe`                             | One transport type, `run_probe` reads like the TS sequence                                                      |
+| Assumptions & docs      | ×1     | Protocol differences between transports undocumented   | Present but unexplained                                                         | The missing `jsonrpc` field on the socket and the detached completion wait carry one-line whys                  |
 
 ## Out of scope
 

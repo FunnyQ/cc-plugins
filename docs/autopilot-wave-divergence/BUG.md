@@ -12,11 +12,11 @@ autopilot 跑 herdr-workbench 的 `docs/workbench-config-schema` 計畫（11 個
 
 三個缺陷，兩個歸屬：
 
-| | 缺陷 | 歸屬 | 狀態 |
-|---|---|---|---|
-| A | `NO_COMMIT_RULE` 沒擋住 `git checkout`，也沒禁止碰別人的檔案 | autopilot | 已修 |
-| B | wave loop 把記憶體 `completed` 當權威，從不與磁碟對帳 | autopilot | 已修 |
-| C | task 的 scope 檢查斷言整棵工作樹，平行 wave 下必假陰性 | **flightplan** | **未修** |
+|     | 缺陷                                                         | 歸屬           | 狀態     |
+| --- | ------------------------------------------------------------ | -------------- | -------- |
+| A   | `NO_COMMIT_RULE` 沒擋住 `git checkout`，也沒禁止碰別人的檔案 | autopilot      | 已修     |
+| B   | wave loop 把記憶體 `completed` 當權威，從不與磁碟對帳        | autopilot      | 已修     |
+| C   | task 的 scope 檢查斷言整棵工作樹，平行 wave 下必假陰性       | **flightplan** | **未修** |
 
 **失效模式一（缺陷 A + B，run `wf_5903a02b-b6e`）** —— 在 7/11 停機。停機訊息是 `(tree)` stall：`stalled in wave 7: no ready task, but 5 of 11 are unfinished`，與真正的成因無關。一個平行任務用 `git checkout` 回捲了另一個平行任務的 task 檔，wave loop 又完全信任自己的記憶體狀態，於是那個任務永遠不會再被派工。
 
@@ -62,11 +62,11 @@ sequenceDiagram
 
 各 wave scout 快照（取自 `journal.jsonl`）顯示 `counts.done` 從 wave 6 起卡在 6，而 `completed` 已累積到 7：
 
-| wave | ready | counts.done | completed 長度 |
-|---|---|---|---|
-| 5 | `launch/02`, `launch/03` | 4 | 4 |
-| 6 | `launch/01`, `launch/03` | 5 | 6 |
-| 7 | `launch/03` | 6 | 7 |
+| wave | ready                    | counts.done | completed 長度 |
+| ---- | ------------------------ | ----------- | -------------- |
+| 5    | `launch/02`, `launch/03` | 4           | 4              |
+| 6    | `launch/01`, `launch/03` | 5           | 6              |
+| 7    | `launch/03`              | 6           | 7              |
 
 `launch/03` 的程式碼本身有落地並被 commit（`d0d02cc`）。遺失的只有 task 檔的 Status 標記。
 
@@ -101,7 +101,8 @@ sequenceDiagram
 
 ```javascript
 const fresh = ready.filter(
-  i => !parked.has(i.ref) && !completed.includes(i.ref))
+  (i) => !parked.has(i.ref) && !completed.includes(i.ref),
+);
 ```
 
 註解說這是 defense-in-depth，防止行為異常的 scout 重跑已完成的工作。它同時也讓任何從 `done` 退回 `todo` 的 ref 永久無法被派工。
@@ -115,7 +116,9 @@ const fresh = ready.filter(
 每個 wave 拿到 scout 快照後，取 `completed` 與 scout `unfinished` 的交集：
 
 ```javascript
-const diverged = completed.filter(ref => unfinished.some(u => u.ref === ref))
+const diverged = completed.filter((ref) =>
+  unfinished.some((u) => u.ref === ref),
+);
 ```
 
 非空即代表磁碟與記憶體不一致。這是一個獨立的終止條件，不是 stall。
@@ -130,12 +133,12 @@ const diverged = completed.filter(ref => unfinished.some(u => u.ref === ref))
 
 ### 缺陷 A
 
-| 選項 | 做法 | 取捨 |
-|---|---|---|
-| A1 | 在 `NO_COMMIT_RULE` 明確列出 `git checkout` / `git restore` / `git reset` | 一行字，零風險，但只擋列舉到的指令 |
-| A2 | 在 A1 之上，補平行語意；但禁令要**拆成兩條互不重疊**的規則 | 涵蓋整類問題而非單一指令；prompt 變長，但這是唯一講得清平行語意的地方 |
-| A3 | 在 dev driver prompt 加獨立的 sibling-file guard 段落，明列本任務可碰的檔案 | 最強，但要把 task 檔的「Files to create / modify」清單傳進 prompt，改動面較大 |
-| A4 | 靠 PostToolUse hook 攔截 | 攔不到——external engine 在 harness 之外寫檔，`orchestrator.md:921` 自己已經記下這點 |
+| 選項 | 做法                                                                        | 取捨                                                                                |
+| ---- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A1   | 在 `NO_COMMIT_RULE` 明確列出 `git checkout` / `git restore` / `git reset`   | 一行字，零風險，但只擋列舉到的指令                                                  |
+| A2   | 在 A1 之上，補平行語意；但禁令要**拆成兩條互不重疊**的規則                  | 涵蓋整類問題而非單一指令；prompt 變長，但這是唯一講得清平行語意的地方               |
+| A3   | 在 dev driver prompt 加獨立的 sibling-file guard 段落，明列本任務可碰的檔案 | 最強，但要把 task 檔的「Files to create / modify」清單傳進 prompt，改動面較大       |
+| A4   | 靠 PostToolUse hook 攔截                                                    | 攔不到——external engine 在 harness 之外寫檔，`orchestrator.md:921` 自己已經記下這點 |
 
 **選 A2。** A1 太窄，下一個沒列到的指令會重演。A3 的成本不對稱：它解的是同一個問題，卻要改動 prompt 組裝邏輯。A4 對 external engine 無效。
 
@@ -148,11 +151,11 @@ const diverged = completed.filter(ref => unfinished.some(u => u.ref === ref))
 
 ### 缺陷 B
 
-| 選項 | 做法 | 取捨 |
-|---|---|---|
-| B1 | 每 wave 取 `completed` ∩ `unfinished`，非空即以專屬訊息 escalate 並停機 | 快速失敗、訊息精準；停機而非自我修復 |
-| B2 | 偵測到分岔就把該 ref 從 `completed` 移除、允許重新派工 | 會自我修復，但等於重跑已通過的任務，且掩蓋了「有東西在回捲檔案」這個事實 |
-| B3 | 放寬 `fresh` 過濾器，只排除 `parked`，不排除 `completed` | 移除的是一道刻意的護欄；scout 若異常會無限重跑 |
+| 選項 | 做法                                                                    | 取捨                                                                     |
+| ---- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| B1   | 每 wave 取 `completed` ∩ `unfinished`，非空即以專屬訊息 escalate 並停機 | 快速失敗、訊息精準；停機而非自我修復                                     |
+| B2   | 偵測到分岔就把該 ref 從 `completed` 移除、允許重新派工                  | 會自我修復，但等於重跑已通過的任務，且掩蓋了「有東西在回捲檔案」這個事實 |
+| B3   | 放寬 `fresh` 過濾器，只排除 `parked`，不排除 `completed`                | 移除的是一道刻意的護欄；scout 若異常會無限重跑                           |
 
 **選 B1。** 分岔代表有東西在動不該動的檔案，那是要修的 bug，不是要繞過的狀態。B2 會讓同一個回捲行為靜靜地重複發生。B3 拆掉現有護欄換來另一個風險。
 
@@ -189,14 +192,14 @@ bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts
 
 A2 與 B1 都已落在本 repo，尚未實跑驗證。
 
-| 位置 | 改動 |
-|---|---|
-| `orchestrator.md` `NO_COMMIT_RULE` | 拆兩條禁令：restore 家族（含「概括條款涵蓋不到」的理由）+ 不得碰他人 task 檔；明說共用原始碼可改。三個注入點共用同一常數不變 |
-| `orchestrator.md` wave loop | `fresh` 過濾前插入交集分岔檢查，以 `(divergence)` escalate 並停機，訊息含 ref 與復原步驟 |
-| `orchestrator.md` 終止條件 | Eight → Nine，列入 divergence |
-| `orchestrator.md` Notes | 新增一則「分岔是集合交集，不是計數比較」，記下 resume 反向與位置約束；`NO_COMMIT_RULE` 理由段補上回捲情境與「為何不寫成籠統禁令」 |
-| `SKILL.md` Escalation | 新增「`(divergence)` 不是 park」段落 |
-| `orchestrator-script.test.ts` | 新增回捲案例；`resume` 反向案例維持綠燈 |
+| 位置                               | 改動                                                                                                                              |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `orchestrator.md` `NO_COMMIT_RULE` | 拆兩條禁令：restore 家族（含「概括條款涵蓋不到」的理由）+ 不得碰他人 task 檔；明說共用原始碼可改。三個注入點共用同一常數不變      |
+| `orchestrator.md` wave loop        | `fresh` 過濾前插入交集分岔檢查，以 `(divergence)` escalate 並停機，訊息含 ref 與復原步驟                                          |
+| `orchestrator.md` 終止條件         | Eight → Nine，列入 divergence                                                                                                     |
+| `orchestrator.md` Notes            | 新增一則「分岔是集合交集，不是計數比較」，記下 resume 反向與位置約束；`NO_COMMIT_RULE` 理由段補上回捲情境與「為何不寫成籠統禁令」 |
+| `SKILL.md` Escalation              | 新增「`(divergence)` 不是 park」段落                                                                                              |
+| `orchestrator-script.test.ts`      | 新增回捲案例；`resume` 反向案例維持綠燈                                                                                           |
 
 該次 run 的 persisted script 也曾就地緩解過，那份只影響那一場：
 
@@ -291,12 +294,12 @@ const EXCLUSIVITY_REGEX = /\b(only|sole|nothing else|no other)\b/i;
 
 ### 修法選項
 
-| 選項 | 做法 | 取捨 |
-|---|---|---|
-| C1 | 改成 pathspec 肯定式：`git status --short -- <本任務宣告的檔案>`，斷言它們**有**變動 | 平行下永遠成立；但放棄了「偵測越界」這個原本的目的 |
-| C2 | 整條刪掉，讓 acceptance criteria 與測試承擔正確性 | 最簡單；越界改動完全失去專屬訊號 |
-| C3 | flightplan 對「可能同 wave」的任務拒絕產出全樹 scope 檢查，序列任務照舊 | 精準；需要 lint 具備依賴圖意識 |
-| C4 | autopilot 端讓 verifier 忽略同 wave sibling 的路徑 | 治標且做不到——verifier 是獨立 agent，不知道 wave 成員名單 |
+| 選項 | 做法                                                                                 | 取捨                                                      |
+| ---- | ------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| C1   | 改成 pathspec 肯定式：`git status --short -- <本任務宣告的檔案>`，斷言它們**有**變動 | 平行下永遠成立；但放棄了「偵測越界」這個原本的目的        |
+| C2   | 整條刪掉，讓 acceptance criteria 與測試承擔正確性                                    | 最簡單；越界改動完全失去專屬訊號                          |
+| C3   | flightplan 對「可能同 wave」的任務拒絕產出全樹 scope 檢查，序列任務照舊              | 精準；需要 lint 具備依賴圖意識                            |
+| C4   | autopilot 端讓 verifier 忽略同 wave sibling 的路徑                                   | 治標且做不到——verifier 是獨立 agent，不知道 wave 成員名單 |
 
 **選 C1 + C3。**
 
@@ -315,12 +318,12 @@ C4 列出只為記錄它為何不可行。
 
 ### 改哪裡
 
-| 位置 | 改動 |
-|---|---|
+| 位置                                                                                 | 改動                                                                                                                                                  |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `flightplan/references/task-template.md:153-165`〈Never gate scope on `git status`〉 | 標題已不精確——問題不是「用了 `git status`」而是「做了全樹否定式斷言」。改寫成兩個 ✅ 分流範例，補上平行 wave 的理由，並明講現行唯一 ✅ 只修了自傷情況 |
-| `flightplan/references/task-template.md:148` self-containment checklist | 現行「No scope gate claims a single modified path」只涵蓋排他變體，要擴到全樹否定式 |
-| `flightplan/scripts/lint-task.ts` | 新增依賴圖感知規則（見下） |
-| `flightplan/SKILL.md` | 分桶／依賴圖那段補一句：排進平行 wave 的任務，其驗證項目不得斷言全樹狀態 |
+| `flightplan/references/task-template.md:148` self-containment checklist              | 現行「No scope gate claims a single modified path」只涵蓋排他變體，要擴到全樹否定式                                                                   |
+| `flightplan/scripts/lint-task.ts`                                                    | 新增依賴圖感知規則（見下）                                                                                                                            |
+| `flightplan/SKILL.md`                                                                | 分桶／依賴圖那段補一句：排進平行 wave 的任務，其驗證項目不得斷言全樹狀態                                                                              |
 
 ### lint-task.ts 能靜態偵測嗎——能，而且成本很低
 

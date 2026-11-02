@@ -1,6 +1,7 @@
 # ENGINE-05: Codex usage source and usage limits
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -187,12 +188,12 @@ The port needs `add_model_usage`, `model_usage_total`, `empty_model_usage`, `mod
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | `source codex` golden fails, or the refresh token is written back / refresh fires on non-401 | Golden passes, but a JS-falsy fallback (`\|\|` on 0 or `""`), local-time bucketing, the second thread loop, or a usage-limit error string drifts from the TS | Golden passes against Rust and TS; every fallback, error string, cache rule and header matches the TS |
-| Test coverage | ×2 | Only the golden test | Golden plus the happy-path cache hit | Cargo tests cover the token delta (first event whole, negative clamps to 0), thread fallback, cache hit/miss/corrupt/prune/null, the TS-shaped summary round-trip, and every usage-limit error path |
-| Interface & readability | ×1 | Changes a frozen signature or edits a shared module | Frozen signatures kept, but `unwrap` on external data or helpers with one caller | Frozen signatures intact; `codex.rs` mirrors the TS function by function; no `unwrap` on I/O or JSON; clippy clean |
-| Assumptions & docs | ×1 | Deliberate differences from the TS go unmarked | Some differences marked | One-line comments pin the no-write-back rule, the 401/403-only refresh, the prune-by-file-set rule, and any private copy of a shared helper |
+| Dimension               | Weight | 0–1 (fail)                                                                                   | 2–3 (below bar)                                                                                                                                              | 4–5 (pass)                                                                                                                                                                                          |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | `source codex` golden fails, or the refresh token is written back / refresh fires on non-401 | Golden passes, but a JS-falsy fallback (`\|\|` on 0 or `""`), local-time bucketing, the second thread loop, or a usage-limit error string drifts from the TS | Golden passes against Rust and TS; every fallback, error string, cache rule and header matches the TS                                                                                               |
+| Test coverage           | ×2     | Only the golden test                                                                         | Golden plus the happy-path cache hit                                                                                                                         | Cargo tests cover the token delta (first event whole, negative clamps to 0), thread fallback, cache hit/miss/corrupt/prune/null, the TS-shaped summary round-trip, and every usage-limit error path |
+| Interface & readability | ×1     | Changes a frozen signature or edits a shared module                                          | Frozen signatures kept, but `unwrap` on external data or helpers with one caller                                                                             | Frozen signatures intact; `codex.rs` mirrors the TS function by function; no `unwrap` on I/O or JSON; clippy clean                                                                                  |
+| Assumptions & docs      | ×1     | Deliberate differences from the TS go unmarked                                               | Some differences marked                                                                                                                                      | One-line comments pin the no-write-back rule, the 401/403-only refresh, the prune-by-file-set rule, and any private copy of a shared helper                                                         |
 
 ## Out of scope
 

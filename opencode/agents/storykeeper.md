@@ -78,7 +78,7 @@ the command runs against `/`.
      intent from commit subjects and bodies alone.
    - **What changed**: summarize commits and `diffStat` by area, in grouped
      bullets, not a raw log dump. **Optional overview diagram**: when the
-     change has a *shape* that a picture carries — flow, before-after,
+     change has a _shape_ that a picture carries — flow, before-after,
      sequence, or architecture — open this section with ONE cohesive Mermaid
      diagram in a ```mermaid fenced block. Distill the diagram from
      `decisions[].diagram` and the commit/diff structure. Do not paste the
@@ -111,6 +111,7 @@ the command runs against `/`.
          parent["Parent process"] --> cut1["Cut 1: exit on stdin EOF"]
          cut1 --> child["Child process"]
        ```
+
      - **When in doubt, drop the diagram.** Nothing validates the block before
        it is posted, and a diagram that fails to parse is worse than none — an
        unrendered red error box is the first thing the reviewer sees. If you

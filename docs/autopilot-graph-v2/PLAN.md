@@ -29,12 +29,12 @@ Five requirements ship: **R1, R2, R3, R5, R6**. R4 is rejected, not deferred.
 - Reduce the scout agent to transcription. It should not transform.
 - Give the commit step a failure channel and a flightlog entry. Leave its grouping and its prose alone.
 - Make a retry see every prior attempt. This part is unconditional and applies to every run.
-- Make it *possible* for a Claude ladder to end on a genuine vendor switch. **Opt-in**, off by default:
+- Make it _possible_ for a Claude ladder to end on a genuine vendor switch. **Opt-in**, off by default:
   the rung only exists once `CFG.lastShotEngine` names an engine. With the default the ladder stays
   sonnet → sonnet → opus, unchanged. Off by default because the rung costs a whole extra attempt per
   failing task, and that is the operator's call to make, not a silent new default.
 - Make a reported between-waves stopping point available to a run that declares a token budget.
-  **Opt-in**, and it needs *both* conditions: a declared budget (`budget.total` non-null) **and** a
+  **Opt-in**, and it needs _both_ conditions: a declared budget (`budget.total` non-null) **and** a
   non-zero `CFG.budgetFloor`. Declaring a budget alone changes nothing. Best-effort even when enabled: the
   check compares the remaining balance against the floor and does not estimate the next wave's cost, so a
   dispatched wave can still exhaust the budget while running. It bounds and reports the stop; it does not
@@ -92,16 +92,16 @@ is confirmed by rereading the file.
 
 ### Verified defects
 
-| # | Defect | Evidence |
-|---|---|---|
-| D1 | Nothing guarantees the closing gate runs a test suite, so the Final review fixer's edits — the last writes in the run — can ship unverified. | Each task verifies only itself; `next-ready.ts` excludes done tasks from any re-offer. The final-review verifier runs only that task's own `## Verification`, and the fixer edits code after every wave has finished. Cross-coverage from path-scoped test commands is incidental: in `docs/waypoints-skill/tasks/`, only the final-review task ran any test at all. |
-| D2 | The scout agent still transforms: it maps `invalid[].ref → invalidRefs`, and the schema carries a defensive `required` list to stop it summarizing `errors` away. | **Not** evidence of a current failure — the whole-tree re-listing incident belongs to the retired line-oriented scout. This is residual trust surface, not a demonstrated bug. |
-| D3 | Inter-wave commits ride the scout prompt under `SCOUT_SCHEMA`, which has no commit-outcome field. A blocked commit is unreportable. | Downstream logic reads only tree fields. |
-| D4 | No commit path calls `flightlog.ts`, so commits never enter the audit trail. | The dashboard side is already built — `fleet.ts` knows the `commit` role, parses `commit-post-loop`, and falls back to the entry's role. **Only emission is missing.** |
-| D5 | After the first escalation, no wave commits again and the post-loop commit is skipped. Later successes accumulate in one dirty tree. | The same `escalations.length === 0` guard in both places. **Not scheduled for a fix.** The guard is deliberate: rejected and in-flight edits share one tree. Listed here so the dirty tree is a known cost, not a surprise. |
-| D6 | An empty-but-existing `tasksDir` reports clean completion, then the post-loop commit sweeps the working tree into a commit. | `next-ready.ts` returns empty maps for a readable empty dir and leaves counts at zero; the orchestrator reads `0 === 0` as complete. Reproduced by running `next-ready.ts <empty dir> --summary` → exit 0, all counts zero. |
-| D7 | A retry sees only the last rejection, so attempt 3 cannot know what attempt 1 already tried and repeatedly fixes A while breaking B. Its ladder also never leaves the vendor: `devEngine: 'claude'` escalates sonnet → opus only. | `executeTask` overwrites a single `feedback` string each attempt; the dev model is chosen by `attempt >= cap ? devEscalated : dev`, both Claude. |
-| D8 | A declared token budget is invisible to the run. It can exhaust mid-task, which is the worst place to stop. | The orchestrator never reads the Workflow `budget` global. |
+| #   | Defect                                                                                                                                                                                                                            | Evidence                                                                                                                                                                                                                                                                                                                                                             |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Nothing guarantees the closing gate runs a test suite, so the Final review fixer's edits — the last writes in the run — can ship unverified.                                                                                      | Each task verifies only itself; `next-ready.ts` excludes done tasks from any re-offer. The final-review verifier runs only that task's own `## Verification`, and the fixer edits code after every wave has finished. Cross-coverage from path-scoped test commands is incidental: in `docs/waypoints-skill/tasks/`, only the final-review task ran any test at all. |
+| D2  | The scout agent still transforms: it maps `invalid[].ref → invalidRefs`, and the schema carries a defensive `required` list to stop it summarizing `errors` away.                                                                 | **Not** evidence of a current failure — the whole-tree re-listing incident belongs to the retired line-oriented scout. This is residual trust surface, not a demonstrated bug.                                                                                                                                                                                       |
+| D3  | Inter-wave commits ride the scout prompt under `SCOUT_SCHEMA`, which has no commit-outcome field. A blocked commit is unreportable.                                                                                               | Downstream logic reads only tree fields.                                                                                                                                                                                                                                                                                                                             |
+| D4  | No commit path calls `flightlog.ts`, so commits never enter the audit trail.                                                                                                                                                      | The dashboard side is already built — `fleet.ts` knows the `commit` role, parses `commit-post-loop`, and falls back to the entry's role. **Only emission is missing.**                                                                                                                                                                                               |
+| D5  | After the first escalation, no wave commits again and the post-loop commit is skipped. Later successes accumulate in one dirty tree.                                                                                              | The same `escalations.length === 0` guard in both places. **Not scheduled for a fix.** The guard is deliberate: rejected and in-flight edits share one tree. Listed here so the dirty tree is a known cost, not a surprise.                                                                                                                                          |
+| D6  | An empty-but-existing `tasksDir` reports clean completion, then the post-loop commit sweeps the working tree into a commit.                                                                                                       | `next-ready.ts` returns empty maps for a readable empty dir and leaves counts at zero; the orchestrator reads `0 === 0` as complete. Reproduced by running `next-ready.ts <empty dir> --summary` → exit 0, all counts zero.                                                                                                                                          |
+| D7  | A retry sees only the last rejection, so attempt 3 cannot know what attempt 1 already tried and repeatedly fixes A while breaking B. Its ladder also never leaves the vendor: `devEngine: 'claude'` escalates sonnet → opus only. | `executeTask` overwrites a single `feedback` string each attempt; the dev model is chosen by `attempt >= cap ? devEscalated : dev`, both Claude.                                                                                                                                                                                                                     |
+| D8  | A declared token budget is invisible to the run. It can exhaust mid-task, which is the worst place to stop.                                                                                                                       | The orchestrator never reads the Workflow `budget` global.                                                                                                                                                                                                                                                                                                           |
 
 ## Requirements
 
@@ -110,7 +110,7 @@ is confirmed by rereading the file.
 Closes D1. **A `lint-task.ts` rule plus template guidance. No new script, no orchestrator change.**
 
 The rejected design was a `verify-all.ts` that re-executes every done task's verification items.
-Sampling real trees killed it. Items are written as *a backticked command plus a prose assertion*:
+Sampling real trees killed it. Items are written as _a backticked command plus a prose assertion_:
 
 ```
 - [x] `grep -c waypoints packages/dispatch/.claude-plugin/plugin.json` is ≥ 2 (description + keyword).
@@ -125,7 +125,7 @@ stamps a broken tree as passed. `ParsedTask` also exposes no command AST to buil
 
 The real gap is narrower than "nothing re-verifies". `docs/waypoints-skill/tasks/integration/03-final-review.md`
 already carries `` `bun test packages/dispatch/skills/waypoints/scripts/ .../flightplan/scripts/` green `` —
-that *is* a cross-task regression net. Nothing requires it.
+that _is_ a cross-task regression net. Nothing requires it.
 
 **Why the Final review specifically, when each wave already verifies.** Each task runs only its own
 `## Verification`; nothing re-runs another task's. Cross-coverage happens incidentally, because test
@@ -166,7 +166,7 @@ Closes D2 and D6.
 - The orchestrator does `JSON.parse(scout.stdout)` and derives every field in plain JS. This is a
   pure in-memory operation, so it needs no Workflow filesystem access.
 - A parse failure or a missing field becomes an explicit `(scout)` escalation.
-- **`exitCode !== 0` is not a failure condition.** `next-ready.ts --summary` prints its JSON *before*
+- **`exitCode !== 0` is not a failure condition.** `next-ready.ts --summary` prints its JSON _before_
   exiting 1 on an invalid or unparseable tree — that is deliberate, so the caller can name the invalid
   refs. Treating a non-zero exit as a scout failure would convert every malformed-tree run into a
   `(scout)` escalation and destroy the `invalid > 0` guard that reports which refs to reset. Parse stdout
@@ -201,6 +201,7 @@ The change is only that the commit stops being a passenger on the scout:
   prevent; the guard just cannot see a defect the scout has not found yet. Running after the guards
   also removes a redundant commit on the `done === total` path, where the post-loop commit already
   covers the last wave.
+
 - Give it `COMMIT_SCHEMA = { committed: boolean, shas: string[], failed: boolean, reason: string }`.
   A blocked hook or a conflict now has somewhere to land.
 - A `failed: true` result, or no structured result at all, becomes an escalation. Today it is
@@ -262,11 +263,11 @@ finish. Never park mid-task on budget — that manufactures a new unknown state.
 
 ## Bucketing
 
-| Bucket | Contents | Why |
-|---|---|---|
-| `lint` | R1 — a `lint-task.ts` rule, an informational report, and the template/SKILL guidance | R1 touches no orchestrator file at all, so it shares nothing with the other branch and can run concurrently. |
-| `orchestrator` | R3 → R2 → R5a → R5b → R6 | Every one of these edits the **same fenced JS block** in `orchestrator.md` and the **same fixture**. Serial by necessity. |
-| `integration` | the closing Final review | One holistic gate over both branches. |
+| Bucket         | Contents                                                                             | Why                                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `lint`         | R1 — a `lint-task.ts` rule, an informational report, and the template/SKILL guidance | R1 touches no orchestrator file at all, so it shares nothing with the other branch and can run concurrently.              |
+| `orchestrator` | R3 → R2 → R5a → R5b → R6                                                             | Every one of these edits the **same fenced JS block** in `orchestrator.md` and the **same fixture**. Serial by necessity. |
+| `integration`  | the closing Final review                                                             | One holistic gate over both branches.                                                                                     |
 
 **Landing order inside `orchestrator/`: R3 → R2 → R5a → R5b → R6.** R3 is the smallest (one agent split,
 one schema, one prompt line) and it removes the commit text from the scout prompt that R2 then rewrites, so
@@ -281,17 +282,17 @@ history lands and is verified before the cap arithmetic that hides the append-vs
 
 ## Task index
 
-| Ref | Title | Depends on |
-|---|---|---|
-| `lint/01` | test-runner detection + the final-review regression-net rule | — |
-| `lint/02` | informational test-path report | `lint/01` |
-| `lint/03` | template + SKILL guidance, then sweep every tree | `lint/01`, `lint/02` |
-| `orchestrator/01` | R3 — the commit gets its own agent | — |
-| `orchestrator/02` | R2 — the scout transcribes, the script interprets | `orchestrator/01` |
-| `orchestrator/03` | R5a — cross-attempt retry history | `orchestrator/02` |
-| `orchestrator/04` | R5b — an opt-in vendor-switch last rung | `orchestrator/03` |
-| `orchestrator/05` | R6 — budget floor | `orchestrator/04` |
-| `integration/01` | Final review | `lint/03`, `orchestrator/05` |
+| Ref               | Title                                                        | Depends on                   |
+| ----------------- | ------------------------------------------------------------ | ---------------------------- |
+| `lint/01`         | test-runner detection + the final-review regression-net rule | —                            |
+| `lint/02`         | informational test-path report                               | `lint/01`                    |
+| `lint/03`         | template + SKILL guidance, then sweep every tree             | `lint/01`, `lint/02`         |
+| `orchestrator/01` | R3 — the commit gets its own agent                           | —                            |
+| `orchestrator/02` | R2 — the scout transcribes, the script interprets            | `orchestrator/01`            |
+| `orchestrator/03` | R5a — cross-attempt retry history                            | `orchestrator/02`            |
+| `orchestrator/04` | R5b — an opt-in vendor-switch last rung                      | `orchestrator/03`            |
+| `orchestrator/05` | R6 — budget floor                                            | `orchestrator/04`            |
+| `integration/01`  | Final review                                                 | `lint/03`, `orchestrator/05` |
 
 ## Eval rubric
 

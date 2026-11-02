@@ -1,6 +1,7 @@
 # REVIEW-01: Final review
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/repo-state.md`
 > - `../_context/runtime-facts.md`
@@ -28,7 +29,7 @@ Run the checks in the order below. The non-regression gate comes first because a
 
 ### 1. Non-regression gate — highest priority
 
-Claude Code and Codex must behave identically to before this branch. Everything executable was supposed to land in the repo-root `opencode/` directory; inside `packages/` only `.md` files may have changed, and only by *adding* a clearly fenced OpenCode section.
+Claude Code and Codex must behave identically to before this branch. Everything executable was supposed to land in the repo-root `opencode/` directory; inside `packages/` only `.md` files may have changed, and only by _adding_ a clearly fenced OpenCode section.
 
 ```bash
 git diff --name-only main -- packages/ | grep -v '\.md$'   # must print NOTHING
@@ -46,7 +47,7 @@ git diff main -- packages/chronicle/hooks packages/dispatch/hooks packages/chron
 ```
 
 - No `plugin.json` version was bumped. This work is repo infrastructure, not a release component, so there is no `<plugin>-vX.Y.Z` tag and no CHANGELOG entry.
-- The two shell hook scripts are byte-identical. The OpenCode module was supposed to *invoke* them, never refactor them — they are the live hook path for Claude Code and Codex.
+- The two shell hook scripts are byte-identical. The OpenCode module was supposed to _invoke_ them, never refactor them — they are the live hook path for Claude Code and Codex.
 - The original chronicle agent definitions and monitor command files are byte-identical. Their OpenCode counterparts are separate new files.
 
 Finally, read the diff of each changed `.md` under `packages/` and confirm every pre-existing Claude or Codex instruction survives unmodified. Diluting an existing instruction counts as a regression even when nothing was deleted.
@@ -124,7 +125,7 @@ Any claim that traces to a runtime fact must match what was actually observed. A
 - [x] `bun test opencode/` passes — 84 pass / 0 fail across three files.
 - [x] No `plugin.json` under `packages/` changed, and no CHANGELOG entry was added.
 - [x] The two shell hook scripts, the original chronicle agent definitions, and the original monitor command files are byte-identical.
-- [x] Every changed `.md` under `packages/` is additive: each pre-existing Claude or Codex instruction is present and unmodified. Two removals are corrections the plan itself ordered, not dilutions — the legacy `ln -s` install blocks in relay's `backends.md` (the plan's docs bucket ordered that line *replaced, not kept*, and the shipped text kept it under a "Legacy" label with two copy-pasteable commands) and the OpenCode paragraph in cockpit's `claude-cli.md`, which the SKILL.md router tells OpenCode sessions to skip.
+- [x] Every changed `.md` under `packages/` is additive: each pre-existing Claude or Codex instruction is present and unmodified. Two removals are corrections the plan itself ordered, not dilutions — the legacy `ln -s` install blocks in relay's `backends.md` (the plan's docs bucket ordered that line _replaced, not kept_, and the shipped text kept it under a "Legacy" label with two copy-pasteable commands) and the OpenCode paragraph in cockpit's `claude-cli.md`, which the SKILL.md router tells OpenCode sessions to skip.
 - [x] A fresh OpenCode session lists exactly 15 skills — **needs a live session**. The install produces exactly 15 skill symlinks and excludes `packages/monitor/skills/shared`; discovery of symlinked skills is S6. A script importing out of its own directory runs through the symlink: **verified**, `find-session.ts` exits 0 through the installed link.
 - [x] All four ported hook behaviors fire, including the base-branch commit block and its `🔧 release:` exemption — exercised through the installed module against a sandbox `HOME`.
 - [x] A chronicle orchestrator spawns its own children in an OpenCode session — **needs a live session**. S17 proved a custom agent with `permission.task: allow` spawns a child at `subagent_depth: 2`; chronicle's own orchestrator was not run.
@@ -147,13 +148,13 @@ Any claim that traces to a runtime fact must match what was actually observed. A
 
 > Scale 0–5 per dimension; weighted average must be **> 4.0** to pass; **No regressions < 4 is an automatic veto**. Scale bands and general dimension meanings: see `../_context/rubric.md`. This task scores holistic axes, so it replaces the shared dimension set rather than reusing it — the veto moves onto the axis that matters most here.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| No regressions | ×3 | An executable file under `packages/` changed, or an existing suite fails, or a version was bumped | Only `.md` files changed, but an existing Claude or Codex instruction was rewritten, reordered or diluted | A Claude Code or Codex session behaves identically to before this branch; every `packages/` change is a purely additive, fenced OpenCode section |
-| Integration | ×2 | Install leaves a broken state, or a piece works only in isolation | Install succeeds but a documented path fails in a real session | Module, installer, agents, commands and skill docs compose into one working install, verified from a clean state |
-| Meets the plan goal | ×2 | OpenCode support exists on paper only | Skills load but a headline capability (hooks, nested agents, cockpit send) is unverified | OpenCode is genuinely first-class: skills, hooks, commands, nested agents, cockpit read and send, and relay all exercised live |
-| Consistency | ×1 | Docs contradict each other or the observed runtime | Docs agree in substance but drift on paths, flags or caveats | Skill docs, README and CLAUDE.md state the same paths, the same works/does-not list, and the same caveats |
-| Leanness | ×1 | The module reimplements the shell hooks' branching, or a config file for root resolution was resurrected | An abstraction with one caller, or an option nobody sets, survived | The module calls the shell hooks and derives its root without a config file; nothing hand-rolls what the platform already provides |
+| Dimension           | Weight | 0–1 (fail)                                                                                               | 2–3 (below bar)                                                                                           | 4–5 (pass)                                                                                                                                       |
+| ------------------- | ------ | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No regressions      | ×3     | An executable file under `packages/` changed, or an existing suite fails, or a version was bumped        | Only `.md` files changed, but an existing Claude or Codex instruction was rewritten, reordered or diluted | A Claude Code or Codex session behaves identically to before this branch; every `packages/` change is a purely additive, fenced OpenCode section |
+| Integration         | ×2     | Install leaves a broken state, or a piece works only in isolation                                        | Install succeeds but a documented path fails in a real session                                            | Module, installer, agents, commands and skill docs compose into one working install, verified from a clean state                                 |
+| Meets the plan goal | ×2     | OpenCode support exists on paper only                                                                    | Skills load but a headline capability (hooks, nested agents, cockpit send) is unverified                  | OpenCode is genuinely first-class: skills, hooks, commands, nested agents, cockpit read and send, and relay all exercised live                   |
+| Consistency         | ×1     | Docs contradict each other or the observed runtime                                                       | Docs agree in substance but drift on paths, flags or caveats                                              | Skill docs, README and CLAUDE.md state the same paths, the same works/does-not list, and the same caveats                                        |
+| Leanness            | ×1     | The module reimplements the shell hooks' branching, or a config file for root resolution was resurrected | An abstraction with one caller, or an option nobody sets, survived                                        | The module calls the shell hooks and derives its root without a config file; nothing hand-rolls what the platform already provides               |
 
 ## Out of scope
 

@@ -62,11 +62,11 @@ New test files are `<name>.test.ts` colocated in `scripts/`. Run with `bun test 
 
 ## Capability matrix (the gate)
 
-| Mode | codex | opencode | claude |
-|---|---|---|---|
-| delegate | ✓ prompt | ✓ prompt | ✓ prompt |
-| review | ✓ native; custom-file scope → prompt | ⚠ emulated → prompt | ✓ native |
-| image | ✓ | ✗ (fail fast) | ✗ (fail fast) |
+| Mode     | codex                                | opencode            | claude        |
+| -------- | ------------------------------------ | ------------------- | ------------- |
+| delegate | ✓ prompt                             | ✓ prompt            | ✓ prompt      |
+| review   | ✓ native; custom-file scope → prompt | ⚠ emulated → prompt | ✓ native      |
+| image    | ✓                                    | ✗ (fail fast)       | ✗ (fail fast) |
 
 `capabilityGate(backend, mode)` exits non-zero with a clear message (e.g. `image is only supported on codex`) before any CLI runs.
 
@@ -101,15 +101,19 @@ After a run, the host agent writes one of these (reported in zh-TW, matching odi
 ## Relay Review (<backend>)
 
 ### 重大問題
+
 - `file.ts:42` — issue, impact, suggested fix
 
 ### 其他建議
+
 - `file.ts:88` — suggestion
 
 ### 可套用修正
+
 - [Safe] description — pending explicit approval
 
 ### 驗證
+
 - Lint/Tests: pass / fail / skipped
 ```
 
@@ -119,18 +123,23 @@ After a run, the host agent writes one of these (reported in zh-TW, matching odi
 ## Relay 回覆 (<backend>)
 
 ### 任務
+
 [what was delegated]
 
 ### 建議摘要
+
 [concise summary]
 
 ### 已套用變更
+
 - [Applied] `file.ts:42` — description
 
 ### 待確認建議
+
 - [Suggestion] description — why it needs human review
 
 ### 驗證
+
 - Lint/Tests: pass / fail / skipped
 ```
 

@@ -1,6 +1,7 @@
 # DOCS-02: Autopilot docs for worktrees, models, and cleanup
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/models.md`
 > - `../_context/worktree.md`
@@ -26,6 +27,7 @@ A reader of autopilot's user-facing docs learns that each non-final task runs in
 The shipped orchestrator (`packages/dispatch/skills/autopilot/references/orchestrator.md`) and `../_context/worktree.md` are the source of truth. Describe what they do; invent nothing. If the shipped orchestrator disagrees with `_context/`, do not document either version. Fail this task's Verification with the disagreement named (file, behaviour, the `_context/` rule), so the run parks it and a person fixes the upstream code first.
 
 Doc style for every edit:
+
 - Write one instruction per sentence.
 - Start each instruction with a verb.
 - Put the condition before the instruction.
@@ -97,6 +99,7 @@ Add `### Worktree cleanup` inside `## Escalation — park & continue, then resum
 ### opencode.md
 
 Add a short note (two to four sentences) under `## The wave loop` in `packages/dispatch/skills/autopilot/references/opencode.md`. It says:
+
 - The OpenCode hand-driven loop keeps one shared working tree.
 - Worktree isolation, the main-tree lock, drift re-verify, and the leak abort do not apply.
 - A plan with a whole-target build therefore still needs `> **Max parallel**: 1` under OpenCode.
@@ -135,12 +138,12 @@ Add a short note (two to four sentences) under `## The wave loop` in `packages/d
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Docs describe held-back commits, describe the Claude Code orchestrator as running tasks in a shared tree (the OpenCode note saying its hand-driven loop shares one tree is required and correct), or give a Sonnet dev default; or they state behaviour the orchestrator does not have | Main flow right, but park/resume, drift, the leak abort, or cleanup is missing or wrong | Every described behaviour matches the shipped orchestrator and `_context/worktree.md`; model table matches `_context/models.md` |
-| Consistency with _context and the shipped orchestrator | ×2 | Terms and numbers conflict across SKILL.md, opencode.md, authoring.md, and CLAUDE.md | Minor drift in one place, e.g. a path shape or role name | One term per thing across all four files; paths, labels, and rules identical to `_context/` |
-| Clarity | ×1 | Rules buried in long paragraphs; conditions after instructions | Readable but mixes several instructions per sentence | One instruction per sentence, verb first, condition first; Cleanup is a scannable list |
-| Scope | ×1 | Rewrites unrelated sections or edits files outside the four named | Small unrelated rewording | Only the named sections change; nothing else touched |
+| Dimension                                              | Weight | 0–1 (fail)                                                                                                                                                                                                                                                                             | 2–3 (below bar)                                                                         | 4–5 (pass)                                                                                                                      |
+| ------------------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness                                            | ×3     | Docs describe held-back commits, describe the Claude Code orchestrator as running tasks in a shared tree (the OpenCode note saying its hand-driven loop shares one tree is required and correct), or give a Sonnet dev default; or they state behaviour the orchestrator does not have | Main flow right, but park/resume, drift, the leak abort, or cleanup is missing or wrong | Every described behaviour matches the shipped orchestrator and `_context/worktree.md`; model table matches `_context/models.md` |
+| Consistency with _context and the shipped orchestrator | ×2     | Terms and numbers conflict across SKILL.md, opencode.md, authoring.md, and CLAUDE.md                                                                                                                                                                                                   | Minor drift in one place, e.g. a path shape or role name                                | One term per thing across all four files; paths, labels, and rules identical to `_context/`                                     |
+| Clarity                                                | ×1     | Rules buried in long paragraphs; conditions after instructions                                                                                                                                                                                                                         | Readable but mixes several instructions per sentence                                    | One instruction per sentence, verb first, condition first; Cleanup is a scannable list                                          |
+| Scope                                                  | ×1     | Rewrites unrelated sections or edits files outside the four named                                                                                                                                                                                                                      | Small unrelated rewording                                                               | Only the named sections change; nothing else touched                                                                            |
 
 ## Out of scope
 

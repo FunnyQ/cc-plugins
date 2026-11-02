@@ -1,6 +1,7 @@
 # AGENTS-03: Barrowkeeper batch write
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contract.md`
 > - `../_context/rubric.md`
@@ -98,7 +99,13 @@ Path collision, before any write:
 Validation error, after the writes landed:
 
 ```json
-{ "success": false, "reason": "validation-error", "newAdrPaths": [], "violations": [], "archived": false }
+{
+  "success": false,
+  "reason": "validation-error",
+  "newAdrPaths": [],
+  "violations": [],
+  "archived": false
+}
 ```
 
 `newAdrPaths` is an array on every shape that carries it. It appears on the validation-error shape because the recovery procedure needs to know what landed on disk.
@@ -148,12 +155,12 @@ The path-collision shape is the exception, and it carries no `newAdrPaths` at al
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Contract fidelity < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Contract fidelity | ×3 | A field name differs from the frozen contract, or a required output shape is missing | Shapes match but the collision check sits after a write, or a refusal rule is softened | Input block, write order, and all four output shapes match the frozen contract exactly |
-| Completeness | ×2 | The Process section still reads in the singular | Input block converted while an output shape or a Process step still writes one record | Input, Process, and every output shape carry the batch contract, with no singular remnant |
-| Readability | ×1 | Instructions run past 25 words, or stack em dashes | Correct content, but the collision reason lands after the step it justifies | Warning before step, one instruction per sentence, and one voice with the rest of the file |
-| Assumptions and docs | ×1 | Invents a rollback, a repair, or a renumbering the contract forbids | The collision pre-check or the `newAdrPaths` addition is stated with no reason | Every non-obvious rule names the failure it prevents, including the attribution note |
+| Dimension            | Weight | 0–1 (fail)                                                                           | 2–3 (below bar)                                                                        | 4–5 (pass)                                                                                 |
+| -------------------- | ------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Contract fidelity    | ×3     | A field name differs from the frozen contract, or a required output shape is missing | Shapes match but the collision check sits after a write, or a refusal rule is softened | Input block, write order, and all four output shapes match the frozen contract exactly     |
+| Completeness         | ×2     | The Process section still reads in the singular                                      | Input block converted while an output shape or a Process step still writes one record  | Input, Process, and every output shape carry the batch contract, with no singular remnant  |
+| Readability          | ×1     | Instructions run past 25 words, or stack em dashes                                   | Correct content, but the collision reason lands after the step it justifies            | Warning before step, one instruction per sentence, and one voice with the rest of the file |
+| Assumptions and docs | ×1     | Invents a rollback, a repair, or a renumbering the contract forbids                  | The collision pre-check or the `newAdrPaths` addition is stated with no reason         | Every non-obvious rule names the failure it prevents, including the attribution note       |
 
 ## Out of scope
 

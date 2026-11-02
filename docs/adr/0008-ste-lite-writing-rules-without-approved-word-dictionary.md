@@ -26,7 +26,7 @@ dictionary (~900 words).
 
 Adopt STE-lite: keep ASD-STE100's writing rules — one instruction per
 sentence, imperative active voice, instructions ≤20 words, condition before
-instruction, warning before step, no em-dash chains, noun strings ≤3 —  and
+instruction, warning before step, no em-dash chains, noun strings ≤3 — and
 drop the approved-word dictionary entirely. A second reason beyond product
 breakage: the dictionary targets non-native human technicians; these files are
 read primarily by LLMs, for which a richer vocabulary carries no comprehension

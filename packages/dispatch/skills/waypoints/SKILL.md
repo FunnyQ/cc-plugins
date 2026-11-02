@@ -35,7 +35,7 @@ If a `docs/<slug>/tasks/` tree already exists and the user wants execution, use 
 
 ## Process
 
-Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Instead, take the skill's load-time *"Base directory for this skill"* banner. Set `SCRIPTS="<base-dir>/scripts"`. Use `bun "$SCRIPTS"/...` in every command below.
+Resolve the scripts path once. `CLAUDE_PLUGIN_ROOT` is **not** reliably set in Bash. Instead, take the skill's load-time _"Base directory for this skill"_ banner. Set `SCRIPTS="<base-dir>/scripts"`. Use `bun "$SCRIPTS"/...` in every command below.
 
 **OpenCode only**: there is no banner. Set `SCRIPTS=~/.config/opencode/skills/waypoints/scripts`; `CLAUDE_PLUGIN_ROOT` is empty there.
 

@@ -49,20 +49,20 @@ Reviewed 2026-10-01. Diff scope: `git diff --stat 33ef2e53f519e84080823e1f7362a3
 
 ## Targets (quoted from measurements.md, plus a re-measure after this review's fixes)
 
-| Metric | Target | measurements.md (Rust) | Result | After review fixes (A/B, same snapshot, same load) |
-|---|---|---|---|---|
-| `atlas serve` RSS after one `/api/stats` | ≤ 40 MB | 77.8 MB (TS 607.1 MB) | **MISS**. Q accepted 77.8 MB on 2026-10-01. Cause: the build's working set, plus the cached payload's `serde_json::Value` tree kept for the life of the process. | see below |
-| `/api/stats` cold build | Rust ≤ TS | 6402 ms vs TS 6636 ms | **PASS** | see below |
-| `atlas statusline` net overhead | ≤ 10 ms | 6.2 ms net (TS 18.4 ms) | **PASS** | see below |
-| Real-home golden diff | equal within 1e-9 relative | 0 differing paths; 1,199 cost sums differ in the last float digit | **PASS** under the tolerance Q accepted (1e-9) | not re-run. The pricing and cost changes here keep summation order: the golden suite is bit-identical and still passes. |
+| Metric                                   | Target                     | measurements.md (Rust)                                            | Result                                                                                                                                                           | After review fixes (A/B, same snapshot, same load)                                                                      |
+| ---------------------------------------- | -------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `atlas serve` RSS after one `/api/stats` | ≤ 40 MB                    | 77.8 MB (TS 607.1 MB)                                             | **MISS**. Q accepted 77.8 MB on 2026-10-01. Cause: the build's working set, plus the cached payload's `serde_json::Value` tree kept for the life of the process. | see below                                                                                                               |
+| `/api/stats` cold build                  | Rust ≤ TS                  | 6402 ms vs TS 6636 ms                                             | **PASS**                                                                                                                                                         | see below                                                                                                               |
+| `atlas statusline` net overhead          | ≤ 10 ms                    | 6.2 ms net (TS 18.4 ms)                                           | **PASS**                                                                                                                                                         | see below                                                                                                               |
+| Real-home golden diff                    | equal within 1e-9 relative | 0 differing paths; 1,199 cost sums differ in the last float digit | **PASS** under the tolerance Q accepted (1e-9)                                                                                                                   | not re-run. The pricing and cost changes here keep summation order: the golden suite is bit-identical and still passes. |
 
 A/B re-measure: the method is the one in measurements.md, driven from `/tmp/q-lab/monitor/review01.*/ab.ts` over the frozen snapshot `snap.LuAS`. It ran 4 interleaved rounds of the HEAD binary against the fixed working-tree binary. The machine's load average was about 5–8, higher than during ship/02, so compare the two columns with each other rather than with the table above.
 
-| Metric (median of 4) | HEAD (`35b64cf`) | This review | Target |
-|---|---|---|---|
-| RSS after one `/api/stats` | 80.0 MB | **66.5 MB** | ≤ 40 MB: still a **MISS** (26.5 MB over), within Q's accepted 77.8 MB |
-| `/api/stats` cold build | 6494 ms | **6126 ms** | ≤ TS 6636 ms: **PASS** |
-| `atlas statusline` total / net of `sh -c true` (3.8 ms) | 11.9 / 8.1 ms | 12.6 / 8.8 ms | ≤ 10 ms net: **PASS**. The difference is run-to-run noise (range 10.3–13.3 on both); this review changed nothing on the statusline hot path apart from one `env_remove`. |
+| Metric (median of 4)                                    | HEAD (`35b64cf`) | This review   | Target                                                                                                                                                                   |
+| ------------------------------------------------------- | ---------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RSS after one `/api/stats`                              | 80.0 MB          | **66.5 MB**   | ≤ 40 MB: still a **MISS** (26.5 MB over), within Q's accepted 77.8 MB                                                                                                    |
+| `/api/stats` cold build                                 | 6494 ms          | **6126 ms**   | ≤ TS 6636 ms: **PASS**                                                                                                                                                   |
+| `atlas statusline` total / net of `sh -c true` (3.8 ms) | 11.9 / 8.1 ms    | 12.6 / 8.8 ms | ≤ 10 ms net: **PASS**. The difference is run-to-run noise (range 10.3–13.3 on both); this review changed nothing on the statusline hot path apart from one `env_remove`. |
 
 Remaining RSS cause: the peak working set of one build, meaning full `serde_json::Value` parses of every transcript line, the OpenCode message rows collected at once, and the payload tree before it is encoded. The allocator keeps that memory after the build. The next lever is the rejected borrowed-deserialization change below.
 

@@ -1,4 +1,3 @@
-
 export function initLead({ svg, viewport, dest, beacon, telemetry }) {
   if (!svg || !viewport || !dest || !beacon) return;
   const underline = svg.querySelector(".lead-underline");

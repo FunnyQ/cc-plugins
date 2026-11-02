@@ -49,7 +49,7 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
    Never exclude a path on your own judgement. Omit `exclude` when there are none.
 2. **Distill `contextBrief`** — terse intent and non-obvious rationale from this
    chat. The Lawspeaker sees the diff but not the conversation, so this is the only
-   source of *why* for every commit body it writes. Everything the reader of a
+   source of _why_ for every commit body it writes. Everything the reader of a
    commit would need to know, and nothing else.
 3. **Spawn the Lawspeaker** (`subagent_type: "chronicle:lawspeaker"`), passing:
    - the **skill directory** — the skill's load-time "Base directory for this

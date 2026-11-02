@@ -75,16 +75,16 @@ type DecisionRecord = {
   id: string;
   type: "decision";
   kind?: "decision" | "rationale" | "learning" | "caveat"; // default "decision"
-  source?: "agent" | "scribe";                              // who wrote it
-  decision: string;   // what was done
-  reason: string;     // why
-  tradeoff: string;   // what was given up
+  source?: "agent" | "scribe"; // who wrote it
+  decision: string; // what was done
+  reason: string; // why
+  tradeoff: string; // what was given up
   facets: { label: string; text: string }[];
   needs_your_call: boolean;
   options: string[];
   files: string[];
-  diagram?: string;   // optional Mermaid source (decision cards may carry a diagram)
-  timestamp: string;  // ISO 8601
+  diagram?: string; // optional Mermaid source (decision cards may carry a diagram)
+  timestamp: string; // ISO 8601
 };
 ```
 

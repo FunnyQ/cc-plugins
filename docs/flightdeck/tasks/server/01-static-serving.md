@@ -1,6 +1,7 @@
 # SERVER-01: static file serving
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/rubric.md`
 >
@@ -39,12 +40,18 @@ The security-relevant part must be pure, so a test can assert it without a files
  * Returns null when the path cannot be decoded or escapes the root.
  * Performs NO filesystem access — existence and file-type are the caller's job.
  */
-export function resolveStaticPath(root: string, pathname: string): string | null;
+export function resolveStaticPath(
+  root: string,
+  pathname: string,
+): string | null;
 
 export function mimeFor(path: string): string;
 
 /** Impure: stats the resolved path and returns the response. */
-export async function serveStatic(root: string, pathname: string): Promise<Response>;
+export async function serveStatic(
+  root: string,
+  pathname: string,
+): Promise<Response>;
 ```
 
 `resolveStaticPath` runs these steps in order:
@@ -121,12 +128,12 @@ and a cached stale bundle is a confusing failure to debug.
 
 > Scale and shared dimensions: see `../_context/rubric.md`. Each dimension 0–5; weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | A traversal escapes the root, or ordinary assets fail to resolve | Blocks plain traversal but not the encoded, double-slash, or prefix-sibling case | Leading slash stripped once, every listed asset resolves, every listed escape rejected, decoding failures handled |
-| Test coverage | ×2 | No tests | Escape cases only, with no success cases | Both directions covered, each MIME mapping, the octet-stream fallback, and all three 404 paths |
-| Interface & readability | ×1 | Resolve and I/O in one function | Split but the pure function still stats | `resolveStaticPath` provably pure, `serveStatic` thin around it |
-| Assumptions & docs | ×1 | The leading-slash strip is unexplained | Noted without the reason | Comments explain that an absolute second argument discards the root, and why a bare prefix comparison is unsafe |
+| Dimension               | Weight | 0–1 (fail)                                                       | 2–3 (below bar)                                                                  | 4–5 (pass)                                                                                                        |
+| ----------------------- | ------ | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | A traversal escapes the root, or ordinary assets fail to resolve | Blocks plain traversal but not the encoded, double-slash, or prefix-sibling case | Leading slash stripped once, every listed asset resolves, every listed escape rejected, decoding failures handled |
+| Test coverage           | ×2     | No tests                                                         | Escape cases only, with no success cases                                         | Both directions covered, each MIME mapping, the octet-stream fallback, and all three 404 paths                    |
+| Interface & readability | ×1     | Resolve and I/O in one function                                  | Split but the pure function still stats                                          | `resolveStaticPath` provably pure, `serveStatic` thin around it                                                   |
+| Assumptions & docs      | ×1     | The leading-slash strip is unexplained                           | Noted without the reason                                                         | Comments explain that an absolute second argument discards the root, and why a bare prefix comparison is unsafe   |
 
 ## Out of scope
 

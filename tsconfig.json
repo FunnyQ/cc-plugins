@@ -9,7 +9,11 @@
     "types": ["bun"],
     "allowImportingTsExtensions": true
   },
-  "include": ["packages/**/*.ts", "opencode/**/*.ts", ".github/scripts/**/*.ts"],
+  "include": [
+    "packages/**/*.ts",
+    "opencode/**/*.ts",
+    ".github/scripts/**/*.ts"
+  ],
   "exclude": [
     "packages/runes/**",
     "packages/monitor/hooks/**",

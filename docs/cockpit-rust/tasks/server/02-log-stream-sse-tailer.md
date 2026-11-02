@@ -1,6 +1,7 @@
 # SERVER-02: Log stream and SSE tailer
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/rubric.md`
@@ -87,12 +88,12 @@ Behavior to keep, in order:
 
 > Scale 0–5, see `../_context/rubric.md`. Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Missing file 404s, or frames differ from TS | Backlog and appends work; rotation, late file, or confinement drift | Wire bytes, confinement, rotation reset, and late-file resolve all match TS |
-| Test coverage | ×2 | No Rust run of the group | Contract group passes; no unit tests for split/reset logic | Contract group passes on both; `cargo test` covers `split_complete_lines`, reset on shrink/new inode, UTF-8 split, drop cleanup |
-| Interface & readability | ×1 | Transcript stream would have to copy the tailer | Tailer reusable but tangled with log specifics | `TailSource` cleanly separates resolve/backlog/emit; no lock across `.await` |
-| Assumptions & docs | ×1 | Cadences hard-coded without env overrides | Env honoured, deviations unexplained | Env fallbacks match TS; re-serialisation and debounce choices commented |
+| Dimension               | Weight | 0–1 (fail)                                      | 2–3 (below bar)                                                     | 4–5 (pass)                                                                                                                      |
+| ----------------------- | ------ | ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Missing file 404s, or frames differ from TS     | Backlog and appends work; rotation, late file, or confinement drift | Wire bytes, confinement, rotation reset, and late-file resolve all match TS                                                     |
+| Test coverage           | ×2     | No Rust run of the group                        | Contract group passes; no unit tests for split/reset logic          | Contract group passes on both; `cargo test` covers `split_complete_lines`, reset on shrink/new inode, UTF-8 split, drop cleanup |
+| Interface & readability | ×1     | Transcript stream would have to copy the tailer | Tailer reusable but tangled with log specifics                      | `TailSource` cleanly separates resolve/backlog/emit; no lock across `.await`                                                    |
+| Assumptions & docs      | ×1     | Cadences hard-coded without env overrides       | Env honoured, deviations unexplained                                | Env fallbacks match TS; re-serialisation and debounce choices commented                                                         |
 
 ## Out of scope
 

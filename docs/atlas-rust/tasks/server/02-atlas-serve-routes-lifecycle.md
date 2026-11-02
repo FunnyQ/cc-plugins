@@ -1,6 +1,7 @@
 # SERVER-02: The atlas serve HTTP shell and lifecycle
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 > - `../_context/engine-api.md`
@@ -142,12 +143,12 @@ Unless `--no-open`: `open <url>` on macOS, `xdg-open <url>` elsewhere, stdio nul
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Contract tests fail against Rust, or `/api/live` stalls behind a stats build, or supersede kills the wrong process | Contract green, but a header, message string, `atlas.json` byte, or the failed-build-not-cached rule drifts from TS | Every §2–§3 behavior matches TS exactly; one build per fingerprint; live never blocked; failed builds retried |
-| Test coverage | ×2 | No cargo tests; contract suite not run against Rust | Contract suite green but startup-decision or `--port` edge cases untested | All 6 lifecycle cases, `--port` edges, in-flight sharing, and the full HTTP/lifecycle contract including the Rust-only concurrency test pass |
-| Interface & readability | ×1 | Handlers duplicate header/JSON building; `unwrap` on request or file data | Works but routing or cache state is hard to follow | One dispatch point, small handlers, reused `json_response`/`serve_dir`, no one-caller abstraction, clippy clean |
-| Assumptions & docs | ×1 | In-flight cache choice and runtime split unexplained | Some choices commented | One-line why-comments on the in-flight cache choice, running the startup decision before the runtime, and any deliberate TS deviation (live not blocked) |
+| Dimension               | Weight | 0–1 (fail)                                                                                                         | 2–3 (below bar)                                                                                                     | 4–5 (pass)                                                                                                                                               |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Contract tests fail against Rust, or `/api/live` stalls behind a stats build, or supersede kills the wrong process | Contract green, but a header, message string, `atlas.json` byte, or the failed-build-not-cached rule drifts from TS | Every §2–§3 behavior matches TS exactly; one build per fingerprint; live never blocked; failed builds retried                                            |
+| Test coverage           | ×2     | No cargo tests; contract suite not run against Rust                                                                | Contract suite green but startup-decision or `--port` edge cases untested                                           | All 6 lifecycle cases, `--port` edges, in-flight sharing, and the full HTTP/lifecycle contract including the Rust-only concurrency test pass             |
+| Interface & readability | ×1     | Handlers duplicate header/JSON building; `unwrap` on request or file data                                          | Works but routing or cache state is hard to follow                                                                  | One dispatch point, small handlers, reused `json_response`/`serve_dir`, no one-caller abstraction, clippy clean                                          |
+| Assumptions & docs      | ×1     | In-flight cache choice and runtime split unexplained                                                               | Some choices commented                                                                                              | One-line why-comments on the in-flight cache choice, running the startup decision before the runtime, and any deliberate TS deviation (live not blocked) |
 
 ## Out of scope
 

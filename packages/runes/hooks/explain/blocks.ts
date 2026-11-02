@@ -139,7 +139,10 @@ export function prepareBlocks(main: string): {
       if (hasClass(attrs, "mermaid"))
         return hold("mermaid", diagramFallback(sourceOf(inner)));
       if (hasClass(attrs, "code"))
-        return hold("code", codeBlock(attr(attrs, LANG_ATTR) ?? "", sourceOf(inner)));
+        return hold(
+          "code",
+          codeBlock(attr(attrs, LANG_ATTR) ?? "", sourceOf(inner)),
+        );
       return whole;
     });
   return {

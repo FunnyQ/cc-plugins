@@ -1,6 +1,7 @@
 # CONTRACT-04: CLI subcommand contract suite
 
 > **Required reading** (read before starting; do not need to open other files):
+>
 > - `../_context/shared.md`
 > - `../_context/contracts.md`
 >
@@ -22,15 +23,28 @@ A black-box bun suite pins the observable behavior of `atlas statusline`, `atlas
 
 ```ts
 // launcher.ts
-export function atlasCommand(sub: "serve" | "stats" | "live" | "rollup-update" | "statusline" | "push-usage", args?: string[]): string[];
+export function atlasCommand(
+  sub:
+    "serve" | "stats" | "live" | "rollup-update" | "statusline" | "push-usage",
+  args?: string[],
+): string[];
 // COCKPIT_BIN set → [COCKPIT_BIN, "atlas", sub, ...args]; unset → ["bun", "<scripts>/<ts file for sub>", ...args]
 export function isRust(): boolean;
 
 // fixtures.ts
 export function makeFixtureHome(): Promise<{
-  home: string;                       // temp HOME, populated with Claude/Codex/OpenCode fixtures
-  env: Record<string, string>;        // HOME, XDG_DATA_HOME, XDG_CONFIG_HOME, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, TOKEN_ATLAS_*_URL → stub
-  stub: { url: string; requests: Array<{ method: string; path: string; headers: Record<string, string>; body: string }>; respondWith(path: string, status: number, body: string): void };
+  home: string; // temp HOME, populated with Claude/Codex/OpenCode fixtures
+  env: Record<string, string>; // HOME, XDG_DATA_HOME, XDG_CONFIG_HOME, COCKPIT_HOME, TZ, TOKEN_ATLAS_NOW_MS, TOKEN_ATLAS_*_URL → stub
+  stub: {
+    url: string;
+    requests: Array<{
+      method: string;
+      path: string;
+      headers: Record<string, string>;
+      body: string;
+    }>;
+    respondWith(path: string, status: number, body: string): void;
+  };
   cleanup(): Promise<void>;
 }>;
 ```
@@ -101,12 +115,12 @@ Every test must be launcher-driven so the same file runs with `COCKPIT_BIN` set.
 
 > Scale 0–5 (see ../_context/rubric.md). Weighted average > 4.0 to pass; Correctness < 4 is an automatic veto.
 
-| Dimension | Weight | 0–1 (fail) | 2–3 (below bar) | 4–5 (pass) |
-|---|---|---|---|---|
-| Correctness | ×3 | Suite fails against TS, or pins behavior the TS does not have | Passes, but loosens a pinned detail (file text, header, key order, exit code) to "contains" checks | Passes against TS and pins every §4 detail exactly, including the live-output object shape and rate-limits file text |
-| Test coverage | ×2 | Only happy paths | Misses the throttle, the unreachable URL, or the untouched-file cases | Every failure path above has its own test; nudge detachment ceiling is named |
-| Interface & readability | ×1 | Hardcoded paths, real env leaked into children | Works but repeats spawn/env boilerplate per test | One small local spawn helper, fixture per describe, launcher-driven throughout |
-| Assumptions & docs | ×1 | Timing bounds and polling unexplained | Some bounds explained | Each timing bound and each `skipIf` carries a one-line why |
+| Dimension               | Weight | 0–1 (fail)                                                    | 2–3 (below bar)                                                                                    | 4–5 (pass)                                                                                                           |
+| ----------------------- | ------ | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Correctness             | ×3     | Suite fails against TS, or pins behavior the TS does not have | Passes, but loosens a pinned detail (file text, header, key order, exit code) to "contains" checks | Passes against TS and pins every §4 detail exactly, including the live-output object shape and rate-limits file text |
+| Test coverage           | ×2     | Only happy paths                                              | Misses the throttle, the unreachable URL, or the untouched-file cases                              | Every failure path above has its own test; nudge detachment ceiling is named                                         |
+| Interface & readability | ×1     | Hardcoded paths, real env leaked into children                | Works but repeats spawn/env boilerplate per test                                                   | One small local spawn helper, fixture per describe, launcher-driven throughout                                       |
+| Assumptions & docs      | ×1     | Timing bounds and polling unexplained                         | Some bounds explained                                                                              | Each timing bound and each `skipIf` carries a one-line why                                                           |
 
 ## Out of scope
 

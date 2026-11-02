@@ -150,9 +150,7 @@ function repo(files: Record<string, string>): string {
 }
 
 async function commitAll(dir: string, message: string): Promise<void> {
-  await $`git add -A && git commit -qm ${message}`
-    .cwd(dir)
-    .quiet();
+  await $`git add -A && git commit -qm ${message}`.cwd(dir).quiet();
 }
 
 async function initRepo(files: Record<string, string>): Promise<string> {
