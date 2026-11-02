@@ -47,6 +47,7 @@ const EXPECTED_SKILL_NAMES = [
   "release",
   "safari",
   "tell",
+  "tune",
   "usage-dashboard",
   "waypoints",
 ];

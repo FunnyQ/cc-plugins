@@ -43,6 +43,11 @@
       "description": "Drive Firefox, Zen, Chrome, and Safari from the terminal."
     },
     {
+      "name": "atelier",
+      "source": "./packages/atelier",
+      "description": "Tune visual effects and animations with live controls, then hand the values back to the agent."
+    },
+    {
       "name": "runes",
       "source": "./packages/runes",
       "description": "Switchable UI mods, toggled with /runes. First rune: Clawd, a pixel crab above the prompt. Claude Code only."

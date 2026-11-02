@@ -123,6 +123,20 @@
           "kind": "json"
         }
       ]
+    },
+    {
+      "name": "atelier",
+      "path": "packages/atelier",
+      "versionFiles": [
+        {
+          "path": "packages/atelier/.claude-plugin/plugin.json",
+          "kind": "json"
+        },
+        {
+          "path": "packages/atelier/.codex-plugin/plugin.json",
+          "kind": "json"
+        }
+      ]
     }
   ]
 }

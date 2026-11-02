@@ -47,6 +47,12 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 |-------|-------------|
 | [herdr](./packages/herdr/skills/herdr) | Reference for the [Herdr](https://herdr.dev) terminal workspace manager (config, CLI, plugin dev) plus a typed `herd` wrapper to spawn and drive agents in sibling panes when running inside herdr |
 
+**atelier** is a single skill:
+
+| Skill | Description |
+|-------|-------------|
+| [tune](./packages/atelier/skills/tune) | Fine-tune a visual effect or animation with live controls — sliders, colour, cubic-bezier, spring — then hand the values back to the agent; isolated on a stage, or injected into your running dev server page |
+
 ## Claude Code Installation
 
 ### CLI
@@ -412,6 +418,35 @@ claude plugins install herdr@q-lab-marketplace
 
 # Codex
 codex plugin add herdr@q-lab-marketplace
+
+# OpenCode
+bun opencode/install.ts --apply
+```
+
+
+## atelier
+
+A token-cheap tuning playground. The agent writes a small JSON spec of tunable values; atelier serves the page, the controls, and the return path, so a tuning run costs the spec in and one line of JSON out.
+
+- **isolated** — the effect renders alone on a stage (light, dark, or checker ground) with replay, loop, and 0.1×–1× speed.
+- **in-situ** — a one-line loader, pasted into the DevTools console of your dev-server tab, injects the same panel into the real page, so `.vue` components and Tailwind tune in place.
+
+```bash
+T="$CLAUDE_PLUGIN_ROOT/skills/tune/scripts/tune.ts"   # or the skill's load-time base dir
+
+bun "$T" open spec.json   # prints url, dir, and for in-situ the inject line
+bun "$T" wait             # blocks until Apply; prints the values; exit 3 on timeout
+bun "$T" stop
+```
+
+### Installation
+
+```bash
+# Claude Code
+claude plugins install atelier@q-lab-marketplace
+
+# Codex
+codex plugin add atelier@q-lab-marketplace
 
 # OpenCode
 bun opencode/install.ts --apply
