@@ -1,0 +1,451 @@
+@font-face {
+  font-family: "Atelier Schibsted";
+  font-weight: 400;
+  font-display: swap;
+  src: url(fonts/schibsted-400.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Atelier Schibsted";
+  font-weight: 500;
+  font-display: swap;
+  src: url(fonts/schibsted-500.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Atelier Schibsted";
+  font-weight: 700;
+  font-display: swap;
+  src: url(fonts/schibsted-700.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Atelier Schibsted";
+  font-weight: 900;
+  font-display: swap;
+  src: url(fonts/schibsted-900.woff2) format("woff2");
+}
+
+.atelier {
+  --g: #f2f1ec;
+  --i: #111;
+  --r: #e2231a;
+  --m: #6e6e6a;
+  --l: #d9d8d1;
+  all: initial;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  height: 100%;
+  background: var(--g);
+  color: var(--i);
+  font:
+    400 13px/1.35 "Atelier Schibsted",
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.atelier * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+.atelier ::selection {
+  background: var(--i);
+  color: var(--g);
+}
+.atelier :focus-visible {
+  outline: 2px solid var(--i);
+  outline-offset: 2px;
+}
+.atelier .tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.atelier .head {
+  background: var(--r);
+  color: var(--g);
+  padding: 20px 32px 22px;
+  height: 172px;
+  display: grid;
+  align-content: space-between;
+}
+.atelier .head .k {
+  font-weight: 500;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atelier .head .n {
+  font-size: 104px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 0.8;
+  margin-left: -5px;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+}
+.atelier .head .n.scrub {
+  cursor: ew-resize;
+  touch-action: none;
+}
+.atelier .head .n.text {
+  font-size: 48px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.atelier .head .n sup {
+  font-size: 28px;
+  letter-spacing: 0;
+  font-weight: 500;
+  vertical-align: top;
+  margin-left: 6px;
+}
+.atelier .head .h {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  color: #fbe3e1;
+}
+.atelier .head .sc {
+  height: 1px;
+  background: rgba(242, 241, 236, 0.5);
+  position: relative;
+}
+.atelier .head .sc b {
+  position: absolute;
+  left: 0;
+  top: -1px;
+  height: 3px;
+  background: var(--g);
+}
+
+.atelier .body {
+  padding: 0 24px 12px 32px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--i) transparent;
+}
+.atelier .f {
+  padding-top: 12px;
+}
+.atelier .f > button {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  font-weight: 900;
+  border-bottom: 1px solid var(--i);
+  padding-bottom: 6px;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.atelier .f > button span {
+  font-weight: 500;
+  color: var(--m);
+}
+.atelier .f.closed .rows {
+  display: none;
+}
+.atelier .p {
+  padding: 6px 0 4px;
+  border-bottom: 1px solid var(--l);
+}
+.atelier .p .t {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+}
+.atelier .p.c .t > label::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--r);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.atelier .val {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: baseline;
+  justify-content: end;
+  gap: 2px;
+}
+.atelier .val input {
+  width: 72px;
+  text-align: right;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+.atelier .val input:hover {
+  border-color: var(--l);
+}
+.atelier .val input:focus {
+  border-color: var(--i);
+  background: #fff;
+  outline: none;
+}
+.atelier .val small {
+  color: var(--m);
+  font-size: 11px;
+  min-width: 14px;
+}
+.atelier .p.c .val input,
+.atelier .p.c .val small {
+  color: var(--r);
+  font-weight: 700;
+}
+
+.atelier input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.atelier input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background:
+    linear-gradient(var(--i), var(--i)) 0 / var(--fill, 0%) 100% no-repeat,
+    linear-gradient(var(--m), var(--m)) 0 1px / 100% 1px no-repeat;
+}
+.atelier input[type="range"]::-moz-range-track {
+  height: 1px;
+  background: var(--m);
+}
+.atelier input[type="range"]::-moz-range-progress {
+  height: 3px;
+  background: var(--i);
+}
+.atelier input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 6px;
+  height: 14px;
+  background: var(--i);
+  border: 0;
+  border-radius: 0;
+  margin-top: -5.5px;
+}
+.atelier input[type="range"]::-moz-range-thumb {
+  width: 6px;
+  height: 14px;
+  background: var(--i);
+  border: 0;
+  border-radius: 0;
+}
+.atelier .p.on input[type="range"]::-webkit-slider-thumb {
+  outline: 2px solid var(--r);
+  outline-offset: 2px;
+}
+.atelier .p.on input[type="range"]::-moz-range-thumb {
+  outline: 2px solid var(--r);
+  outline-offset: 2px;
+}
+.atelier input[type="range"]:focus-visible {
+  outline: none;
+}
+.atelier input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--i);
+  outline-offset: 2px;
+}
+
+.atelier .sw {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--i);
+  background: none;
+  cursor: pointer;
+}
+.atelier .sw::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.atelier .sw::-webkit-color-swatch {
+  border: 0;
+}
+.atelier .sw::-moz-color-swatch {
+  border: 0;
+}
+.atelier select {
+  border: 1px solid var(--i);
+  background: var(--g);
+  padding: 3px 24px 3px 8px;
+  font-weight: 500;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--i) 50%),
+    linear-gradient(-45deg, transparent 50%, var(--i) 50%);
+  background-position:
+    right 12px center,
+    right 7px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.atelier .tg {
+  appearance: none;
+  width: 30px;
+  height: 16px;
+  border: 1px solid var(--i);
+  position: relative;
+  cursor: pointer;
+  background: var(--g);
+}
+.atelier .tg::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 1px;
+  width: 12px;
+  height: 12px;
+  background: var(--m);
+}
+.atelier .tg:checked::after {
+  left: auto;
+  right: 1px;
+  background: var(--i);
+}
+
+.atelier .crv {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 16px;
+  padding: 12px 0 10px;
+  align-items: end;
+}
+.atelier .crv svg {
+  width: 112px;
+  height: 112px;
+  overflow: visible;
+  touch-action: none;
+}
+.atelier .crv svg rect.h {
+  cursor: grab;
+}
+.atelier .crv .val {
+  grid-auto-flow: row;
+  justify-items: end;
+  gap: 4px;
+}
+.atelier .crv .val input {
+  width: 64px;
+}
+.atelier .sub {
+  font-size: 12px;
+  color: var(--m);
+  text-align: right;
+  padding: 4px 0 0;
+}
+
+.atelier .foot {
+  border-top: 1px solid var(--i);
+  padding: 14px 32px 18px;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 12px;
+}
+.atelier .foot .ch {
+  grid-column: 1 / 3;
+  font-weight: 700;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+  gap: 12px;
+}
+.atelier .foot .ch span {
+  color: var(--m);
+  font-weight: 500;
+}
+.atelier .foot .err {
+  grid-column: 1 / 3;
+  line-height: 1.45;
+}
+.atelier .foot .err b {
+  color: var(--r);
+  font-weight: 700;
+}
+.atelier .foot button {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  padding: 12px 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: space-between;
+}
+.atelier .foot button:focus-visible {
+  outline: 2px solid var(--i);
+  outline-offset: 2px;
+}
+.atelier .foot .rs {
+  border: 1px solid var(--i);
+}
+.atelier .foot .ap {
+  background: var(--r);
+  color: var(--g);
+  font-weight: 900;
+}
+.atelier .foot .ap.ok {
+  background: var(--i);
+}
+.atelier .foot .ap.quiet {
+  background: transparent;
+  color: var(--i);
+  border: 1px solid var(--i);
+}
+.atelier .foot .ap:disabled {
+  cursor: default;
+  background: transparent;
+  color: var(--m);
+  border: 1px solid var(--l);
+}
+
+.atelier.compact .head {
+  height: 132px;
+  padding: 14px 16px 16px;
+}
+.atelier.compact .head .n {
+  font-size: 72px;
+}
+.atelier.compact .head .n.text {
+  font-size: 36px;
+}
+.atelier.compact .head .n sup {
+  font-size: 20px;
+}
+.atelier.compact .body {
+  padding: 0 12px 8px 16px;
+}
+.atelier.compact .foot {
+  padding: 12px 16px 14px;
+}
+.atelier .val .sw {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--i);
+}
+.atelier .foot .ap.ok:disabled {
+  background: var(--i);
+  color: var(--g);
+  border: 0;
+}
+.atelier.compact {
+  height: auto;
+  max-height: 100%;
+}

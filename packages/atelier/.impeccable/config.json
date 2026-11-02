@@ -1,0 +1,16 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "skills/tune/assets/*"
+        ],
+        "createdAt": "2026-11-02T16:13:18.614Z"
+      }
+    ]
+  }
+}

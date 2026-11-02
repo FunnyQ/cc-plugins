@@ -1,0 +1,35 @@
+{
+  "name": "atelier",
+  "version": "0.1.0",
+  "description": "Tune a visual effect or animation with sliders, colour, easing and spring controls, then hand the values back to the agent. The agent writes a small spec; prebuilt pages render the controls, isolated or injected into your running dev server.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "design",
+    "tuning",
+    "animation",
+    "easing",
+    "spring",
+    "css-variables",
+    "playground"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Atelier",
+    "shortDescription": "Fine-tune visual effects and animations with live controls.",
+    "longDescription": "The agent writes a small JSON spec of tunable values; atelier renders sliders, colour, easing and spring controls beside the effect, or injects them into your running dev server page. Press Apply and the agent receives only the final values.",
+    "developerName": "Q",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Let me tune this card's glow with sliders.",
+      "Give me controls for the modal's open animation.",
+      "Inject a tuning panel into localhost:5173 for the hero button."
+    ],
+    "brandColor": "#E2231A"
+  }
+}

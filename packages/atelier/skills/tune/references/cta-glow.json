@@ -1,0 +1,9 @@
+{
+  "mode": "in-situ",
+  "target": ".cta",
+  "params": [
+    { "id": "glow", "type": "range", "min": 0, "max": 1, "step": 0.01, "default": 0.35, "folder": "CTA" },
+    { "id": "radius", "type": "range", "min": 0, "max": 32, "step": 1, "unit": "px", "default": 10, "folder": "CTA" },
+    { "id": "fill", "type": "color", "default": "#1a3fd1", "folder": "CTA" }
+  ]
+}

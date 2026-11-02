@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>atelier · tune</title>
+    <link rel="stylesheet" href="panel.css" />
+    <style>
+      :root {
+        --g: #f2f1ec;
+        --i: #111;
+        --m: #6e6e6a;
+        --l: #d9d8d1;
+        --r: #e2231a;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background: var(--g);
+        color: var(--i);
+        font:
+          400 13px/1.35 "Atelier Schibsted",
+          Helvetica,
+          Arial,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::selection {
+        background: var(--i);
+        color: var(--g);
+      }
+      :focus-visible {
+        outline: 2px solid var(--i);
+        outline-offset: 2px;
+      }
+      .app {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        grid-template-rows: 48px 1fr;
+        height: 100%;
+        min-height: 560px;
+      }
+      .top {
+        grid-column: 1 / 3;
+        display: grid;
+        grid-template-columns: 200px 1fr auto;
+        align-items: center;
+        gap: 24px;
+        padding: 0 40px;
+        border-bottom: 1px solid var(--i);
+      }
+      .top b {
+        font-weight: 900;
+      }
+      .top .spec {
+        color: var(--m);
+      }
+      .top .spec em {
+        font-style: normal;
+        color: var(--i);
+        font-weight: 500;
+        margin-right: 24px;
+      }
+      .status {
+        display: grid;
+        grid-auto-flow: column;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+      }
+      .status i {
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--i);
+      }
+      .status[data-kind="ok"] i,
+      .status[data-kind="sent"] i {
+        background: var(--i);
+      }
+      .status[data-kind="down"] i {
+        background: var(--r);
+        border-color: var(--r);
+      }
+      .left {
+        display: grid;
+        grid-template-rows: 56px 1fr 88px;
+        padding: 0 40px;
+        border-right: 1px solid var(--i);
+        min-height: 0;
+      }
+      .bar,
+      .anim {
+        display: grid;
+        grid-auto-flow: column;
+        justify-content: start;
+        align-items: center;
+      }
+      .anim {
+        grid-template-columns: auto auto 1fr auto auto;
+        gap: 24px;
+      }
+      .lab {
+        color: var(--m);
+        font-weight: 500;
+        width: 120px;
+      }
+      .anim .lab {
+        width: auto;
+      }
+      .seg {
+        display: grid;
+        grid-auto-flow: column;
+      }
+      .seg button {
+        all: unset;
+        cursor: pointer;
+        width: 76px;
+        padding: 8px 0 6px;
+        border-top: 2px solid var(--l);
+        color: var(--m);
+        font-weight: 500;
+      }
+      .anim .seg button {
+        width: 56px;
+      }
+      .seg button[aria-pressed="true"] {
+        border-top-color: var(--i);
+        color: var(--i);
+        font-weight: 700;
+      }
+      .seg button:focus-visible {
+        outline: 2px solid var(--i);
+        outline-offset: 2px;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        display: block;
+        background: var(--ground, #161615);
+      }
+      .btn {
+        all: unset;
+        cursor: pointer;
+        border: 1px solid var(--i);
+        padding: 9px 20px;
+        font-weight: 700;
+      }
+      .chk {
+        display: grid;
+        grid-auto-flow: column;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .chk input {
+        appearance: none;
+        width: 12px;
+        height: 12px;
+        border: 1px solid var(--i);
+        cursor: pointer;
+      }
+      .chk input:checked {
+        background: var(--i);
+      }
+      .panel {
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <b>atelier · tune</b>
+        <div class="spec"><em id="title"></em>isolated</div>
+        <div class="status" id="status" data-kind="idle">
+          <i></i><span>Connecting</span>
+        </div>
+      </header>
+      <main class="left">
+        <div class="bar">
+          <span class="lab">Stage ground</span>
+          <div class="seg" id="ground">
+            <button type="button" data-v="light">Light</button>
+            <button type="button" data-v="dark">Dark</button>
+            <button type="button" data-v="checker">Checker</button>
+          </div>
+        </div>
+        <iframe id="stage" src="stage" title="Stage"></iframe>
+        <div class="anim">
+          <button type="button" class="btn" id="replay">Replay</button>
+          <label class="chk"><input type="checkbox" id="loop" />Loop</label>
+          <span></span>
+          <span class="lab">Speed</span>
+          <div class="seg" id="speed">
+            <button type="button" data-v="0.1">0.1×</button>
+            <button type="button" data-v="0.25">0.25×</button>
+            <button type="button" data-v="0.5">0.5×</button>
+            <button type="button" data-v="1">1×</button>
+          </div>
+        </div>
+      </main>
+      <aside class="panel" id="panel"></aside>
+    </div>
+    <script type="module">
+      import { mount } from "./panel.js";
+
+      const GROUNDS = {
+        light: "#ffffff",
+        dark: "#161615",
+        checker:
+          "repeating-conic-gradient(#d8d7d0 0 25%, #f2f1ec 0 50%) 0 0 / 24px 24px",
+      };
+      const base = new URL(".", location.href).href;
+      const prefs = JSON.parse(
+        localStorage.getItem(`atelier-shell:${base}`) ??
+          '{"ground":"dark","speed":"1","loop":false}',
+      );
+      const savePrefs = () =>
+        localStorage.setItem(`atelier-shell:${base}`, JSON.stringify(prefs));
+      const stage = document.getElementById("stage");
+      const target = () => ({
+        doc: stage.contentDocument,
+        win: stage.contentWindow,
+      });
+
+      let panel;
+      window.atelierStage = () => panel?.writeAll();
+      const statusEl = document.getElementById("status");
+      panel = await mount({
+        host: document.getElementById("panel"),
+        base,
+        target,
+        onStatus(text, kind) {
+          statusEl.dataset.kind = kind;
+          statusEl.lastElementChild.textContent = text;
+        },
+      });
+      if (panel)
+        document.getElementById("title").textContent =
+          `${panel.spec.title}.json`;
+
+      function pick(groupId, value) {
+        for (const b of document.querySelectorAll(`#${groupId} button`))
+          b.setAttribute("aria-pressed", String(b.dataset.v === value));
+      }
+      function paintGround() {
+        const doc = stage.contentDocument;
+        if (doc?.body) doc.body.style.background = GROUNDS[prefs.ground];
+        pick("ground", prefs.ground);
+      }
+      let queued = false;
+      stage.addEventListener("load", () => {
+        queued = false;
+        paintGround();
+        panel?.writeAll();
+        stage.contentWindow.atelier?.emit("replay", Date.now());
+      });
+      document.getElementById("ground").addEventListener("click", (e) => {
+        if (!e.target.dataset.v) return;
+        prefs.ground = e.target.dataset.v;
+        savePrefs();
+        paintGround();
+      });
+      document.getElementById("speed").addEventListener("click", (e) => {
+        if (!e.target.dataset.v) return;
+        prefs.speed = e.target.dataset.v;
+        savePrefs();
+        pick("speed", prefs.speed);
+      });
+      const loop = document.getElementById("loop");
+      loop.checked = prefs.loop;
+      loop.addEventListener("change", () => {
+        prefs.loop = loop.checked;
+        savePrefs();
+      });
+      const replay = () => stage.contentWindow?.location.reload();
+      document.getElementById("replay").addEventListener("click", replay);
+      pick("speed", prefs.speed);
+      paintGround();
+
+      setInterval(() => {
+        const anims = stage.contentDocument?.getAnimations() ?? [];
+        const rate = Number(prefs.speed);
+        for (const a of anims)
+          if (a.playbackRate !== rate) a.playbackRate = rate;
+        const done = anims.length > 0 && anims.every((a) => a.playState === "finished");
+        if (done && prefs.loop && !queued) {
+          queued = true;
+          setTimeout(replay, 400);
+        }
+      }, 100);
+    </script>
+  </body>
+</html>

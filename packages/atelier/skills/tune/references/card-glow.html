@@ -1,0 +1,24 @@
+<style>
+  .card {
+    width: 360px;
+    height: 220px;
+    padding: 28px;
+    display: grid;
+    align-content: space-between;
+    border-radius: var(--radius);
+    border: calc(var(--border) * 1px) solid #3a3836;
+    background: #1f1e1d;
+    color: #f2f1ec;
+    font: 500 13px system-ui, sans-serif;
+    box-shadow: 0 0 var(--blur) var(--spread) color-mix(in srgb, var(--glow) calc(var(--opacity) * 100%), transparent);
+    animation: enter var(--enter) var(--ease) both;
+  }
+  .card strong { font-size: 56px; font-weight: 900; letter-spacing: -0.03em; }
+  .card small { font-size: 16px; font-weight: 500; color: #b9b6ae; letter-spacing: 0; }
+  @keyframes enter { from { opacity: 0; transform: translateY(24px) scale(0.96); } }
+</style>
+<div class="card"><span>Pro plan</span><strong>$12 <small>/ month</small></strong></div>
+<script>
+  const tints = { warm: "#1f1e1d", cool: "#1b1e24", none: "#1c1c1c" };
+  atelier.on("tint", (v) => (document.querySelector(".card").style.background = tints[v]));
+</script>

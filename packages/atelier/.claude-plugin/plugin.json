@@ -1,0 +1,18 @@
+{
+  "name": "atelier",
+  "version": "0.1.0",
+  "description": "Tune a visual effect or animation with sliders, colour, easing and spring controls, then hand the values back to the agent. The agent writes a small spec; prebuilt pages render the controls, isolated or injected into your running dev server.",
+  "author": {
+    "name": "Q"
+  },
+  "license": "MIT",
+  "keywords": [
+    "design",
+    "tuning",
+    "animation",
+    "easing",
+    "spring",
+    "css-variables",
+    "playground"
+  ]
+}
