@@ -70,7 +70,8 @@ border-width: calc(var(--border) * 1px); /* toggle is 1 or 0 */
 ## 2. Write the spec
 
 Write the spec, and for isolated the snippet, into a `mktemp -d` directory under
-`/tmp/q-lab/atelier/tune/`.
+`/tmp/q-lab/atelier/tune/`. On Windows, use `q-lab\atelier\tune\` under the
+system temp directory (`%TEMP%`) instead, and pass `T open` that absolute path.
 
 ```json
 {

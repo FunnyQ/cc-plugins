@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { parseSpec, SpecError } from "./spec";
 
 const SPEC_PATH = "/work/specs/card.json";
@@ -18,7 +19,7 @@ describe("parseSpec", () => {
     );
     expect(spec.mode).toBe("isolated");
     expect(spec.title).toBe("card");
-    expect(spec.snippet).toBe("/work/specs/card.html");
+    expect(spec.snippet).toBe(resolve("/work/specs/card.html"));
     expect(spec.params[0]).toEqual({
       id: "blur",
       type: "range",

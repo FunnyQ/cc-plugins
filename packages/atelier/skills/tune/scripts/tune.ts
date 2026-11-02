@@ -108,6 +108,7 @@ async function open(args: Args) {
       stdout: log,
       stderr: log,
       stdin: "ignore",
+      detached: true,
     },
   );
   child.unref();
