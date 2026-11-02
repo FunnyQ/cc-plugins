@@ -47,16 +47,34 @@ export function createHcClient(
     return { status: statusOf(t.status) };
   }
 
+  async function tabOf(
+    address: string,
+  ): Promise<{ space: string; tab: string } | null> {
+    const layout = await json(["herdr-app", "ls"]).catch(() => null);
+    for (const space of layout?.spaces ?? []) {
+      for (const tab of space.tabs ?? []) {
+        if ((tab.terminals ?? []).some((t: any) => t.terminal === address)) {
+          return { space: space.id, tab: tab.id };
+        }
+      }
+    }
+    return null;
+  }
+
   return {
+    // Only terminals started with `--label herdr.space=…` carry the label;
+    // herdr-app places every terminal it shows, so ask it otherwise.
     async callerLocation() {
       const self = env.HC_TERMINAL_ID;
       if (!self) return null;
       const labels = (await json(["hc", "get", "--json", self])).labels ?? {};
-      const workspaceId = labels["herdr.space"];
-      if (!workspaceId) return null;
+      const place = labels["herdr.space"]
+        ? { space: labels["herdr.space"], tab: labels["herdr.tab"] ?? "" }
+        : await tabOf(self);
+      if (!place) return null;
       return {
-        workspaceId,
-        tabId: labels["herdr.tab"] ?? "",
+        workspaceId: place.space,
+        tabId: place.tab,
         paneId: self,
         source: "env",
       };
@@ -76,28 +94,29 @@ export function createHcClient(
       // hc's manual: Codex without --no-daemon runs its commands outside hc.
       if (basename(opts.agent) === "codex") cmd.push("--no-daemon");
       cmd.push(...(opts.argv ?? []));
+      // hc's manual: a send to a booting agent can be dropped, so the first
+      // prompt rides the argv; opencode reads a bare positional as its project.
+      if (opts.prompt !== undefined) {
+        if (basename(opts.agent) === "opencode") cmd.push("--prompt");
+        cmd.push(opts.prompt);
+      }
       const { address } = await json(cmd);
 
       // herdr-app shows the terminal ~0.4s after hc starts it (measured).
       for (let attempt = 0; attempt < 20; attempt++) {
-        const layout = await json(["herdr-app", "ls"]).catch(() => null);
-        const tab = (layout?.spaces ?? [])
-          .flatMap((space: any) => space.tabs ?? [])
-          .find((tab: any) =>
-            (tab.terminals ?? []).some((t: any) => t.terminal === address),
-          );
-        if (tab) {
+        const place = await tabOf(address);
+        if (place) {
           await run([
             "herdr-app",
             "do",
             "tab.rename",
-            JSON.stringify({ id: tab.id, name }),
+            JSON.stringify({ id: place.tab, name }),
           ]).catch(() => {});
           break;
         }
         await sleep(150);
       }
-      return { name };
+      return opts.prompt === undefined ? { name } : { name, prompted: true };
     },
 
     // A harness reports no status until it is past its startup dialogs, and
@@ -125,7 +144,7 @@ export function createHcClient(
 
     get,
 
-    read: (target) => run(["hc", "read", "--lines", "60", target]),
+    read: (target) => run(["hc", "read", "--lines", "0", target]),
 
     async list(): Promise<HerdAgent[]> {
       const listed = await json(["hc", "ls", "--json"]);

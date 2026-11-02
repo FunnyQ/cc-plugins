@@ -156,7 +156,8 @@ export type HerdClient = {
     workspace?: string;
     argv?: string[];
     env?: string[];
-  }): Promise<{ name: string }>;
+    prompt?: string;
+  }): Promise<{ name: string; prompted?: boolean }>;
   // The third argument is herd.ts 0.4.0+. An older herd.ts ignores it, which is
   // why the bootstrap send below must stay correct without it.
   send(
@@ -455,6 +456,7 @@ export async function runLive(
   }
 
   let agentName: string | undefined;
+  let prompted = false;
   try {
     const spawned = await herd.spawn({
       role,
@@ -468,8 +470,12 @@ export async function runLive(
       // ignores newTab and degrades to a down-split instead of failing.
       newTab: true,
       split: "down",
+      // herd.ts ignores this and the send below delivers the bootstrap; the hc
+      // client starts the agent with it and reports `prompted`.
+      prompt: opts.bootstrapText,
     });
     agentName = spawned.name;
+    prompted = spawned.prompted === true;
   } catch (error) {
     let leaked: string | undefined;
     try {
@@ -488,53 +494,55 @@ export async function runLive(
     };
   }
 
-  try {
+  if (!prompted) {
     try {
-      await herd.wait(agentName, {
-        status: "idle",
-        timeoutMs: SPAWN_IDLE_WAIT_MS,
-      });
-    } catch {}
-    // Ask herdr to confirm the bootstrap actually landed. When the agent takes
-    // the text but never acts, herdr says so outright rather than leaving the
-    // nudge loop below to infer it from the pane's visible text one poll window
-    // later.
-    //
-    // The list must be the WHOLE enum. herdr excludes `unknown` from its own
-    // defaults, so omitting it here would let a detection wobble — agent reacted,
-    // screen momentarily unclassifiable — burn the budget and surface as a plain
-    // `timeout` on a bootstrap that demonstrably landed. The list is a ceiling,
-    // not a floor: since 0.9.0 only observed `working` or `blocked` activity
-    // settles a prompt sent to a non-working agent, so an agent reaching `done`
-    // without a visible working phase reports stalled however wide the list is.
-    //
-    // Failing to CONFIRM is never fatal either. This call is a diagnostic, not a
-    // gate: before it existed relay sent and moved on unconditionally, and the
-    // nudge loop below still heals a genuine miss. A cold start can exceed
-    // herdr's five-second window, so both "no activity" and "did not settle"
-    // report and continue. Only a rejected send (e.g. `agent_blocked`, which
-    // sends nothing and needs a human at the pane) still fails the run.
-    try {
-      await herd.send(agentName, opts.bootstrapText, {
-        status: ["working", "done", "idle", "blocked", "unknown"],
-        timeoutMs: BOOTSTRAP_ACTIVITY_WAIT_MS,
-      });
+      try {
+        await herd.wait(agentName, {
+          status: "idle",
+          timeoutMs: SPAWN_IDLE_WAIT_MS,
+        });
+      } catch {}
+      // Ask herdr to confirm the bootstrap actually landed. When the agent takes
+      // the text but never acts, herdr says so outright rather than leaving the
+      // nudge loop below to infer it from the pane's visible text one poll window
+      // later.
+      //
+      // The list must be the WHOLE enum. herdr excludes `unknown` from its own
+      // defaults, so omitting it here would let a detection wobble — agent reacted,
+      // screen momentarily unclassifiable — burn the budget and surface as a plain
+      // `timeout` on a bootstrap that demonstrably landed. The list is a ceiling,
+      // not a floor: since 0.9.0 only observed `working` or `blocked` activity
+      // settles a prompt sent to a non-working agent, so an agent reaching `done`
+      // without a visible working phase reports stalled however wide the list is.
+      //
+      // Failing to CONFIRM is never fatal either. This call is a diagnostic, not a
+      // gate: before it existed relay sent and moved on unconditionally, and the
+      // nudge loop below still heals a genuine miss. A cold start can exceed
+      // herdr's five-second window, so both "no activity" and "did not settle"
+      // report and continue. Only a rejected send (e.g. `agent_blocked`, which
+      // sends nothing and needs a human at the pane) still fails the run.
+      try {
+        await herd.send(agentName, opts.bootstrapText, {
+          status: ["working", "done", "idle", "blocked", "unknown"],
+          timeoutMs: BOOTSTRAP_ACTIVITY_WAIT_MS,
+        });
+      } catch (error) {
+        // Duck-typed: relay never statically imports herd.ts, so HerdrError is not
+        // in scope here.
+        const code = (error as { code?: string })?.code;
+        if (code !== "agent_prompt_stalled" && code !== "timeout") throw error;
+        deps.stderr(
+          `[relay live] ${agentName}: bootstrap submitted but herdr could not confirm activity (${code}) — continuing; the nudge loop will retry\n`,
+        );
+      }
     } catch (error) {
-      // Duck-typed: relay never statically imports herd.ts, so HerdrError is not
-      // in scope here.
-      const code = (error as { code?: string })?.code;
-      if (code !== "agent_prompt_stalled" && code !== "timeout") throw error;
-      deps.stderr(
-        `[relay live] ${agentName}: bootstrap submitted but herdr could not confirm activity (${code}) — continuing; the nudge loop will retry\n`,
-      );
+      return {
+        ok: false,
+        pending: false,
+        agentName,
+        error: `failed to send bootstrap to ${agentName}: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
-  } catch (error) {
-    return {
-      ok: false,
-      pending: false,
-      agentName,
-      error: `failed to send bootstrap to ${agentName}: ${error instanceof Error ? error.message : String(error)}`,
-    };
   }
 
   deps.stderr(

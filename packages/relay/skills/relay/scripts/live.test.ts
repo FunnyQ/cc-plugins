@@ -391,6 +391,7 @@ function fakeHerd(options: {
   preSpawnAgents?: string[]; // list() result before spawn (snapshot)
   postSpawnAgents?: string[]; // list() result after spawn (leak probe)
   visible?: string; // what read({source:"visible"}) returns (input-box probe)
+  spawnPrompted?: boolean;
   callerAgents?: Array<{
     name: string | null;
     type: string | null;
@@ -409,7 +410,9 @@ function fakeHerd(options: {
     async spawn(opts) {
       calls.push({ verb: "spawn", args: [opts] });
       if (options.spawnError) throw options.spawnError;
-      return { name: "relay-codex-delegate-ab12" };
+      return options.spawnPrompted
+        ? { name: "relay-codex-delegate-ab12", prompted: true }
+        : { name: "relay-codex-delegate-ab12" };
     },
     async list() {
       calls.push({ verb: "list", args: [] });
@@ -472,6 +475,7 @@ function runLiveHarness(options: {
   postSpawnAgents?: string[];
   visible?: string;
   keepPane?: boolean;
+  spawnPrompted?: boolean;
   callerAgents?: Parameters<typeof fakeHerd>[0]["callerAgents"];
   callerEnv?: Record<string, string | undefined>;
   clientLocation?: CallerLocation | null;
@@ -583,6 +587,25 @@ describe("runLive", () => {
     expect(sends[0].args[1]).toContain("live-prompt.md");
 
     expect(errors.some((e) => e.includes("working"))).toBe(true);
+  });
+
+  it("hands the bootstrap to spawn and sends nothing when the client starts the agent with it", async () => {
+    const { run, calls } = runLiveHarness({
+      statuses: ["working", "idle"],
+      resultAppearsAtGet: 2,
+      resultContent: `# Result\n${RESULT_END_MARKER}\n`,
+      spawnPrompted: true,
+    });
+
+    expect((await run()).ok).toBe(true);
+    const spawn = calls.find((c) => c.verb === "spawn")!.args[0] as Record<
+      string,
+      unknown
+    >;
+    expect(spawn.prompt).toContain("live-prompt.md");
+    expect(calls.some((c) => c.verb === "send" || c.verb === "wait")).toBe(
+      false,
+    );
   });
 
   it("pins the new tab to the runtime workspace when Codex env is stale", async () => {

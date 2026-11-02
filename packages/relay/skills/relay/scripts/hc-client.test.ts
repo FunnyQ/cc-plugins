@@ -25,6 +25,58 @@ describe("createHcClient", () => {
     });
   });
 
+  it("finds the caller's space through herdr-app ls when its terminal carries no labels", async () => {
+    const { run } = fake((cmd) =>
+      cmd[0] === "herdr-app"
+        ? {
+            spaces: [
+              {
+                id: "sp1",
+                tabs: [
+                  { id: "tb1", terminals: [{ terminal: "t46", pane: "p1" }] },
+                ],
+              },
+            ],
+          }
+        : { labels: { where: "cc-plugins / main" } },
+    );
+    const client = createHcClient({ HC_TERMINAL_ID: "t46" }, run);
+    expect(await client.callerLocation()).toEqual({
+      workspaceId: "sp1",
+      tabId: "tb1",
+      paneId: "t46",
+      source: "env",
+    });
+  });
+
+  it("puts the first prompt in hc run, opencode's through --prompt", async () => {
+    const { run, calls } = fake((cmd) =>
+      cmd[1] === "run" ? { address: "t9" } : { spaces: [] },
+    );
+    const client = createHcClient(
+      { HC_TERMINAL_ID: "t46" },
+      run,
+      () => "ab12",
+      async () => {},
+    );
+    const codex = await client.spawn({
+      role: "r",
+      agent: "codex",
+      argv: ["-m", "x"],
+      prompt: "Read the file /tmp/p.md",
+    });
+    expect(codex.prompted).toBe(true);
+    expect(calls[0].slice(-4)).toEqual([
+      "--no-daemon",
+      "-m",
+      "x",
+      "Read the file /tmp/p.md",
+    ]);
+    await client.spawn({ role: "r", agent: "/bin/opencode", prompt: "go" });
+    const opencodeRun = calls.filter((c) => c[1] === "run").at(-1)!;
+    expect(opencodeRun.slice(-3)).toEqual(["/bin/opencode", "--prompt", "go"]);
+  });
+
   it("spawns a named, silent hc terminal in a new tab of that space, env riding the argv", async () => {
     const { run, calls } = fake((cmd) => {
       if (cmd[1] === "run")
@@ -107,7 +159,7 @@ describe("createHcClient", () => {
     await client.close("a");
     expect(calls).toEqual([
       ["hc", "keys", "a", "ctrl+a", "ctrl+k"],
-      ["hc", "read", "--lines", "60", "a"],
+      ["hc", "read", "--lines", "0", "a"],
       ["hc", "wait", "--json", "a", "--timeout", "20"],
       ["hc", "kill", "--json", "a"],
     ]);
