@@ -1,5 +1,26 @@
 # Changelog
 
+## [monitor 8.4.3] - 2026-11-03
+
+_tracks tag `monitor-v8.4.3`_
+
+### Fixed
+- Users who prefer reduced motion no longer see the loading animation, because the broken reduced-motion block in the loading stylesheet is restored and parses again.
+
+## [dispatch 5.8.7] - 2026-11-03
+
+_tracks tag `dispatch-v5.8.7`_
+
+### Fixed
+- Dispatch now accepts markdown that has been through a formatter, so a formatted RUNLOG.md re-renders identically and the task template uses a single four-backtick outer fence.
+
+## [atelier 0.1.1] - 2026-11-03
+
+_tracks tag `atelier-v0.1.1`_
+
+### Fixed
+- Atelier tune now works on Windows: the tune server stays alive after `tune.ts open` exits, so apply and wait no longer fail with ECONNREFUSED, and the skill documents the Windows temp directory for specs.
+
 ## [atelier 0.1.0] - 2026-11-03
 
 _tracks tag `atelier-v0.1.0`_
