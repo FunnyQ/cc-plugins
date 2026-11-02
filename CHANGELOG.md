@@ -1,5 +1,14 @@
 # Changelog
 
+## [atelier 0.1.0] - 2026-11-03
+
+_tracks tag `atelier-v0.1.0`_
+
+### Added
+- New atelier plugin with a `tune` skill: the agent writes a small JSON spec of tunable parameters, and you adjust them in a ready-made control panel and press Apply to hand the values back as one JSON line, with no need for the model to write a whole HTML playground each time.
+- Tune components either in an isolated iframe stage or in place in a running dev server, so `.vue` and Tailwind components can be adjusted where they actually render.
+- An Apply pressed while no agent is waiting is kept and delivered to the next wait instead of being lost.
+
 ## [dispatch 5.8.6] - 2026-11-01
 
 _tracks tag `dispatch-v5.8.6`_
