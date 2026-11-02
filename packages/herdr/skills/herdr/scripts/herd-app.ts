@@ -12,10 +12,11 @@ import {
 
 export type AppRunner = (
   cmd: string[],
+  env?: Record<string, string | undefined>,
 ) => Promise<{ stdout: string; stderr: string; code: number }>;
 
-export const appRunner: AppRunner = async (cmd) => {
-  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
+export const appRunner: AppRunner = async (cmd, env) => {
+  const proc = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe", env });
   const [stdout, stderr, code] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -55,8 +56,11 @@ export function createHerdApp(
   run: AppRunner = appRunner,
   deps: HerdDeps & { selfPaneId?: string; layoutCli?: string | null } = {},
 ) {
-  async function call(cmd: string[]): Promise<any> {
-    const result = await run(cmd);
+  async function call(
+    cmd: string[],
+    env?: Record<string, string | undefined>,
+  ): Promise<any> {
+    const result = await run(cmd, env);
     let parsed: any = null;
     try {
       parsed = JSON.parse(result.stdout.trim() || result.stderr.trim());
@@ -93,6 +97,20 @@ export function createHerdApp(
           tabLabel: cleanLabel(tab),
         };
       });
+  }
+
+  /** Only terminals hc started with `herdr.space` labels carry them; the window
+   *  places every terminal it shows, so ask it when the labels are missing. */
+  async function spaceOf(address: string): Promise<string> {
+    const layout = await call(["herdr-app", "ls"]).catch(() => null);
+    for (const space of layout?.spaces ?? []) {
+      for (const tab of space.tabs ?? []) {
+        if ((tab.terminals ?? []).some((t: any) => t.terminal === address)) {
+          return space.id;
+        }
+      }
+    }
+    return "";
   }
 
   async function get(target: string): Promise<AgentInfo> {
@@ -174,19 +192,22 @@ export function createHerdApp(
 
   /** A harness reports no status until it is past its startup dialogs, and
    *  `hc send` presses Enter: on Claude's folder-trust dialog that answers
-   *  "No, exit". `hc send` also wraps text in an `<hc from=…>` tag, which turns
-   *  a slash command into a message, so a one-line command is typed as keys. */
+   *  "No, exit". `hc send` also wraps text in an `<hc from=…>` tag naming the
+   *  caller, which turns a slash command into a message; without
+   *  `HC_TERMINAL_ID` it names no caller and pastes the text bare (measured,
+   *  hc 0.1.17). `hc keys` cannot stand in: it has no key for `:` or `_`. */
   async function send(target: string, text: string): Promise<SendResult> {
     if ((await get(target)).status === "unknown") {
       throw new HerdrError(
         `${target} has not reported a status yet — it may be waiting on a startup dialog (folder trust, login). Read it with \`hc read ${target}\` and ask the person.`,
       );
     }
-    if (/^\/\S/.test(text) && !text.includes("\n")) {
-      const keys = [...text].map((ch) => (ch === " " ? "space" : ch));
-      await call(["hc", "keys", "--json", target, ...keys, "enter"]);
+    const cmd = ["hc", "send", "--json", "--", target, text];
+    if (/^\/\S/.test(text)) {
+      const { HC_TERMINAL_ID: _, ...untagged } = process.env;
+      await call(cmd, untagged);
     } else {
-      await call(["hc", "send", "--json", "--", target, text]);
+      await call(cmd);
     }
     return { target, paneId: target, submitted: true, waited: false };
   }
@@ -202,7 +223,8 @@ export function createHerdApp(
   /** Only ever reached for a space `ask` spawned itself, so closing the whole
    *  space takes nothing the person opened. */
   async function close(target: string): Promise<unknown> {
-    const { workspaceId } = await get(target);
+    const agent = await get(target);
+    const workspaceId = agent.workspaceId || (await spaceOf(agent.paneId));
     if (!workspaceId) {
       return call(["hc", "kill", "--json", target]);
     }

@@ -217,6 +217,54 @@ describe("ask", () => {
   });
 });
 
+describe("ask without herdr.space labels", () => {
+  test("finds the spawned space through herdr-app ls and closes it whole", async () => {
+    const registry = join(mkdtempSync(join(tmpdir(), "herd-app-")), "r.json");
+    await Bun.write(
+      registry,
+      JSON.stringify({ version: 1, projects: { "/p/acme": { name: "acme" } } }),
+    );
+    const resultDir = mkdtempSync(join(tmpdir(), "herd-app-ask-"));
+    const { run, calls } = fakeRunner((cmd) => {
+      if (cmd[0] === "hc" && cmd[1] === "ls") return LS;
+      if (cmd[0] === "herdr-app" && cmd[1] === "ls")
+        return {
+          spaces: [
+            {
+              id: "sp1",
+              tabs: [
+                { id: "tb1", terminals: [{ terminal: "t9", pane: "p1" }] },
+              ],
+            },
+          ],
+        };
+      if (cmd[0] === "herdr-app" && cmd[2] === "space.new")
+        return { space: "sp1", tab: "tb1", terminal: "t9" };
+      if (cmd[1] === "send") {
+        void Bun.write(
+          join(resultDir, "result.md"),
+          `42\n${ASK_RESULT_END_MARKER}\n`,
+        );
+        return { sent: true };
+      }
+      if (cmd[1] === "get")
+        return { address: "t9", cwd: "/p/acme", status: { state: "idle" } };
+      return {};
+    });
+    await createHerdApp(run, { selfPaneId: "t46", ...clock() }).ask(
+      "acme",
+      "meaning?",
+      { registryPath: registry, resultDir },
+    );
+    expect(calls.at(-1)).toEqual([
+      "herdr-app",
+      "do",
+      "space.close",
+      JSON.stringify({ id: "sp1", confirmed: true }),
+    ]);
+  });
+});
+
 describe("runtimeFor", () => {
   test("old herdr wins when its pane env is present", () => {
     expect(
@@ -253,24 +301,32 @@ describe("send", () => {
 });
 
 describe("slash commands and paths", () => {
-  test("types a one-line slash command as keys, since hc send wraps text in an <hc> tag", async () => {
-    const { run, calls } = fakeRunner((cmd) =>
-      cmd[1] === "get" ? { address: "t9", status: { state: "idle" } } : {},
-    );
-    await createHerdApp(run, { selfPaneId: "t46" }).send("t9", "/rc on");
-    expect(calls.at(-1)).toEqual([
-      "hc",
-      "keys",
-      "--json",
+  test("sends a slash command without HC_TERMINAL_ID, so hc pastes it untagged", async () => {
+    const envs: (Record<string, string | undefined> | undefined)[] = [];
+    const run: AppRunner = async (cmd, env) => {
+      envs.push(env);
+      const out =
+        cmd[1] === "get" ? { address: "t9", status: { state: "idle" } } : {};
+      return { stdout: JSON.stringify(out), stderr: "", code: 0 };
+    };
+    await createHerdApp(run, { selfPaneId: "t46" }).send(
       "t9",
-      "/",
-      "r",
-      "c",
-      "space",
-      "o",
-      "n",
-      "enter",
-    ]);
+      "/chronicle:commit Fix_It?",
+    );
+    expect(envs.at(-1)).toBeDefined();
+    expect("HC_TERMINAL_ID" in envs.at(-1)!).toBe(false);
+  });
+
+  test("keeps the caller tag on plain text", async () => {
+    const envs: (Record<string, string | undefined> | undefined)[] = [];
+    const run: AppRunner = async (cmd, env) => {
+      envs.push(env);
+      const out =
+        cmd[1] === "get" ? { address: "t9", status: { state: "idle" } } : {};
+      return { stdout: JSON.stringify(out), stderr: "", code: 0 };
+    };
+    await createHerdApp(run, { selfPaneId: "t46" }).send("t9", "hello");
+    expect(envs.at(-1)).toBeUndefined();
   });
 
   test("tell opens an absolute folder no registry knows", async () => {

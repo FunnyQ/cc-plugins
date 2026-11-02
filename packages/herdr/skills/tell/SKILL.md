@@ -41,7 +41,9 @@ bun "$HERD" tell /Users/dev/Projects/herdr-q-saddle "read the brief in /tmp/…/
 bun "$HERD" tell herdr-q-saddle "/rc"
 ```
 
-Under herdr-app, `hc send` wraps text in an `<hc from=…>` tag, so a slash command sent as text arrives as a message the agent tries to interpret. `tell` types a one-line text starting with `/` as keys instead. Send the command and the task as two `tell` calls, command first.
+Under herdr-app, `hc send` wraps text in an `<hc from=…>` tag, so a slash command sent as text arrives as a message the agent tries to interpret. `tell` sends a text starting with `/` with no caller, so it arrives bare and runs as a command. Send the command and the task as two `tell` calls, command first.
+
+Under herdr-app, `tell` also reaches a live agent on another machine, addressed `mini-server/t14` or by its space and tab labels. It spawns a new agent only on this machine.
 
 Need a verb's flags? Run `bun "$HERD" <verb> --help`. Never read `herd.ts` to answer that.
 
