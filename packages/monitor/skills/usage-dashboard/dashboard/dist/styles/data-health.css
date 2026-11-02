@@ -1,18 +1,3 @@
-  .loading-overlay__wave > path,
-  .loading-overlay__title > span,
-  .loading-overlay__sub,
-  .loading-overlay__dot {
-    animation: none;
-  }
-
-  .loading-overlay__title > span,
-  .loading-overlay__sub {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-}
-
 .data-health-panel {
   margin-top: var(--s-18);
   border-radius: var(--radius);
@@ -188,4 +173,3 @@
   font-size: var(--fs-sm);
   text-align: center;
 }
-

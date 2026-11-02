@@ -244,3 +244,17 @@
   .loading-overlay,
   .loading-overlay__sky,
   .loading-overlay__sun,
+  .loading-overlay__wave > path,
+  .loading-overlay__title > span,
+  .loading-overlay__sub,
+  .loading-overlay__dot {
+    animation: none;
+  }
+
+  .loading-overlay__title > span,
+  .loading-overlay__sub {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
