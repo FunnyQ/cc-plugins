@@ -1,5 +1,21 @@
 # Changelog
 
+## [herdr 0.9.1] - 2026-11-03
+
+_tracks tag `herdr-v0.9.1`_
+
+### Fixed
+- Slash commands sent under herdr-app now work, including ones with `:`, `_` or capitals that previously failed or were lowercased.
+- `ask` now closes its space even when the terminal has no herdr.space label, instead of leaving it open.
+
+## [relay 0.10.1] - 2026-11-03
+
+_tracks tag `relay-v0.10.1`_
+
+### Fixed
+- Live relay no longer silently falls back to headless when the terminal has no herdr.space label; the caller is now located through `herdr-app ls`.
+- Live relay's startup prompt is passed on the launch command, so a booting agent can no longer drop it, and screen reads no longer scroll full-screen apps.
+
 ## [monitor 8.4.3] - 2026-11-03
 
 _tracks tag `monitor-v8.4.3`_
