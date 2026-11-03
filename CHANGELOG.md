@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.23.0] - 2026-11-03
+
+_tracks tag `chronicle-v0.23.0`_
+
+### Added
+- Chronicle now protects GitHub Flow branches from direct Codex commits while allowing release commits and retaining existing Claude Code hooks.
+
+## [dispatch 5.9.0] - 2026-11-03
+
+_tracks tag `dispatch-v5.9.0`_
+
+### Added
+- Dispatch now checks changed flightplan task files after Codex apply_patch calls and returns authoring issues as follow-up context without changing Claude Code behavior.
+
 ## [herdr 0.9.1] - 2026-11-03
 
 _tracks tag `herdr-v0.9.1`_
