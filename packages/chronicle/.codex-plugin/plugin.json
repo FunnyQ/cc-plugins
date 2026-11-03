@@ -17,6 +17,7 @@
     "history"
   ],
   "skills": "./skills/",
+  "hooks": "./.codex-plugin/hooks.json",
   "interface": {
     "displayName": "Chronicle",
     "shortDescription": "Craft commits, PRs/MRs, releases, and ADRs.",

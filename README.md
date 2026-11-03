@@ -158,9 +158,10 @@ Claude Code inside WSL is expected to behave like Linux, but is not yet verified
 
 **Requirements on native Windows:**
 
-- Put `bun` on `PATH`. monitor, guard and runes call it.
+- Put `bun` on `PATH`. monitor, guard, runes, and Chronicle/Dispatch's Codex hooks call it.
 - Install Git for Windows (recommended). Without it, Claude Code runs hooks through PowerShell, which these plugins also tolerate.
 - If you use OpenCode, put Git for Windows' `bash` on `PATH`. The OpenCode flightplan lint hook spawns `flightplan-lint.sh` through `bash`.
+- If you use Chronicle's Codex branch guard, put `bash` and `jq` on `PATH`. Review and trust the plugin hooks in Codex before relying on them.
 
 Scratch files go under `%TEMP%\q-lab\<plugin>\` on native Windows (the `join(tmpdir(), "q-lab", …)` root), not under `/tmp/q-lab`.
 

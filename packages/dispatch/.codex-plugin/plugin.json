@@ -25,6 +25,7 @@
     "execute"
   ],
   "skills": "./skills/",
+  "hooks": "./.codex-plugin/hooks.json",
   "interface": {
     "displayName": "Dispatch",
     "shortDescription": "Interview-driven planning, from captured intent to in-conversation specs to multi-file blueprints for sub-agents.",
