@@ -1,10 +1,10 @@
 # cc-plugins
 
-A local Claude Code, Codex, and OpenCode plugin marketplace for a personal coding workflow. It ships five plugins: **monitor** turns local traces into useful dashboards — the _usage-dashboard_ skill is the rear-view mirror for usage history, and the _cockpit_ skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task _out_ to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, and cut the tag; **herdr** is reference plus a typed wrapper for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager.
+A local Claude Code, Codex, and OpenCode plugin marketplace for a personal coding workflow. It ships nine plugins: **monitor** turns local traces into useful dashboards — the _usage-dashboard_ skill is the rear-view mirror for usage history, and the _cockpit_ skill is the windshield for the session currently in flight; **dispatch** is interview-driven planning you can then execute — spec the work, write a blueprint to disk, and fly it with a quality loop, or map a whole project into milestone legs and plan each one just-in-time; **relay** delegates a task _out_ to another harness's CLI (codex, opencode, or claude) — delegate work, request a review, or generate an image — then captures the result and reports back; **chronicle** authors your git history — ADRs from the cockpit decision trail, commits (auto simple/atomic), reviewer-legible PRs/MRs, and config-first releases that bump versions, write the changelog, and cut the tag; **herdr** is reference plus orchestration for driving agents across panes in the [Herdr](https://herdr.dev) terminal workspace manager and herdr-app; **guard** turns coding rules into hooks the harness enforces, plus an on-demand comment sweep; **browsers** drives Firefox, Zen, Chrome, and Safari from the terminal; **atelier** tunes visual effects with live controls; **runes** is a set of switchable UI mods for Claude Code only.
 
 ## Development Workflow
 
-This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. The existing `develop` branch is historical and does not indicate that this repository uses git-flow. Chronicle records this machine-readable PR policy in [`.chronicle/pr.json`](./.chronicle/pr.json).
+This repository uses GitHub Flow. Create feature and fix branches from `main`, then open pull requests back into `main`. There is no `develop` branch. Chronicle records this machine-readable PR policy in [`.chronicle/pr.json`](./.chronicle/pr.json).
 
 ## Plugins
 
@@ -12,11 +12,11 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 
 | Skill                                                        | Description                                                                                                                                                          |
 | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code, Codex, and OpenCode: sessions, tokens, cost, model mix, and project activity, plus live sessions for Claude Code and Codex    |
+| [usage-dashboard](./packages/monitor/skills/usage-dashboard) | Local usage dashboard for Claude Code, Codex, and OpenCode: sessions, tokens, cost, model mix, and project activity, plus live sessions for all three                |
 | [cockpit](./packages/monitor/skills/cockpit)                 | Per-project work cockpit for Claude Code, Codex, and OpenCode: goal capture, decision log, live transcript, needs-your-call bridge, and a send box for live sessions |
 | [install](./packages/monitor/skills/install)                 | One-stop prerequisite check and permission wiring for the whole plugin, command-triggered                                                                            |
 
-**dispatch** bundles five skills:
+**dispatch** bundles six skills:
 
 | Skill                                               | Description                                                                                                                                                                                                                                     |
 | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -25,6 +25,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | [flightplan](./packages/dispatch/skills/flightplan) | Heavyweight interviewer that writes a multi-file blueprint to disk — `PLAN.md` + a `tasks/` tree of self-contained task files for sub-agents                                                                                                    |
 | [autopilot](./packages/dispatch/skills/autopilot)   | Executes a flightplan tree in parallel waves — a dev→verify→judge→score loop gated on each task's Eval rubric, an atomic commit between waves, then the closing final-review gate, leaving an audit trail                                       |
 | [waypoints](./packages/dispatch/skills/waypoints)   | Rolling-wave milestone-roadmap tier _above_ flightplan — writes only `docs/<proj>/WAYPOINTS.md` plus a `waypoints.ts` CLI (`active` / `leg-scaffold` / `advance`) so each leg's flightplan is planned just-in-time after the previous leg lands |
+| [deckplan](./packages/dispatch/skills/deckplan)     | Reference-only guide to authoring Workflow scripts whose runs can be watched on flightdeck — runs no interview and scaffolds nothing                                                                                                            |
 
 **relay** is a single portable skill:
 
@@ -32,26 +33,48 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [relay](./packages/relay/skills/relay) | Delegate a task to another harness's CLI (codex / opencode / claude): `delegate` (do work), `review` (analysis only), or `image` (codex only) — capture the result, smart-apply when safe, and report back |
 
-**chronicle** bundles four skills:
+**chronicle** bundles five skills:
 
 | Skill                                          | Description                                                                                                                                                |
 | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [adr](./packages/chronicle/skills/adr)         | Triage the cockpit decision trail as an inbox and promote the decisions that mattered into Architecture Decision Records under `docs/adr/`                 |
 | [commit](./packages/chronicle/skills/commit)   | Craft git commit(s) for the current changes — auto-decides between one simple commit and an atomic split                                                   |
 | [pr](./packages/chronicle/skills/pr)           | Open a reviewer-legible PR/MR for the current branch, enriched by the cockpit decision trail when present                                                  |
 | [release](./packages/chronicle/skills/release) | Cut a release — bump version files, write the CHANGELOG entry, then commit, merge, tag, and push; `local` stops before the push, `prepare` after the entry |
 | [install](./packages/chronicle/skills/install) | Set up chronicle's prerequisites — the named agent roles on Codex (Claude Code needs none)                                                                 |
 
-**herdr** is a single skill:
+**herdr** bundles six skills:
 
-| Skill                                  | Description                                                                                                                                                                                        |
-| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [herdr](./packages/herdr/skills/herdr) | Reference for the [Herdr](https://herdr.dev) terminal workspace manager (config, CLI, plugin dev) plus a typed `herd` wrapper to spawn and drive agents in sibling panes when running inside herdr |
+| Skill                                                                    | Description                                                                                                                                                                                        |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [herdr](./packages/herdr/skills/herdr)                                   | Reference for the [Herdr](https://herdr.dev) terminal workspace manager (config, CLI, plugin dev) plus a typed `herd` wrapper to spawn and drive agents in sibling panes when running inside herdr |
+| [herdr-app](./packages/herdr/skills/herdr-app)                           | Drive herdr-app (the Herdr desktop window) and herdr-core's `hc`: agents, spaces, tabs, panes, layouts, keys, settings, and mods                                                                   |
+| [tell](./packages/herdr/skills/tell)                                     | Hand a job to another project's agent, fire-and-forget — an open one, or one spun up on demand                                                                                                     |
+| [ask](./packages/herdr/skills/ask)                                       | Ask another project's agent a question and get its answer back                                                                                                                                     |
+| [herdr-browser](./packages/herdr/skills/herdr-browser)                   | Open web pages in a terminal browser pane, read and drive them, and attach Playwright or other CDP clients                                                                                         |
+| [herdr-protocol-upgrade](./packages/herdr/skills/herdr-protocol-upgrade) | Check whether a Herdr protocol upgrade broke a Herdr plugin, then raise its minimum-protocol constant                                                                                              |
+
+**guard** is hooks plus one skill (Claude Code and OpenCode only; Codex gets the hooks alone):
+
+| Skill                                                      | Description                                                                                                                                   |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| [comments-reaper](./packages/guard/skills/comments-reaper) | Scan code comments with a fresh-eyes reviewer subagent and delete the ones that restate the code; with no paths, scans the changes since HEAD |
+
+**browsers** bundles three skills:
+
+| Skill                                         | Description                                                                       |
+| --------------------------------------------- | --------------------------------------------------------------------------------- |
+| [firefox](./packages/browsers/skills/firefox) | Drive Firefox or Zen over Gecko's own Marionette protocol, with no geckodriver    |
+| [chrome](./packages/browsers/skills/chrome)   | Drive an isolated headless Chrome over the Chrome DevTools Protocol               |
+| [safari](./packages/browsers/skills/safari)   | Drive Safari over the `safaridriver` that ships with macOS, in one visible window |
 
 **atelier** is a single skill:
 
 | Skill                                  | Description                                                                                                                                                                                                    |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [tune](./packages/atelier/skills/tune) | Fine-tune a visual effect or animation with live controls — sliders, colour, cubic-bezier, spring — then hand the values back to the agent; isolated on a stage, or injected into your running dev server page |
+
+**runes** has no skill. It is a Claude Code function-hooks mod, toggled with `/runes on|off|status` or `/runes <rune> on|off`; its first rune is the Clawd mascot. It has no Codex manifest.
 
 ## Claude Code Installation
 
@@ -60,7 +83,7 @@ This repository uses GitHub Flow. Create feature and fix branches from `main`, t
 ```bash
 claude plugins marketplace add FunnyQ/cc-plugins
 claude plugins install monitor@q-lab-marketplace
-# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr
+# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr, guard, browsers, atelier, runes
 ```
 
 ### TUI
@@ -80,12 +103,12 @@ bun $CLAUDE_PLUGIN_ROOT/skills/install/scripts/install.ts
 
 ## Codex Installation
 
-Codex reads this marketplace from `.agents/plugins/marketplace.json`. The registry lists all five plugins, and each is installed by id.
+Codex reads this marketplace from `.agents/plugins/marketplace.json`. The registry lists eight plugins, every one but runes, and each is installed by id.
 
 ```bash
 codex plugin marketplace add FunnyQ/cc-plugins
 codex plugin add monitor@q-lab-marketplace
-# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr
+# Any of these plugin ids works: monitor, dispatch, relay, chronicle, herdr, guard, browsers, atelier (runes is Claude Code only)
 ```
 
 Check the install:
@@ -114,7 +137,7 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 
 | Installs         | Count  | Target                                  |
 | ---------------- | ------ | --------------------------------------- |
-| Skills           | 15     | `~/.config/opencode/skills/<name>/`     |
+| Skills           | 26     | `~/.config/opencode/skills/<name>/`     |
 | Plugin module    | 1      | `~/.config/opencode/plugin/q-lab.ts`    |
 | Chronicle agents | 6      | `~/.config/opencode/agents/<name>.md`   |
 | Commands         | 2      | `~/.config/opencode/commands/<name>.md` |
@@ -126,7 +149,7 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 
 **Works under OpenCode:**
 
-- All 15 skills, discovered from `~/.config/opencode/skills/`.
+- All 26 skills, discovered from `~/.config/opencode/skills/`.
 - usage-dashboard reads OpenCode data natively — the shared reader already handles `~/.local/share/opencode/opencode.db`.
 - cockpit **reads and sends** for OpenCode sessions. Precondition: the OpenCode TUI must have been started with a port (`opencode --port <n>`), or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts.
 - relay `delegate` and `review`.
@@ -205,13 +228,13 @@ Require installed Chrome on every native smoke host and Firefox on macOS/Linux. 
 
 ## usage-dashboard
 
-A single-page dashboard that reads local `~/.claude/` and `~/.codex/` data and visualizes usage in a browser. No telemetry, no cloud; everything stays on your machine.
+A single-page dashboard that reads local `~/.claude/`, `~/.codex/`, and OpenCode data and visualizes usage in a browser. No telemetry, no cloud; everything stays on your machine.
 
 ![Token Atlas dashboard preview](./assets/token-atlas-dashboard.png)
 
 ### Features
 
-- **Live now (Claude + Codex)** — a panel of your currently-active Claude and Codex sessions with live status; click one to open it in cockpit's live transcript view (token-atlas links out rather than rendering transcripts itself). When cockpit's daemon isn't running the panel says so and the rows stay inert, so a click never opens a dead tab
+- **Live now (Claude, Codex, OpenCode)** — a panel of your currently-active Claude, Codex, and OpenCode sessions with live status; click one to open it in cockpit's live transcript view (token-atlas links out rather than rendering transcripts itself). When cockpit's daemon isn't running the panel says so and the rows stay inert, so a click never opens a dead tab
 - **Cost + usage overview** — sessions, interactions, tokens, estimated spend, daily burn, and monthly budget projection
 - **Persistent history** — Claude usage is rolled into a local SQLite store (`~/.local/share/q-lab/token-atlas/`), so your token/cost/model history survives Claude Code's automatic transcript cleanup (`cleanupPeriodDays`) instead of disappearing as old sessions age out
 - **Model analysis** — daily trend, model distribution, and per-model token/cost breakdown
@@ -316,7 +339,7 @@ Cockpit checks `/api/codex-control/status` before enabling the Codex send box, s
 
 ## dispatch
 
-Interview-driven planning you can execute. Four skills form one arc — capture what you want, gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop — and a fifth, `waypoints`, sits _above_ it for whole-project rolling-wave planning.
+Interview-driven planning you can execute. Four skills form one arc — capture what you want, gather the spec, commit a blueprint to disk, then fly it with a multi-agent quality loop. A fifth, `waypoints`, sits _above_ it for whole-project rolling-wave planning, and a sixth, `deckplan`, is a reference for authoring Workflow scripts that flightdeck can watch.
 
 ![Dispatch flow: preflight, hop, waypoints, flightplan, autopilot, final review, ship](./assets/dispatch-flow.svg)
 
@@ -378,10 +401,11 @@ If you previously ran the old manual symlink (`ln -s .../packages/relay/skills/r
 
 Chronicle authors your git history — what a commit says, what a pull request argues, and what a release ships. A thin `SKILL.md` sends the bulky reading to an agent — a diff, a branch, a range of commits — and keeps the decisions where you can see them. Diff-reading and git output stay out of your conversation.
 
+- **adr** — triages the cockpit decision trail as an inbox: judge agents screen clustered entries, you confirm, and the decisions that mattered become Architecture Decision Records under `docs/adr/`.
 - **commit** — one agent reads the changeset, cuts it into commits that each build on their own, and writes the messages; a script decides whether the split is worth keeping and does the staging. Pass `simple` to force one commit.
 - **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title, a four-section body, and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
 - **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, then bumps the version files and writes the CHANGELOG entry, commits, tags, and pushes. Pass `local` to stop before the push, or `prepare` to stop after the entry.
-- **install** — sets up each harness's prerequisite: on Claude Code the nested-subagent spawn-depth setting described in the Plugins section above, on Codex the named agent roles the orchestrators are addressed by.
+- **install** — registers the named agent roles on Codex. Claude Code and OpenCode need no setup step.
 
 ### Installation
 
