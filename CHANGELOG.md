@@ -1,5 +1,12 @@
 # Changelog
 
+## [browsers 0.1.5] - 2026-11-05
+
+_tracks tag `browsers-v0.1.5`_
+
+### Fixed
+- The browsers plugin description now names Chrome (over CDP), so the listing matches the chrome skill it ships.
+
 ## [chronicle 0.23.0] - 2026-11-03
 
 _tracks tag `chronicle-v0.23.0`_
