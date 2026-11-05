@@ -1,7 +1,7 @@
 {
   "name": "browsers",
   "version": "0.1.4",
-  "description": "Drive Firefox, Zen, and Safari from the terminal — open pages, read and drive them, and take screenshots. Firefox and Zen run as isolated headless instances over Marionette; Safari runs in its own automation window over safaridriver.",
+  "description": "Drive Firefox, Zen, Chrome, and Safari from the terminal — open pages, read and drive them, and take screenshots. Firefox and Zen run as isolated headless instances over Marionette; Chrome runs as an isolated headless instance over the Chrome DevTools Protocol; Safari runs in its own automation window over safaridriver.",
   "author": { "name": "Q" },
   "license": "MIT",
   "keywords": [
