@@ -166,10 +166,14 @@ test("the desktop keeps the engine's own reply: runes draws nothing there", asyn
 });
 
 test("the header's raw button hands the reply's markdown to open-raw.ts", async ($, on) => {
-  const calls: { argv: readonly string[]; stdin?: string }[] = [];
+  const calls: {
+    argv: readonly string[];
+    stdin?: string;
+    env?: Record<string, string>;
+  }[] = [];
   await startSession($, on, {
     run: (e) => {
-      calls.push({ argv: e.argv, stdin: e.init?.stdin });
+      calls.push({ argv: e.argv, stdin: e.init?.stdin, env: e.init?.env });
       return ran(1, "");
     },
   });
@@ -181,4 +185,5 @@ test("the header's raw button hands the reply's markdown to open-raw.ts", async 
   expect(await eventually(async () => opened() !== undefined)).toBe(true);
   expect(opened()!.argv.slice(2)).toEqual(["r9"]);
   expect(opened()!.stdin).toBe("**hi** there");
+  expect(opened()!.env).toMatchObject({ HOME: expect.any(String) });
 });
