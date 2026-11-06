@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.14.0] - 2026-11-07
+
+_tracks tag `runes-v0.14.0`_
+
+### Added
+- Inside Herdr, the raw button on a reply now opens it in a terminal editor (nvim, vim, or $EDITOR) in read-only mode, and outside Herdr the reply opens as a .txt file so Windows and Linux always have a handler.
+
 ## [browsers 0.1.5] - 2026-11-05
 
 _tracks tag `browsers-v0.1.5`_
