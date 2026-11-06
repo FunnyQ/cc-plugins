@@ -43,7 +43,7 @@ export const reply = (on: On) => {
         for (const [name, value] of Object.entries(passed))
           if (value) env[name] = value;
         const { exitCode, stderr } = await $.process.run(
-          ["bun", script, e.requestId],
+          ["bun", script, e.requestId, config.reply.editor],
           { stdin: e.props.text, env },
         );
         if (exitCode !== 0)

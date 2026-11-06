@@ -33,6 +33,20 @@ test("the editor falls from nvim to vim to $EDITOR", () => {
   });
 });
 
+test("a configured editor runs as written, and falls back when it is missing", () => {
+  const env = { HERDR_ENV: "1" };
+  expect(planRaw(env, has("nvim", "nano"), "linux", "nano -v")).toEqual({
+    via: "popup",
+    editor: ["nano", "-v"],
+  });
+  expect(planRaw(env, has("nvim"), "linux", "nano")).toEqual({
+    via: "system",
+  });
+  expect(planRaw(env, has("nvim"), "linux", "auto")).toMatchObject({
+    editor: ["nvim", "-R"],
+  });
+});
+
 test("no editor, or herdr's sh popup on Windows, falls back to the system opener", () => {
   expect(planRaw({ HC_TERMINAL_ID: "t1" }, has(), "linux")).toEqual({
     via: "system",

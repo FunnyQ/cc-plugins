@@ -31,7 +31,7 @@ export type Theme = (typeof THEMES)[number];
 type Config = {
   enabled: Record<Rune, boolean>;
   prompt: { color: string; icon: string; side: Side; fold_lines: number };
-  reply: { color: string; icon: string; side: Side };
+  reply: { color: string; icon: string; side: Side; editor: string };
   bash: {
     color: string;
     error_color: string;
@@ -74,7 +74,7 @@ export const DEFAULTS: Config = {
   // nf-md icon U+F064C, needs a Nerd Font
   prompt: { color: "#1b5ea6", icon: "\u{F064C}", side: "right", fold_lines: 6 },
   // nf-cod icon U+EC82, needs a Nerd Font
-  reply: { color: "#d97757", icon: "\u{EC82}", side: "left" },
+  reply: { color: "#d97757", icon: "\u{EC82}", side: "left", editor: "auto" },
   // nf-oct-terminal icon U+F489, needs a Nerd Font
   bash: {
     color: "#5f8f6a",
@@ -161,6 +161,7 @@ transcript:
     # color: "${DEFAULTS.reply.color}"
     # icon: "\\uEC82"       # Nerd Font glyph
     # side: ${DEFAULTS.reply.side}
+    # editor: ${DEFAULTS.reply.editor}          # opens the raw button's reply inside Herdr: auto tries nvim -R, vim -R, then $EDITOR; any other command runs as written, e.g. "nano -v"
   bash:
     enabled: ${enabled.bash}    # Bash calls and their output
     # color: "${DEFAULTS.bash.color}"
@@ -283,6 +284,7 @@ const RULES: {
     color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
+    editor: [isText, "auto | a command"],
   },
   bash: {
     color: [isColor, "#rrggbb"],

@@ -183,7 +183,7 @@ test("the header's raw button hands the reply's markdown to open-raw.ts", async 
   const opened = () =>
     calls.find((c) => /hooks\/transcript\/open-raw\.ts$/.test(c.argv[1] ?? ""));
   expect(await eventually(async () => opened() !== undefined)).toBe(true);
-  expect(opened()!.argv.slice(2)).toEqual(["r9"]);
+  expect(opened()!.argv.slice(2)).toEqual(["r9", "auto"]);
   expect(opened()!.stdin).toBe("**hi** there");
   expect(opened()!.env).toMatchObject({ HOME: expect.any(String) });
 });

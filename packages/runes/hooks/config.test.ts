@@ -41,6 +41,18 @@ test("normalize fills every missing field from the defaults", () => {
   expect(problems).toEqual([]);
 });
 
+test("reply.editor defaults to auto and takes any command", () => {
+  expect(DEFAULTS.reply.editor).toBe("auto");
+  expect(
+    normalize({ transcript: { reply: { editor: "nano -v" } } }).config.reply
+      .editor,
+  ).toBe("nano -v");
+  expect(
+    normalize({ transcript: { reply: { editor: "" } } }).problems.length,
+  ).toBe(1);
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain("# editor: auto");
+});
+
 test("normalize reads each switch and field under transcript, and drops only an invalid one", () => {
   const { config, problems } = normalize({
     clawd: { enabled: "off" },

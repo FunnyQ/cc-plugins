@@ -1,5 +1,5 @@
 /// <reference types="bun" />
-// Opens a reply's raw markdown: `bun open-raw.ts <requestId>` with the text on stdin.
+// Opens a reply's raw markdown: `bun open-raw.ts <requestId> [editor]` with the text on stdin.
 import { quicklook } from "./quicklook";
 import { planRaw, shellLine } from "./raw-plan";
 import { mkdir } from "node:fs/promises";
@@ -23,12 +23,13 @@ height = "80%"
 command = ["sh", "-c", "eval \\"$RUNES_RAW_CMD\\""]
 `;
 
-const [requestId = "reply"] = process.argv.slice(2);
+const [requestId = "reply", editor = "auto"] = process.argv.slice(2);
 const info = runtimeInfo();
 const plan = planRaw(
   process.env,
   (cmd) => Bun.which(cmd) !== null,
   info.platform,
+  editor,
 );
 const dir = join(scratchRoot(info), "raw");
 await mkdir(dir, { recursive: true });
@@ -53,17 +54,29 @@ const fail = (what: string, err: string) => {
 };
 
 if (plan.via === "peek") {
-  const started = run([
-    "hc",
-    "run",
-    "--bg",
-    "--rm",
-    "--no-notify",
-    "--name",
-    "runes-raw",
-    ...plan.editor,
-    out,
-  ]);
+  // closing a peek with its [X] leaves the editor running under the name, so the last raw view is ended first
+  run(["hc", "kill", "runes-raw"]);
+  const start = () =>
+    run([
+      "hc",
+      "run",
+      "--bg",
+      "--rm",
+      "--no-notify",
+      "--name",
+      "runes-raw",
+      ...plan.editor,
+      out,
+    ]);
+  let started = start();
+  for (
+    let i = 0;
+    !started.ok && started.err.includes("name_taken") && i < 20;
+    i++
+  ) {
+    await Bun.sleep(100);
+    started = start();
+  }
   if (!started.ok) fail("hc run failed", started.err);
   const { address } = JSON.parse(started.out) as { address: string };
   // herdr-app answers `no running terminal` for a moment after hc starts one, measured once
