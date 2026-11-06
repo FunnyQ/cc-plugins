@@ -1,5 +1,15 @@
 # Changelog
 
+## [runes 0.14.1] - 2026-11-07
+
+_tracks tag `runes-v0.14.1`_
+
+### Added
+- Choose which editor opens a raw reply with the new `transcript.reply.editor` setting (default `auto` tries nvim -R, vim -R, then $EDITOR; any other value runs as written, e.g. `nano -v`), and a configured editor that is not installed falls back to the system opener.
+
+### Fixed
+- Pressing the raw reply button again after closing a herdr-app peek with [X] no longer fails with name_taken; the old editor is stopped first, so only one raw peek can be open at a time.
+
 ## [runes 0.14.0] - 2026-11-07
 
 _tracks tag `runes-v0.14.0`_
