@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.14.2] - 2026-11-07
+
+_tracks tag `runes-v0.14.2`_
+
+### Fixed
+- The explain checker no longer takes down every Herdr terminal on macOS: it now prefers chrome-headless-shell, or launches Chrome.app through `open -n` in its own coalition, so macOS stops force-quitting the whole group about 30 seconds in.
+
 ## [runes 0.14.1] - 2026-11-07
 
 _tracks tag `runes-v0.14.1`_
