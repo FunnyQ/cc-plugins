@@ -1,9 +1,9 @@
 /// <reference types="bun" />
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { discoverChrome } from "../platform-cli";
+import { chromeCommand, discoverChrome } from "../platform-cli";
 
 type Screenshot = { mode: "wide" | "narrow"; page: string };
 
@@ -35,19 +35,21 @@ export const takeScreenshot = async (
     /\.html$/,
     mode === "wide" ? ".check.png" : ".check-narrow.png",
   );
+  rmSync(output, { force: true });
   const profile = mkdtempSync(join(tmpdir(), "runes-check-"));
   try {
-    const exitCode = await run([
-      chrome,
-      "--headless=new",
-      "--disable-gpu",
-      "--hide-scrollbars",
-      `--window-size=${mode === "wide" ? "1280,4000" : "420,7000"}`,
-      `--screenshot=${output}`,
-      `--user-data-dir=${profile}`,
-      pathToFileURL(page).href,
-    ]);
+    const exitCode = await run(
+      chromeCommand(chrome, [
+        "--disable-gpu",
+        "--hide-scrollbars",
+        `--window-size=${mode === "wide" ? "1280,4000" : "420,7000"}`,
+        `--screenshot=${output}`,
+        `--user-data-dir=${profile}`,
+        pathToFileURL(page).href,
+      ]),
+    );
     if (exitCode !== 0) throw new Error(`Chrome exited ${exitCode}`);
+    if (!existsSync(output)) throw new Error("Chrome wrote no screenshot");
     return output;
   } finally {
     rmSync(profile, { recursive: true, force: true, maxRetries: 10 });

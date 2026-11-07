@@ -3,6 +3,7 @@ import { mkdir, unlink } from "node:fs/promises";
 import {
   closeSync,
   openSync,
+  readdirSync,
   readFileSync,
   readSync,
   realpathSync,
@@ -51,8 +52,30 @@ export const discoverChrome = (
       return path;
     }
   },
+  entries: (dir: string) => string[] = (dir) => {
+    try {
+      return readdirSync(dir);
+    } catch {
+      return [];
+    }
+  },
 ): string | null => {
   if (platform === "darwin") {
+    // A Chrome.app launched from a terminal joins that terminal's coalition, and loginwindow's force quit takes the whole coalition down
+    const onPath = which("chrome-headless-shell");
+    if (onPath) return onPath;
+    if (env.HOME) {
+      const cache = `${env.HOME}/Library/Caches/ms-playwright`;
+      const versions = entries(cache)
+        .map((name) => /^chromium_headless_shell-(\d+)$/.exec(name))
+        .filter((match) => match !== null)
+        .sort((a, b) => Number(b[1]) - Number(a[1]));
+      for (const [name] of versions)
+        for (const arch of ["arm64", "x64"]) {
+          const path = `${cache}/${name}/chrome-headless-shell-mac-${arch}/chrome-headless-shell`;
+          if (usable(path)) return path;
+        }
+    }
     const path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
     return usable(path) ? path : null;
   }
@@ -91,6 +114,30 @@ export const discoverChrome = (
     }
   }
   return null;
+};
+
+export const chromeCommand = (
+  chrome: string,
+  args: string[],
+  platform: string = process.platform,
+): string[] => {
+  if (/(^|[\\/])chrome-headless-shell(\.exe)?$/.test(chrome))
+    return [chrome, "--headless", ...args];
+  const app = /^(.+\.app)\/Contents\/MacOS\/[^/]+$/.exec(chrome)?.[1];
+  // open hands the app to launchd, which gives it a coalition of its own; it exits 0 whatever Chrome exits
+  if (platform === "darwin" && app)
+    return [
+      "open",
+      "-n",
+      "-W",
+      "-g",
+      "-a",
+      app,
+      "--args",
+      "--headless=new",
+      ...args,
+    ];
+  return [chrome, "--headless=new", ...args];
 };
 
 export const runtimeInfo = (): RuntimeInfo => {

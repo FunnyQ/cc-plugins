@@ -6,21 +6,18 @@ import { pathToFileURL } from "node:url";
 
 import { faults, MEASURE } from "./geometry";
 import type { Measure } from "./geometry";
+import { chromeCommand } from "../platform-cli";
 
 const [chromePath, page] = process.argv.slice(2) as [string, string];
 const profile = mkdtempSync(join(tmpdir(), "runes-geometry-"));
-const chrome = Bun.spawn(
-  [
-    chromePath,
-    "--headless=new",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--remote-debugging-port=0",
-    `--user-data-dir=${profile}`,
-    "about:blank",
-  ],
-  { stdout: "ignore", stderr: "ignore" },
-);
+const argv = chromeCommand(chromePath, [
+  "--disable-gpu",
+  "--hide-scrollbars",
+  "--remote-debugging-port=0",
+  `--user-data-dir=${profile}`,
+  "about:blank",
+]);
+const chrome = Bun.spawn(argv, { stdout: "ignore", stderr: "ignore" });
 
 try {
   let port = 0;
@@ -77,6 +74,9 @@ try {
   }
   console.log(JSON.stringify({ faults: faults(byWidth) }));
 } finally {
+  // killing open leaves the launchd-owned Chrome running; its unique profile names every Chrome process of this run
+  if (argv[0] === "open")
+    Bun.spawnSync(["pkill", "-f", `user-data-dir=${profile}`]);
   chrome.kill();
   await chrome.exited;
   // Chrome's helpers still write the profile for a moment after the main process exits

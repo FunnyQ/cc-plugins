@@ -110,7 +110,12 @@ import {
   resolveRuntime,
   scratchRoot,
 } from "./platform";
-import { discoverChrome, executeOperation, openArtifact } from "./platform-cli";
+import {
+  chromeCommand,
+  discoverChrome,
+  executeOperation,
+  openArtifact,
+} from "./platform-cli";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const CLI = join(import.meta.dir, "platform-cli.ts");
@@ -529,10 +534,126 @@ for (const home of [undefined, ""]) {
   });
 }
 
+test("macOS discovery prefers chrome-headless-shell, which joins no LaunchServices coalition", () => {
+  const mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  const env = { HOME: "/Users/q", PATH: "/opt/bin" };
+  const cache = "/Users/q/Library/Caches/ms-playwright";
+  const shell = (version: string, arch = "arm64") =>
+    `${cache}/chromium_headless_shell-${version}/chrome-headless-shell-mac-${arch}/chrome-headless-shell`;
+  const entries = (dir: string) =>
+    dir === cache
+      ? [
+          "chromium-1300",
+          "chromium_headless_shell-1200",
+          "chromium_headless_shell-1248",
+          "chromium_headless_shell-999",
+          "ffmpeg-1013",
+        ]
+      : [];
+  const onPath = (name: string) =>
+    name === "chrome-headless-shell" ? "/opt/bin/chrome-headless-shell" : null;
+
+  expect(
+    discoverChrome(
+      "darwin",
+      env,
+      () => true,
+      onPath,
+      (p) => p,
+      entries,
+    ),
+  ).toBe("/opt/bin/chrome-headless-shell");
+  expect(
+    discoverChrome(
+      "darwin",
+      env,
+      () => true,
+      () => null,
+      (p) => p,
+      entries,
+    ),
+  ).toBe(shell("1248"));
+  expect(
+    discoverChrome(
+      "darwin",
+      env,
+      (path) => path === shell("1200", "x64") || path === mac,
+      () => null,
+      (p) => p,
+      entries,
+    ),
+  ).toBe(shell("1200", "x64"));
+  expect(
+    discoverChrome(
+      "darwin",
+      env,
+      (path) => path === mac,
+      () => null,
+      (p) => p,
+      entries,
+    ),
+  ).toBe(mac);
+  expect(
+    discoverChrome(
+      "darwin",
+      {},
+      (path) => path === mac,
+      () => null,
+      (p) => p,
+      () => [],
+    ),
+  ).toBe(mac);
+});
+
+test("Chrome command keeps the Chrome app out of the caller's coalition on macOS", () => {
+  const app = "/Applications/Google Chrome.app";
+  const args = ["--disable-gpu", "about:blank"];
+  expect(
+    chromeCommand("/opt/bin/chrome-headless-shell", args, "darwin"),
+  ).toEqual(["/opt/bin/chrome-headless-shell", "--headless", ...args]);
+  expect(
+    chromeCommand(`${app}/Contents/MacOS/Google Chrome`, args, "darwin"),
+  ).toEqual([
+    "open",
+    "-n",
+    "-W",
+    "-g",
+    "-a",
+    app,
+    "--args",
+    "--headless=new",
+    ...args,
+  ]);
+  expect(chromeCommand("/usr/bin/chromium", args, "linux")).toEqual([
+    "/usr/bin/chromium",
+    "--headless=new",
+    ...args,
+  ]);
+  expect(chromeCommand("C:\\Chrome\\chrome.exe", args, "win32")).toEqual([
+    "C:\\Chrome\\chrome.exe",
+    "--headless=new",
+    ...args,
+  ]);
+});
+
 test("Chrome discovery uses the platform order and environment roots", () => {
   const mac = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-  expect(discoverChrome("darwin", {}, (path) => path === mac)).toBe(mac);
-  expect(discoverChrome("darwin", {}, () => false)).toBeNull();
+  expect(
+    discoverChrome(
+      "darwin",
+      {},
+      (path) => path === mac,
+      () => null,
+    ),
+  ).toBe(mac);
+  expect(
+    discoverChrome(
+      "darwin",
+      {},
+      () => false,
+      () => null,
+    ),
+  ).toBeNull();
   const env = {
     ProgramFiles: "D:\\Apps",
     "ProgramFiles(x86)": "E:\\Apps",
@@ -680,8 +801,9 @@ test("screenshot helper accepts exactly one mode and one HTML page", () => {
 });
 
 test("screenshot helper encodes the URL, derives outputs and removes profiles after exit", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "runes-shot-"));
   for (const mode of ["wide", "narrow"] as const) {
-    const page = join(import.meta.dir, "page 空間 & %#'.html");
+    const page = join(dir, "page 空間 & %#'.html");
     let profile = "";
     const output = await takeScreenshot(
       { mode, page },
@@ -701,6 +823,7 @@ test("screenshot helper encodes the URL, derives outputs and removes profiles af
           mode === "wide" ? ".check.png" : ".check-narrow.png",
         );
         expect(argv).toContain("--screenshot=" + output);
+        writeFileSync(output, "png");
         return 0;
       },
     );
@@ -711,6 +834,24 @@ test("screenshot helper encodes the URL, derives outputs and removes profiles af
       ),
     );
     expect(existsSync(profile)).toBe(false);
+  }
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("screenshot helper fails when Chrome writes no screenshot, since open -W always exits 0", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "runes-shot-"));
+  try {
+    const page = join(dir, "page.html");
+    writeFileSync(join(dir, "page.check.png"), "stale");
+    await expect(
+      takeScreenshot(
+        { mode: "wide", page },
+        () => "/chrome",
+        async () => 0,
+      ),
+    ).rejects.toThrow("Chrome wrote no screenshot");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
