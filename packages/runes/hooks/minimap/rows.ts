@@ -61,19 +61,31 @@ const rowsOfLine = (raw: string): Row[] => {
   return rows;
 };
 
-// the same rows read one line at a time, so memory stays near one line rather than 5x the file
-export const rowsOfStream = async (
-  texts: AsyncIterable<string>,
-): Promise<Row[]> => {
+// one line at a time, so memory stays near one line rather than 5x the file; `bytes` ends at the last newline, where the next read starts
+export const rowsOfBytes = async (
+  chunks: AsyncIterable<Uint8Array>,
+): Promise<{ rows: Row[]; bytes: number }> => {
   const rows: Row[] = [];
-  let tail = "";
-  for await (const text of texts) {
-    const lines = (tail + text).split("\n");
-    tail = lines.pop() ?? "";
-    for (const line of lines) rows.push(...rowsOfLine(line));
+  const decoder = new TextDecoder();
+  let tail = new Uint8Array(0);
+  let bytes = 0;
+  for await (const chunk of chunks) {
+    const joined = new Uint8Array(tail.length + chunk.length);
+    joined.set(tail);
+    joined.set(chunk, tail.length);
+    let start = 0;
+    for (
+      let end = joined.indexOf(10);
+      end !== -1;
+      end = joined.indexOf(10, start)
+    ) {
+      rows.push(...rowsOfLine(decoder.decode(joined.subarray(start, end))));
+      start = end + 1;
+    }
+    bytes += start;
+    tail = joined.slice(start);
   }
-  rows.push(...rowsOfLine(tail));
-  return rows;
+  return { rows, bytes };
 };
 
 // an assistant row's requestId is its uuid with the last group zeroed (…-b80d-000000000000), so ids match on the rest

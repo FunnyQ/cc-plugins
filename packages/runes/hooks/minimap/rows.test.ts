@@ -1,18 +1,19 @@
 import { expect, test } from "claude-code/testing";
 
 import { COLOR } from "./minimap";
-import { TOOL_KIND, kindAt, lines, rowsOfStream, stem } from "./rows";
+import { TOOL_KIND, kindAt, lines, rowsOfBytes, stem } from "./rows";
 
 const jsonl = (...entries: object[]) =>
   entries.map((e) => JSON.stringify(e)).join("\n");
 
-// the whole text as one chunk: the uncut reading every cut must match
-const rowsOf = (text: string) =>
-  rowsOfStream(
-    (async function* () {
-      yield text;
-    })(),
-  );
+const rowsOf = async (text: string) =>
+  (
+    await rowsOfBytes(
+      (async function* () {
+        yield new TextEncoder().encode(`${text}\n`);
+      })(),
+    )
+  ).rows;
 
 test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the rest", async () => {
   const text = jsonl(
@@ -116,7 +117,13 @@ test("kindAt reads a line's segments as one strip, top to bottom when the map li
   expect(kindAt(line, 3)).toBeUndefined();
 });
 
-test("rowsOfStream gives rowsOf's rows however the text is cut, with or without a final newline", async () => {
+const cut = (bytes: Uint8Array, size: number) =>
+  (async function* () {
+    for (let at = 0; at < bytes.length; at += size)
+      yield bytes.slice(at, at + size);
+  })();
+
+test("rowsOfBytes gives the same rows however the bytes are cut, and counts the bytes it read", async () => {
   const text = `${jsonl(
     { type: "user", uuid: "u1", message: { content: "你好，世界" } },
     {
@@ -126,14 +133,25 @@ test("rowsOfStream gives rowsOf's rows however the text is cut, with or without 
     },
     { type: "user", uuid: "u2", message: { content: "last" } },
   )}\n`;
-  for (const source of [text, text.trimEnd()])
-    for (const size of [1, 2, 7, source.length]) {
-      const chunks = (async function* () {
-        for (let at = 0; at < source.length; at += size)
-          yield source.slice(at, at + size);
-      })();
-      expect(await rowsOfStream(chunks)).toEqual(await rowsOf(text));
-    }
+  const bytes = new TextEncoder().encode(text);
+  for (const size of [1, 2, 7, bytes.length])
+    expect(await rowsOfBytes(cut(bytes, size))).toEqual({
+      rows: [
+        { id: "u1", kind: "prompt", size: 5 },
+        { id: "a1", kind: "reply", size: 2 },
+        { id: "u2", kind: "prompt", size: 4 },
+      ],
+      bytes: bytes.length,
+    });
+});
+
+// the writer may be mid-line; the next read starts at that line
+test("rowsOfBytes holds back a line with no newline yet", async () => {
+  const done = `${jsonl({ type: "user", uuid: "u1", message: { content: "a" } })}\n`;
+  const text = `${done}{"type":"user","uuid":"u2","mess`;
+  const read = await rowsOfBytes(cut(new TextEncoder().encode(text), 5));
+  expect(read.rows.map((r) => r.id)).toEqual(["u1"]);
+  expect(read.bytes).toBe(new TextEncoder().encode(done).length);
 });
 
 test("every kind a row can take has a bubble colour", () => {

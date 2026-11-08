@@ -37,33 +37,50 @@ const colorOf = (kind: string) => COLOR[kind]?.() ?? "#808080";
 
 let transcript: string | undefined;
 let lastSeen: string | undefined;
-let lastRows = "";
+let offset = 0;
+let isReading = false;
+// a session change mid-read must not take the old transcript's offset
+let generation = 0;
 
 // a bun child, because a transcript outgrows the mod's 4 MiB $.fs.read cap; true once the transcript has been read
 const reread = async ($: EngineInterface) => {
+  const asked = generation;
   const { exitCode, stdout } = await $.process.run([
     "bun",
     `${$.plugin.root}/hooks/minimap/index.ts`,
     await $.session.id(),
+    String(offset),
   ]);
-  if (exitCode !== 0) return false;
-  const read = JSON.parse(stdout) as { path: string; rows: Row[] };
+  if (exitCode !== 0 || asked !== generation) return false;
+  const read = JSON.parse(stdout) as {
+    path: string;
+    from: number;
+    bytes: number;
+    rows: Row[];
+  };
   transcript = read.path;
-  if (stdout !== lastRows) {
-    lastRows = stdout;
-    await update($, rows, () => read.rows);
-  }
+  offset = read.bytes;
+  if (read.from === 0) await update($, rows, () => read.rows);
+  else if (read.rows.length)
+    await update($, rows, (old) => [...(old ?? []), ...read.rows]);
   return true;
 };
 
-// a stat of the transcript is one file-system call; the spawn it spares is a process and up to 76 MB.
+// a stat of the transcript is one file-system call; the spawn it spares is a process
 const rereadIfChanged = async ($: EngineInterface) => {
-  const stat = transcript
-    ? await $.fs.stat(transcript).catch(() => undefined)
-    : undefined;
-  const seen = stat && `${stat.size}:${stat.mtimeMs}`;
-  if (seen !== undefined && seen === lastSeen) return;
-  lastSeen = (await reread($)) ? seen : undefined;
+  // two reads from one offset would append its rows twice
+  if (isReading) return;
+  isReading = true;
+  try {
+    const stat = transcript
+      ? await $.fs.stat(transcript).catch(() => undefined)
+      : undefined;
+    const seen = stat && `${stat.size}:${stat.mtimeMs}`;
+    if (seen !== undefined && seen === lastSeen) return;
+    lastSeen = (await reread($)) ? seen : undefined;
+  } finally {
+    isReading = false;
+  }
 };
 
 // one column per bucket, `barRows` blocks tall, the track along the bottom as a line into an arrowhead, drawn mid-cell like `→` so they join; drawn in Clawd's band
@@ -172,7 +189,8 @@ export const desktopMap = (
 
 const forgetTranscript = () => {
   transcript = lastSeen = undefined;
-  lastRows = "";
+  offset = 0;
+  generation += 1;
 };
 
 const startTicker = ($: EngineInterface) => {
