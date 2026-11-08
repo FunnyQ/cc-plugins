@@ -14,6 +14,7 @@ import {
   titleOf,
   TITLES,
 } from "./teacher";
+import { config, DEFAULTS } from "../config";
 import { wrapWords } from "../transcript/text";
 import { lessonLines, rewriteRuns, TEACHER_COLOR } from "./lesson";
 import type { Attempt } from "./attempt";
@@ -56,6 +57,7 @@ test("a flagged prompt gets the rewrite, the latest lesson clears on the next su
     complete: async () =>
       "<quip>Checking? Bold tense.</quip>\nCan you check why the test is failing?",
     redraw: () => redraws++,
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -89,6 +91,7 @@ test("no key asks nothing", async () => {
     post: async () => (posts++, { ok: false, text: "" }),
     complete: async () => "x",
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -259,6 +262,7 @@ test("a lesson without a quip falls back to a stock title", async () => {
     }),
     complete: async () => "Please make this faster.",
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -346,6 +350,7 @@ test("a prompt that was fine as written is never sent again", async () => {
     post: async () => (posts++, { ok: true, text: flagged(prompt) }),
     complete: async () => (completes++, prompt),
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -364,6 +369,7 @@ test("two identical prompts share a lesson and the latest requestId wins", async
     post: async () => ({ ok: true, text: flagged(prompt) }),
     complete: async () => "Please make rows with the same text.",
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -374,6 +380,63 @@ test("two identical prompts share a lesson and the latest requestId wins", async
   expect(teacher.latest()?.requestId).toBe("second");
 });
 
+test("the latest lesson closes notice_ms after it lands and redraws, and 0 keeps it open", async () => {
+  const prompt = "please making the notice go away";
+  const timers: { ms: number; fire: () => void }[] = [];
+  let redraws = 0;
+  const transport = {
+    apiKey: "k",
+    post: async () => ({ ok: true, text: flagged(prompt) }),
+    complete: async () => "Please make the notice go away.",
+    redraw: () => redraws++,
+    after: (ms: number, fire: () => void) => void timers.push({ ms, fire }),
+    record: () => {},
+    language: async () => undefined,
+  };
+  teacher.work(transport);
+  teacher.submit(prompt, Promise.resolve("s1"));
+  for (let i = 0; i < 50 && !teacher.latest(); i++) await settle();
+  expect(timers.map((t) => t.ms)).toEqual([3000]);
+  const before = redraws;
+  timers[0]!.fire();
+  expect(teacher.latest()).toBe(undefined);
+  expect(redraws).toBe(before + 1);
+  expect(teacher.lesson(prompt)).toBe("Please make the notice go away.");
+
+  config.teacher = { notice_ms: 0 };
+  try {
+    const kept = "please making the notice stay open";
+    timers.length = 0;
+    teacher.submit(kept, Promise.resolve("s1"));
+    for (let i = 0; i < 50 && !teacher.latest(); i++) await settle();
+    expect(teacher.latest()).not.toBe(undefined);
+    expect(timers).toEqual([]);
+  } finally {
+    config.teacher = DEFAULTS.teacher;
+  }
+});
+
+test("a stale close timer leaves a newer lesson open", async () => {
+  const timers: (() => void)[] = [];
+  teacher.work({
+    apiKey: "k",
+    post: async () => ({ ok: true, text: flagged("") }),
+    complete: async (text) =>
+      text.includes("first") ? "The first one." : "The second one.",
+    redraw: () => {},
+    after: (_ms, fire) => void timers.push(fire),
+    record: () => {},
+    language: async () => undefined,
+  });
+  teacher.submit("please making the first one", Promise.resolve("s1"));
+  for (let i = 0; i < 50 && !teacher.latest(); i++) await settle();
+  teacher.submit("please making the second one", Promise.resolve("s1"));
+  for (let i = 0; i < 50 && teacher.latest()?.better !== "The second one."; i++)
+    await settle();
+  timers[0]!();
+  expect(teacher.latest()?.better).toBe("The second one.");
+});
+
 test("work called again leaves no latest lesson, though the lesson itself stays", async () => {
   const prompt = "please making the latest go away";
   const transport = {
@@ -381,6 +444,7 @@ test("work called again leaves no latest lesson, though the lesson itself stays"
     post: async () => ({ ok: true, text: flagged(prompt) }),
     complete: async () => "Please make the latest go away.",
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   };
@@ -403,6 +467,7 @@ test("teach keys the lesson on the prompt that entered, not the one typed", asyn
     ),
     complete: async () => "Rewritten by the teacher.",
     redraw: () => {},
+    after: () => {},
     record: () => {},
     language: async () => undefined,
   });
@@ -442,6 +507,7 @@ const recording = (
     post,
     complete,
     redraw: () => {},
+    after: () => {},
     record: (a, session) => seen.push({ a, session }),
     language: async () => language,
   });

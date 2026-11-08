@@ -53,6 +53,19 @@ test("reply.editor defaults to auto and takes any command", () => {
   expect(TEMPLATE(DEFAULTS.enabled)).toContain("# editor: auto");
 });
 
+test("teacher.notice_ms defaults to 3000, takes 0 to keep the notice, and refuses a negative or fractional one", () => {
+  expect(DEFAULTS.teacher.notice_ms).toBe(3000);
+  expect(
+    normalize({ teacher: { notice_ms: 0 } }).config.teacher.notice_ms,
+  ).toBe(0);
+  for (const bad of [-1, 1.5, "3000"]) {
+    const { config, problems } = normalize({ teacher: { notice_ms: bad } });
+    expect(config.teacher.notice_ms).toBe(3000);
+    expect(problems.join("\n")).toContain("teacher.notice_ms");
+  }
+  expect(TEMPLATE(DEFAULTS.enabled)).toContain("# notice_ms: 3000");
+});
+
 test("normalize reads each switch and field under transcript, and drops only an invalid one", () => {
   const { config, problems } = normalize({
     clawd: { enabled: "off" },

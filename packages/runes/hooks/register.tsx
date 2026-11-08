@@ -191,6 +191,7 @@ export const register: Register = (on) => {
         return r.isAnswered ? r.text : undefined;
       },
       redraw,
+      after: (ms, fire) => void $.clock.after(ms, fire),
       language: async () =>
         ((await $.settings.read()) as { language?: string }).language,
       record: (a, session) => {

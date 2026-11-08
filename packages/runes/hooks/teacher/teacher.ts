@@ -165,6 +165,7 @@ type Transport = {
   apiKey: string;
   complete: Complete;
   redraw: () => void;
+  after: (ms: number, fire: () => void) => void;
   record: (a: Attempt, session: Promise<string | undefined>) => void;
   language: () => Promise<string | undefined>;
 };
@@ -175,6 +176,7 @@ const lessons = new Map<string, Lesson | undefined>();
 const asked = new Set<string>();
 const rows = new Map<string, string>();
 let current: string | undefined;
+let closed: string | undefined;
 
 const keep = <V>(map: Map<string, V>, key: string, value: V) => {
   map.delete(key);
@@ -247,7 +249,10 @@ export const teacher = {
   title: (text: string) => lessons.get(keyOf(text))?.quip ?? titleOf(text),
   why: (text: string) => lessons.get(keyOf(text))?.why,
   latest() {
-    const better = current === undefined ? undefined : teacher.lesson(current);
+    const better =
+      current === undefined || current === closed
+        ? undefined
+        : teacher.lesson(current);
     return better
       ? {
           better,
@@ -278,7 +283,15 @@ export const teacher = {
       .then((lesson) => {
         asked.delete(key);
         keep(lessons, key, lesson);
-        if (lesson) t.redraw();
+        if (!lesson) return;
+        t.redraw();
+        const ms = config.teacher.notice_ms;
+        if (ms > 0)
+          t.after(ms, () => {
+            if (current !== key) return;
+            closed = key;
+            t.redraw();
+          });
       });
   },
   work(next: Omit<Transport, "apiKey"> & { apiKey: string | undefined }) {

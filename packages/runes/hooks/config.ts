@@ -63,6 +63,7 @@ type Config = {
   fold: { keep: string; min_calls: number };
   glow: { style: string };
   minimap: { bar_rows: number; gap: number; marker_color: string };
+  teacher: { notice_ms: number };
   explain: { theme: (typeof THEME_SETTINGS)[number] };
 };
 
@@ -131,6 +132,7 @@ export const DEFAULTS: Config = {
   fold: { keep: "", min_calls: 1 },
   glow: { style: "dark" },
   minimap: { bar_rows: 3, gap: 2, marker_color: "#ff8c00" },
+  teacher: { notice_ms: 3000 },
   explain: { theme: "auto" },
 };
 
@@ -224,6 +226,7 @@ minimap:
 teacher:
   enabled: ${enabled.teacher}    # the English teacher: a better phrasing under an English prompt that could read better; needs TYPESAFE_API_KEY, sends each (secret-masked) English-looking prompt to TypeSafe's Jev, and asks sonnet for the rewrite
   # with it on and TYPESAFE_API_KEY set, every asked prompt is logged (secret-masked) to ~/.local/share/q-lab/runes/teacher/lessons.db, kept until you trash the file
+  # notice_ms: ${DEFAULTS.teacher.notice_ms}      # how long the band's notice of the latest lesson stays, in milliseconds; 0 keeps it until the next prompt
 explain:
   enabled: ${enabled.explain} # the [Explain plz!] button under Clawd; a press forks this session to explain it, ELI5
   # theme: ${DEFAULTS.explain.theme}   # ${THEME_SETTINGS.join(" | ")}
@@ -265,6 +268,7 @@ const isColor: Check = (v) =>
 const isText: Check = (v) => typeof v === "string" && v.length > 0;
 const isSide: Check = (v) => v === "left" || v === "right";
 const isCount: Check = (v) => Number.isInteger(v) && (v as number) > 0;
+const isWhole: Check = (v) => Number.isInteger(v) && (v as number) >= 0;
 const isList: Check = (v) => typeof v === "string";
 const isTheme: Check = (v) =>
   (THEME_SETTINGS as readonly unknown[]).includes(v);
@@ -344,6 +348,7 @@ const RULES: {
     gap: [isCount, "a whole number above 0"],
     marker_color: [isColor, "#rrggbb"],
   },
+  teacher: { notice_ms: [isWhole, "a whole number, 0 or above"] },
   explain: { theme: [isTheme, THEME_SETTINGS.join(" | ")] },
 };
 
