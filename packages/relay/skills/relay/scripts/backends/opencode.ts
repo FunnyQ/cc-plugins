@@ -3,6 +3,9 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 /**
  * No model is pinned: hosted ids churn, and a pinned default rotted once already.
  *
+ * Verified against opencode 2.2.6. The 2.x TUI takes no `-m`, so a run with a
+ * model always goes headless (see invokeLive).
+ *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke
  * and live TUI). Headless `run` auto-REJECTS approval prompts when `--auto` is
  * absent — no pane means no human can answer — so a non-dangerous headless
@@ -51,17 +54,16 @@ export const opencodeBackend: Backend = {
     return { argv, stdin: opts.promptText };
   },
 
-  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec {
+  invokeLive(_mode: Mode, opts: InvokeOpts): LiveSpec | null {
+    // The 2.x TUI exits on `-m` ("Unrecognized flag"), and OPENCODE_CONFIG_CONTENT
+    // never reaches the background service that resolves the model (2.2.6), so a
+    // chosen model has no live path; relay.ts then runs it headless.
+    if (opts.model) return null;
     const argv: string[] = [];
-    if (opts.model) argv.push("-m", opts.model);
-    // opencode's approval-bypass flag is `--auto` ("auto-approve permissions
-    // that are not explicitly denied (dangerous!)"), accepted by the interactive
-    // TUI too. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist
-    // on `run` and currently collapse to the same boolean (1.18.18) — not a
-    // separate, stronger mode. Gate --auto on --dangerous so it matches
+    // `--auto` is accepted by the TUI too. Gate it on --dangerous so it matches
     // codex/claude: --dangerous = unattended, no --dangerous = prompts surface
-    // in the pane. Note --auto still respects explicit deny rules — it is not a
-    // full bypass like codex's flag.
+    // in the pane. It still respects explicit deny rules — not a full bypass
+    // like codex's flag.
     if (opts.dangerous) argv.push("--auto");
     return { agentBin: "opencode", argv };
   },
@@ -97,14 +99,18 @@ export function parseJsonl(raw: string): string {
 
 /**
  * `opencode run` exits 1 with empty stderr and reports the cause only as a
- * JSONL event on stdout: {"type":"error","error":{"name":..,"data":{"message":..}}}.
+ * JSONL event on stdout: 2.x {"type":"error","error":{"type":..,"message":..}},
+ * 1.x {"type":"error","error":{"name":..,"data":{"message":..}}}.
  */
 export function parseError(stdout: string): string | undefined {
   for (const line of stdout.split("\n")) {
     try {
       const obj = JSON.parse(line.trim());
       if (obj.type === "error") {
-        return obj.error?.data?.message || obj.error?.name || undefined;
+        const e = obj.error;
+        return (
+          e?.message || e?.data?.message || e?.type || e?.name || undefined
+        );
       }
     } catch {
       continue;
