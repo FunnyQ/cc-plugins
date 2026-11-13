@@ -272,13 +272,13 @@ After the workflow returns:
 Run this loop only when the user picked **Goal mode** in Step 2, under Claude Code. Repairs happen in this conversation, between Workflow runs, because a task-file edit during a run trips the leak check. Take every command and placeholder value from [references/goal-mode.md](references/goal-mode.md).
 
 1. Before the first launch, run `flightlog.ts flight-start`. Then show the user the exact `/goal …` line from `goal-mode.md` to type, and wait until they have set it. `/goal` is a session Stop hook only the user can set.
-2. After each Workflow return, check `logFailed`. When it is `true`, stop and report that the trail is incomplete, so `repairs --status` cannot be trusted.
+2. After each Workflow return, check `logFailed`. When it is `true`, stop and report that the trail is incomplete, so `repairs --status` cannot be trusted, and ask the user to type `/goal clear`. Ask the same whenever the loop stops before step 7.
 3. Run `flightlog.ts repairs --status`. On `complete` or `exhausted`, go to step 7.
 4. Sort each escalation by its `class`, following the table in `goal-mode.md`. Record each `infra-retry` or `halt` with `flightlog.ts repair` before acting on it.
 5. For each `plan-defect` or `capped` escalation, spawn the repair reviewer with [references/repair.md](references/repair.md). Spawn reviewers one at a time. Before each spawn, commit the tree so that nothing is uncommitted; when something stays uncommitted, stop and report. On `fix`, `defer`, or `not-plan`, run `flightlog.ts guard`:
-   - When the guard rejects, restore each changed file with `git show HEAD:<path> > <path>` and record `refuse`.
-   - When the guard passes, record `repair` with the guard's `reentry`, write `DEFERRED.md` for `defer` through `appendDeferred`, and commit the task files as `plan repair: <pattern>`.
-6. Reset the repaired tasks to `todo` and commit. Bake with `reentry`, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` from `DEFERRED.md`. Re-launch, then go to step 2.
+   - On `refuse`, a missing verdict file, a guard rejection, or a failed `lint-task.ts` run after the guard, restore each changed file with `git show HEAD:<path> > <path>` and record `refuse`.
+   - When the guard and the lint pass, record `repair` with the guard's `reentry`, write `DEFERRED.md` for `defer` through `appendDeferred`, and commit the task files as `plan repair: <pattern>`.
+6. Reset the repaired tasks to `todo` and commit. Bake with `reentry` for the repaired and `infra-retry` tasks, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` from `DEFERRED.md`. Re-launch, then go to step 2.
 7. Run `flightlog.ts report --flight`. Print the outcome and the `FLIGHTREPORT.md` path.
 
 Print the `repairs --status` line as the last line of every goal-mode turn. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".

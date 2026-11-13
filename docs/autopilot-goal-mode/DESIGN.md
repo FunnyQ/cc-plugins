@@ -80,16 +80,17 @@ The main agent ends every goal-mode turn with `repairs --status: <status>`, the 
 
 After each Workflow return, the main agent sorts the escalations:
 
-| Escalation                                         | Action                                                                                                                                |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan defect (`PLAN DEFECT reported by …`)          | Run the repair reviewer.                                                                                                              |
-| Capped (`maxAttempts` or `finalReviewMaxAttempts`) | Run the repair reviewer. Point it at the Verification and judge criteria first, since Q's experience says the cause is usually there. |
-| Infrastructure (`infrastructure: true`), including `(scout)`, `(worktree)`, `(commit)` | Re-launch once with no edit (`infra-retry`). A second infrastructure stop on the same task is recorded `halt`. |
-| `parked: false` | Reset the Status to `todo` as `SKILL.md:316` says, then treat it as infrastructure. |
-| Divergence (`(divergence)`), `(tree)` stall | Record `halt` for that task. The existing rule (`SKILL.md:318`) needs a person. Other tasks keep repairing. |
-| Leak abort, `drained`, budget-floor stop | Record `halt` for the flight and stop the loop at once. The tree state is unknown after a leak, and a drain is the user's own stop. |
+| Escalation                                                                             | Action                                                                                                                                         |
+| -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan defect (`PLAN DEFECT reported by …`)                                              | Run the repair reviewer.                                                                                                                       |
+| Capped (`maxAttempts` or `finalReviewMaxAttempts`)                                     | Run the repair reviewer. Point it at the Verification and judge criteria first, since Q's experience says the cause is usually there.          |
+| Infrastructure (`infrastructure: true`), including `(scout)`, `(worktree)`, `(commit)` | Re-launch once with no edit (`infra-retry`). A second infrastructure stop on the same task is recorded `halt`.                                 |
+| `parked: false`                                                                        | Reset the Status to `todo` as `SKILL.md:316` says, then treat it as infrastructure.                                                            |
+| Divergence (`(divergence)`)                                                            | Record `halt` for that ref. The existing rule (`SKILL.md:318`) needs a person. Other tasks keep repairing.                                     |
+| `(tree)` stall                                                                         | Record `halt` for `(tree)`. `--status` reads a `(tree)` halt as `exhausted`, because a re-launch with no edit would stall again without bound. |
+| Leak abort, `drained`, budget-floor stop                                               | Record `halt` for the flight and stop the loop at once. The tree state is unknown after a leak, and a drain is the user's own stop.            |
 
-Every escalation is recorded in the trail (section 4) before it is acted on, so `--status` sees every stop. A task-level `halt` does not block other work. The goal ends `exhausted` once nothing repairable remains.
+Every escalation is recorded in the trail (section 4) before it is acted on, so `--status` sees every stop. A task already `blocked` when the flight starts has no escalation or repair in it, so `--status` counts it as stopped, never as repairable. A task-level `halt` does not block other work. The goal ends `exhausted` once nothing repairable remains.
 
 **The repair reviewer** is a fresh opus subagent. Its input is only:
 
