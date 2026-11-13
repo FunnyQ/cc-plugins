@@ -91,6 +91,12 @@ export function flightStatus(
     return "exhausted";
   }
   if (counts.flight >= FLIGHT_REPAIR_CAP) return "exhausted";
+  // A leak abort pushes no escalation of its own and its stopped tasks report
+  // `infrastructure`, so only the run-end's flag keeps them from an infra-retry.
+  const lastEnd = flightEntries.findLast(
+    (e): e is RunEndEntry => e.kind === "run-end",
+  );
+  if (lastEnd?.aborted) return "exhausted";
 
   const ready = new Set(findReady(tasks).map((r) => `${r.bucket}/${r.nn}`));
   const stopped = new Set(

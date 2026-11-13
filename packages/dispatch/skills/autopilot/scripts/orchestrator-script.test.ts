@@ -4267,7 +4267,7 @@ describe("escalation classes and the flightlog trail", () => {
       blocks.push(script.slice(at, end + 1));
       at = script.indexOf(marker, end);
     }
-    expect(blocks.length).toBeGreaterThanOrEqual(11);
+    expect(blocks.length).toBe(12);
     for (const block of blocks) expect(block).toContain("class:");
   });
 

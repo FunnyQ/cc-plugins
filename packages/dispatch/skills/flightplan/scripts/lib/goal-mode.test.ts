@@ -258,6 +258,20 @@ describe("flightStatus", () => {
     );
     expect(flightStatus(entries, tree({ "ui/01": {} }))).toBe("exhausted");
   });
+
+  test("an aborted latest run-end exhausts the flight unless every task is done", () => {
+    const aborted = [runEnd({ aborted: true })];
+    expect(flightStatus(aborted, tree({ "ui/01": {} }))).toBe("exhausted");
+    const done = tree({
+      "ui/01": { status: "done", acceptance: ["- [x] it works"] },
+    });
+    expect(flightStatus(aborted, done)).toBe("complete");
+  });
+
+  test("a later non-aborted run-end after an aborted one continues again", () => {
+    const entries = [runEnd({ aborted: true }), runEnd()];
+    expect(flightStatus(entries, tree({ "ui/01": {} }))).toBe("continue");
+  });
 });
 
 describe("admitRepair", () => {

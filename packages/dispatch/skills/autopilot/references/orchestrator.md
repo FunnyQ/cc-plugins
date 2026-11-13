@@ -2296,7 +2296,7 @@ return (async () => {
 - `worktrees` — report the sorted `{ ref, path }` union of live worktrees and blocked leftovers retained from the start sweep. If a scout failed, preserve the returned worktree list without filtering it further.
 - `drained` — ready tasks left `todo` because `<planDir>/.flightlog/drain` existed at their dispatch. Report them as not started, not as failures. Tell the user to delete the drain file before the next run.
 - `cleanupFailures` — report landed worktrees whose removal could not be confirmed, separately from kept worktrees. A removal failure alone leaves the task completed, with no escalation.
-- `logFailed` — `true` when the closing `log-escalations` call did not confirm that `flightlog.ts escalations` wrote the escalations and the `run-end` entry to `run.jsonl`. The other fields are unaffected. Tell the user the trail is missing this run's stops, so `--status` and goal mode cannot see them.
+- `logFailed` — `true` when the closing `log-escalations` call did not confirm that `flightlog.ts escalations` wrote the escalations and the `run-end` entry to `run.jsonl`. The other fields are unaffected. Tell the user the trail is missing this run's stops, so `--status` and goal mode cannot see them. A retried log call may append duplicate escalation and `run-end` rows, so readers must take each ref's latest.
 - A task ref appears in exactly one of `completed`, `escalations`, and `drained`. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, follow `SKILL.md` → "Escalation — park & continue, then resume".
