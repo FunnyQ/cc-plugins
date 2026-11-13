@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 8.6.1] - 2026-11-13
+
+_tracks tag `monitor-v8.6.1`_
+
+### Changed
+- Token Atlas no longer lists throwaway test repos under temp directories in Recent projects, while totals, daily charts and model mix still count their tokens.
+- The session ledger table no longer shows sessions run from temp directories, and the 24-hour window totals are unaffected.
+
 ## [monitor 8.6.0] - 2026-11-13
 
 _tracks tag `monitor-v8.6.0`_
