@@ -687,7 +687,7 @@ Use the identical label in both start and end calls.
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}). Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, leanness, efficiency).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md is MISSING, is empty, or begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run, and the orchestrator fails this round's gate whatever you fix, so the round is re-run under its cap.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the three Claude lenses (behaviour-preserving). On the ABSTRACTION axis the two lenses point opposite ways on purpose: \`reuse\` may ask for more code, \`leanness\` only ever asks for less. Where they land on the same span, that is a genuine trade-off for you to settle — not a contradiction to route around. This split says nothing about \`efficiency\`: a cheaper approach that needs a cache, a batch, or an index is a normal fix, so never reject an efficiency finding merely because it adds code. For any finding you reject, say why.
-3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.${CFG.deferredScope ? ` These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${CFG.deferredScope}\n` : " "}${BASE_REF_RULE}
+3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.${DEFERRED_SCOPE_RULE ? ` ${DEFERRED_SCOPE_RULE}\n` : " "}${BASE_REF_RULE}
 ${attempt > 1 ? "This is re-loop attempt " + attempt + " (capped at " + FINAL_MAX + "). The previous round was rejected:\n" + feedback + "\nEnsure the new findings + your fixes address that." : ""}
 ${STATUS_RULE}
 ${NO_COMMIT_RULE}
@@ -733,6 +733,13 @@ async function runFinalReview(ref, path, attempt, attempts, fixChoice) {
 // are ALL tagged, so a tagged plan always leaves the verifier real work.
 // A plan is written before the run, so it cannot name the commit the run starts from.
 const BASE_REF_RULE = `Where a Verification command or criterion says \`<baseRef>\`, substitute ${CFG.baseRef}, the commit this run started from. That substitution is the one edit "exactly as written" allows.`;
+// A waypoints leg defers some criteria to a later leg. Every Final-review agent
+// that judges the PLAN goal gets it — the fixer, the verifier and the judge —
+// because a `verify` reentry skips the fixer, and a judge that never saw it
+// would fail the goal over work this leg was never meant to do.
+const DEFERRED_SCOPE_RULE = CFG.deferredScope
+  ? `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${CFG.deferredScope}`
+  : "";
 
 const HUMAN_GATE_RULE = `A gate item written \`- [ ] (human) …\` in ## Acceptance criteria or ## Verification is one the PLAN declares only a person can perform — a physical action, a visual sweep, a device or UI interaction no command reaches. Do not invent a way to run it, and do not fail the task for it. Return each one verbatim as written in the file in humanPending, and name it in summary as not machine-checked.
 The tag exempts that ONE item. Every untagged item is yours exactly as before: run it, and any non-zero exit is passed=false. You may never add the tag yourself, or treat an untagged item as human-only because it looked hard to run — an item you believe is unrunnable is a plan defect, so leave it standing and let it fail.`;
@@ -751,16 +758,24 @@ The attestation covers ONLY the items it names. It is not a blanket pass and it 
 // attempt has no dev row. Without it RUNLOG.md shows a verify at attempt 3 under
 // nothing, and a reader cannot tell a resume from a lost dev step. The
 // orchestrator cannot write the row itself — it has no filesystem access — so it
-// rides the one agent that is already logging there.
-const resumeNote = (ref, attempt, role) =>
-  RESUME &&
-  RESUME.from !== "dev" &&
-  RESUME.from === role &&
-  attempt === RESUME.attempt
-    ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ""}"\n`
+// rides the one agent that is already logging there. A reentry writes the same
+// row. It keys off the attempt's actual `startAt`, not the entry, because a
+// `verify` reentry whose worktree was gone ran dev after all.
+const resumeNote = (ref, attempt, role, startAt) =>
+  startAt !== "dev" && startAt === role
+    ? RESUME
+      ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ""}"\n`
+      : `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${attempt} --agent "<your label>" --message "re-entered at the ${startAt} step after a plan repair; the steps before it were taken as already satisfied"\n`
     : "";
 
-const verifyPrompt = (ref, path, attempt, wtPath, reverify = false) => {
+const verifyPrompt = (
+  ref,
+  path,
+  attempt,
+  wtPath,
+  reverify = false,
+  { startAt = "dev", finalReview = false } = {},
+) => {
   const role = reverify ? "reverify" : "verify";
   const closing = reverify
     ? `Run this check because the main tree changed after this task's snapshot. A failure means the merged result is broken.
@@ -770,7 +785,7 @@ Never clean, restore, reset, stash or otherwise rewrite the tree to obtain a cle
 Run every Verification command exactly as written. Any non-zero exit is passed=false.`;
   return `
 ${reverify ? `Work in the repo root: ${CFG.repoRoot}. Run every command from that directory.\n` : worktreeRules(wtPath)}First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
-${resumeNote(ref, attempt, role)}Then proceed.
+${resumeNote(ref, attempt, role, startAt)}Then proceed.
 Use the identical label in both start and end calls.
 
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -781,7 +796,7 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
 ${HUMAN_GATE_RULE}
-${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ""}
+${finalReview && DEFERRED_SCOPE_RULE ? `${DEFERRED_SCOPE_RULE}\n` : ""}${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ""}
 ${reverify ? "" : `${PLAN_DEFECT_MEANING} Return planDefect as null by default. When a plan defect decided a failing item, set planDefect to one line naming the item and why no implementation can pass it, and report passed=false as usual. The task is parked for a person to fix the plan instead of spending another attempt.\n`}${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
@@ -799,10 +814,17 @@ const humanGateSummary = () =>
   `Read that file: it names which gate items were checked, and when. Ground the correctness dimension in it exactly as you would in a verifier's raw output. ` +
   `Treat every gate item the file does NOT name as unverified — say so in your rationale and score correctness accordingly. Do not assume an unnamed item passed.`;
 
-const judgePrompt = (ref, path, gateSummary, attempt, wtPath) => `
+const judgePrompt = (
+  ref,
+  path,
+  gateSummary,
+  attempt,
+  wtPath,
+  { startAt = "dev", finalReview = false } = {},
+) => `
 ${worktreeRules(wtPath)}
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase start
-${resumeNote(ref, attempt, "judge")}Then proceed.
+${resumeNote(ref, attempt, "judge", startAt)}Then proceed.
 Use the identical label in both start and end calls.
 
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -810,7 +832,7 @@ ${NO_RESTORE_RULE}
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
 Open the task file at ${path} and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
-Make a fresh scratch directory and use the path it prints as <dir> below. Never reuse a fixed path: another run may have left a file there.
+${finalReview && DEFERRED_SCOPE_RULE ? `${DEFERRED_SCOPE_RULE}\n` : ""}Make a fresh scratch directory and use the path it prints as <dir> below. Never reuse a fixed path: another run may have left a file there.
   ${scratchDir("judge", ref, attempt)}
 Write the scores JSON into it, then run score-task.ts to compute and persist the verdict:
   echo '<scores-json>' > <dir>/scores.json
@@ -1354,12 +1376,18 @@ async function executeTask(item) {
         ? { passed: true, summary: humanGateSummary(), humanPending: [] }
         : await resilient(
             (retryModel) =>
-              agent(verifyPrompt(ref, path, attempt, wt?.path), {
-                label: `verify:${ref}#${attempt}`,
-                phase: "Execute",
-                ...pick(retryModel ?? choices.verify),
-                schema: GATE_SCHEMA,
-              }),
+              agent(
+                verifyPrompt(ref, path, attempt, wt?.path, false, {
+                  startAt,
+                  finalReview,
+                }),
+                {
+                  label: `verify:${ref}#${attempt}`,
+                  phase: "Execute",
+                  ...pick(retryModel ?? choices.verify),
+                  schema: GATE_SCHEMA,
+                },
+              ),
             MODEL.structuredRetry,
           );
     checkAbort();
@@ -1394,7 +1422,10 @@ async function executeTask(item) {
     // score row already holds the whole structured verdict. Until that exists,
     // a judge throw parks, which is the pre-existing behaviour and never worse.
     const judged = await agent(
-      judgePrompt(ref, path, gate.summary, attempt, wt?.path),
+      judgePrompt(ref, path, gate.summary, attempt, wt?.path, {
+        startAt,
+        finalReview,
+      }),
       {
         label: `judge:${ref}#${attempt}`,
         phase: "Execute",

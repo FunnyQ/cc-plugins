@@ -2519,7 +2519,7 @@ describe("orchestrator per-task reentry", () => {
     expect(log.result.completed).toEqual(["review/01"]);
   });
 
-  test("deferredScope reaches only the Final-review verify prompt", async () => {
+  test("deferredScope reaches only the Final-review fixer, verifier and judge", async () => {
     const scope = "- [ ] works offline (leg 3)";
     const log = await runOrchestrator(
       {
@@ -2544,11 +2544,86 @@ describe("orchestrator per-task reentry", () => {
     );
 
     const deferred = `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${scope}`;
-    expect(promptFor(log, "fix:review/01#1")).toContain(deferred);
+    for (const label of [
+      "fix:review/01#1",
+      "verify:review/01#1",
+      "judge:review/01#1",
+    ]) {
+      expect(promptFor(log, label)).toContain(deferred);
+    }
     const carriers = log.labels.filter((_, i) =>
       log.prompts[i].includes(scope),
     );
-    expect(carriers).toEqual(["fix:review/01#1"]);
+    expect(carriers).toEqual([
+      "fix:review/01#1",
+      "verify:review/01#1",
+      "judge:review/01#1",
+    ]);
+  });
+
+  test("a Final-review verify reentry hands deferredScope to its verifier and judge", async () => {
+    const scope = "- [ ] works offline (leg 3)";
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(1),
+        ],
+      },
+      {
+        reentry: `{ "review/01": { from: "verify", attempt: 3 } }`,
+        deferredScope: JSON.stringify(scope),
+      },
+    );
+
+    const deferred = `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${scope}`;
+    expect(log.labels.some((l) => l.startsWith("fix:"))).toBe(false);
+    expect(promptFor(log, "verify:review/01#3")).toContain(deferred);
+    expect(promptFor(log, "judge:review/01#3")).toContain(deferred);
+  });
+
+  test("a verify reentry logs why its attempt has no dev row, and only that attempt", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        gate: { "ui/01": [{ passed: false, summary: "red" }] },
+      },
+      { reentry: REENTRY },
+    );
+
+    const note =
+      "re-entered at the verify step after a plan repair; the steps before it were taken as already satisfied";
+    const first = promptFor(log, "verify:ui/01#4");
+    expect(first).toContain(note);
+    expect(first).toContain("--role reentry --attempt 4");
+    expect(promptFor(log, "verify:ui/01#5")).not.toContain(note);
+    expect(log.prompts.filter((p) => p.includes(note))).toHaveLength(1);
+  });
+
+  test("a verify reentry that fell back to dev, or a dev reentry, logs no reentry note", async () => {
+    const fellBack = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        worktree: {
+          "wt-show:ui/01": [{ path: "/wt/ui/01", base: null, exists: false }],
+        },
+      },
+      { reentry: REENTRY },
+    );
+    const dev = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: `{ "ui/01": { from: "dev", attempt: 3 } }` },
+    );
+
+    for (const log of [fellBack, dev]) {
+      expect(log.prompts.some((p) => p.includes("re-entered at the"))).toBe(
+        false,
+      );
+    }
   });
 
   test("an empty deferredScope leaves the Final-review prompt as before", async () => {
