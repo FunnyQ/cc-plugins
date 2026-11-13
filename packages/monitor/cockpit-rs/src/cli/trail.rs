@@ -222,6 +222,16 @@ pub fn run(sub: &str, args: &Args, cwd: &Path) -> Result<(), String> {
     let kind = args.value("type").filter(|s| !s.is_empty());
     if sub == "scribe" && kind.is_none() {
         if args.flag("prep") {
+            if let Some(id) = args.value("session").filter(|id| !id.is_empty())
+                && !crate::nudge_toggle::nudge_enabled_for(
+                    Some(id),
+                    cwd,
+                    registry::now_ms(),
+                )
+            {
+                println!("Scribe is switched off for this session. Stop now and write nothing.");
+                return Ok(());
+            }
             println!(
                 "Decision-log language:\n{}\n\nRecent scribe entries:",
                 config::get_language()

@@ -20,6 +20,12 @@ ${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit find-session --provider claude
 
 This is the **initiating parent session**. Put that literal id in the fork prompt as `<parent-session-id>`. Do not ask the fork to resolve it again. Context inheritance does not imply session identity: a background fork can have its own transcript/session row.
 
+Then switch the scribe on for this session, once, substituting that id. A fork whose session has the scribe off stops at its prep step and writes nothing:
+
+```bash
+${CLAUDE_PLUGIN_ROOT}/skills/cockpit/bin/cockpit nudge on --session <parent-session-id>
+```
+
 Use the Agent tool in the background with `subagent_type: "fork"`. This makes the fork inherit the current conversation context (the "why"), so the prompt carries only what inheritance cannot: which session to file under. Use this exact prompt:
 
 ```text

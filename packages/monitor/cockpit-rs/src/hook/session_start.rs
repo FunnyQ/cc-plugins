@@ -1,4 +1,5 @@
 use super::{Env, parse_input, reminder};
+use crate::nudge_toggle;
 use std::{
     fs,
     io::{self, Write},
@@ -50,6 +51,13 @@ pub fn run() -> io::Result<()> {
     if reminder::should_skip(&env, &input, now)
         || (reminder::is_claude_code(&env, &input) && claude_on_path(&env))
     {
+        return Ok(());
+    }
+    let cwd = match input.cwd.as_deref().filter(|cwd| !cwd.is_empty()) {
+        Some(cwd) => std::path::PathBuf::from(cwd),
+        None => std::env::current_dir()?,
+    };
+    if !nudge_toggle::nudge_enabled_for(input.session_id.as_deref(), &cwd, now) {
         return Ok(());
     }
     let id = reminder::resolve_parent_session(&env, &input);

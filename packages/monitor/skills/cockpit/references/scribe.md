@@ -46,6 +46,8 @@ omit `--session` and let the CLI auto-resolve the live session.
 
 For a direct/manual invocation, omit the shown `--session` argument.
 
+If it prints `Scribe is switched off for this session. Stop now and write nothing.`, stop: run no other command and reply with that line. The switch is `/monitor:scribe` or the dashboard's Scribe toggle, and only a `--session` call checks it.
+
 It prints the configured decision-log language, the last 8 scribe-authored
 entries, and git change context (`git diff`, `git diff --staged`,
 `git log --oneline -5`). Write every `--title` / `--text` in that language,

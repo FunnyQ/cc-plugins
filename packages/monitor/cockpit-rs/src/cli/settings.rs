@@ -5,7 +5,7 @@ use nudge_toggle::{NudgeScope, NudgeState, ToggleAction};
 use std::path::Path;
 
 const NUDGE_USAGE: &str =
-    "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user]";
+    "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user] [--session <id>]";
 
 pub fn run(sub: &str, rest: &[String], cwd: &Path) -> Result<(), String> {
     match sub {
@@ -50,9 +50,10 @@ fn run_config(rest: &[String]) -> Result<(), String> {
     Err("usage: cockpit config --log-language <lang> | get-language | --answer-here on|off | get-answer-here".to_owned())
 }
 
-fn parse_nudge(rest: &[String]) -> Result<(String, NudgeScope), String> {
+fn parse_nudge(rest: &[String]) -> Result<(String, NudgeScope, Option<String>), String> {
     let mut action = "status".to_owned();
     let mut scope = NudgeScope::Session;
+    let mut session = None;
     let mut tokens = rest.iter();
     while let Some(token) = tokens.next() {
         if token == "--scope" {
@@ -67,6 +68,8 @@ fn parse_nudge(rest: &[String]) -> Result<(String, NudgeScope), String> {
                     ));
                 }
             };
+        } else if token == "--session" {
+            session = tokens.next().filter(|id| !id.is_empty()).cloned();
         } else {
             action = token.to_lowercase();
         }
@@ -79,7 +82,7 @@ fn parse_nudge(rest: &[String]) -> Result<(String, NudgeScope), String> {
             "cockpit nudge: unknown action \"{action}\"\n{NUDGE_USAGE}"
         ));
     }
-    Ok((action, scope))
+    Ok((action, scope, session))
 }
 
 fn fmt_scope(state: Option<NudgeState>) -> &'static str {
@@ -91,11 +94,11 @@ fn fmt_scope(state: Option<NudgeState>) -> &'static str {
 }
 
 fn run_nudge(rest: &[String], cwd: &Path) -> Result<(), String> {
-    let (action, scope) = parse_nudge(rest)?;
+    let (action, scope, session) = parse_nudge(rest)?;
     let now = crate::registry::now_ms();
-    let session_id = find_session::find_session(Provider::Claude, cwd);
+    let session_id = session.or_else(|| find_session::find_session(Provider::Claude, cwd));
     if action != "status" && matches!(scope, NudgeScope::Session) && session_id.is_none() {
-        return Err("cockpit nudge: could not resolve the current session id (no CLAUDE_CODE_SESSION_ID and no transcript). Run inside a Claude session, or target --scope project|user.".to_owned());
+        return Err("cockpit nudge: could not resolve the current session id (no CLAUDE_CODE_SESSION_ID and no transcript). Run inside a Claude session, pass --session <id>, or target --scope project|user.".to_owned());
     }
     let scope_name = match scope {
         NudgeScope::Session => "session",
@@ -175,10 +178,10 @@ mod tests {
 
     #[test]
     fn nudge_defaults_lowercases_and_last_action_wins() {
-        let (action, scope) = parse_nudge(&[]).unwrap();
+        let (action, scope, _) = parse_nudge(&[]).unwrap();
         assert_eq!(action, "status");
         assert!(matches!(scope, NudgeScope::Session));
-        let (action, scope) = parse_nudge(&args(&["wrong", "ON", "--scope", "user"])).unwrap();
+        let (action, scope, _) = parse_nudge(&args(&["wrong", "ON", "--scope", "user"])).unwrap();
         assert_eq!(action, "on");
         assert!(matches!(scope, NudgeScope::User));
     }

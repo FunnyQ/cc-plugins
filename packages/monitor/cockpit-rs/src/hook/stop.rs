@@ -329,6 +329,7 @@ mod tests {
     fn unchanged_signature_gates_after_the_throttle() {
         let fixture = TestEnv::new();
         fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
+        crate::config::set_user_nudge(Some(crate::config::NudgeState::On));
         let cwd = fixture.dir.path().join("work");
         fs::create_dir_all(&cwd).unwrap();
         for args in [

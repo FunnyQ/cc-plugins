@@ -25,7 +25,7 @@ pub const USAGE: &str = r#"usage: cockpit <log|scribe|prep|config|wait|send|rest
   cockpit wait   <sessionId>
   cockpit send   <sessionId> <answer>
   cockpit restart [--port N] [--no-open]
-  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#;
+  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user] [--session <id>]"#;
 const RUST_ONLY: [&str; 4] = ["server", "ensure-daemon", "hook", "atlas"];
 const KNOWN: [&str; 13] = [
     "log",
@@ -224,7 +224,7 @@ mod tests {
   cockpit wait   <sessionId>
   cockpit send   <sessionId> <answer>
   cockpit restart [--port N] [--no-open]
-  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]"#
+  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user] [--session <id>]"#
         );
         assert_eq!(
             unknown_subcommand("bogus"),

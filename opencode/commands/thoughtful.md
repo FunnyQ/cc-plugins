@@ -20,6 +20,12 @@ Before spawning any fork, resolve the current main-agent session id:
 
 This is the **initiating parent session**. Put that literal id in the fork prompt as `<parent-session-id>`.
 
+Then switch the scribe on for this session, once, substituting that id. A fork whose session has the scribe off stops at its prep step and writes nothing:
+
+```bash
+~/.config/opencode/skills/cockpit/bin/cockpit nudge on --session <parent-session-id>
+```
+
 Spawn a background subagent with `subagent_type: general`, the built-in subagent. Treat the fork as a briefing, not a handoff. The child starts clean and sees none of the parent's conversation. Pass an inline prompt with the resolved parent session id substituted literally for `<parent-session-id>`. Use this prompt:
 
 ```text

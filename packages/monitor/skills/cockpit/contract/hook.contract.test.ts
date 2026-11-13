@@ -47,7 +47,16 @@ esac
   );
   chmodSync(join(bin, "git"), 0o755);
   env = baseEnv(homes, { ...fixtureEnv(fixtures), PATH: bin });
+  scribeConfig({ user: "on" });
 });
+
+function scribeConfig(nudges: object) {
+  mkdirSync(join(homes.configHome, "q-lab/cockpit"), { recursive: true });
+  writeFileSync(
+    join(homes.configHome, "q-lab/cockpit/config.json"),
+    JSON.stringify({ nudges }),
+  );
+}
 afterEach(() => cleanup(homes.root));
 
 function payload(event: "SessionStart" | "Stop") {
@@ -286,7 +295,7 @@ describe("hook: session-start", () => {
       });
   });
 
-  test("keeps guidance enabled with session nudges off", () => {
+  test("suppresses guidance with session nudges off", () => {
     writeFileSync(
       join(homes.cockpitHome, "scribe-nudge-toggle.json"),
       JSON.stringify({
@@ -295,7 +304,16 @@ describe("hook: session-start", () => {
     );
     expect(hook("session-start")).toEqual({
       exitCode: 0,
-      stdout: guidance(fixtures.claudeSessionId),
+      stdout: "",
+      stderr: "",
+    });
+  });
+
+  test("prints nothing when no scope opted in", () => {
+    scribeConfig({});
+    expect(hook("session-start")).toEqual({
+      exitCode: 0,
+      stdout: "",
       stderr: "",
     });
   });
@@ -421,14 +439,13 @@ describe("hook: stop", () => {
     expect(existsSync(calls)).toBe(false);
   });
 
-  test("suppresses project and user opt-outs", () => {
-    const path = join(homes.configHome, "q-lab/cockpit/config.json");
-    mkdirSync(join(homes.configHome, "q-lab/cockpit"), { recursive: true });
+  test("suppresses project and user opt-outs and the unset default", () => {
     for (const nudges of [
+      {},
       { user: "off" },
-      { projects: { [fixtures.projectDir]: "off" } },
+      { user: "on", projects: { [fixtures.projectDir]: "off" } },
     ]) {
-      writeFileSync(path, JSON.stringify({ nudges }));
+      scribeConfig(nudges);
       expect(hook("stop")).toEqual({ exitCode: 0, stdout: "", stderr: "" });
     }
   });

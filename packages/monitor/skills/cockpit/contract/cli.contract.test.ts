@@ -142,7 +142,7 @@ const usage =
     "  cockpit wait   <sessionId>",
     "  cockpit send   <sessionId> <answer>",
     "  cockpit restart [--port N] [--no-open]",
-    "  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user]",
+    "  cockpit nudge  <on|off|toggle|clear|status> [--scope session|project|user] [--session <id>]",
   ].join("\n") + "\n";
 
 describe("cli: trail", () => {
@@ -320,9 +320,22 @@ describe("cli: trail", () => {
         return `$ ${label}\n${result.exitCode === 0 ? out.trimEnd() || "(no output)" : `(not available: ${(err || out || `exit ${result.exitCode}`).trim()})`}`;
       })
       .join("\n\n");
+    const bundle = `Decision-log language:\nEnglish\n\nRecent scribe entries:\n${listing(8)}\nGit change context:\n${gitBlocks}\n`;
+    success(["scribe", "--prep"], bundle);
     success(
       ["scribe", "--prep", "--session", f.claudeSessionId],
-      `Decision-log language:\nEnglish\n\nRecent scribe entries:\n${listing(8)}\nGit change context:\n${gitBlocks}\n`,
+      "Scribe is switched off for this session. Stop now and write nothing.\n",
+    );
+    success(
+      ["nudge", "on", "--session", "ses_explicit"],
+      `scribe nudges: ON (effective) — session set to ON\n  session: ON · project: default · user: default\n`,
+    );
+    expect(
+      cli(["scribe", "--prep", "--session", "ses_explicit"]).stdout,
+    ).toStartWith("Decision-log language:\n");
+    success(
+      ["scribe", "--prep", "--session", f.claudeSessionId],
+      "Scribe is switched off for this session. Stop now and write nothing.\n",
     );
   });
   test("unknown flags and scribe validation report exact errors without writing", () => {
@@ -445,7 +458,7 @@ describe("cli: config", () => {
         "usage: cockpit config --log-language <lang> | get-language | --answer-here on|off | get-answer-here\n",
     });
     const nudgeUsage =
-      "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user]\n";
+      "usage: cockpit nudge <on|off|toggle|clear|status> [--scope session|project|user] [--session <id>]\n";
     expect(cli(["nudge", "--scope", "invalid"])).toEqual({
       exitCode: 1,
       stdout: "",
@@ -469,7 +482,7 @@ describe("cli: config", () => {
       const effective =
         [states.session, states.project, states.user].find(
           (s) => s !== "default",
-        ) ?? "ON";
+        ) ?? "OFF";
       success(
         ["nudge", action, "--scope", scope],
         `scribe nudges: ${effective} (effective)${action === "status" ? "" : ` — ${scope} set to ${state}`}\n  session: ${states.session} · project: ${states.project} · user: ${states.user}\n`,
@@ -495,7 +508,7 @@ describe("cli: config", () => {
     });
     for (const scope of ["session", "project", "user"]) {
       nudge("status", scope, states[scope]);
-      nudge("toggle", scope, states[scope] === "OFF" ? "ON" : "OFF");
+      nudge("toggle", scope, states[scope] === "ON" ? "OFF" : "ON");
       nudge("on", scope, "ON");
       nudge("off", scope, "OFF");
       nudge("clear", scope, "default");

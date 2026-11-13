@@ -25,17 +25,17 @@ pub fn resolve_nudge_enabled(
     project: Option<NudgeState>,
     user: Option<NudgeState>,
 ) -> bool {
-    session.or(project).or(user) != Some(NudgeState::Off)
+    session.or(project).or(user) == Some(NudgeState::On)
 }
 pub fn apply_action(action: ToggleAction, current: Option<NudgeState>) -> Option<NudgeState> {
     match action {
         ToggleAction::On => Some(NudgeState::On),
         ToggleAction::Off => Some(NudgeState::Off),
         ToggleAction::Clear => None,
-        ToggleAction::Toggle => Some(if current == Some(NudgeState::Off) {
-            NudgeState::On
-        } else {
+        ToggleAction::Toggle => Some(if current == Some(NudgeState::On) {
             NudgeState::Off
+        } else {
+            NudgeState::On
         }),
     }
 }
@@ -86,7 +86,7 @@ pub fn nudge_enabled_for(session_id: Option<&str>, cwd: &Path, now_ms: i64) -> b
     session_state(session_id, now_ms)
         .or_else(|| config::get_project_nudge(&project_key(cwd).to_string_lossy()))
         .or_else(config::get_user_nudge)
-        != Some(NudgeState::Off)
+        == Some(NudgeState::On)
 }
 pub fn set_scope(
     scope: NudgeScope,
@@ -136,7 +136,7 @@ mod tests {
     #[test]
     fn precedence_and_actions() {
         use NudgeState::{Off, On};
-        assert!(resolve_nudge_enabled(None, None, None));
+        assert!(!resolve_nudge_enabled(None, None, None));
         assert!(resolve_nudge_enabled(Some(On), Some(Off), Some(Off)));
         assert!(!resolve_nudge_enabled(None, Some(Off), Some(On)));
         assert!(!resolve_nudge_enabled(None, None, Some(Off)));
@@ -147,7 +147,7 @@ mod tests {
             assert_eq!(apply_action(ToggleAction::Clear, current), None);
             assert_eq!(
                 apply_action(ToggleAction::Toggle, current),
-                Some(if current == Some(Off) { On } else { Off })
+                Some(if current == Some(On) { Off } else { On })
             );
         }
     }
@@ -158,7 +158,7 @@ mod tests {
         fixture.set("COCKPIT_HOME", fixture.dir.path().join("data"));
         let cwd = fixture.dir.path().join("missing");
         let now = 1_000_000_000_000;
-        assert!(nudge_enabled_for(Some("s1"), &cwd, now));
+        assert!(!nudge_enabled_for(Some("s1"), &cwd, now));
         assert_eq!(project_key(&cwd), cwd);
         set_scope(NudgeScope::User, ToggleAction::Off, "s1", &cwd, now);
         assert!(!nudge_enabled_for(Some("s1"), &cwd, now));
@@ -183,7 +183,7 @@ mod tests {
         set_scope(NudgeScope::Project, ToggleAction::Clear, "s1", &cwd, now);
         assert!(config::read_config()["nudges"].get("projects").is_none());
         set_scope(NudgeScope::User, ToggleAction::Clear, "s1", &cwd, now);
-        assert!(nudge_enabled_for(None, &cwd, now));
+        assert!(!nudge_enabled_for(None, &cwd, now));
     }
 
     #[test]
@@ -275,7 +275,7 @@ mod tests {
         let _ = fs::remove_file(&git_log);
         assert!(!nudge_enabled_for(Some("s1"), &cwd, now));
         assert!(!git_log.exists());
-        assert!(nudge_enabled_for(Some("s2"), &cwd, now));
+        assert!(!nudge_enabled_for(Some("s2"), &cwd, now));
         assert!(git_log.exists());
     }
 }
