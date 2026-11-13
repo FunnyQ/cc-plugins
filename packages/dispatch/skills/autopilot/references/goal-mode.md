@@ -21,6 +21,8 @@ bun $SCRIPTS/flightlog.ts flight-start <log> --plan <PLAN.md> --tasks <tasks dir
 
 It prints a JSON array of the escalations it adopted. Every task already `blocked` when the flight starts becomes an escalation of this flight, keeping the `class` and `reason` of its last `capped` or `plan-defect` escalation in the trail, or `plan-defect` with a placeholder reason when the trail has none. Those tasks are repairable under the same budget as any other.
 
+`flight-start` needs a clean working tree: it refuses, exits non-zero and writes no flight entry when `git status --porcelain` at the repo root lists any path outside `<plan dir>/.flightlog/`, because the checkpoint commit in step 5.1 would otherwise sweep the user's own uncommitted work into a `chore(autopilot)` commit. When it refuses, show the user the listed paths, tell them to commit or stash those changes first, and run `flight-start` again once they have. Do not stash or commit on their behalf.
+
 Show the user this line, filled in, and ask them to type it:
 
 ```text
@@ -80,7 +82,8 @@ Handle one `plan-defect` or `capped` escalation at a time. Finish its guard, rec
    ```
    When `flight` is 10 or more, write `flight repair budget spent before review` to `<scratch>.reason.md`, record `halt` for the ref, and go to step 3. When `byTask` holds 3 or more for the ref, write `task repair budget spent before review` to `<scratch>.reason.md`, record `refuse` for the ref, and go to the next escalation. These are the verdicts `repair` itself redirects a counted verdict to, so no reviewer is spent on a repair that could never be recorded.
 1. Checkpoint the tree, once per round, before the first reviewer:
-   - When the Workflow result's `failedInMainTree` is not empty, a failed Final review's fixer left ungated edits in the main tree, which the orchestrator kept out of history. Save them as a commit object first, without touching the real index or the stash:
+   - **Mixed tree, no save.** When `failedInMainTree` is not empty and either `CFG.commitBetweenWaves` is `false` or the result's `escalations` hold one for `(commit)`, the tree still holds this run's gated, uncommitted work beside the ungated fixer edits, and a restore would revert the gated code while the `done` Status lines survive. Save nothing and restore nothing. Write `gated and ungated changes are mixed in the main tree (commitBetweenWaves false or a (commit) failure)` to `<plan dir>/.flightlog/repair/<round>-flight.reason.md`, record `halt` with `--flight` as step 4 shows, tell the user the tree needs a person, ask them to type `/goal clear`, and go to step 7.
+   - Otherwise, when the Workflow result's `failedInMainTree` is not empty, a failed Final review's fixer left ungated edits in the main tree, which the orchestrator kept out of history. Save them as a commit object first, without touching the real index or the stash:
      ```bash
      idx=$(mktemp -d)/index
      GIT_INDEX_FILE=$idx git -C <root> read-tree HEAD
@@ -145,6 +148,7 @@ Record `refuse` with the same command as step 4, using `--verdict refuse`. Never
 
 ## 6. Re-launch
 
+0. When the Workflow result's `failedInMainTree` is not empty and step 5.1's save has not run this round, because no reviewer ran, run its save and restore now, under the same mixed-tree rule, so that no re-launch starts with ungated fixer edits uncommitted.
 1. Set `Status: todo` on every task this round recorded as `fix`, `defer`, `not-plan`, or `infra-retry`, and on every `blocked` task named in a `changed` list. Commit the Status edits with `git commit -m "plan repair: reset <refs> to todo"`.
 2. Build `CFG.reentry` from three sources:
    - this round's guard `reentry` maps;
