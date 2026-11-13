@@ -1,6 +1,6 @@
 # Commit under the OpenCode harness
 
-The topology is the same as the Claude Code flow: spawn ONE Lawspeaker and let it
+The topology is the same as the Claude Code flow: spawn one Lawspeaker and let it
 run the whole flow itself. Only the two items below differ.
 
 ## The agent name is bare

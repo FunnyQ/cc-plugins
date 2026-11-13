@@ -19,7 +19,7 @@ agent writes from it, decides the shape, checks the plan covers the changeset,
 stages, commits, and verifies. Re-running `apply` finishes an interrupted run
 instead of duplicating it.
 
-Spawn ONE **Lawspeaker** and let it run the whole flow. That keeps every diff and
+Spawn one **Lawspeaker** and let it run the whole flow. That keeps every diff and
 every line of git output out of the main conversation, which is the only reason
 this work happens in a subagent at all.
 
@@ -54,7 +54,7 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
 3. **Spawn the Lawspeaker** (`subagent_type: "chronicle:lawspeaker"`), passing:
    - the **skill directory** — the skill's load-time "Base directory for this
      skill" banner value, so it can resolve `<skill dir>/scripts/`. Do not
-     hard-code a repo-relative path or rely on `${CLAUDE_PLUGIN_ROOT}`.
+     hard-code a repo-relative path.
      Pass it as a **literal absolute path**, never as a `$`-prefixed token —
      nothing sets that variable in the agent's shell, so its command silently
      runs against `/`.

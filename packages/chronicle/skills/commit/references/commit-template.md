@@ -40,18 +40,11 @@
   follows.
 - The message describes only the files in _this_ commit.
 
-## Length guardrail
+## Scope of the body
 
-The Lawspeaker writes the body from the main agent's `contextBrief`, which holds
-far more "why" than belongs in a commit. Be terse on purpose: the commit records
-the change, not the whole investigation.
+The `contextBrief` holds more "why" than belongs in a commit. A `git log` reader
+wants what changed and why, not the investigation: say _why_, never restate the
+diff or narrate the session, and leave detail to the cockpit trail, the PR body,
+or the code.
 
-- **Body**: Write one line per bullet where possible. Use about 3–4 bullets
-  for a normal change. Say _why_; do not restate the diff or narrate the
-  session.
-- **繁中 summary**: Write genuinely 1–3 sentences that _summarize_. Do not
-  write a line-by-line re-translation of the English body. If the zh-TW reads
-  like the body in Chinese, it is too long; cut it to the one thing a reader
-  needs.
-- When in doubt, choose the shorter version. Detail belongs in the cockpit
-  decision trail, the PR body, or the code, not the commit message.
+The 繁中 summary summarizes; it is not a translation of the English body.
