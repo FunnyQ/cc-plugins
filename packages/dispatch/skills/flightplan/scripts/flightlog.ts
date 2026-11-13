@@ -220,6 +220,26 @@ async function main() {
     const plan = flagValue(rest, "--plan");
     if (!plan) fail("flightlog flight-start requires --plan");
     const tasksDir = flagValue(rest, "--tasks") ?? join(dirname(plan), "tasks");
+    const planAbs = await realpath(dirname(plan));
+    const top = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
+      cwd: planAbs,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    if (top.exitCode === 0) {
+      const repoRoot = top.stdout.toString().trim();
+      const flightlogDir = join(planAbs, ".flightlog") + sep;
+      const dirty = changedPaths(repoRoot).filter(
+        (path) => !path.startsWith(flightlogDir),
+      );
+      if (dirty.length > 0) {
+        fail(
+          `flight-start needs a clean working tree; uncommitted changes outside ${relative(repoRoot, flightlogDir) || ".flightlog"}:\n` +
+            dirty.map((path) => `  ${relative(repoRoot, path)}`).join("\n") +
+            "\nCommit or stash them first, then start the flight again.",
+        );
+      }
+    }
     const earlier = await readLog(logFile);
     const { byRef } = await loadAllTasks(tasksDir);
     const ts = new Date().toISOString();

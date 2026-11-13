@@ -440,6 +440,35 @@ describe("goal-mode CLI", () => {
     }
   });
 
+  test("flight-start refuses a repo tree dirty outside the plan's .flightlog", async () => {
+    const p = await planFixture();
+    try {
+      commitAll(p);
+      await writeFile(join(p.root, "mine.txt"), "uncommitted user work\n");
+      const start = await p.run("flight-start", p.log, "--plan", p.plan);
+      expect(start.code).not.toBe(0);
+      expect(start.err).toContain("mine.txt");
+      expect(start.err).toContain("Commit or stash");
+      expect(await Bun.file(p.log).exists()).toBe(false);
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("flight-start starts on a clean tree, ignoring its own .flightlog", async () => {
+    const p = await planFixture();
+    try {
+      commitAll(p);
+      await mkdir(dirname(p.log), { recursive: true });
+      await writeFile(join(dirname(p.log), "stray.txt"), "x\n");
+      const start = await p.run("flight-start", p.log, "--plan", p.plan);
+      expect(start.code).toBe(0);
+      expect((await readEntries(p.log))[0].kind).toBe("flight");
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
   test("flight-start adopts a task parked before the flight as a current escalation", async () => {
     const p = await planFixture();
     try {
