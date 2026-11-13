@@ -123,7 +123,7 @@ After installing a Codex plugin, start a new Codex session so the skill list is 
 
 There is no plugin registry step. The repo is the single source of truth: `opencode/install.ts` symlinks skills, agents, commands, and the plugin module straight into `~/.config/opencode/`, so an update to the checkout is live immediately — no reinstall, no rebuild.
 
-**Requires OpenCode 1.x.** The plugin module targets OpenCode's V1 plugin API. OpenCode 2.x replaced that API, so on 2.x the module fails to load and none of its hooks run. The cockpit send and relay's opencode backend also support 1.x only.
+**Requires OpenCode 2.x.** The plugin module targets OpenCode's V2 plugin API (`{ id, setup(ctx) }`). OpenCode 1.x cannot load that shape. The cockpit send and relay's opencode backend target 2.x too. The installer links the module into `~/.config/opencode/plugins/` and raises `experimental.subagent_depth`. It removes the V1 link in `plugin/`, because 2.x loads both directories and refuses a duplicate plugin ID.
 
 ```bash
 bun opencode/install.ts --check     # report what is and is not wired
@@ -151,7 +151,7 @@ bun opencode/install.ts --unlink    # remove only what --apply created
 
 - All 26 skills, discovered from `~/.config/opencode/skills/`.
 - usage-dashboard reads OpenCode data natively — the shared reader already handles `~/.local/share/opencode/opencode.db`.
-- cockpit **reads and sends** for OpenCode sessions. Precondition: the OpenCode TUI must have been started with a port (`opencode --port <n>`), or `OPENCODE_TUI_SERVER_URL` must be set before cockpit starts.
+- cockpit **reads and sends** for OpenCode sessions. Precondition: OpenCode must be running (the TUI or `opencode serve`), or `OPENCODE_SERVER_URL` must be set before cockpit starts.
 - relay `delegate` and `review`.
 - The five ported hook behaviors: decision-log start, the scribe nudge, the chronicle branch guard, the dispatch flightplan lint, and the guard comment check.
 - Both monitor commands.
@@ -318,7 +318,7 @@ The send box at the bottom of the Decision Log column can send text into a runni
 
 - **Claude Code** uses the monitor mod's inbox poll, described below. The agent's answer comes back through the live transcript.
 - **Codex** uses the managed Codex remote-control daemon. Cockpit connects to the local app-server control socket, resumes the selected thread, and submits or steers a turn. Direct app-server is only a fallback when remote-control is unavailable.
-- **OpenCode** uses the TUI HTTP bridge, not the mod: it discovers the running TUI from `OPENCODE_TUI_SERVER_URL` (or a `ps` scan for `opencode --port <n>`) and delivers through `/tui/append-prompt` + `/tui/submit-prompt`. Same port precondition as the OpenCode Installation section above — the TUI must have been started with `--port`; a `serve` process is not discovered, and a successful send is not a delivery receipt.
+- **OpenCode** uses the background service, not the mod: it discovers the service from `OPENCODE_SERVER_URL` or `~/.local/state/opencode/service.json` and delivers through `POST /api/session/{id}/prompt` (`delivery: "queue"`). Start OpenCode first (the TUI or `opencode serve` both count); an admitted prompt is the delivery receipt, and the answer rides the transcript.
 
 A monitor mod (`hooks/register.ts`) delivers Claude Code sends. On session start it long-polls the cockpit daemon's inbox over HTTP and submits each message as a new turn once the session is idle. The same mod relays permission dialogs to the dashboard. It needs a Claude Code build with function-hook mods, and a plain `claude` session gets both:
 

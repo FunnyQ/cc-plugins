@@ -1,6 +1,6 @@
 import {
-  beforeAll,
   afterAll,
+  beforeAll,
   beforeEach,
   afterEach,
   describe,
@@ -54,8 +54,6 @@ afterAll(async () => {
   await rm(stubDir, { recursive: true, force: true });
 });
 
-// Structurally identical to the module's private type — the module exports
-// nothing but the plugin function (S18), so the tests re-declare it.
 type PendingGuidance = { items: string[]; pushes: number };
 
 const {
@@ -65,12 +63,53 @@ const {
   lintVerdict,
   withOpenCodeNote,
   stashPending,
+  seedFromEvent,
   GUIDANCE_CAP,
+  PENDING_GUIDANCE,
   PUSH_CAP,
   COMMIT_COMMAND,
   COMMENT_GUARDED,
   FLIGHTPLAN_TASK,
 } = QLabPlugin;
+
+type HookCallback = (event: any) => Promise<void> | void;
+type Registered = {
+  toolHooks: Map<string, HookCallback>;
+  sessionHooks: Map<string, HookCallback>;
+};
+
+async function registerHooks(directory: string): Promise<Registered> {
+  const toolHooks = new Map<string, HookCallback>();
+  const sessionHooks = new Map<string, HookCallback>();
+  const ctx = {
+    location: { directory },
+    event: { subscribe: async function* () {} },
+    session: {
+      hook: async (name: string, callback: HookCallback) => {
+        sessionHooks.set(name, callback);
+        return { dispose: async () => {} };
+      },
+    },
+    tool: {
+      hook: async (name: string, callback: HookCallback) => {
+        toolHooks.set(name, callback);
+        return { dispose: async () => {} };
+      },
+    },
+  };
+  await QLabPlugin.setup(ctx as never);
+  return { toolHooks, sessionHooks };
+}
+
+function contentText(event: { result?: { content?: unknown } }): string {
+  const content = event.result?.content;
+  if (typeof content === "string") return content;
+  if (Array.isArray(content))
+    return content
+      .map((part) => (part as { text?: string }).text ?? "")
+      .join("");
+  return "";
+}
 
 describe("guardVerdict", () => {
   test("returns an ask message verbatim", () => {
@@ -211,32 +250,30 @@ One sentence.
 See PLAN.md for the broader plan.
 `;
 
-// End-to-end through the real handler. The hook contract is the regression
-// under test: after-hooks receive the arguments on the FIRST parameter
-// (`input.args`) and the tool result on the second — the before-hook shape
-// (`output.args`) throws on write/edit and fails the tool call.
-describe("tool.execute.after handler", () => {
+// End-to-end through the real handler. The V2 hook contract is the regression
+// under test: the event carries `input` (the tool arguments) and `result` on
+// the ONE event object, and the after-hook appends feedback to
+// `result.content` — the old V1 two-parameter shape would throw here and fail
+// the write after it has landed.
+describe("tool execute.after handler", () => {
   const root = dirname(import.meta.dir);
 
   async function lintHook(
     filePath: string,
     tool = "write",
   ): Promise<{ output: string; thrown?: unknown }> {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { output: "" };
+    const { toolHooks } = await registerHooks(root);
+    const event = {
+      tool,
+      input: { path: filePath },
+      status: "completed",
+      result: { content: [] as unknown[] },
+    };
     try {
-      await hooks["tool.execute.after"](
-        {
-          tool,
-          sessionID: "ses_test",
-          callID: "call_test",
-          args: { filePath },
-        },
-        output,
-      );
-      return output;
+      await toolHooks.get("execute.after")!(event);
+      return { output: contentText(event), thrown: undefined };
     } catch (thrown) {
-      return { output: output.output, thrown };
+      return { output: contentText(event), thrown };
     }
   }
 
@@ -249,7 +286,7 @@ describe("tool.execute.after handler", () => {
   test("a non-write tool is a silent no-op even with a task path", async () => {
     const { output, thrown } = await lintHook(
       "docs/x/tasks/runtime/01-x.md",
-      "bash",
+      "shell",
     );
     expect(thrown).toBeUndefined();
     expect(output).toBe("");
@@ -273,22 +310,85 @@ describe("tool.execute.after handler", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  test("lints a task file the patch tool updates", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-lint-"));
+    try {
+      const filePath = join(dir, "docs", "x", "tasks", "runtime", "01-x.md");
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, VALID_TASK_WITH_PLAN_REF);
+      const { toolHooks } = await registerHooks(root);
+      const event = {
+        tool: "patch",
+        input: {
+          patchText: `*** Begin Patch\n*** Update File: ${filePath}\n@@\n+x\n*** End Patch`,
+        },
+        status: "completed",
+        result: { content: [] as unknown[], output: "Success." },
+      };
+      await toolHooks.get("execute.after")!(event);
+
+      expect(contentText(event)).toContain("flightplan lint violations");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("keeps the tool's output when the result carries no content", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "qlab-lint-"));
+    try {
+      const filePath = join(dir, "docs", "x", "tasks", "runtime", "01-x.md");
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, VALID_TASK_WITH_PLAN_REF);
+      const { toolHooks } = await registerHooks(root);
+      const event = {
+        tool: "write",
+        input: { path: filePath },
+        status: "completed",
+        result: {
+          content: [] as unknown[],
+          output: "Wrote file successfully.",
+        },
+      };
+      await toolHooks.get("execute.after")!(event);
+
+      expect(contentText(event)).toStartWith("Wrote file successfully.");
+      expect(contentText(event)).toContain("flightplan lint violations");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("leaves an errored tool's result untouched", async () => {
+    const { toolHooks } = await registerHooks(root);
+    const event = {
+      tool: "write",
+      input: { path: "docs/x/tasks/runtime/01-x.md" },
+      status: "error",
+      result: { content: [{ type: "text", text: "the failure" }] },
+    };
+    await toolHooks.get("execute.after")!(event);
+
+    expect(contentText(event)).toBe("the failure");
+  });
 });
 
-describe("comment guard on tool.execute.after", () => {
+describe("comment guard on execute.after", () => {
   const root = dirname(import.meta.dir);
 
   async function guardHook(
     args: Record<string, string>,
     tool = "write",
   ): Promise<string> {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { output: "" };
-    await hooks["tool.execute.after"](
-      { tool, sessionID: "ses_test", callID: "call_test", args },
-      output,
-    );
-    return output.output;
+    const { toolHooks } = await registerHooks(root);
+    const event = {
+      tool,
+      input: args,
+      status: "completed",
+      result: { content: [] as unknown[] },
+    };
+    await toolHooks.get("execute.after")!(event);
+    return contentText(event);
   }
 
   async function inTmp(
@@ -310,7 +410,7 @@ describe("comment guard on tool.execute.after", () => {
   test("appends the guard question for a newly written comment block", async () => {
     const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, content: body }),
+      guardHook({ path: filePath, content: body }),
     );
 
     expect(output).toContain("does it say why, or what?");
@@ -318,11 +418,128 @@ describe("comment guard on tool.execute.after", () => {
     expect(output).toContain("+ 2  # one");
   });
 
+  test("guards a file the patch tool adds", async () => {
+    const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
+    const output = await inTmp("user.rb", body, (filePath) =>
+      guardHook(
+        {
+          patchText: [
+            "*** Begin Patch",
+            `*** Add File: ${filePath}`,
+            ...body
+              .trimEnd()
+              .split("\n")
+              .map((line) => `+${line}`),
+            "*** End Patch",
+          ].join("\n"),
+        },
+        "patch",
+      ),
+    );
+
+    expect(output).toContain("user.rb:2-4");
+  });
+
+  test("guards only the comment lines a patch update adds, at the moved path", async () => {
+    const body = "def bump\n  # one\n  # two\n  # three\n  @n += 1\nend\n";
+    const output = await inTmp("lib/user.rb", body, (filePath) =>
+      guardHook(
+        {
+          patchText: [
+            "*** Begin Patch",
+            `*** Update File: ${join(dirname(filePath), "old.rb")}`,
+            `*** Move to: ${filePath}`,
+            "@@ def bump",
+            "+  # one",
+            "+  # two",
+            "+  # three",
+            "   @n += 1",
+            "*** End Patch",
+          ].join("\n"),
+        },
+        "patch",
+      ),
+    );
+
+    expect(output).toContain("user.rb:2-4");
+  });
+
+  test("resolves a relative patch path against the session's directory", async () => {
+    const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
+    const output = await inTmp("user.rb", body, async (filePath) => {
+      seedFromEvent({
+        type: "session.created",
+        data: {
+          sessionID: "ses_patch",
+          location: { directory: dirname(filePath) },
+        },
+      });
+      const { toolHooks } = await registerHooks(root);
+      const event = {
+        tool: "patch",
+        sessionID: "ses_patch",
+        input: {
+          patchText: [
+            "*** Begin Patch",
+            "*** Add File: user.rb",
+            ...body
+              .trimEnd()
+              .split("\n")
+              .map((line) => `+${line}`),
+            "*** End Patch",
+          ].join("\n"),
+        },
+        status: "completed",
+        result: { content: [] as unknown[] },
+      };
+      await toolHooks.get("execute.after")!(event);
+      PENDING_GUIDANCE.delete("ses_patch");
+      return contentText(event);
+    });
+
+    expect(output).toContain("user.rb:2-4");
+  });
+
+  test("a patch that only deletes a file runs no guard", async () => {
+    const output = await guardHook(
+      {
+        patchText:
+          "*** Begin Patch\n*** Delete File: /nowhere/user.rb\n*** End Patch",
+      },
+      "patch",
+    );
+
+    expect(output).toBe("");
+    expect(spawnWithBinary).not.toHaveBeenCalled();
+  });
+
+  test("appends to a string result instead of replacing it", async () => {
+    const body = "x = 1\n# one\n# two\n# three\ny = 2\n";
+    const output = await inTmp("user.rb", body, async (filePath) => {
+      const { toolHooks } = await registerHooks(root);
+      const event = {
+        tool: "write",
+        input: { path: filePath, content: body },
+        status: "completed",
+        result: { content: "wrote the file" },
+      };
+      await toolHooks.get("execute.after")!(event);
+      return contentText(event);
+    });
+
+    expect(output).toStartWith("wrote the file");
+    expect(output).toContain("does it say why, or what?");
+  });
+
   test("translates OpenCode's camelCase edit args", async () => {
     const body = "def bump\n  # one\n  # two\n  # three\n  @n += 1\nend\n";
     const output = await inTmp("user.rb", body, (filePath) =>
       guardHook(
-        { filePath, oldString: "def bump\n  @n += 1\nend", newString: body },
+        {
+          path: filePath,
+          oldString: "def bump\n  @n += 1\nend",
+          newString: body,
+        },
         "edit",
       ),
     );
@@ -333,7 +550,7 @@ describe("comment guard on tool.execute.after", () => {
   test("stays silent for a comment shorter than the block threshold", async () => {
     const body = "x = 1\n# why not what\ny = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, content: body }),
+      guardHook({ path: filePath, content: body }),
     );
 
     expect(output).toBe("");
@@ -342,7 +559,10 @@ describe("comment guard on tool.execute.after", () => {
   test("stays silent when the edit adds no comment", async () => {
     const body = "x = 2\n";
     const output = await inTmp("user.rb", body, (filePath) =>
-      guardHook({ filePath, oldString: "x = 1", newString: "x = 2" }, "edit"),
+      guardHook(
+        { path: filePath, oldString: "x = 1", newString: "x = 2" },
+        "edit",
+      ),
     );
 
     expect(output).toBe("");
@@ -354,7 +574,7 @@ describe("comment guard on tool.execute.after", () => {
       const body = "# a comment\n";
       expect(
         await inTmp(name, body, (filePath) =>
-          guardHook({ filePath, content: body }),
+          guardHook({ path: filePath, content: body }),
         ),
       ).toBe("");
     },
@@ -364,7 +584,7 @@ describe("comment guard on tool.execute.after", () => {
 describe("commentPayload", () => {
   test("maps the write tool to Claude's Write shape", () => {
     expect(
-      JSON.parse(commentPayload("write", { filePath: "a.rb", content: "# x" })),
+      JSON.parse(commentPayload("write", { path: "a.rb", content: "# x" })),
     ).toEqual({
       tool_name: "Write",
       tool_input: {
@@ -380,7 +600,7 @@ describe("commentPayload", () => {
     expect(
       JSON.parse(
         commentPayload("edit", {
-          filePath: "a.rb",
+          path: "a.rb",
           oldString: "a",
           newString: 7,
         }),
@@ -409,6 +629,14 @@ describe("COMMENT_GUARDED", () => {
     expect(COMMENT_GUARDED.test("C:\\repo\\Rakefile")).toBe(true);
     expect(COMMENT_GUARDED.test("C:\\repo\\sub\\Dockerfile.dev")).toBe(true);
     expect(COMMENT_GUARDED.test("C:\\repo\\notes.txt")).toBe(false);
+  });
+
+  test("admits a path the hook's own policy refuses, so the policy lives in the hook alone", async () => {
+    const { isGuardedPath } =
+      await import("../packages/guard/hooks/comment-core.ts");
+
+    expect(isGuardedPath("docs/gen.ts")).toBe(false);
+    expect(COMMENT_GUARDED.test("docs/gen.ts")).toBe(true);
   });
 
   test.each(["a.md", "a.cfg", "LICENSE"])("leaves %s alone", (name) =>
@@ -447,7 +675,7 @@ describe("withOpenCodeNote", () => {
     const note = withOpenCodeNote("Log the decision.");
 
     expect(note).toStartWith("Log the decision.\n\n");
-    expect(note).toContain("task tool");
+    expect(note).toContain("subagent tool");
     // The Claude scripts name a tool OpenCode does not have; the note must say so.
     expect(note).toContain("fork");
   });
@@ -457,100 +685,78 @@ describe("withOpenCodeNote", () => {
   );
 });
 
-// S19/S20/S21: guidance must reach the model via the system prompt, not the
-// TUI. The event handler seeds the guidance synchronously; the transform hook
-// materializes the seed and pushes it into every request of the turn (the
-// first request is the throwaway title generator, so consume-once would lose
-// it), and session.idle retires the entry.
-describe("experimental.chat.system.transform", () => {
+describe("session context hook", () => {
   // No Windows cockpit build, and the shim is a POSIX sh script.
   const cockpitTest = test.skipIf(process.platform === "win32");
   const root = dirname(import.meta.dir);
 
-  async function createdAndTransform(
+  async function runContextFor(
+    sessionID?: string,
+  ): Promise<(system: string[]) => Promise<string[]>> {
+    const { sessionHooks } = await registerHooks(root);
+    return async (system: string[]) => {
+      const event = {
+        sessionID,
+        system: system.map((text) => ({ type: "text" as const, text })),
+      };
+      await sessionHooks.get("context")!(event);
+      return event.system.map((part) => part.text);
+    };
+  }
+
+  async function createdAndInject(
     sessionID = "ses_guidance",
-  ): Promise<{ system: string[] }> {
-    const hooks = await QLabPlugin({ directory: root });
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
-    const output = { system: ["base system prompt"] };
-    await hooks["experimental.chat.system.transform"]({ sessionID }, output);
-    return output;
+  ): Promise<string[]> {
+    QLabPlugin.seedFromEvent({ type: "session.created", data: { sessionID } });
+    return await (
+      await runContextFor(sessionID)
+    )(["base system prompt"]);
   }
 
   cockpitTest(
     "injects the decision-log guidance into the system prompt",
     async () => {
-      const { system } = await createdAndTransform();
+      const system = await createdAndInject();
 
       expect(system[0]).toBe("base system prompt");
       expect(system[1]).toContain("DECISION LOG ACTIVE");
-      expect(system[1]).toContain("task tool");
+      expect(system[1]).toContain("subagent tool");
     },
   );
 
   cockpitTest(
-    "the created seed survives a fire-and-forget dispatch (S20)",
+    "the created seed lands before the first context hook (S20)",
     async () => {
-      const hooks = await QLabPlugin({ directory: root });
       const sessionID = "ses_race";
-      const output = { system: ["base"] };
 
-      // The runtime calls hook["event"] without awaiting it. The handler's
-      // synchronous seeding must land before the transform — the async spawn
-      // that used to live in the handler lost this race and the model never
-      // saw the guidance.
-      void hooks.event({
-        event: { type: "session.created", properties: { sessionID } },
+      // An async stash used to lose the race to the first request; the
+      // synchronous seed keeps the guidance visible from the instant the
+      // event lands.
+      QLabPlugin.seedFromEvent({
+        type: "session.created",
+        data: { sessionID },
       });
-      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+      const runContext = await runContextFor(sessionID);
 
-      expect(output.system[1]).toContain("DECISION LOG ACTIVE");
-    },
-  );
-
-  cockpitTest(
-    "rides the title request AND the real request (S21)",
-    async () => {
-      const hooks = await QLabPlugin({ directory: root });
-      const sessionID = "ses_title_first";
-      await hooks.event({
-        event: { type: "session.created", properties: { sessionID } },
-      });
-
-      // The runtime triggers the transform once per LLM request: the first is
-      // the throwaway title generator, the second is the request the user
-      // actually sees. Both must carry the guidance.
-      const title = { system: ["title prompt"] };
-      const main = { system: ["full system prompt"] };
-      await hooks["experimental.chat.system.transform"]({ sessionID }, title);
-      await hooks["experimental.chat.system.transform"]({ sessionID }, main);
-
-      expect(title.system[1]).toContain("DECISION LOG ACTIVE");
-      expect(main.system[1]).toContain("DECISION LOG ACTIVE");
+      expect((await runContext(["base"]))[1]).toContain("DECISION LOG ACTIVE");
     },
   );
 
   cockpitTest(
     "materializes the seed once and replays the cache (S21)",
     async () => {
-      const hooks = await QLabPlugin({ directory: root });
       const sessionID = "ses_cache";
-      await hooks.event({
-        event: { type: "session.created", properties: { sessionID } },
+      QLabPlugin.seedFromEvent({
+        type: "session.created",
+        data: { sessionID },
       });
+      const runContext = await runContextFor(sessionID);
 
       const spawn = spyOn(Bun, "spawn");
       try {
-        const outputs = [];
+        const outputs: string[][] = [];
         for (let i = 0; i < PUSH_CAP; i++) {
-          const output = { system: ["base"] };
-          await hooks["experimental.chat.system.transform"](
-            { sessionID },
-            output,
-          );
-          outputs.push(output);
+          outputs.push(await runContext(["base"]));
         }
 
         // Re-running the script per push assumes it is a pure function of its
@@ -569,8 +775,8 @@ describe("experimental.chat.system.transform", () => {
           cwd: root,
           provider: "opencode",
         });
-        for (const output of outputs) {
-          expect(output.system[1]).toContain("DECISION LOG ACTIVE");
+        for (const system of outputs) {
+          expect(system[1]).toContain("DECISION LOG ACTIVE");
         }
       } finally {
         spawn.mockRestore();
@@ -578,63 +784,177 @@ describe("experimental.chat.system.transform", () => {
     },
   );
 
-  cockpitTest("stops pushing after PUSH_CAP requests (S21)", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const sessionID = "ses_cap";
-    await hooks.event({
-      event: { type: "session.created", properties: { sessionID } },
-    });
+  cockpitTest(
+    "rides the primary request, a tool continuation and a retry, then stops (S21)",
+    async () => {
+      expect(PUSH_CAP).toBe(3);
+      const sessionID = "ses_cap";
+      QLabPlugin.seedFromEvent({
+        type: "session.created",
+        data: { sessionID },
+      });
+      const runContext = await runContextFor(sessionID);
 
-    const outputs = Array.from({ length: PUSH_CAP + 2 }, () => ({
-      system: ["base"],
-    }));
-    for (const output of outputs) {
-      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+      const outputs: string[][] = [];
+      for (let i = 0; i < PUSH_CAP + 2; i++) {
+        outputs.push(await runContext(["base"]));
     }
 
-    for (const output of outputs.slice(0, PUSH_CAP)) {
-      expect(output.system).toHaveLength(2);
+      for (const system of outputs.slice(0, PUSH_CAP)) {
+        expect(system).toHaveLength(2);
     }
-    for (const output of outputs.slice(PUSH_CAP)) {
-      expect(output.system).toHaveLength(1);
+      for (const system of outputs.slice(PUSH_CAP)) {
+        expect(system).toHaveLength(1);
     }
-  });
+    },
+  );
+
+  cockpitTest(
+    "a materialized message spelling a seed's name is replayed, never re-run, because seeds start with NUL",
+    async () => {
+      PENDING_GUIDANCE.set("ses_spelled", {
+        items: ["created-guidance", "idle-nudge"],
+        pushes: 1,
+      });
+      const runContext = await runContextFor("ses_spelled");
+
+      expect(await runContext(["base"])).toEqual([
+        "base",
+        "created-guidance",
+        "idle-nudge",
+      ]);
+      expect(spawnWithBinary).not.toHaveBeenCalled();
+      PENDING_GUIDANCE.delete("ses_spelled");
+    },
+  );
 
   cockpitTest(
     "session.idle retires the turn's entry and seeds the nudge (S21)",
     async () => {
-      const hooks = await QLabPlugin({ directory: root });
       const sessionID = "ses_turn";
-      await hooks.event({
-        event: { type: "session.created", properties: { sessionID } },
+      QLabPlugin.seedFromEvent({
+        type: "session.created",
+        data: { sessionID },
       });
-      const first = { system: ["base"] };
-      await hooks["experimental.chat.system.transform"]({ sessionID }, first);
-      expect(first.system[1]).toContain("DECISION LOG ACTIVE");
+      const runContext = await runContextFor(sessionID);
+
+      const first = await runContext(["base"]);
+      expect(first[1]).toContain("DECISION LOG ACTIVE");
 
       // Turn over: the created guidance must not ride the next turn's requests.
       // The nudge script may or may not push in this environment (it gates on
       // the repo's change signature), but whatever it does, the created
       // guidance — identified by its unique "DECISION LOG ACTIVE" line — is gone.
-      await hooks.event({
-        event: { type: "session.idle", properties: { sessionID } },
-      });
-      const second = { system: ["base"] };
-      await hooks["experimental.chat.system.transform"]({ sessionID }, second);
-      expect(second.system.join("\n")).not.toContain("DECISION LOG ACTIVE");
+      QLabPlugin.seedFromEvent({ type: "session.idle", data: { sessionID } });
+      const second = await runContext(["base"]);
+      expect(second.join("\n")).not.toContain("DECISION LOG ACTIVE");
     },
   );
 
   cockpitTest(
+    "execution.succeeded is a V2 turn boundary and seeds the nudge",
+    async () => {
+      // V2 on 2.2.7: a CLI turn ends with execution.succeeded and
+      // session.idle never arrives, so the nudge must seed from this event.
+      const sessionID = "ses_exec";
+      QLabPlugin.seedFromEvent({
+        type: "session.created",
+        data: { sessionID },
+      });
+      const runContext = await runContextFor(sessionID);
+      await runContext(["base"]);
+
+      QLabPlugin.seedFromEvent({
+        type: "session.execution.succeeded",
+        data: { sessionID },
+      });
+      const next = await runContext(["base"]);
+      expect(next.join("\n")).not.toContain("DECISION LOG ACTIVE");
+    },
+  );
+
+  test("ignores events without a session id", () => {
+    const pending = PENDING_GUIDANCE.size;
+    seedFromEvent({ type: "session.created" });
+    seedFromEvent({ type: "session.execution.succeeded", data: {} });
+
+    expect(PENDING_GUIDANCE.size).toBe(pending);
+  });
+
+  test("seeds the session cwd from the event's location", () => {
+    seedFromEvent({
+      type: "session.created",
+      data: {
+        sessionID: "ses_cwd",
+        location: { directory: "/repo/one" },
+      },
+    });
+
+    expect(PENDING_GUIDANCE.get("ses_cwd")?.cwd).toBe("/repo/one");
+    PENDING_GUIDANCE.delete("ses_cwd");
+  });
+
+  test("stores no cwd when the event has no location", () => {
+    seedFromEvent({ type: "session.created", data: { sessionID: "ses_cwd2" } });
+
+    expect(PENDING_GUIDANCE.get("ses_cwd2")?.cwd).toBeUndefined();
+    PENDING_GUIDANCE.delete("ses_cwd2");
+  });
+
+  test("a turn boundary never invents a cwd for a session it has not seen created", () => {
+    seedFromEvent({
+      type: "session.execution.succeeded",
+      data: { sessionID: "ses_resumed" },
+    });
+
+    expect(PENDING_GUIDANCE.get("ses_resumed")?.cwd).toBeUndefined();
+    PENDING_GUIDANCE.delete("ses_resumed");
+  });
+
+  test("keeps the session cwd across a turn boundary", () => {
+    seedFromEvent({
+      type: "session.created",
+      data: {
+        sessionID: "ses_cwd3",
+        location: { directory: "/repo/two" },
+      },
+    });
+    seedFromEvent({
+      type: "session.execution.succeeded",
+      data: { sessionID: "ses_cwd3" },
+    });
+
+    expect(PENDING_GUIDANCE.get("ses_cwd3")?.cwd).toBe("/repo/two");
+    PENDING_GUIDANCE.delete("ses_cwd3");
+  });
+
+  for (const type of [
+    "session.execution.failed",
+    "session.execution.interrupted",
+  ]) {
+    test(`${type} retires the turn's guidance and seeds no nudge`, () => {
+      seedFromEvent({
+        type: "session.created",
+        data: { sessionID: "ses_end", location: { directory: "/repo/end" } },
+      });
+      seedFromEvent({ type, data: { sessionID: "ses_end" } });
+
+      expect(PENDING_GUIDANCE.get("ses_end")).toEqual({
+        items: [],
+        pushes: 0,
+        cwd: "/repo/end",
+      });
+      PENDING_GUIDANCE.delete("ses_end");
+    });
+  }
+
+  cockpitTest(
     "runs the stop hook through the shim with the OpenCode payload",
     async () => {
-      const hooks = await QLabPlugin({ directory: root });
       const sessionID = "ses_stop_argv";
-      await hooks.event({
-        event: { type: "session.idle", properties: { sessionID } },
-      });
-      const output = { system: ["base"] };
-      await hooks["experimental.chat.system.transform"]({ sessionID }, output);
+      QLabPlugin.seedFromEvent({ type: "session.idle", data: { sessionID } });
+      const system = await (await runContextFor(sessionID))(["base"]);
+
       expect(spawnWithBinary.mock.calls[0]?.[0]).toEqual([
         join(root, "packages/monitor/skills/cockpit/bin/cockpit"),
         "hook",
@@ -646,22 +966,16 @@ describe("experimental.chat.system.transform", () => {
         cwd: root,
         provider: "opencode",
       });
-      expect(output.system[1]).toContain("Log the decision.");
+      expect(system[1]).toContain("Log the decision.");
     },
   );
 
   test("no-ops without a session id or without pending guidance", async () => {
-    const hooks = await QLabPlugin({ directory: root });
-    const output = { system: ["base"] };
+    const withoutSession = await runContextFor(undefined);
+    expect(await withoutSession(["base"])).toHaveLength(1);
 
-    await hooks["experimental.chat.system.transform"]({}, output);
-    expect(output.system).toHaveLength(1);
-
-    await hooks["experimental.chat.system.transform"](
-      { sessionID: "ses_unknown" },
-      output,
-    );
-    expect(output.system).toHaveLength(1);
+    const unknown = await runContextFor("ses_unknown");
+    expect(await unknown(["base"])).toHaveLength(1);
   });
 });
 
@@ -749,5 +1063,70 @@ describe("stashPending", () => {
     expect(pending.get("ses_live")).toEqual({ items: ["idle"], pushes: 0 });
     // The genuinely-stalest session took the eviction instead.
     expect(pending.has("ses_dead_0")).toBe(false);
+  });
+});
+
+describe("hooks run in the session's own directory, never the server's", () => {
+  const scriptCwd = (suffix: string) =>
+    (
+      spawnWithBinary.mock.calls.find(([argv]) =>
+        String((argv as string[])[1]).endsWith(suffix),
+      )?.[1] as { cwd?: string } | undefined
+    )?.cwd;
+
+  test("the branch guard and the comment guard take the cwd session.created named", async () => {
+    const instance = await mkdtemp(join(tmpdir(), "qlab-instance-"));
+    const session = await mkdtemp(join(tmpdir(), "qlab-session-"));
+    try {
+      seedFromEvent({
+        type: "session.created",
+        data: { sessionID: "ses_where", location: { directory: session } },
+      });
+      const { toolHooks } = await registerHooks(instance);
+      await toolHooks.get("execute.before")!({
+        tool: "shell",
+        sessionID: "ses_where",
+        input: { command: "git commit -m x" },
+      });
+      await toolHooks.get("execute.after")!({
+        tool: "write",
+        sessionID: "ses_where",
+        input: { path: join(session, "a.ts"), content: "" },
+        status: "completed",
+        result: { content: [] },
+      });
+
+      expect(scriptCwd("check-branch.sh")).toBe(session);
+      expect(scriptCwd("comment-guard.ts")).toBe(session);
+    } finally {
+      PENDING_GUIDANCE.delete("ses_where");
+      await rm(instance, { recursive: true, force: true });
+      await rm(session, { recursive: true, force: true });
+    }
+  });
+
+  test("a session it never saw created falls back to the hook's own instance", async () => {
+    const instance = await mkdtemp(join(tmpdir(), "qlab-instance-"));
+    try {
+      const { toolHooks } = await registerHooks(instance);
+      await toolHooks.get("execute.before")!({
+        tool: "shell",
+        sessionID: "ses_unseen",
+        input: { command: "git commit -m x" },
+      });
+
+      expect(scriptCwd("check-branch.sh")).toBe(instance);
+    } finally {
+      await rm(instance, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("module shape", () => {
+  test("exports only the plugin, because a stray export once kept it from loading (S18)", async () => {
+    const module = await import("./plugin");
+
+    expect(Object.keys(module).sort()).toEqual(["QLabPlugin", "default"]);
+    expect(module.default).toBe(QLabPlugin);
   });
 });
