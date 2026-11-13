@@ -94,16 +94,16 @@ Unset by default, so codex uses its own configured model. When a caller passes `
 
 ---
 
-## opencode (1.x)
+## opencode (2.x)
 
-Relay supports opencode 1.x only. On 2.x, suggest downgrading to 1.x. 2.x drops `--variant`, drops `-m` from the TUI, and changes the error event shape.
+Verified on opencode 2.2.6. The 2.x TUI takes no `-m`, so a run with a model (from `--model` or the relay config) has no live path and runs headless, with a one-line stderr note. Relay still parses the 1.x error event shape.
 
-Binary: `opencode`. Headless subcommand: `opencode run [message..]`.
+Binary: `opencode`. Headless subcommand: `opencode run`, prompt on stdin.
 
 ### Delegate
 
 ```bash
-opencode run --format json -- "<prompt>"
+opencode run [-m <model>] --format json [--auto] < prompt
 ```
 
 Write-capable by default. `--dangerous` maps to `--auto` on the headless path
@@ -115,7 +115,7 @@ loudly. Use `--dangerous` for unattended headless runs that may need approvals.
 ### Review (emulated, read-only prompt)
 
 ```bash
-opencode run --format json -- "<read-only review prompt>"
+opencode run [-m <model>] --format json < read-only-review-prompt
 ```
 
 There is no native review. The prompt must instruct "analyze only, do not modify files."
@@ -124,16 +124,15 @@ Read-only is prompt-level only, and opencode's default permissions allow `edit`
 — a headless review _could_ write files if the model ignores the instruction.
 Hard read-only is possible via an agent profile that denies `edit`/`bash`
 (`--agent <name>` with `permission` deny rules) but relay does not wire one in:
-the profile would have to exist in every machine's opencode config. Create a
-local `readonly` agent (e.g. via `opencode agent create --mode primary --permissions read,glob,grep,webfetch`) and pass `--agent readonly` manually if you need it.
+the profile would have to exist in every machine's opencode config.
 
 ### Relevant flags
 
-- `-m, --model <provider/model>` — model specification (optional; relay passes it only when `--model` or the relay config sets one, otherwise opencode uses its own configured or provider default). The live TUI takes the same `-m`
+- `-m, --model <provider/model#variant>` — model specification (optional; relay passes it only when `--model` or the relay config sets one, otherwise opencode uses its own configured or provider default). `#variant` is optional, e.g. `opencode-go/qwen3.8-max#high`; an unknown variant fails with `Variant unavailable for <model>: <variant>`. The TUI rejects `-m` ("Unrecognized flag"), and `OPENCODE_CONFIG_CONTENT` does not reach the background service that resolves the model, so there is no live equivalent
 - `--agent <name>` — agent profile (optional)
 - `--format <default|json>` — output format
-- `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous`. Hidden `--yolo` / `--dangerously-skip-permissions` aliases exist on `run` and collapsed to the same boolean on 1.18.18 — they are not a stronger bypass. `--auto` still respects explicit deny rules, unlike codex's full bypass.
-- `--` — relay appends this separator before the message so flag-like task text (e.g. "add --help flag") is passed through as the message, not parsed as options.
+- `--auto` — auto-approve permissions that are not explicitly denied (dangerous!). Maps to relay's `--dangerous` on `run` and the TUI alike. It still respects explicit deny rules, unlike codex's full bypass.
+- The prompt rides stdin, never argv, so flag-like task text (e.g. "add --help flag") cannot be parsed as options. The live TUI gets its one-line bootstrap through `--prompt`.
 
 ### Output parsing
 
@@ -147,13 +146,13 @@ local `readonly` agent (e.g. via `opencode agent create --mode primary --permiss
 
 ### Model
 
-`relay.ts` pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). A `cli-default` value also omits `-m`. Format is `provider/model`. Relay passes no `--variant`, so the model runs at its default variant.
+`relay.ts` pins no opencode model. Precedence is `--model` flag, then relay config, then opencode's own default (`-m` omitted). A `cli-default` value also omits `-m`. Format is `provider/model`, optionally `provider/model#variant`; without `#variant` the model runs at its default variant.
 
-The suggested models ship in `references/config.suggested.json` and reach the user's config only through `relay.ts config apply`.
+The suggested models ship in `references/config.suggested.json` and reach the user's config only through `relay.ts config apply`. They are `cli-default`, because a pinned model has no live path; pinned ids ride `suggestions` instead.
 
 ### Errors
 
-A failed `opencode run` leaves stderr empty and reports the cause as a JSONL `error` event on stdout. `opencode run` exits 1. Relay prints the event's `data.message`, or its `name` when there is no message. A bad model id often yields only `Unexpected server error. Check server logs for details.`, because opencode puts nothing more in the event. The failure line names the model or "CLI default". It never echoes the argv or the prompt.
+A failed `opencode run` leaves stderr empty and reports the cause as a JSONL `error` event on stdout. `opencode run` exits 1. On 2.x the event is `{"type":"error","error":{"type":"provider.no-route","message":"Model unavailable: nope/bogus-model"}}`; relay prints `error.message`, falling back to `error.type`. It also reads the 1.x shape (`error.data.message`, else `error.name`). The failure line names the model or "CLI default". It never echoes the argv or the prompt.
 
 ---
 
