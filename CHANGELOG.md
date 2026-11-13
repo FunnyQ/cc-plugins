@@ -1,5 +1,39 @@
 # Changelog
 
+## [monitor 8.5.0] - 2026-11-13
+
+_tracks tag `monitor-v8.5.0`_
+
+### Added
+- Cockpit and the usage dashboard now work with OpenCode 2.x: messages are sent through the background service, and sessions, titles and transcripts are read from the new session tables in the right order.
+
+## [relay 0.11.0] - 2026-11-13
+
+_tracks tag `relay-v0.11.0`_
+
+### Added
+- Relay's opencode backend now targets OpenCode 2.x, reads its new error format, and defaults the suggested delegate and review config to `cli-default` so the live pane stays reachable. 1.x support is dropped.
+
+### Changed
+- Relay's instructions are corrected: opencode live launch no longer mentions `-m`, questions use the harness's own question tool, the codex alias forbids `codex review` rather than `-p`, and opencode 2.2.7 is recorded as the verified version.
+
+## [chronicle 0.23.1] - 2026-11-13
+
+_tracks tag `chronicle-v0.23.1`_
+
+### Changed
+- The commit, pr and release skill instructions are tighter and no longer contradict themselves: release states that the engine runs the git steps, pr says "branch guard", and commit drops a stale plugin-root note and uses audience framing for message length.
+
+## [runes 0.14.3] - 2026-11-13
+
+_tracks tag `runes-v0.14.3`_
+
+### Added
+- The English teacher's band notice now closes itself after 3 seconds, adjustable with `teacher.notice_ms` (0 keeps it until the next prompt); the lesson under the prompt stays.
+
+### Changed
+- The minimap reads only the new lines of a transcript instead of re-parsing the whole file, cutting an 87 MB read from 94ms to 18ms.
+
 ## [runes 0.14.2] - 2026-11-07
 
 _tracks tag `runes-v0.14.2`_
