@@ -544,6 +544,49 @@ describe("applyStateEntries", () => {
     });
   });
 
+  test("goal-mode entries never count as undeclared nodes", () => {
+    const original = loadedNode({ status: "todo" });
+    const entries: FlightlogEntry[] = [
+      {
+        kind: "flight",
+        ts: "same",
+        task: "(flight)",
+        goalHash: "h",
+        planPath: "docs/x/PLAN.md",
+      },
+      {
+        kind: "escalation",
+        ts: "same",
+        task: "(worktree)",
+        attempt: 0,
+        class: "infrastructure",
+        infrastructure: true,
+        parked: false,
+        reason: "x",
+      },
+      {
+        kind: "repair",
+        ts: "same",
+        task: "(flight)",
+        verdict: "halt",
+        reason: "x",
+      },
+      {
+        kind: "run-end",
+        ts: "same",
+        task: "(flight)",
+        aborted: false,
+        completed: [],
+        drained: [],
+        needsHuman: [],
+      },
+    ];
+    expect(applyStateEntries({ [original.ref]: original }, entries)).toEqual({
+      nodes: { [original.ref]: original },
+      errors: [],
+    });
+  });
+
   test("preserves untouched fields and normalizes only null status", () => {
     const original = loadedNode();
     const done = loadedNode({

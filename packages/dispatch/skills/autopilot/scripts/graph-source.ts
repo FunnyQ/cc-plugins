@@ -242,6 +242,13 @@ export async function loadGraph(dir: string): Promise<ParsedGraph> {
   return parseGraph(text, file, fallbackTitle);
 }
 
+const GOAL_MODE_KINDS: ReadonlySet<FlightlogEntry["kind"]> = new Set([
+  "flight",
+  "escalation",
+  "repair",
+  "run-end",
+]);
+
 export function applyStateEntries(
   nodes: Record<string, GraphNode>,
   entries: FlightlogEntry[],
@@ -251,6 +258,7 @@ export function applyStateEntries(
   const latest = new Map<string, StateEntry>();
   const file = runLogPath("");
   for (const entry of entries) {
+    if (GOAL_MODE_KINDS.has(entry.kind)) continue;
     if (!Object.hasOwn(nodes, entry.task)) {
       if (unknownRefs.has(entry.task)) continue;
       unknownRefs.add(entry.task);

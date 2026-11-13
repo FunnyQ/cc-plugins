@@ -17,19 +17,51 @@
  *
  * `report` parses the JSONL trail and writes a grouped, human-readable
  * RUNLOG.md (default: sibling of the log file).
+ *
+ * Goal mode (budget, status, guard and report all count from the latest
+ * `flight` entry):
+ *   bun flightlog.ts flight-start <logfile> --plan <PLAN.md>
+ *   bun flightlog.ts escalations <logfile> --payload <uri-encoded JSON>
+ *   bun flightlog.ts guard <logfile> --plan <PLAN.md> --tasks <dir> \
+ *       --verdict fix|defer --justified <json file> --kept <ref,ref|"">
+ *   bun flightlog.ts repair <logfile> --task <ref>|--flight --verdict <v> \
+ *       --reason-file <f> [--pattern <text>] [--changed <ref,ref>] \
+ *       [--reentry <json>] [--diff-file <f>]
+ *   bun flightlog.ts repairs <logfile> --tasks <dir> --status|--json
+ *   bun flightlog.ts report <logfile> --flight [--deferred <DEFERRED.md>]
+ *
+ * `report --flight` writes FLIGHTREPORT.md beside the log instead of RUNLOG.md.
  */
-import { writeFile } from "node:fs/promises";
-import { dirname, join, basename } from "node:path";
+import { readFile, realpath, writeFile } from "node:fs/promises";
+import { dirname, join, basename, relative, resolve, sep } from "node:path";
+import { legOf, parseDeferred } from "../../waypoints/scripts/deferred";
+import { loadAllTasks } from "./next-ready";
 import { flagValue } from "./lib/args";
 import {
   FLIGHTLOG_DIRNAME,
   appendEntry,
   readLog,
   renderRunlog,
+  type EscalationClass,
+  type EscalationEntry,
+  type FlightlogEntry,
   type NoteEntry,
+  type RepairEntry,
+  type RepairVerdict,
+  type RunEndEntry,
   type StateEntry,
   type StateFields,
 } from "./lib/flightlog";
+import {
+  admitRepair,
+  currentFlight,
+  flightStatus,
+  goalHash,
+  guardRepair,
+  renderFlightReport,
+  repairCounts,
+} from "./lib/goal-mode";
+import { parseTask, refToString } from "./lib/parse-task";
 import { resumePoint, tasksIn } from "./lib/resume-point";
 
 export function buildNoteEntry(meta: {
@@ -179,6 +211,263 @@ async function main() {
     return;
   }
 
+  if (cmd === "flight-start") {
+    if (!logFile) usage();
+    const plan = flagValue(rest, "--plan");
+    if (!plan) fail("flightlog flight-start requires --plan");
+    await appendEntry(logFile, {
+      kind: "flight",
+      ts: new Date().toISOString(),
+      task: "(flight)",
+      goalHash: goalHash(await readFile(plan, "utf-8")),
+      planPath: plan,
+    });
+    return;
+  }
+
+  if (cmd === "escalations") {
+    if (!logFile) usage();
+    const raw = flagValue(rest, "--payload");
+    if (!raw) fail("flightlog escalations requires --payload");
+    const payload = decodePayload(raw);
+    const ts = new Date().toISOString();
+    for (const e of payload.escalations) {
+      await appendEntry(logFile, {
+        kind: "escalation",
+        ts,
+        task: e.task,
+        attempt: e.attempt,
+        class: e.class,
+        infrastructure: e.infrastructure,
+        parked: e.parked,
+        reason: e.reason,
+      });
+    }
+    for (const c of payload.cleanupFailures) {
+      await appendEntry(logFile, {
+        kind: "escalation",
+        ts,
+        task: c.ref,
+        attempt: 0,
+        class: "cleanup-failure",
+        infrastructure: true,
+        parked: false,
+        reason: `worktree removal could not be confirmed: ${c.path}`,
+      });
+    }
+    await appendEntry(logFile, {
+      kind: "run-end",
+      ts,
+      task: "(flight)",
+      aborted: Boolean(payload.aborted),
+      completed: payload.completed,
+      drained: payload.drained,
+      needsHuman: payload.needsHuman,
+    });
+    return;
+  }
+
+  if (cmd === "guard") {
+    if (!logFile) usage();
+    const plan = flagValue(rest, "--plan");
+    const tasksDir = flagValue(rest, "--tasks");
+    const verdict = flagValue(rest, "--verdict");
+    const justifiedFile = flagValue(rest, "--justified");
+    const keptAt = rest.indexOf("--kept");
+    const keptRaw = keptAt === -1 ? undefined : rest[keptAt + 1];
+    if (
+      !plan ||
+      !tasksDir ||
+      !justifiedFile ||
+      keptRaw === undefined ||
+      keptRaw.startsWith("--")
+    ) {
+      fail(
+        "flightlog guard requires --plan, --tasks, --verdict, --justified and --kept",
+      );
+    }
+    if (verdict !== "fix" && verdict !== "defer") {
+      fail("flightlog guard --verdict must be fix or defer");
+    }
+    const entries = await readLog(logFile);
+    const flight = requireFlight(entries);
+    const justifiedJson = JSON.parse(await readFile(justifiedFile, "utf-8"));
+    const planDir = await realpath(dirname(plan));
+    const tasksAbs = await realpath(tasksDir);
+    const repoRoot = git(planDir, "rev-parse", "--show-toplevel").trim();
+
+    const before: Record<string, string> = {};
+    const doneRefs: string[] = [];
+    const tracked = git(
+      repoRoot,
+      "ls-tree",
+      "-r",
+      "--name-only",
+      "-z",
+      "HEAD",
+      "--",
+      relative(repoRoot, tasksAbs),
+    )
+      .split("\0")
+      .filter((path) => isTaskPath(join(repoRoot, path), tasksAbs));
+    for (const path of tracked) {
+      const content = git(repoRoot, "show", `HEAD:${path}`);
+      const parsed = parseTask(content);
+      if (!parsed.ok) continue;
+      const ref = refToString(parsed.task);
+      before[ref] = content;
+      if (parsed.task.status === "done") doneRefs.push(ref);
+    }
+
+    const loaded = await loadAllTasks(tasksDir);
+    const after: Record<string, string> = {};
+    for (const [ref, path] of Object.entries(loaded.pathByRef)) {
+      after[ref] = await readFile(path, "utf-8");
+    }
+
+    const refs = [...new Set([...Object.keys(before), ...Object.keys(after)])];
+    const workedRefs = refs.filter((ref) =>
+      resumePoint(entries, ref)?.last.steps.some(
+        (s) => s.role === "dev" && s.completed,
+      ),
+    );
+    const devReportedDefect = refs.filter(
+      (ref) =>
+        flight.entries.findLast(
+          (e): e is EscalationEntry =>
+            e.kind === "escalation" && e.task === ref,
+        )?.class === "plan-defect",
+    );
+
+    const result = guardRepair({
+      verdict,
+      isLeg: legOf(resolve(plan)) !== null,
+      flightGoalHash: flight.flight.goalHash,
+      planMd: await readFile(plan, "utf-8"),
+      before,
+      after,
+      doneRefs,
+      justified: Array.isArray(justifiedJson)
+        ? justifiedJson
+        : (justifiedJson.justified ?? []),
+      kept: keptRaw.split(",").filter(Boolean),
+      devReportedDefect,
+      workedRefs,
+    });
+
+    const deferredPath = join(planDir, "DEFERRED.md");
+    const unexpected = changedPaths(repoRoot, planDir)
+      .filter(
+        (path) =>
+          !isTaskPath(path, tasksAbs) &&
+          !(verdict === "defer" && path === deferredPath),
+      )
+      .map((path) => `unexpected file ${relative(repoRoot, path)}`);
+    const violations = [...(result.ok ? [] : result.violations), ...unexpected];
+    const outcome = violations.length > 0 ? { ok: false, violations } : result;
+    console.log(JSON.stringify(outcome));
+    if (!outcome.ok) process.exit(1);
+    return;
+  }
+
+  if (cmd === "repair") {
+    if (!logFile) usage();
+    const task = flagValue(rest, "--task");
+    const wholeFlight = rest.includes("--flight");
+    const verdict = flagValue(rest, "--verdict");
+    const reasonFile = flagValue(rest, "--reason-file");
+    if (task !== undefined && wholeFlight) {
+      fail("flightlog repair takes --task or --flight, not both");
+    }
+    if (task === undefined && !wholeFlight) {
+      fail("flightlog repair requires --task <ref> or --flight");
+    }
+    if (!verdict || !isRepairVerdict(verdict)) {
+      fail(
+        `flightlog repair --verdict must be one of ${REPAIR_VERDICTS.join(", ")}`,
+      );
+    }
+    if (!reasonFile) fail("flightlog repair requires --reason-file");
+    const ref = task ?? "(flight)";
+    const flight = requireFlight(await readLog(logFile));
+    const admitted = admitRepair(flight.entries, ref, verdict);
+    if (!admitted.ok) {
+      console.error(admitted.error);
+      process.exit(1);
+    }
+    const pattern = flagValue(rest, "--pattern", { allowDashValue: true });
+    const changed = flagValue(rest, "--changed");
+    const reentry = flagValue(rest, "--reentry");
+    const diffFile = flagValue(rest, "--diff-file");
+    const entry: RepairEntry = {
+      kind: "repair",
+      ts: new Date().toISOString(),
+      task: ref,
+      verdict,
+      reason: await readFile(reasonFile, "utf-8"),
+      ...(pattern === undefined ? {} : { pattern }),
+      ...(changed === undefined
+        ? {}
+        : { changed: changed.split(",").filter(Boolean) }),
+      ...(reentry === undefined ? {} : { reentry: JSON.parse(reentry) }),
+      ...(diffFile === undefined
+        ? {}
+        : { diff: await readFile(diffFile, "utf-8") }),
+    };
+    await appendEntry(logFile, entry);
+    return;
+  }
+
+  if (cmd === "repairs") {
+    if (!logFile) usage();
+    const tasksDir = flagValue(rest, "--tasks");
+    const status = rest.includes("--status");
+    const json = rest.includes("--json");
+    if (!tasksDir || status === json) {
+      fail("flightlog repairs requires --tasks and one of --status or --json");
+    }
+    const flight = requireFlight(await readLog(logFile));
+    const loaded = await loadAllTasks(tasksDir);
+    if (loaded.errors.length > 0) {
+      fail(loaded.errors.map((e) => `${e.file}: ${e.reason}`).join("\n"));
+    }
+    const result = flightStatus(flight.entries, loaded.byRef);
+    console.log(
+      status
+        ? result
+        : JSON.stringify({ ...repairCounts(flight.entries), status: result }),
+    );
+    return;
+  }
+
+  if (cmd === "report" && rest.includes("--flight")) {
+    if (!logFile) usage();
+    const flight = requireFlight(await readLog(logFile));
+    const tasksDir =
+      flagValue(rest, "--tasks") ?? join(dirname(dirname(logFile)), "tasks");
+    const deferredFile = flagValue(rest, "--deferred");
+    const deferredMd =
+      deferredFile === undefined
+        ? null
+        : await readFile(deferredFile, "utf-8").catch(() => null);
+    const tasks = (await loadAllTasks(tasksDir)).byRef;
+    const out = join(dirname(logFile), "FLIGHTREPORT.md");
+    await writeFile(
+      out,
+      renderFlightReport(flight.entries, {
+        slug: flagValue(rest, "--slug") ?? slugFromLogPath(logFile),
+        status: flightStatus(flight.entries, tasks),
+        deferredMd:
+          deferredMd !== null && parseDeferred(deferredMd).length > 0
+            ? deferredMd
+            : null,
+        tasks,
+      }),
+    );
+    console.log(out);
+    return;
+  }
+
   if (cmd === "report") {
     if (!logFile) usage();
     const entries = await readLog(logFile);
@@ -190,6 +479,117 @@ async function main() {
   }
 
   usage();
+}
+
+const REPAIR_VERDICTS = [
+  "fix",
+  "defer",
+  "not-plan",
+  "refuse",
+  "infra-retry",
+  "halt",
+] as const satisfies readonly RepairVerdict[];
+
+const ESCALATION_CLASSES: readonly EscalationClass[] = [
+  "plan-defect",
+  "capped",
+  "infrastructure",
+  "divergence",
+  "stall",
+  "leak",
+  "budget-floor",
+  "cleanup-failure",
+];
+
+const isRepairVerdict = (v: string): v is RepairVerdict =>
+  (REPAIR_VERDICTS as readonly string[]).includes(v);
+
+type EscalationPayload = {
+  escalations: Omit<EscalationEntry, "kind" | "ts">[];
+  cleanupFailures: { ref: string; path: string }[];
+  drained: string[];
+  aborted: unknown;
+  completed: string[];
+  needsHuman: RunEndEntry["needsHuman"];
+};
+
+function decodePayload(raw: string): EscalationPayload {
+  let payload: EscalationPayload;
+  try {
+    payload = JSON.parse(decodeURIComponent(raw));
+  } catch (err) {
+    fail(`flightlog escalations --payload is not URI-encoded JSON: ${err}`);
+  }
+  const arrays = [
+    "escalations",
+    "cleanupFailures",
+    "drained",
+    "completed",
+    "needsHuman",
+  ] as const;
+  const missing = arrays.filter((key) => !Array.isArray(payload?.[key]));
+  if (missing.length > 0) {
+    fail(`flightlog escalations payload lacks arrays: ${missing.join(", ")}`);
+  }
+  for (const e of payload.escalations) {
+    if (!ESCALATION_CLASSES.includes(e.class)) {
+      fail(
+        `flightlog escalations: ${e.task} has class ${JSON.stringify(e.class)}, expected one of ${ESCALATION_CLASSES.join(", ")}`,
+      );
+    }
+  }
+  return payload;
+}
+
+function requireFlight(
+  entries: FlightlogEntry[],
+): NonNullable<ReturnType<typeof currentFlight>> {
+  return currentFlight(entries) ?? fail("no goal-mode flight started");
+}
+
+function git(cwd: string, ...args: string[]): string {
+  const proc = Bun.spawnSync(["git", ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (proc.exitCode !== 0) {
+    throw new Error(`git ${args[0]}: ${proc.stderr.toString().trim()}`);
+  }
+  return proc.stdout.toString();
+}
+
+function isTaskPath(path: string, tasksDir: string): boolean {
+  const parts = relative(tasksDir, path).split(sep);
+  return (
+    parts.length === 2 &&
+    parts[0] !== ".." &&
+    parts[0] !== "_context" &&
+    parts[1].endsWith(".md") &&
+    parts[1] !== "README.md"
+  );
+}
+
+function changedPaths(repoRoot: string, dir: string): string[] {
+  const records = git(
+    repoRoot,
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--untracked-files=all",
+    "--",
+    relative(repoRoot, dir),
+  ).split("\0");
+  const paths: string[] = [];
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    if (!record) continue;
+    paths.push(join(repoRoot, record.slice(3)));
+    if (record[0] === "R" || record[0] === "C") {
+      paths.push(join(repoRoot, records[++i]));
+    }
+  }
+  return paths;
 }
 
 function fail(message: string): never {
@@ -205,6 +605,12 @@ function usage(): never {
       "  bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed [--agent <label>] [--message <why>]",
       "  bun flightlog.ts progress <logfile> [--task <ref>] [--json]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
+      "  bun flightlog.ts report <logfile> --flight [--deferred <DEFERRED.md>] [--tasks <dir>] [--slug <slug>]",
+      "  bun flightlog.ts flight-start <logfile> --plan <PLAN.md>",
+      "  bun flightlog.ts escalations <logfile> --payload <uri-encoded JSON>",
+      '  bun flightlog.ts guard <logfile> --plan <PLAN.md> --tasks <dir> --verdict fix|defer --justified <json file> --kept <ref,ref|"">',
+      "  bun flightlog.ts repair <logfile> --task <ref>|--flight --verdict <verdict> --reason-file <f> [--pattern <text>] [--changed <ref,ref>] [--reentry <json>] [--diff-file <f>]",
+      "  bun flightlog.ts repairs <logfile> --tasks <dir> --status|--json",
     ].join("\n"),
   );
 }
