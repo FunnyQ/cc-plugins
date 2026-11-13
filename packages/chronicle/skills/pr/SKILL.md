@@ -10,7 +10,7 @@ when_to_use: >-
 
 # Chronicle PR Skill
 
-Spawn ONE **Storykeeper**. The Storykeeper owns the whole flow: it analyzes the
+Spawn one **Storykeeper**. The Storykeeper owns the whole flow: it analyzes the
 branch, writes a reviewer-legible title and body to a file, and opens the request
 from that file. This keeps all branch/diff/`gh` output out of the main
 conversation, and it preserves the "why" behind the change.
@@ -19,7 +19,7 @@ conversation, and it preserves the "why" behind the change.
 
 ```
 main agent  (holds the conversation = the "why")
-  └─ chronicle:storykeeper   (sonnet; subagent_type — a custom agent, NOT a fork)
+  └─ chronicle:storykeeper   (subagent_type — a custom agent, NOT a fork)
        ├─ analyze-branch.ts   → branch material file + textPath
        ├─ writes { title, body } to textPath (4 sections, optional overview diagram)
        └─ request-creator.ts --material --text  → opens the PR/MR, returns the URL
@@ -103,14 +103,14 @@ optional Mermaid overview diagram, and the `CreateResult` contract — lives the
    - the **skill directory** — the skill's load-time "Base directory for this
      skill" banner value (so the Storykeeper resolves `<skill dir>/scripts/analyze-branch.ts`
      and `<skill dir>/scripts/request-creator.ts`). Do not hard-code a
-     repo-relative path or rely on `${CLAUDE_PLUGIN_ROOT}`.
+     repo-relative path.
      Pass it as a **literal absolute path**, never as a `$`-prefixed token —
      nothing sets that variable in the Storykeeper's shell, so its command silently
      runs against `/`.
    - `contextBrief` (from step 3).
    - `base` — the explicit branch selected in step 1. Never pass `auto`.
    - `branch` — the current branch. If it is a protected branch, defer to the user's
-     existing git-flow guard before spawning.
+     existing branch guard before spawning.
    - `draft` — optional. Default `false`. Pass `true` only if the user asked to open
      the PR as a draft.
    - `skipReview` — the answer from step 2. Always pass it explicitly.

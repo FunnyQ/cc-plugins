@@ -1,6 +1,6 @@
 # PR/MR under the OpenCode harness
 
-The topology is the same as the Claude Code flow: spawn ONE Storykeeper, which
+The topology is the same as the Claude Code flow: spawn one Storykeeper, which
 runs the scripts itself and spawns nothing. Only the two items below differ.
 
 ## Agent names are bare
