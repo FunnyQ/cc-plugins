@@ -6,12 +6,11 @@ use axum::{
     http::StatusCode,
     routing::{get, post},
 };
-use regex::Regex;
 use reqwest::{Client, RequestBuilder};
 use serde_json::{Value, json};
-use std::{collections::HashMap, process::Stdio, sync::LazyLock, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
-const UNAVAILABLE: &str = "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
+const UNAVAILABLE: &str = "OpenCode background service unavailable. Start OpenCode (the TUI or opencode serve), or set OPENCODE_SERVER_URL=http://127.0.0.1:<port> — with OPENCODE_SERVER_PASSWORD when the service requires auth — before starting cockpit.";
 
 fn env(name: &str) -> Option<String> {
     std::env::var(name).ok().filter(|s| !s.is_empty())
@@ -19,123 +18,136 @@ fn env(name: &str) -> Option<String> {
 
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(1);
 const SESSION_TIMEOUT: Duration = Duration::from_secs(2);
-const PROMPT_TIMEOUT: Duration = Duration::from_secs(5);
+const PROMPT_TIMEOUT: Duration = Duration::from_secs(15);
 
-fn authenticated(request: RequestBuilder, timeout: Duration) -> RequestBuilder {
+/// V2 always authenticates as the fixed user; 1.x accepted a username override.
+const AUTH_USERNAME: &str = "opencode";
+
+fn authenticated(
+    request: RequestBuilder,
+    password: Option<&str>,
+    timeout: Duration,
+) -> RequestBuilder {
     let request = request.timeout(timeout);
-    match env("OPENCODE_SERVER_PASSWORD") {
-        Some(password) => request.basic_auth(
-            env("OPENCODE_SERVER_USERNAME").unwrap_or_else(|| "opencode".into()),
-            Some(password),
-        ),
+    match password {
+        Some(password) => request.basic_auth(AUTH_USERNAME, Some(password)),
         None => request,
     }
 }
 
-fn process_urls(output: &str) -> Vec<String> {
-    static COMMAND: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"(^|[/\s])opencode(\s|$)").expect("constant regex"));
-    static EXCLUDE: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"\bopencode\s+(serve|web|attach)\b").expect("constant regex"));
-    static PORT: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"--port(?:=|\s+)(\d{1,5})").expect("constant regex"));
-    static SHORT_PORT: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"-p\s+(\d{1,5})").expect("constant regex"));
-    static HOST: LazyLock<Regex> =
-        LazyLock::new(|| Regex::new(r"--hostname(?:=|\s+)(\S+)").expect("constant regex"));
-    output
-        .lines()
-        .map(str::trim)
-        .filter(|line| COMMAND.is_match(line) && !EXCLUDE.is_match(line))
-        .filter_map(|line| {
-            let port = PORT.captures(line).or_else(|| SHORT_PORT.captures(line))?;
-            let host = HOST.captures(line);
-            Some(format!(
-                "http://{}:{}",
-                host.as_ref().map(|c| &c[1]).unwrap_or("127.0.0.1"),
-                &port[1]
-            ))
-        })
-        .collect()
+/// The background service registration V2 writes on every start. Each candidate
+/// carries its own password so one service's credential never reaches another.
+fn service_info() -> Option<(String, Option<String>)> {
+    let value: Value =
+        serde_json::from_str(&std::fs::read_to_string(crate::paths::opencode_service_json()).ok()?)
+            .ok()?;
+    let url = value.get("url")?.as_str()?.trim_end_matches('/').to_owned();
+    if url.is_empty() {
+        return None;
+    }
+    let password = value
+        .get("password")
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    Some((url, password))
 }
 
-async fn discover(client: &Client, candidates: Vec<String>) -> Option<String> {
-    for url in candidates {
-        let response = authenticated(client.get(format!("{url}/global/health")), HEALTH_TIMEOUT)
-            .send()
-            .await;
-        if let Ok(response) = response
-            && response.status().is_success()
+type Candidate = (String, Option<String>);
+
+fn candidates() -> Vec<Candidate> {
+    let file = service_info();
+    let mut candidates = Vec::new();
+    if let Some(url) = env("OPENCODE_TUI_SERVER_URL").or_else(|| env("OPENCODE_SERVER_URL")) {
+        let url = url.trim_end_matches('/').to_owned();
+        let password = env("OPENCODE_SERVER_PASSWORD").or_else(|| {
+            file.as_ref()
+                .filter(|(file_url, _)| *file_url == url)
+                .and_then(|(_, password)| password.clone())
+        });
+        candidates.push((url, password));
+    }
+    if let Some(candidate) = file
+        && !candidates.iter().any(|(url, _)| *url == candidate.0)
+    {
+        candidates.push(candidate);
+    }
+    candidates
+}
+
+/// Health is "answers /api/info with JSON that names its version" — the 1.x
+/// /global/health probe is gone in V2.
+async fn discover(client: &Client, candidates: Vec<Candidate>) -> Result<Candidate, String> {
+    let mut rejected = None;
+    for candidate in candidates {
+        let Ok(response) = authenticated(
+            client.get(format!("{}/api/info", candidate.0)),
+            candidate.1.as_deref(),
+            HEALTH_TIMEOUT,
+        )
+        .send()
+        .await
+        else {
+            continue;
+        };
+        let status = response.status();
+        if status == StatusCode::UNAUTHORIZED || status == StatusCode::FORBIDDEN {
+            rejected.get_or_insert(format!(
+                "OpenCode rejected the service password: {}",
+                status.as_u16()
+            ));
+            continue;
+        }
+        if status.is_success()
             && response
                 .json::<Value>()
                 .await
                 .ok()
-                .is_some_and(|v| v.get("healthy") == Some(&Value::Bool(true)))
+                .and_then(|v| v.get("version").and_then(Value::as_str).map(str::to_owned))
+                .is_some_and(|version| !version.is_empty())
         {
-            return Some(url);
+            return Ok(candidate);
         }
     }
-    None
-}
-
-async fn candidates() -> Vec<String> {
-    let mut urls = Vec::new();
-    if let Some(url) = env("OPENCODE_TUI_SERVER_URL").or_else(|| env("OPENCODE_SERVER_URL")) {
-        urls.push(url.trim_end_matches('/').to_owned());
-    }
-    if let Ok(output) = tokio::process::Command::new("ps")
-        .args(["-axo", "command"])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .await
-        && output.status.success()
-    {
-        urls.extend(process_urls(&String::from_utf8_lossy(&output.stdout)));
-    }
-    urls
+    Err(rejected.unwrap_or_else(|| UNAVAILABLE.into()))
 }
 
 #[derive(Default)]
 struct Report {
     ready: bool,
     server: Option<String>,
-    directory: String,
+    password: Option<String>,
+    session: Option<String>,
     delivered: bool,
     errors: Vec<String>,
 }
 
-async fn check(client: &Client, urls: Vec<String>, session: &str) -> Report {
-    let Some(server) = discover(client, urls).await else {
-        return Report {
-            errors: vec![UNAVAILABLE.into()],
-            ..Report::default()
-        };
+async fn check(client: &Client, candidates: Vec<Candidate>, session: &str) -> Report {
+    let (server, password) = match discover(client, candidates).await {
+        Ok(found) => found,
+        Err(error) => {
+            return Report {
+                errors: vec![error],
+                ..Report::default()
+            };
+        }
     };
     let mut report = Report {
-        server: Some(server.clone()),
+        server: Some(server),
+        password,
         ..Report::default()
     };
     match authenticated(
-        client.get(format!("{server}/session/{session}")),
+        client.get(format!(
+            "{}/api/session/{session}",
+            report.server.as_deref().expect("discovered server")
+        )),
+        report.password.as_deref(),
         SESSION_TIMEOUT,
     )
     .send()
     .await
     {
-        Ok(response) if response.status().is_success() => {
-            report.directory = response
-                .json::<Value>()
-                .await
-                .ok()
-                .and_then(|v| {
-                    v.get("directory")
-                        .and_then(Value::as_str)
-                        .map(str::to_owned)
-                })
-                .unwrap_or_default();
-            report.ready = true;
-        }
+        Ok(response) if response.status().is_success() => report.ready = true,
         Ok(response) => report
             .errors
             .push(if response.status() == StatusCode::NOT_FOUND {
@@ -156,45 +168,62 @@ async fn send(client: &Client, report: &mut Report, text: &str) {
         return;
     }
     let server = report.server.as_deref().expect("ready report has server");
-    for action in ["append", "submit"] {
-        let mut request = authenticated(
-            client.post(format!("{server}/tui/{action}-prompt")),
-            PROMPT_TIMEOUT,
-        );
-        if !report.directory.is_empty() {
-            request = request.query(&[("directory", &report.directory)]);
-        }
-        if action == "append" {
-            request = request.json(&json!({"text": text}));
-        }
-        match request.send().await {
-            Ok(response) => {
-                let status = response.status();
-                let body = response.json::<Value>().await.unwrap_or(Value::Null);
-                if !status.is_success() || body != Value::Bool(true) {
-                    let message = [
-                        body.pointer("/data/message"),
-                        body.get("message"),
-                        body.get("error"),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .find(|value| js_truthy(value))
-                    .map(js_string)
-                    .unwrap_or_else(|| {
-                        format!("OpenCode TUI {action} failed: {}", status.as_u16())
-                    });
-                    report.errors.push(message);
-                    return;
-                }
-            }
-            Err(error) => {
-                report.errors.push(error.to_string());
+    let response = authenticated(
+        client.post(format!(
+            "{server}/api/session/{}/prompt",
+            session_of(report)
+        )),
+        report.password.as_deref(),
+        PROMPT_TIMEOUT,
+    )
+    .json(&json!({"text": text, "delivery": "queue"}))
+    .send()
+    .await;
+    match response {
+        Ok(response) => {
+            let status = response.status();
+            let body = response.json::<Value>().await.unwrap_or(Value::Null);
+            if !status.is_success() {
+                report.errors.push(prompt_error(&body, status));
                 return;
             }
         }
+        Err(error) => {
+            report.errors.push(error.to_string());
+            return;
+        }
     }
     report.delivered = true;
+}
+
+fn session_of(report: &Report) -> String {
+    report
+        .session
+        .as_deref()
+        .expect("ready report carries its session")
+        .to_owned()
+}
+
+fn prompt_error(body: &Value, status: StatusCode) -> String {
+    let message = [
+        body.pointer("/error/message"),
+        body.get("message"),
+        body.get("error"),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|value| js_truthy(value))
+    .map(js_string);
+    match message {
+        Some(message) => message,
+        None if status.as_u16() == 401 || status.as_u16() == 403 => {
+            format!(
+                "OpenCode rejected the service password: {}",
+                status.as_u16()
+            )
+        }
+        None => format!("OpenCode prompt failed: {}", status.as_u16()),
+    }
 }
 
 pub(crate) fn js_truthy(value: &Value) -> bool {
@@ -261,7 +290,7 @@ async fn status(Query(query): Query<HashMap<String, String>>) -> axum::response:
         Ok(session) => session,
         Err((status, error)) => return json_error(status, error),
     };
-    let report = check(&Client::new(), candidates().await, session).await;
+    let report = check(&Client::new(), candidates(), session).await;
     let mut body = json!({"ready": report.ready});
     if let Some(server) = report.server {
         body["serverUrl"] = json!(server);
@@ -292,7 +321,8 @@ async fn message(bytes: Bytes) -> axum::response::Response {
         return json_error(StatusCode::BAD_REQUEST, "empty text");
     }
     let client = Client::new();
-    let mut report = check(&client, candidates().await, session).await;
+    let mut report = check(&client, candidates(), session).await;
+    report.session = Some(session.to_owned());
     send(&client, &mut report, text).await;
     if !report.delivered {
         let error = report.errors.join("; ");
@@ -303,7 +333,7 @@ async fn message(bytes: Bytes) -> axum::response::Response {
     }
     json_response(
         StatusCode::OK,
-        json!({"delivered": true, "delivery": "tui", "serverUrl": report.server, "warnings": []}),
+        json!({"delivered": true, "delivery": "prompt", "serverUrl": report.server, "warnings": []}),
     )
 }
 
@@ -320,91 +350,102 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn parses_only_tui_processes() {
-        assert_eq!(
-            process_urls(
-                "opencode --port 4096\n/usr/local/bin/opencode -p 4096 --hostname 0.0.0.0\nopencode serve --port 4096\nopencode web --port 9\nopencode attach --port 9\nopencode\nnotopencode --port 9"
-            ),
-            vec!["http://127.0.0.1:4096", "http://0.0.0.0:4096"]
-        );
-        assert_eq!(
-            process_urls("opencode --port=123 --hostname=localhost"),
-            vec!["http://localhost:123"]
-        );
-    }
-
-    #[test]
-    fn auth_is_optional_and_uses_default_username() {
+    fn auth_is_fixed_user_with_optional_password() {
         let _env = crate::paths::tests::TestEnv::new();
-        let saved: Vec<_> = ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME"]
-            .into_iter()
-            .map(|key| (key, std::env::var_os(key)))
-            .collect();
+        let saved = std::env::var_os("OPENCODE_SERVER_PASSWORD");
         unsafe {
             std::env::remove_var("OPENCODE_SERVER_PASSWORD");
-            std::env::remove_var("OPENCODE_SERVER_USERNAME");
         }
         let client = Client::new();
         assert!(
-            !authenticated(client.get("http://localhost"), HEALTH_TIMEOUT)
+            !authenticated(client.get("http://localhost"), None, HEALTH_TIMEOUT)
                 .build()
                 .unwrap()
                 .headers()
                 .contains_key("authorization")
         );
-        unsafe {
-            std::env::set_var("OPENCODE_SERVER_PASSWORD", "secret");
-        }
         assert_eq!(
-            authenticated(client.get("http://localhost"), HEALTH_TIMEOUT)
-                .build()
-                .unwrap()
-                .headers()["authorization"],
+            authenticated(
+                client.get("http://localhost"),
+                Some("secret"),
+                HEALTH_TIMEOUT
+            )
+            .build()
+            .unwrap()
+            .headers()["authorization"],
             "Basic b3BlbmNvZGU6c2VjcmV0"
         );
         unsafe {
-            std::env::set_var("OPENCODE_SERVER_USERNAME", "user");
-        }
-        assert_eq!(
-            authenticated(client.get("http://localhost"), HEALTH_TIMEOUT)
-                .build()
-                .unwrap()
-                .headers()["authorization"],
-            "Basic dXNlcjpzZWNyZXQ="
-        );
-        for (key, value) in saved {
-            unsafe {
-                match value {
-                    Some(value) => std::env::set_var(key, value),
-                    None => std::env::remove_var(key),
-                }
+            match saved {
+                Some(value) => std::env::set_var("OPENCODE_SERVER_PASSWORD", value),
+                None => std::env::remove_var("OPENCODE_SERVER_PASSWORD"),
             }
         }
     }
 
-    type Calls = Arc<Mutex<Vec<(String, String, Value)>>>;
+    #[test]
+    fn service_info_reads_url_and_password_pair() {
+        let fixture = crate::paths::tests::TestEnv::new();
+        fixture.set(
+            "COCKPIT_OPENCODE_SERVICE_JSON",
+            fixture.dir.path().join("service.json"),
+        );
+        assert_eq!(service_info(), None);
+        std::fs::write(
+            crate::paths::opencode_service_json(),
+            r#"{"url":"http://127.0.0.1:49374/","password":"secret"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            service_info(),
+            Some(("http://127.0.0.1:49374".into(), Some("secret".into())))
+        );
+        std::fs::write(crate::paths::opencode_service_json(), r#"{"url":""}"#).unwrap();
+        assert_eq!(service_info(), None);
+    }
+
+    type Calls = Arc<Mutex<Vec<(String, String, Value, String)>>>;
     async fn fake(
         State((calls, fail)): State<(Calls, bool)>,
         request: Request<Body>,
     ) -> axum::response::Response {
         let path = request.uri().path().to_owned();
         let query = request.uri().query().unwrap_or_default().to_owned();
+        let authorization = request
+            .headers()
+            .get("authorization")
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or_default()
+            .to_owned();
         let bytes = axum::body::to_bytes(request.into_body(), 4096)
             .await
             .unwrap();
         let body = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
-        calls.lock().unwrap().push((path.clone(), query, body));
+        calls
+            .lock()
+            .unwrap()
+            .push((path.clone(), query, body, authorization));
         let body = match path.as_str() {
-            "/global/health" => json!({"healthy": true}),
-            "/session/ses_12345678" => json!({"directory": "/tmp/project with spaces"}),
-            "/tui/append-prompt" if fail => json!({"data": {"message": "append denied"}}),
-            _ => json!(true),
+            "/api/info" => StatusCode::OK,
+            "/api/session/ses_12345678" => StatusCode::OK,
+            "/api/session/ses_12345678/prompt" if fail => StatusCode::BAD_GATEWAY,
+            _ => StatusCode::OK,
         };
-        json_response(StatusCode::OK, body)
+        let payload = match path.as_str() {
+            "/api/info" => json!({"version": "2.2.7"}),
+            "/api/session/ses_12345678" => {
+                json!({"data": {"location": {"directory": "/tmp/project with spaces"}}})
+            }
+            "/api/session/ses_12345678/prompt" if fail => {
+                json!({"error": {"message": "prompt denied"}})
+            }
+            _ => json!({"data": {"id": "msg_1"}}),
+        };
+        json_response(body, payload)
     }
 
     #[test]
-    fn delivers_in_order_and_surfaces_append_errors() {
+    fn delivers_one_prompt_and_surfaces_errors() {
         let _env = crate::paths::tests::TestEnv::new();
         let saved = std::env::var_os("OPENCODE_TUI_SERVER_URL");
         tokio::runtime::Builder::new_current_thread()
@@ -426,8 +467,9 @@ mod tests {
                     unsafe {
                         std::env::set_var("OPENCODE_TUI_SERVER_URL", &url);
                     }
-                    let mut report = check(&client, candidates().await, "ses_12345678").await;
+                    let mut report = check(&client, candidates(), "ses_12345678").await;
                     assert!(report.ready);
+                    report.session = Some("ses_12345678".into());
                     send(&client, &mut report, "Hello").await;
                     assert_eq!(report.delivered, !fail);
                     let calls = calls.lock().unwrap();
@@ -435,26 +477,21 @@ mod tests {
                         calls.iter().map(|c| c.0.as_str()).collect::<Vec<_>>(),
                         if fail {
                             vec![
-                                "/global/health",
-                                "/session/ses_12345678",
-                                "/tui/append-prompt",
+                                "/api/info",
+                                "/api/session/ses_12345678",
+                                "/api/session/ses_12345678/prompt",
                             ]
                         } else {
                             vec![
-                                "/global/health",
-                                "/session/ses_12345678",
-                                "/tui/append-prompt",
-                                "/tui/submit-prompt",
+                                "/api/info",
+                                "/api/session/ses_12345678",
+                                "/api/session/ses_12345678/prompt",
                             ]
                         }
                     );
-                    assert_eq!(calls[2].1, "directory=%2Ftmp%2Fproject+with+spaces");
-                    assert_eq!(calls[2].2, json!({"text": "Hello"}));
+                    assert_eq!(calls[2].2, json!({"text": "Hello", "delivery": "queue"}));
                     if fail {
-                        assert_eq!(report.errors, vec!["append denied"]);
-                    } else {
-                        assert_eq!(calls[3].1, calls[2].1);
-                        assert_eq!(calls[3].2, Value::Null);
+                        assert_eq!(report.errors, vec!["prompt denied"]);
                     }
                     task.abort();
                 }
@@ -467,49 +504,57 @@ mod tests {
         }
     }
 
-    async fn truthy_but_not_true(
-        State(body): State<Value>,
-        request: Request<Body>,
-    ) -> axum::response::Response {
-        match request.uri().path() {
-            "/global/health" => json_response(StatusCode::OK, json!({"healthy": true})),
-            "/session/ses_12345678" => json_response(StatusCode::OK, json!({"directory": ""})),
-            _ => json_response(StatusCode::OK, body),
-        }
-    }
-
     #[test]
-    fn delivery_needs_a_2xx_json_body_strictly_equal_to_true() {
-        let _env = crate::paths::tests::TestEnv::new();
+    fn password_pairs_with_its_url() {
+        let fixture = crate::paths::tests::TestEnv::new();
         let saved = std::env::var_os("OPENCODE_TUI_SERVER_URL");
+        std::fs::create_dir_all(fixture.dir.path().join("opencode")).unwrap();
+        fixture.set(
+            "COCKPIT_OPENCODE_SERVICE_JSON",
+            fixture.dir.path().join("opencode/service.json"),
+        );
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .unwrap()
             .block_on(async {
-                for (body, delivered) in [
-                    (json!({}), false),
-                    (json!("true"), false),
-                    (json!(true), true),
-                ] {
-                    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-                    let url = format!("http://{}", listener.local_addr().unwrap());
-                    let router = Router::new()
-                        .fallback(truthy_but_not_true)
-                        .with_state(body.clone());
-                    let task = tokio::spawn(async move {
-                        axum::serve(listener, router).await.unwrap();
-                    });
-                    let client = Client::new();
-                    unsafe {
-                        std::env::set_var("OPENCODE_TUI_SERVER_URL", &url);
-                    }
-                    let mut report = check(&client, candidates().await, "ses_12345678").await;
-                    assert!(report.ready);
-                    send(&client, &mut report, "Hello").await;
-                    assert_eq!(report.delivered, delivered, "body {body}");
-                    task.abort();
-                }
+                let calls: Calls = Arc::default();
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let url = format!("http://{}", listener.local_addr().unwrap());
+                std::fs::write(
+                    crate::paths::opencode_service_json(),
+                    json!({"url": url, "password": "file-secret"}).to_string(),
+                )
+                .unwrap();
+                let router = Router::new()
+                    .fallback(fake)
+                    .with_state((calls.clone(), false));
+                let task = tokio::spawn(async move {
+                    axum::serve(listener, router).await.unwrap();
+                });
+                let client = Client::new();
+                let mut report = check(&client, candidates(), "ses_12345678").await;
+                assert!(report.ready);
+                assert_eq!(report.server.as_deref(), Some(url.as_str()));
+                assert_eq!(report.password.as_deref(), Some("file-secret"));
+                report.session = Some("ses_12345678".into());
+                send(&client, &mut report, "Hello").await;
+                assert!(report.delivered);
+                let calls = calls.lock().unwrap();
+                assert_eq!(
+                    calls.iter().map(|c| c.0.as_str()).collect::<Vec<_>>(),
+                    vec![
+                        "/api/info",
+                        "/api/session/ses_12345678",
+                        "/api/session/ses_12345678/prompt"
+                    ]
+                );
+                assert!(
+                    calls
+                        .iter()
+                        .all(|call| call.3 == "Basic b3BlbmNvZGU6ZmlsZS1zZWNyZXQ=")
+                );
+                task.abort();
             });
         unsafe {
             match saved {
@@ -517,6 +562,52 @@ mod tests {
                 None => std::env::remove_var("OPENCODE_TUI_SERVER_URL"),
             }
         }
+    }
+
+    #[test]
+    fn env_url_matching_service_json_reuses_its_password() {
+        let fixture = crate::paths::tests::TestEnv::new();
+        fixture.set(
+            "COCKPIT_OPENCODE_SERVICE_JSON",
+            fixture.dir.path().join("service.json"),
+        );
+        std::fs::write(
+            crate::paths::opencode_service_json(),
+            r#"{"url":"http://127.0.0.1:49374","password":"file-secret"}"#,
+        )
+        .unwrap();
+        fixture.set("OPENCODE_SERVER_URL", "http://127.0.0.1:49374/");
+        assert_eq!(
+            candidates(),
+            vec![("http://127.0.0.1:49374".into(), Some("file-secret".into()))]
+        );
+        fixture.set("OPENCODE_SERVER_PASSWORD", "env-secret");
+        assert_eq!(
+            candidates(),
+            vec![("http://127.0.0.1:49374".into(), Some("env-secret".into()))]
+        );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn rejected_password_reports_auth_not_unavailable() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let router = Router::new().fallback(|| async { StatusCode::UNAUTHORIZED });
+        let task = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let report = check(
+            &Client::new(),
+            vec![(url, Some("wrong".into()))],
+            "ses_12345678",
+        )
+        .await;
+        assert!(!report.ready);
+        assert_eq!(
+            report.errors,
+            vec!["OpenCode rejected the service password: 401"]
+        );
+        task.abort();
     }
 
     #[test]
@@ -569,7 +660,7 @@ mod tests {
                     if index < 2 {
                         tokio::time::sleep(Duration::from_secs(10)).await;
                     }
-                    axum::Json(json!({"healthy": true}))
+                    axum::Json(json!({"version": "2.2.7"}))
                 }
             });
             tasks.push(tokio::spawn(async move {
@@ -578,8 +669,13 @@ mod tests {
         }
         let started = std::time::Instant::now();
         assert_eq!(
-            discover(&Client::new(), urls.clone()).await,
-            Some(urls[2].clone())
+            discover(
+                &Client::new(),
+                urls.iter().map(|url| (url.clone(), None)).collect()
+            )
+            .await
+            .map(|(url, _)| url),
+            Ok(urls[2].clone())
         );
         assert_eq!(*calls.lock().unwrap(), vec![0, 1, 2]);
         assert!(started.elapsed() >= Duration::from_secs(2));
@@ -591,12 +687,17 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn unavailable_and_ordered_discovery() {
+        let fixture = crate::paths::tests::TestEnv::new();
+        fixture.set(
+            "COCKPIT_OPENCODE_SERVICE_JSON",
+            fixture.dir.path().join("none/service.json"),
+        );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let closed = format!("http://{}", listener.local_addr().unwrap());
         drop(listener);
         let client = Client::new();
         let start = std::time::Instant::now();
-        let report = check(&client, vec![closed.clone()], "ses_12345678").await;
+        let mut report = check(&client, candidates(), "ses_12345678").await;
         assert!(!report.ready);
         assert_eq!(report.errors, vec![UNAVAILABLE]);
         assert!(start.elapsed() < Duration::from_secs(2));
@@ -609,12 +710,13 @@ mod tests {
         let task = tokio::spawn(async move {
             axum::serve(listener, router).await.unwrap();
         });
-        let mut report = check(
+        report = check(
             &client,
-            vec![closed.clone(), closed, url.clone()],
+            vec![(closed.clone(), None), (closed, None), (url.clone(), None)],
             "ses_12345678",
         )
         .await;
+        report.session = Some("ses_12345678".into());
         send(&client, &mut report, "Third candidate").await;
         assert!(report.delivered);
         assert_eq!(report.server, Some(url));

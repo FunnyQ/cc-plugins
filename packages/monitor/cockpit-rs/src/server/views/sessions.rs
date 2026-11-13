@@ -281,7 +281,7 @@ fn database_live(path: &Path, provider: Provider, now: i64) -> rusqlite::Result<
             }
         )
     } else {
-        "select id, directory, title, time_updated, time_created from session where time_archived is null order by time_updated desc limit 24".into()
+        "select id, directory, title, time_updated, time_created from session_v2 where time_archived is null order by time_updated desc limit 24".into()
     };
     let mut statement = db.prepare(&sql)?;
     let rows = statement.query_map([], |row| {
@@ -396,14 +396,14 @@ mod tests {
         let opencode = fixture.dir.path().join("opencode.sqlite");
         fixture.set("COCKPIT_OPENCODE_DB", &opencode);
         let db = Connection::open(&opencode).unwrap();
-        db.execute_batch("create table session(id text, directory text, title text, time_created integer, time_updated integer, time_archived integer);").unwrap();
+        db.execute_batch("create table session_v2(id text primary key, directory text, title text, time_created integer, time_updated integer, time_archived integer);").unwrap();
         db.execute(
-            "insert into session values ('open', '/repo', ' Open ', ?1, ?2, null)",
+            "insert into session_v2 values ('open', '/repo', ' Open ', ?1, ?2, null)",
             rusqlite::params![now, now / 1000],
         )
         .unwrap();
         db.execute(
-            "insert into session values ('archived', '/repo', '', ?1, ?1, 1)",
+            "insert into session_v2 values ('archived', '/repo', '', ?1, ?1, 1)",
             [now],
         )
         .unwrap();

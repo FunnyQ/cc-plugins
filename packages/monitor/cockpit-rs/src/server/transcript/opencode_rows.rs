@@ -14,7 +14,7 @@ struct Row {
     created: i64,
     updated: i64,
     data: String,
-    part: Option<String>,
+    kind: String,
 }
 
 fn compact_path(path: &str) -> String {
@@ -36,7 +36,9 @@ fn part_content(part: &Value) -> Vec<Value> {
         return Vec::new();
     }
     let kind = part["type"].as_str().unwrap_or("");
-    if kind == "tool" && part["tool"] == "read" {
+    if kind == "tool"
+        && nonnull([&part["tool"], &part["name"]]).and_then(Value::as_str) == Some("read")
+    {
         let state = &part["state"];
         let path = nonnull([
             &state["input"]["filePath"],
@@ -109,22 +111,26 @@ fn entries(rows: &[Row]) -> Vec<Value> {
         if groups.last().is_none_or(|(first, _)| first.id != row.id) {
             groups.push((row, Vec::new()));
         }
-        if let Some(part) = row
-            .part
-            .as_deref()
-            .and_then(|part| serde_json::from_str::<Value>(part).ok())
-            && let Some((_, parts)) = groups.last_mut()
-        {
-            parts.extend(part_content(&part));
+        if let Some((_, parts)) = groups.last_mut() {
+            // V2 stores the message parts inline in data.content; part_content
+            // renders each one the way the legacy part table did.
+            if let Some(content) = serde_json::from_str::<Value>(&row.data)
+                .ok()
+                .and_then(|data| data["content"].as_array().cloned())
+            {
+                for part in &content {
+                    parts.extend(part_content(part));
+                }
+            }
         }
     }
     let mut output = Vec::new();
     for (row, parts) in groups {
         let data = serde_json::from_str::<Value>(&row.data).unwrap_or(Value::Null);
-        let role = if data["role"] == "user" {
-            "user"
-        } else {
-            "assistant"
+        let role = match row.kind.as_str() {
+            "user" => "user",
+            "assistant" => "assistant",
+            _ => continue,
         };
         let content = if parts.is_empty() {
             nonnull([&data["content"], &data["text"]])
@@ -156,26 +162,25 @@ fn entries(rows: &[Row]) -> Vec<Value> {
     output
 }
 
+fn query_rows(db: &Connection, session: &str, cursor: i64) -> rusqlite::Result<Vec<Row>> {
+    let mut query = db.prepare("select id, time_created, time_updated, data, type from (select * from session_message where session_id = ? and time_updated > ? order by time_updated desc, id desc limit ?) order by seq")?;
+    query
+        .query_map((session, cursor, BACKLOG_LINES), |row| {
+            Ok(Row {
+                id: row.get(0)?,
+                created: row.get(1)?,
+                updated: row.get(2)?,
+                data: row.get(3)?,
+                kind: row.get(4)?,
+            })
+        })?
+        .collect()
+}
+
 fn read_rows(session: &str, cursor: i64) -> Vec<Row> {
-    let read = || -> rusqlite::Result<Vec<Row>> {
-        let db = Connection::open_with_flags(
-            crate::paths::opencode_db(),
-            OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?;
-        let mut query = db.prepare("select m.id as message_id, m.time_created as message_created, m.time_updated as message_updated, m.data as message_data, p.id as part_id, p.time_created as part_created, p.data as part_data from (select id, session_id, time_created, time_updated, data from message where session_id = ? and time_updated > ? order by time_updated desc, id desc limit ?) m left join part p on p.message_id = m.id order by m.time_created asc, m.id asc, p.time_created asc, p.id asc")?;
-        query
-            .query_map((session, cursor, BACKLOG_LINES), |row| {
-                Ok(Row {
-                    id: row.get(0)?,
-                    created: row.get(1)?,
-                    updated: row.get(2)?,
-                    data: row.get(3)?,
-                    part: row.get(6)?,
-                })
-            })?
-            .collect()
-    };
-    read().unwrap_or_default()
+    Connection::open_with_flags(crate::paths::opencode_db(), OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .and_then(|db| query_rows(&db, session, cursor))
+        .unwrap_or_default()
 }
 
 fn emit_rows(rows: &[Row], cursor: &mut i64, seen: &mut HashSet<String>) -> String {
@@ -261,35 +266,28 @@ mod tests {
     }
 
     #[test]
-    fn groups_parts_preserves_field_order_and_deduplicates() {
+    fn inline_content_renders_and_deduplicates() {
         let rows = vec![
             Row {
                 id: "one".into(),
                 created: 1,
                 updated: 1_700_000_000_001,
-                data: "{\"role\":\"user\"}".into(),
-                part: Some("{\"type\":\"text\",\"text\":\"hello\"}".into()),
-            },
-            Row {
-                id: "one".into(),
-                created: 1,
-                updated: 1_700_000_000_001,
-                data: "{}".into(),
-                part: Some("{\"type\":\"reasoning\",\"text\":\"think\"}".into()),
+                data: r#"{"content":[{"type":"text","text":"hello"},{"type":"reasoning","text":"think"}]}"#.into(),
+                kind: "user".into(),
             },
             Row {
                 id: "empty".into(),
                 created: 2,
                 updated: 2,
                 data: "{}".into(),
-                part: None,
+                kind: "assistant".into(),
             },
             Row {
                 id: "false".into(),
                 created: 3,
                 updated: 0,
                 data: "{\"content\":false}".into(),
-                part: None,
+                kind: "assistant".into(),
             },
         ];
         let mapped = entries(&rows);
@@ -320,7 +318,7 @@ mod tests {
             created: 0,
             updated: 0,
             data: data.into(),
-            part: None,
+            kind: "assistant".into(),
         };
         let content = |data: &str| {
             entries(&[row(data)])
@@ -342,15 +340,48 @@ mod tests {
     }
 
     #[test]
+    fn rows_follow_seq_even_when_a_prompt_is_updated_after_its_reply() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "create table session_message (id text primary key, session_id text, type text, seq integer, time_created integer, time_updated integer, data text);
+             insert into session_message values ('prompt', 's', 'user', 0, 10, 530654, '{}');
+             insert into session_message values ('reply', 's', 'assistant', 1, 11, 530622, '{}');",
+        )
+        .unwrap();
+        let ids: Vec<_> = query_rows(&db, "s", 0)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect();
+        assert_eq!(ids, ["prompt", "reply"]);
+    }
+
+    #[test]
+    fn system_synthetic_and_idle_rows_are_not_replies() {
+        let row = |kind: &str| Row {
+            id: kind.into(),
+            created: 0,
+            updated: 0,
+            data: json!({"text":"The server restarted while you were working"}).to_string(),
+            kind: kind.into(),
+        };
+        assert!(entries(&[row("system"), row("synthetic"), row("idle")]).is_empty());
+    }
+
+    #[test]
     fn non_adjacent_rows_with_the_same_id_stay_split() {
-        let row = |id: &str, text: &str| Row {
+        let row = |id: &str, kind: &str, text: &str| Row {
             id: id.into(),
             created: 0,
             updated: 0,
-            data: "{}".into(),
-            part: Some(json!({"type":"text","text":text}).to_string()),
+            data: json!({"content":[{"type":"text","text":text}]}).to_string(),
+            kind: kind.into(),
         };
-        let mapped = entries(&[row("a", "one"), row("b", "two"), row("a", "three")]);
+        let mapped = entries(&[
+            row("a", "user", "one"),
+            row("b", "assistant", "two"),
+            row("a", "user", "three"),
+        ]);
         assert_eq!(
             mapped
                 .iter()

@@ -293,7 +293,7 @@ fn read_opencode_session_rows() -> Vec<OpenCodeRow> {
     let query = || -> rusqlite::Result<Vec<OpenCodeRow>> {
         let mut stmt = db.prepare(
             "select id, directory, time_created, time_updated
-             from session
+             from session_v2
              order by time_updated desc
              limit ?1",
         )?;
@@ -924,8 +924,8 @@ mod tests {
         env.set("COCKPIT_OPENCODE_DB", &oc);
         let odb = Connection::open(&oc).unwrap();
         odb.execute_batch(&format!(
-            "create table session (id text, directory text, time_created integer, time_updated integer);
-             insert into session values ('o', '/w/q', {}, {});",
+            "create table session_v2 (id text, directory text, time_created integer, time_updated integer);
+             insert into session_v2 values ('o', '/w/q', {}, {});",
             now - 5000,
             now - 120_000
         ))

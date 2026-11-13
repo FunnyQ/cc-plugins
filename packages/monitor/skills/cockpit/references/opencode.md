@@ -33,7 +33,7 @@ edit in the checkout is live with no reinstall.
 It returns `OPENCODE_SESSION_ID` or `OPENCODE_SESSION` when either is set.
 Otherwise it reads the OpenCode database at
 `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/opencode.db` and takes the
-latest non-archived `session` row whose `directory` matches this project's
+latest non-archived `session_v2` row whose `directory` matches this project's
 cwd. If it exits non-zero, generate one with `crypto.randomUUID()` and note
 which id you used.
 
@@ -56,25 +56,24 @@ On exit `4` nobody is watching the cockpit — ask the same question in chat,
 then record the answer with `cockpit send`. See "Nobody is watching" in
 `pilot.md`.
 
-## Sends go over the TUI HTTP bridge
+## Sends go over the background service prompt route
 
 The monitor mod that delivers Claude sends does not run on OpenCode, so a send takes a
 different path: the Rust OpenCode send bridge, served by the cockpit daemon at
-`/api/send-opencode-message`. It discovers the TUI server from
-`OPENCODE_TUI_SERVER_URL` or `OPENCODE_SERVER_URL`, falls back to a `ps` scan
-for `opencode --port <n>`, health-checks `/global/health`, resolves the
-session through `/session/<id>`, and delivers via `/tui/append-prompt` then
-`/tui/submit-prompt`.
+`/api/send-opencode-message`. It discovers the background service from
+`OPENCODE_TUI_SERVER_URL`, then `OPENCODE_SERVER_URL`, then
+`~/.local/state/opencode/service.json`. An env URL authenticates with
+`OPENCODE_SERVER_PASSWORD`, or with the file's password when both name the same
+URL. It health-checks
+`/api/info`, resolves the session through `/api/session/<id>`, and delivers with
+`POST /api/session/<id>/prompt` and `delivery: "queue"`. The 1.x TUI HTTP bridge
+(`/tui/append-prompt`, a `--port` TUI server, `/global/health`) is removed in
+OpenCode 2.x.
 
-Two preconditions, both observed on opencode 1.18.18:
-
-- **Start the TUI with a port.** Run `opencode --port <n>`, or set
-  `OPENCODE_TUI_SERVER_URL` before the cockpit daemon starts. An
-  `opencode serve` process does **not** count — discovery scans `ps` for
-  `opencode` and explicitly excludes `serve`, `web`, and `attach`.
-- **A successful send is not a delivery receipt.** `/tui/append-prompt`
-  returns `200 true` even with no TUI attached, so treat delivery as
-  best-effort and confirm through the session itself.
+- **Start OpenCode first.** The TUI and `opencode serve` both register the
+  background service; the send needs it running.
+- **A send is an admission, not a delivery receipt.** The prompt route admits
+  the message durably; confirm the answer through the session itself.
 
 Reads are unaffected. Transcript reads, the decision trail, and
 `needs_your_call` behave as they do for the other providers.

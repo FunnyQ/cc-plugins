@@ -468,7 +468,7 @@ describe("hook: stop", () => {
     const invocation = cli;
     const refs = join(skill, "references");
     const session = fixtures.claudeSessionId;
-    const prompt = `Scribe this session's decision log. In one turn, read ${refs}/scribe.md and run \`${invocation} scribe --prep --session ${session}\`. Then follow scribe.md: the CLI is ${cli}, and every call passes --session ${session}. Spell each call as \`${invocation} scribe …\`, never through a shell variable. When done, reply with one line.`;
+    const prompt = `Scribe this session's decision log. In one turn, read ${refs}/scribe.md and run \`${invocation} scribe --prep --session ${session}\`. Then follow scribe.md: the CLI is ${cli}, and every call passes --session ${session}. Spell each call as \`${invocation} scribe …\`, never through a shell variable. You are not this session's author: do not continue its work, answer its pending notifications, or touch any file. When done, reply with one line.`;
     expect(hook("stop")).toEqual({ exitCode: 0, stdout: "", stderr: "" });
     for (let i = 0; i < 100 && !existsSync(capture); i++) await Bun.sleep(20);
     expect(JSON.parse(readFileSync(capture, "utf8"))).toEqual({
@@ -483,6 +483,12 @@ describe("hook: stop", () => {
         "low",
         "--output-format",
         "json",
+        "--tools",
+        "Bash,Read",
+        "--permission-mode",
+        "dontAsk",
+        "--max-budget-usd",
+        "2",
         "--allowedTools",
         `Bash(${invocation} scribe:*)`,
         `Read(/${refs}/**)`,

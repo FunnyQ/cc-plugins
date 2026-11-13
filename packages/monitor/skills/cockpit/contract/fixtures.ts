@@ -205,18 +205,15 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
   }
   const opencode = new Database(f.opencodeDb, { create: true });
   try {
-    opencode.exec(`create table session (
+    opencode.exec(`create table session_v2 (
       id text primary key, directory text, title text, time_created integer,
       time_updated integer, time_archived integer
     );
-    create table message (
-      id text primary key, session_id text, time_created integer, time_updated integer, data text
-    );
-    create table part (
-      id text primary key, message_id text, time_created integer, data text
+    create table session_message (
+      id text primary key, session_id text, time_created integer, time_updated integer, type text, data text, seq integer
     );`);
     opencode
-      .query("insert into session values (?, ?, ?, ?, ?, ?)")
+      .query("insert into session_v2 values (?, ?, ?, ?, ?, ?)")
       .run(
         f.opencodeSessionId,
         f.projectDir,
@@ -226,13 +223,15 @@ export function makeProviderFixtures(h: Homes): ProviderFixtures {
         null,
       );
     opencode
-      .query("insert into message values (?, ?, ?, ?, ?)")
+      .query("insert into session_message values (?, ?, ?, ?, ?, ?, ?)")
       .run(
         "msg_fixture",
         f.opencodeSessionId,
         now,
         now,
-        JSON.stringify({ role: "user", content: "Fixture request" }),
+        "user",
+        JSON.stringify({ text: "Fixture request" }),
+        0,
       );
   } finally {
     opencode.close();

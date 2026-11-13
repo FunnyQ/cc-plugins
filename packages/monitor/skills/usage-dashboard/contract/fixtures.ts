@@ -717,19 +717,15 @@ function writeOpenCode(home: string): void {
   const cwd = FIXTURE_PROJECTS.c;
 
   const db = new Database(join(dir, "opencode.db"), { create: true });
-  db.exec(`create table session (
+  db.exec(`create table session_v2 (
       id text primary key, directory text not null, title text,
       time_created integer not null, time_updated integer not null
     );
-    create table message (
-      id text primary key, session_id text not null,
+    create table session_message (
+      id text primary key, session_id text not null, type text not null,
       time_created integer not null, time_updated integer not null, data text not null
-    );
-    create table part (
-      id text primary key, message_id text not null, session_id text not null,
-      time_created integer not null, data text not null
     );`);
-  db.query("insert into session values (?, ?, ?, ?, ?)").run(
+  db.query("insert into session_v2 values (?, ?, ?, ?, ?)").run(
     ses,
     cwd,
     "Fixture session",
@@ -737,27 +733,28 @@ function writeOpenCode(home: string): void {
     FIXTURE_NOW_MS - 300_000,
   );
 
-  const message = db.query("insert into message values (?, ?, ?, ?, ?)");
-  const part = db.query("insert into part values (?, ?, ?, ?, ?)");
+  const message = db.query(
+    "insert into session_message values (?, ?, ?, ?, ?, ?)",
+  );
   const u1 = local("2026-09-28T09:00:10");
   message.run(
     "msg_oc_u1",
     ses,
+    "user",
     u1,
     u1,
-    JSON.stringify({ role: "user", time: { created: u1 } }),
+    JSON.stringify({ text: "Fix the bug", time: { created: u1 } }),
   );
   const a1 = local("2026-09-28T09:00:12");
   const a1Done = local("2026-09-28T09:01:00");
   message.run(
     "msg_oc_a1",
     ses,
+    "assistant",
     a1,
     a1Done,
     JSON.stringify({
-      role: "assistant",
-      modelID: "kimi-k2",
-      providerID: "moonshotai",
+      model: { id: "kimi-k2", providerID: "moonshotai" },
       cost: 0,
       tokens: {
         input: 1200,
@@ -766,49 +763,32 @@ function writeOpenCode(home: string): void {
         cache: { read: 4000, write: 0 },
       },
       time: { created: a1, completed: a1Done },
-      path: { cwd, root: cwd },
+      content: [
+        { type: "tool", name: "read", state: {} },
+        { type: "tool", name: "edit", state: {} },
+        { type: "text", text: "done" },
+      ],
     }),
-  );
-  part.run(
-    "prt_1",
-    "msg_oc_a1",
-    ses,
-    a1,
-    JSON.stringify({ type: "tool", tool: "read" }),
-  );
-  part.run(
-    "prt_2",
-    "msg_oc_a1",
-    ses,
-    a1,
-    JSON.stringify({ type: "tool", tool: "edit" }),
-  );
-  part.run(
-    "prt_3",
-    "msg_oc_a1",
-    ses,
-    a1,
-    JSON.stringify({ type: "text", text: "done" }),
   );
   const u2 = local("2026-09-28T11:00:00");
   message.run(
     "msg_oc_u2",
     ses,
+    "user",
     u2,
     u2,
-    JSON.stringify({ role: "user", time: { created: u2 } }),
+    JSON.stringify({ text: "And the tests", time: { created: u2 } }),
   );
   const a2 = local("2026-09-28T11:00:05");
   const a2Done = local("2026-09-28T11:02:00");
   message.run(
     "msg_oc_a2",
     ses,
+    "assistant",
     a2,
     a2Done,
     JSON.stringify({
-      role: "assistant",
-      modelID: "claude-sonnet-4-6",
-      providerID: "anthropic",
+      model: { id: "claude-sonnet-4-6", providerID: "anthropic" },
       cost: 0.0123,
       tokens: {
         input: 800,
@@ -817,7 +797,7 @@ function writeOpenCode(home: string): void {
         cache: { read: 2500, write: 300 },
       },
       time: { created: a2, completed: a2Done },
-      path: { cwd, root: cwd },
+      content: [{ type: "text", text: "all green" }],
     }),
   );
   db.close();
