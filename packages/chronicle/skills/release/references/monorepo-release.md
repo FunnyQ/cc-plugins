@@ -9,18 +9,18 @@ plain git.
 
 - **Tag** — `<component>-vX.Y.Z` (e.g. `chronicle-v0.5.0`), never a repo-wide
   `vX.Y.Z`. The last tag for a component is the newest `<component>-v*`.
-- **Version files** — every manifest that component owns moves together. In this
-  repo each plugin has a **paired** manifest: `.claude-plugin/plugin.json` and
-  `.codex-plugin/plugin.json`. **Both** bump to the same version. Marketplace
-  registries (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`)
-  carry **no** version field and are never touched.
+- **Version files** — every manifest the component lists moves together, to the
+  same version. A file the config does not list is never touched.
 - **CHANGELOG** — one file, entries headed per-component: `## [chronicle 0.5.0]`,
   noting the scoped tag it tracks.
 - **"Did it change?"** — commits since that component's last tag, scoped to its path:
   `git rev-list --count <component>-vLAST..HEAD -- packages/<component>`.
 - **Bump only what changed** — leave every other component's version alone.
 
-## The git-flow finish (plain git, replicating gitflow)
+## The git-flow finish the engine runs
+
+The `commit`, `merge`, `tag`, `back-merge` and `push` stages run these commands.
+Never run them by hand; re-run `release.ts run` instead.
 
 On `github-flow` there is no merge: the bump commit lands on `main` and every tag sits on it (see `release-config.md`).
 

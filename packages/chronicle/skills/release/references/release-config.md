@@ -108,11 +108,10 @@ first, corrupting the lock. Only the block under `name = "<crate>"` may move.
 Workspaces share one root lock: every member component lists the same
 `Cargo.lock` path with its own crate name in the pattern.
 
-Detection runs once, so a config committed before this existed lists only
-`Cargo.toml`. The analyzer reports that as `versionFileDrift` — one entry per
-`manifest` whose companion is `missing` — and `/chronicle:release` offers the edit at
-the gate. It never applies it silently, for the same reason it never re-shapes the
-workflow: the committed config is the source of truth.
+A config that lists a `Cargo.toml` without its `Cargo.lock` block is reported as
+`versionFileDrift` — one entry per `manifest` whose companion is `missing` — and
+`/chronicle:release` offers the edit at the gate. It never applies it silently: the
+committed config is the source of truth.
 
 ### `artifacts`
 

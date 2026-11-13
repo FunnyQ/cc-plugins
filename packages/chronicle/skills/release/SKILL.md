@@ -94,10 +94,9 @@ bun "{SKILL_DIR}/scripts/analyze-release.ts"
 ```
 
 `{SKILL_DIR}` is the skill's load-time "Base directory for this skill" banner.
-Substitute the literal absolute path before running. Do not hard-code a path, do
-not rely on `${CLAUDE_PLUGIN_ROOT}`, and never leave a `$`-prefixed token in the
-command — nothing sets that variable, so it expands to empty and the command runs
-against `/`.
+Substitute the literal absolute path before running. Do not hard-code a path, and
+never leave a `$`-prefixed token in the command — nothing sets such a variable in
+Bash, so it expands to empty and the command runs against `/`.
 
 You get one line per changed unit, one collapsing the unchanged ones, the config
 and branch, and the payload path:
