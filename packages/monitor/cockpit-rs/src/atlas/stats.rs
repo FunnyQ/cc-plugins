@@ -794,6 +794,15 @@ fn build_daily(
         .collect()
 }
 
+fn is_temp_path(path: &str) -> bool {
+    ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"]
+        .iter()
+        .any(|root| {
+            path.strip_prefix(root)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        })
+}
+
 fn build_projects(loaded: &Loaded, table: &PricingTable) -> Vec<ProjectRow> {
     let claude = &loaded.claude;
     let codex = &loaded.codex;
@@ -821,6 +830,7 @@ fn build_projects(loaded: &Loaded, table: &PricingTable) -> Vec<ProjectRow> {
 
     let mut projects: Vec<ProjectRow> = project_paths
         .into_iter()
+        .filter(|path| !is_temp_path(path))
         .map(|path| {
             let claude_activity = claude.history.by_project.get(path);
             let codex_activity = codex.project_activity.get(path);
@@ -1607,6 +1617,30 @@ mod tests {
         let projects = build_projects(&src, &pricing_load().table);
         let order: Vec<&str> = projects.iter().map(|p| p.path.as_str()).collect();
         assert_eq!(order, ["/b", "/a", "/c"]);
+    }
+
+    #[test]
+    fn projects_under_temp_dirs_are_left_out() {
+        let mut src = loaded(StatsCache::default());
+        let seen = |path: &str| HistoryProject {
+            message_count: 5,
+            first_seen: 1,
+            last_seen: 2,
+            path: path.into(),
+        };
+        let paths = [
+            "/Users/q/app",
+            "/tmp",
+            "/private/tmp/q-lab/oc-v2-smoke/repo10",
+            "/var/folders/xy/T/repo",
+            "/private/var/folders/xy/T/repo",
+            "/tmpfiles/app",
+        ];
+        src.claude.history.by_project =
+            paths.iter().map(|p| (p.to_string(), seen(p))).collect();
+        let projects = build_projects(&src, &pricing_load().table);
+        let kept: Vec<&str> = projects.iter().map(|p| p.path.as_str()).collect();
+        assert_eq!(kept, ["/Users/q/app", "/tmpfiles/app"]);
     }
 
     fn assembled(model_usage: IndexMap<String, ModelUsage>) -> Value {
