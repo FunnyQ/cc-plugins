@@ -246,6 +246,34 @@ describe("flightStatus", () => {
     expect(flightStatus([repair("ui/01", "refuse")], tasks)).toBe("exhausted");
   });
 
+  test("a task parked before this flight, never escalated in it, is not repairable", () => {
+    const tasks = tree({
+      "ui/01": { status: "blocked" },
+      "ui/02": { dependsOn: "ui/01" },
+    });
+    const stall = escalation("(tree)", "stalled in wave 1", "stall");
+    expect(flightStatus([stall, runEnd()], tasks)).toBe("exhausted");
+    expect(flightStatus([escalation("ui/01"), stall, runEnd()], tasks)).toBe(
+      "continue",
+    );
+  });
+
+  test("a halt recorded for a (tree) stall exhausts the flight", () => {
+    const tasks = tree({
+      "ui/01": { status: "blocked" },
+      "ui/02": { dependsOn: "ui/01" },
+    });
+    const round = [
+      escalation("ui/01"),
+      escalation("(tree)", "stalled in wave 1", "stall"),
+      runEnd(),
+    ];
+    expect(flightStatus(round, tasks)).toBe("continue");
+    expect(flightStatus([...round, repair("(tree)", "halt")], tasks)).toBe(
+      "exhausted",
+    );
+  });
+
   test("a flight halt exhausts the flight even with ready work", () => {
     expect(
       flightStatus([repair("(flight)", "halt")], tree({ "ui/01": {} })),

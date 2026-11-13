@@ -440,7 +440,7 @@ describe("goal-mode CLI", () => {
     }
   });
 
-  test("flight-start then repairs --status prints continue for a blocked task", async () => {
+  test("flight-start then repairs --status prints continue for a task blocked in this flight", async () => {
     const p = await planFixture();
     try {
       expect((await p.run("flight-start", p.log, "--plan", p.plan)).code).toBe(
@@ -455,6 +455,25 @@ describe("goal-mode CLI", () => {
           planPath: p.plan,
         },
       ]);
+      const before = await p.run(
+        "repairs",
+        p.log,
+        "--tasks",
+        p.tasks,
+        "--status",
+      );
+      expect(before).toEqual({ code: 0, out: "exhausted\n", err: "" });
+      const escalated = escalationPayload([
+        {
+          task: "ui/01",
+          attempt: 3,
+          class: "capped",
+          infrastructure: false,
+          parked: true,
+          reason: "capped at 3",
+        },
+      ]);
+      await p.run("escalations", p.log, "--payload", escalated);
       const res = await p.run("repairs", p.log, "--tasks", p.tasks, "--status");
       expect(res).toEqual({ code: 0, out: "continue\n", err: "" });
 
@@ -699,7 +718,7 @@ describe("goal-mode CLI", () => {
       expect(res.out).toBe(`${out}\n`);
       const md = await readFile(out, "utf-8");
       expect(md).toContain("# Flight report — toy");
-      expect(md).toContain("Outcome: **continue**");
+      expect(md).toContain("Outcome: **exhausted**");
       expect(md).toContain("## Deferred criteria");
       expect(md).toContain("- [ ] it is fast");
       expect(md).toContain("- ui/01: no escalation or repair recorded");

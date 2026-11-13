@@ -93,7 +93,12 @@ export function flightStatus(
 
   const repairs = repairsIn(flightEntries);
   const counts = repairCounts(flightEntries);
-  if (repairs.some((r) => r.task === "(flight)" && r.verdict === "halt")) {
+  if (
+    repairs.some(
+      (r) =>
+        (r.task === "(flight)" || r.task === "(tree)") && r.verdict === "halt",
+    )
+  ) {
     return "exhausted";
   }
   if (counts.flight >= FLIGHT_REPAIR_CAP) return "exhausted";
@@ -110,10 +115,16 @@ export function flightStatus(
       .filter((r) => r.verdict === "refuse" || r.verdict === "halt")
       .map((r) => r.task),
   );
+  const seen = new Set(
+    flightEntries
+      .filter((e) => e.kind === "escalation" || e.kind === "repair")
+      .map((e) => e.task),
+  );
   const repairable = Object.entries(tasks).some(([ref, task]) => {
     if (ready.has(ref) || task.status === "in-progress") return true;
     return (
       task.status === "blocked" &&
+      seen.has(ref) &&
       !stopped.has(ref) &&
       (counts.byTask[ref] ?? 0) < TASK_REPAIR_CAP
     );
