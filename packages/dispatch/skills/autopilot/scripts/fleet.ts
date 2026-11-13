@@ -169,7 +169,7 @@ function aggregateByTask(
       byTask.set(entry.task, aggregate);
     }
 
-    if (entry.kind === "state") continue;
+    if (entry.kind !== "score" && entry.kind !== "note") continue;
 
     aggregate.attempts = Math.max(aggregate.attempts, entry.attempt ?? 0);
 
@@ -263,7 +263,7 @@ type IndexedRow = FleetRow & {
 };
 
 function roleFromEntry(entry: FlightlogEntry, parsed: ParsedLabel): AgentRole {
-  if (entry.kind === "state") return "unknown";
+  if (entry.kind !== "score" && entry.kind !== "note") return "unknown";
   if (parsed.role !== "unknown") return parsed.role;
   if (entry.kind === "score") return "judge";
   return (KNOWN_ROLES as readonly string[]).includes(entry.role)
@@ -371,7 +371,7 @@ export function aggregateFleet(entries: FlightlogEntry[]): FleetRow[] {
   };
 
   entries.forEach((entry, order) => {
-    if (entry.kind === "state") return;
+    if (entry.kind !== "score" && entry.kind !== "note") return;
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
     const identity =
       entry.kind === "note"
