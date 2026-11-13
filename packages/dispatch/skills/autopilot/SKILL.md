@@ -185,6 +185,14 @@ EOF
 
 The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `planGoal`, `scriptsDir`, and `baseRef`. It rejects a relative path and any key the `CFG` block does not carry. It derives `planDir` from `planPath`, so a plan nested deeper than `docs/<slug>/` — a waypoints leg — keeps its own Status edits out of the worktree leak check. Omit a field you did not scout, and it keeps the block's default. It writes `<plan dir>/.flightlog/orchestrator.js`, drops the `.flightlog/` self-ignore, and prints that absolute path. On a non-zero exit, fix the reported field and re-run.
 
+Set `deferredScope` whenever `<plan dir>/DEFERRED.md` parses to at least one item, in standard and goal mode alike, so a Final review never fails the goal for a criterion a waypoints leg already deferred:
+
+```bash
+bun -e 'const [mod, file] = process.argv.slice(1); const { parseDeferred } = await import(mod); const f = Bun.file(file); const md = (await f.exists()) ? await f.text() : ""; console.log(parseDeferred(md).length ? md : "")' "$WAYPOINTS"/deferred.ts <plan dir>/DEFERRED.md
+```
+
+Pass what it prints as `deferredScope`; leave the field out when it prints an empty line. `$WAYPOINTS` is `<base>/../waypoints/scripts`, absolute.
+
 Then call `Workflow({ scriptPath: <the printed path> })`. No `args` needed. Do not rely on the Workflow `args` global.
 
 **Drain a running flight with `touch <plan dir>/.flightlog/drain`.** While the file exists, the orchestrator dispatches no new task, lets in-flight tasks finish and land, runs the post-loop commit, and returns the undispatched refs in `drained`. Delete the file before the next run; at Step 1, if it already exists, ask the user before removing it.
@@ -271,15 +279,15 @@ After the workflow returns:
 
 Run this loop only when the user picked **Goal mode** in Step 2, under Claude Code. Repairs happen in this conversation, between Workflow runs, because a task-file edit during a run trips the leak check. Take every command and placeholder value from [references/goal-mode.md](references/goal-mode.md).
 
-1. Before the first launch, run `flightlog.ts flight-start`. Then show the user the exact `/goal …` line from `goal-mode.md` to type, and wait until they have set it. `/goal` is a session Stop hook only the user can set.
-2. After each Workflow return, check `logFailed`. When it is `true`, stop and report that the trail is incomplete, so `repairs --status` cannot be trusted, and ask the user to type `/goal clear`. Ask the same whenever the loop stops before step 7.
+1. Before the first launch, run `flightlog.ts flight-start`. It adopts every task already `blocked` as an escalation of this flight. Then show the user the exact `/goal …` line from `goal-mode.md` to type, and wait until they have set it. `/goal` is a session Stop hook only the user can set. When it adopted any task, review those escalations first, from step 3, and let step 6 make the first launch.
+2. After each Workflow return, check `logFailed`. When it is `true`, stop and report that the trail is incomplete, so `repairs --status` cannot be trusted, and ask the user to type `/goal clear`. Ask the same whenever the loop stops before step 7. A Workflow that throws or returns no result is an infrastructure stop for the round: re-launch once, and halt the flight when it repeats.
 3. Run `flightlog.ts repairs --status`. On `complete` or `exhausted`, go to step 7.
 4. Sort each escalation by its `class`, following the table in `goal-mode.md`. Record each `infra-retry` or `halt` with `flightlog.ts repair` before acting on it.
-5. For each `plan-defect` or `capped` escalation, spawn the repair reviewer with [references/repair.md](references/repair.md). Spawn reviewers one at a time. Before each spawn, commit the tree so that nothing is uncommitted; when something stays uncommitted, stop and report. On `fix`, `defer`, or `not-plan`, run `flightlog.ts guard`:
+5. For each `plan-defect` or `capped` escalation, check the repair budget with `flightlog.ts repairs --json`, then spawn the repair reviewer with [references/repair.md](references/repair.md). Spawn reviewers one at a time. Before the first spawn of a round, save a failed Final review's ungated edits under `refs/autopilot/ungated/`, then commit the tree so that nothing is uncommitted; when something stays uncommitted, stop and report. On `fix`, `defer`, or `not-plan`, run `flightlog.ts guard`:
    - On `refuse`, a missing verdict file, a guard rejection, or a failed `lint-task.ts` run after the guard, restore each changed file with `git show HEAD:<path> > <path>` and record `refuse`.
    - When the guard and the lint pass, record `repair` with the guard's `reentry`, write `DEFERRED.md` for `defer` through `appendDeferred`, and commit the task files as `plan repair: <pattern>`.
-6. Reset the repaired tasks to `todo` and commit. Bake with `reentry` for the repaired and `infra-retry` tasks, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` from `DEFERRED.md`. Re-launch, then go to step 2.
-7. Run `flightlog.ts report --flight`. Print the outcome and the `FLIGHTREPORT.md` path.
+6. Reset the repaired tasks to `todo` and commit. Bake with `reentry` for the repaired and `infra-retry` tasks and for the last launch's reentry tasks that never ran, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` as Step 3 says. Re-launch, then go to step 2.
+7. Run `flightlog.ts report --flight`, then `flightlog.ts repairs --status` again. Print that outcome and the `FLIGHTREPORT.md` path.
 
 Print the `repairs --status` line as the last line of every goal-mode turn. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".
 

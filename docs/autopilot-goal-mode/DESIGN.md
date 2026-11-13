@@ -86,11 +86,11 @@ After each Workflow return, the main agent sorts the escalations:
 | Capped (`maxAttempts` or `finalReviewMaxAttempts`)                                     | Run the repair reviewer. Point it at the Verification and judge criteria first, since Q's experience says the cause is usually there.          |
 | Infrastructure (`infrastructure: true`), including `(scout)`, `(worktree)`, `(commit)` | Re-launch once with no edit (`infra-retry`). A second infrastructure stop on the same task is recorded `halt`.                                 |
 | `parked: false`                                                                        | Reset the Status to `todo` as `SKILL.md:316` says, then treat it as infrastructure.                                                            |
-| Divergence (`(divergence)`)                                                            | Record `halt` for that ref. The existing rule (`SKILL.md:318`) needs a person. Other tasks keep repairing.                                     |
+| Divergence (`(divergence)`)                                                            | Record `halt` for the flight and stop the loop. Its refs passed and landed, so a re-launch would fly them again over their own uncommitted work; the existing rule (`SKILL.md:318`) needs a person. |
 | `(tree)` stall                                                                         | Record `halt` for `(tree)`. `--status` reads a `(tree)` halt as `exhausted`, because a re-launch with no edit would stall again without bound. |
 | Leak abort, `drained`, budget-floor stop                                               | Record `halt` for the flight and stop the loop at once. The tree state is unknown after a leak, and a drain is the user's own stop.            |
 
-Every escalation is recorded in the trail (section 4) before it is acted on, so `--status` sees every stop. A task already `blocked` when the flight starts has no escalation or repair in it, so `--status` counts it as stopped, never as repairable. A task-level `halt` does not block other work. The goal ends `exhausted` once nothing repairable remains.
+Every escalation is recorded in the trail (section 4) before it is acted on, so `--status` sees every stop. **A task already `blocked` when the flight starts is adopted (Q's decision):** `flight-start` records it as an escalation of the new flight, keeping the class and reason of its last `capped` or `plan-defect` escalation, or `plan-defect` when the trail has none, and the reviewer sees it before the first launch, under the same budget. A task-level `halt` does not block other work, but a `halt` on any synthetic ref exhausts the flight, since it has no Status a re-launch could change. A run that completes nothing after a round with no counted repair also exhausts it. The goal ends `exhausted` once nothing repairable remains.
 
 **The repair reviewer** is a fresh opus subagent. Its input is only:
 
@@ -154,7 +154,8 @@ A deterministic check, run before each repair is recorded:
 - The PLAN.md `## Goals` section (or `## Goal`) is byte-identical to its state at flight start. The script stores a hash at the first launch.
 - Each removed or reworded Acceptance criteria item must appear in the reviewer's per-item justification. Otherwise the guard rejects the repair.
 - No `(human)` tag is added, and no attestation file is created.
-- Except for a `defer` verdict, the number of Acceptance criteria items in a task does not drop.
+- Except for a `defer` verdict, the number of Acceptance criteria items in a task does not drop. Under `defer`, every removed Acceptance criteria item appears in the verdict's `defer` list for its task.
+- No task's Status changes to `done`, and no gate checkbox is ticked.
 
 The guard stops a careless edit, not a determined one. The reviewer's judgement is the real defence. That limit is stated in the final report's header.
 

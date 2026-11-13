@@ -71,6 +71,7 @@ A gate item that depends on a file, symbol, or output no task in the tree produc
 - Never edit `{{tasks_dir}}/_context/` or `{{tasks_dir}}/README.md`. The guard does not count them as task files and rejects any change to them.
 - Never edit `DEFERRED.md`. The main agent writes it from your `defer` list.
 - Never edit the `> **Status**:` line or any other header line except `> **Depends on**:`.
+- Never tick or untick a gate checkbox. The guard rejects a repair that sets any task's Status to `done` or ticks any box.
 - Never edit, commit, or reset anything in {{kept}}.
 - Never run a git command that writes: no commit, stash, checkout, restore, reset, or add.
 - Never name another task's ref in a task body. Express an ordering change through `> **Depends on**:` only.
@@ -105,7 +106,7 @@ When an earlier repair of {{ref}} was `not-plan`, choose `fix`, `defer`, or `ref
 ## On `defer`
 
 1. Remove each deferred criterion from its task file.
-2. Name each one in `defer`, with `criterion` copied verbatim from the task file.
+2. Name each one in `defer`, with `task` set to its task's ref and `criterion` copied verbatim from the task file. The guard rejects a removed `## Acceptance criteria` item that no `defer` entry of the same task names.
 3. Record each one in `justified` too, with `after` set to `""`.
 4. State in each `why` which in-leg paths you examined and why none can satisfy the criterion.
 
