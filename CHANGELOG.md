@@ -1,5 +1,26 @@
 # Changelog
 
+## [dispatch 5.10.0] - 2026-11-14
+
+_tracks tag `dispatch-v5.10.0`_
+
+### Added
+- Autopilot offers a goal mode on Claude Code: at confirmation you pick Standard or Goal mode, and goal mode runs a bounded repair loop (3 repairs per task, 10 per flight) between Workflow runs that fixes tasks parked for plan defects or capped attempts.
+- Goal mode hands each parked task to a fresh reviewer that decides fix, defer, not-plan or refuse, and a guard rejects repairs that weaken a task's rubric, tick boxes, rewrite done tasks or add stray files.
+- Repaired tasks re-enter a whole-tree autopilot flight at dev or verify, and criteria a waypoints leg defers are carried to the next leg through DEFERRED.md and treated as out of scope by the Final review.
+- Every autopilot flight, standard mode included, now logs its escalations to the flightlog with a class (infrastructure, stall, divergence, budget-floor, plan-defect, capped), so status and reports no longer parse reason text.
+- flight-start refuses to begin when the repo has uncommitted changes outside the plan's .flightlog directory, so the goal-mode checkpoint commit never sweeps in your own work.
+
+### Changed
+- The goal-mode docs now describe the repair loop as it behaves: clean-tree start, halting on a mixed tree, divergence halts, escalation ordering, saving failed Final review edits under refs/autopilot/ungated, and telling you to run /goal clear when the loop stops early.
+
+### Fixed
+- Goal-mode status no longer loops forever or ends a flight early by mistake: stale blocks, tree stalls, leak aborts and synthetic-ref halts now resolve to exhausted, and a task parked beside a passing one no longer causes a phantom stall (this also stops standard autopilot reporting a stall for a task blocked by an earlier run).
+- The goal-mode guard is stricter and more accurate: it protects tasks finished in the current run but not yet committed, rejects weakened rubrics and stray files anywhere in the repo, reports unparseable tasks, and no longer flags rewording of an already-tagged (human) item.
+- A repaired task that never re-ran no longer loses its worktree, and a verify reentry is logged and judged against the right deferred scope, so existing work is not redone.
+- Deferred criteria that span several lines or are ticked are no longer silently dropped when read between waypoints legs.
+- Flightlog guard and flight-start checks compare POSIX paths, fixing mismatched messages and allow-list checks on Windows.
+
 ## [monitor 8.6.1] - 2026-11-13
 
 _tracks tag `monitor-v8.6.1`_
