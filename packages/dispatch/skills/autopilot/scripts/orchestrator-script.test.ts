@@ -2477,6 +2477,67 @@ describe("orchestrator per-task reentry", () => {
     expect(promptFor(log, "wt-sweep:start")).toContain("--keep ui/01");
   });
 
+  test("a reentry ref that never runs keeps its worktree through the end sweep", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "ui/02", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "ui/02", state: "todo" }],
+          }),
+        ],
+      },
+      { reentry: `{ "ui/02": { from: "verify", attempt: 2 } }` },
+    );
+
+    expect(log.labels.some((l) => /:ui\/02#/.test(l))).toBe(false);
+    expect(promptFor(log, "wt-sweep:end")).toContain("--keep ui/02");
+    expect(log.result.worktrees).toContainEqual({
+      ref: "ui/02",
+      path: "/wt/ui/02",
+    });
+  });
+
+  test("a reentry ref that ran and passed is not kept by the end sweep", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "ui/02", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [ready("ui/02")],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "ui/02", state: "todo" }],
+          }),
+          complete(2),
+        ],
+      },
+      { reentry: `{ "ui/02": { from: "verify", attempt: 2 } }` },
+    );
+
+    expect(log.labels).toContain("verify:ui/02#2");
+    expect(promptFor(log, "wt-sweep:end")).not.toContain("ui/02");
+    expect(log.result.worktrees).not.toContainEqual({
+      ref: "ui/02",
+      path: "/wt/ui/02",
+    });
+  });
+
   test("a verify reentry with a missing worktree falls back to dev", async () => {
     const log = await runOrchestrator(
       {

@@ -1010,6 +1010,8 @@ const checkAbort = () => {
   if (aborted) throw new Error(`run aborted: ${aborted.reason}`);
 };
 const live = new Map();
+// Every ref `executeTask` started, so the end sweep can tell a reentry that never ran.
+const entered = new Set();
 const cleanupFailures = [];
 const wtArgs = `--repo ${CFG.repoRoot} --slug ${CFG.slug} --plan-dir ${CFG.planDir}`;
 const wtCommand = (args) => `bun ${S}/worktree.ts ${args} ${wtArgs}`;
@@ -1149,6 +1151,7 @@ const removeLanded = async (ref, path) => {
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item) {
   const { ref, finalReview, path } = item;
+  entered.add(ref);
   const header = parseModels(item.modelsRaw);
   const choices = { ...MODEL, ...header };
   const devLast = header.dev ? raise(header.dev) : MODEL.devLast;
@@ -1736,7 +1739,11 @@ return (async () => {
             scoutFailed ||
             lastScout?.unfinished.some(
               (item) => item.ref === ref && item.state === "blocked",
-            ),
+            ) ||
+            // A repaired task reads `todo`, not `blocked`, so a reentry that
+            // never became ready this flight would lose the worktree its next
+            // `verify` reentry needs. One that ran is tracked by `live`.
+            (Object.hasOwn(REENTRY, ref) && !entered.has(ref)),
         )
         .map(({ ref, path }) => [ref, path]),
     );
