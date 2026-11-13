@@ -41,7 +41,7 @@ Any of these makes the feature a failure, even if every task reads `done`:
 ## Constraints
 
 - **Leak check.** The orchestrator aborts the run when the main tree changes outside a land (`SKILL.md:231`). Therefore no task file may be edited while a Workflow runs. Every repair happens between Workflow runs.
-- **Relayed user message.** The Workflow relays the user's latest message verbatim to every agent, as the only user voice (`SKILL.md:155`). Under `/goal`, the latest message on a continuation turn may be the goal's own text. Write the goal condition as a description of a state, never as an imperative.
+- **No relayed user message (measured).** An earlier runtime relayed the user's latest message verbatim to every Workflow agent. Measured on Claude Code, Workflow agents now receive no user message, on the goal-setting turn or on a `/goal` continuation turn, so the goal text never reaches them (see Open risk). Write the goal condition as a description of a state anyway.
 - **Carve-outs stay human-only.** A repair may never add a `(human)` tag or write an attestation file (`SKILL.md:293`). Those carve-outs are declared by a person.
 - **Leg scaffolding.** `waypoints.ts leg-scaffold` creates the leg directory non-recursively and throws when the directory exists (`flightplan/references/waypoint-mode.md:33`). A deferral therefore cannot pre-create the next leg's directory, so deferred items live in the current leg's directory.
 - **Version policy.** This changes the dispatch plugin only. Bump dispatch's two `plugin.json` files at release.
@@ -66,9 +66,13 @@ Offer this question only under Claude Code. In goal mode, the one-screen brief a
 
 ### 2. Setting the goal
 
-After the user's explicit go and before the first Workflow launch, the main agent proposes the session goal through the harness's goal-proposal flow, which the user approves with one keypress. The condition describes a state with two exits:
+After the user's explicit go and before the first Workflow launch, the main agent shows the user the exact `/goal` line to type. `/goal` is a session Stop hook that only the user sets; whether the model can propose one through a tool is unverified. The evaluator judges from the transcript, so the condition names what the transcript shows, and describes a state with two exits:
 
-> The autopilot flight for `docs/<slug>` has ended: `flightlog.ts repairs <run.jsonl> --status` prints `complete` or `exhausted`, and `<plan dir>/.flightlog/FLIGHTREPORT.md` exists.
+```text
+/goal The autopilot flight for docs/<slug> has ended: the last line of the latest turn reads "repairs --status: complete" or "repairs --status: exhausted", and that turn printed the path of <plan dir>/.flightlog/FLIGHTREPORT.md.
+```
+
+The main agent ends every goal-mode turn with `repairs --status: <status>`, the latest `flightlog.ts repairs <run.jsonl> --tasks <dir> --status` output.
 
 `complete` means every task is `done`. `exhausted` means the repair budget ran out, a task hit a non-repairable stop, or every remaining escalation was refused by the reviewer. Both exits end the goal.
 
@@ -188,7 +192,8 @@ RUNLOG.md stays as today. FLIGHTREPORT.md is the summary a person reads first.
 
 ## Open risk
 
-Two behaviours are unmeasured. Before building section 3, run one spike: a two-task toy plan in goal mode with one deliberately impossible Verification command. Check both:
+The spike (a two-task toy plan in goal mode with one deliberately impossible Verification command) measured both open behaviours on Claude Code. They are now facts:
 
-1. What the agents receive as the user voice on the re-launch.
-2. Whether the `/goal` evaluator can see command output, or reads only the transcript. **My call until measured:** the main agent prints the `repairs --status` line as the last line of every turn, so a transcript-only evaluator still sees it.
+1. **User voice.** Workflow agents receive no relayed user message at all, on the goal-setting turn or on a `/goal` continuation turn. Each gets only the script's computed task, framed as carrying no user authority. The old `SKILL.md` advice to send a plain go-ahead before launch is dropped, since nothing relays the message any more.
+2. **Evaluator input.** The `/goal` evaluator judges from the transcript, not the filesystem, and a continuation turn arrives as "Stop hook feedback". Printing the `repairs --status` line as the last line of every goal-mode turn is therefore required, not a precaution.
+3. **Setting the goal.** `/goal` is a session Stop hook the user sets by typing `/goal <condition>`. Whether the model can propose one through a tool is unverified, so the skill shows the user the exact line to type (section 2).
