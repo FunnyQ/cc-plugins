@@ -474,6 +474,9 @@ body {
   background: var(--aurora);
   box-shadow: 0 0 6px color-mix(in oklch, var(--aurora) 60%, transparent);
 }
+.scribe-switch {
+  margin-inline-start: 0;
+}
 
 .design-toggle {
   position: fixed;

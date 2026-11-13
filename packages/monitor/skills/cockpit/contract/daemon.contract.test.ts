@@ -1500,6 +1500,59 @@ describe("server: broker", () => {
       answer_here: false,
     });
   });
+  test("defaults scribe off and toggles the user scope", async () => {
+    const off = { scribe: false, user: false, source: "default" };
+    expect(await get(c.d, "/api/scribe")).toEqual(off);
+    expect(await get(c.d, "/api/scribe", { token: "bad" }, 401)).toEqual({
+      error: "unauthorized",
+    });
+    expect(
+      await post(c.d, "/api/scribe", { token: "bad", on: true }, 401),
+    ).toEqual({ error: "unauthorized" });
+    expect(await post(c.d, "/api/scribe", { on: "true" }, 400)).toEqual({
+      error: "invalid on",
+    });
+    const on = { scribe: true, user: true, source: "user" };
+    expect(await post(c.d, "/api/scribe", { on: true })).toEqual(on);
+    expect(await get(c.d, "/api/scribe")).toEqual(on);
+    const path = join(c.h.configHome, "q-lab/cockpit/config.json");
+    expect(JSON.parse(readFileSync(path, "utf8")).nudges).toEqual({
+      user: "on",
+    });
+    expect(
+      await post(c.d, "/api/scribe", { on: false }),
+    ).toEqual({ scribe: false, user: false, source: "user" });
+    expect(JSON.parse(readFileSync(path, "utf8")).nudges).toEqual({
+      user: "off",
+    });
+  });
+  test("reports the scope that decides the selected session", async () => {
+    const project = c.f.projectDir;
+    const session = c.f.claudeSessionId;
+    const path = join(c.h.configHome, "q-lab/cockpit/config.json");
+    mkdirSync(join(c.h.configHome, "q-lab/cockpit"), { recursive: true });
+    writeFileSync(
+      path,
+      JSON.stringify({ nudges: { user: "on", projects: { [project]: "off" } } }),
+    );
+    expect(await get(c.d, "/api/scribe", { project, session })).toEqual({
+      scribe: false,
+      user: true,
+      source: "project",
+    });
+    writeFileSync(
+      join(c.h.cockpitHome, "scribe-nudge-toggle.json"),
+      JSON.stringify({ [session]: { state: "on", ts: Date.now() } }),
+    );
+    expect(await get(c.d, "/api/scribe", { project, session })).toEqual({
+      scribe: true,
+      user: true,
+      source: "session",
+    });
+    expect(
+      await post(c.d, "/api/scribe", { on: false, project, session }),
+    ).toEqual({ scribe: true, user: false, source: "session" });
+  });
   test("parks without the opt-in presence gate even with answer_here off", async () => {
     const started = Date.now();
     expect(

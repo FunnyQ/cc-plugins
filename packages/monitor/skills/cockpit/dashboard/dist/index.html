@@ -274,6 +274,20 @@
                 v-text="answerHere ? 'Ask me here' : 'Ask in terminal'"
               ></span>
             </button>
+            <button
+              class="answer-here scribe-switch"
+              type="button"
+              :class="{ 'is-on': scribe }"
+              :aria-pressed="scribeUser ? 'true' : 'false'"
+              @click="toggleScribe()"
+              :title="(scribeOverride ? `This ${scribeOverride}'s own setting decides, so this switch does not change it. Run /monitor:scribe clear --scope ${scribeOverride} to follow the switch. ` : '') + 'Switch for every project: on, agents distill their work into this log after each turn; off, nothing is logged automatically.'"
+            >
+              <span class="answer-here__lamp" aria-hidden="true"></span>
+              <span
+                class="answer-here__label"
+                v-text="(scribe ? 'Scribe on' : 'Scribe off') + (scribeOverride ? ' · ' + scribeOverride : '')"
+              ></span>
+            </button>
           </header>
           <div class="instrument__body" data-column="decision">
             <p class="placeholder">No decisions logged yet.</p>

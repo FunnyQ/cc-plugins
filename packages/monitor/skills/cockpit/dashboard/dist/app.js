@@ -45,6 +45,9 @@ export const store = reactive({
   // Visibility cannot stand in for this switch: a browser window
   // behind the terminal still reports its tab visible.
   answerHere: false,
+  scribe: false,
+  scribeUser: false,
+  scribeSource: "default",
   _subscribers: [],
   _sessionSubscribers: [],
   expandedOverrides: {},
@@ -545,6 +548,48 @@ export const store = reactive({
     }
   },
 
+  get scribeOverride() {
+    return ["session", "project"].includes(this.scribeSource)
+      ? this.scribeSource
+      : "";
+  },
+
+  scribeTarget() {
+    return {
+      session: this.selectedSessionId || "",
+      project: this.selectedProject || "",
+    };
+  },
+
+  applyScribe(state) {
+    this.scribe = state.scribe === true;
+    this.scribeUser = state.user === true;
+    this.scribeSource = state.source || "default";
+  },
+
+  async fetchScribe() {
+    const token = await getToken();
+    const query = new URLSearchParams({ ...this.scribeTarget(), token: token || "" });
+    try {
+      const r = await fetch(`/api/scribe?${query}`);
+      if (!r.ok) return;
+      this.applyScribe(await r.json());
+    } catch {}
+  },
+
+  async toggleScribe() {
+    const token = await getToken();
+    try {
+      const r = await fetch("/api/scribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ on: !this.scribeUser, token, ...this.scribeTarget() }),
+      });
+      if (!r.ok) return;
+      this.applyScribe(await r.json());
+    } catch {}
+  },
+
   subscribe(fn) {
     this._subscribers.push(fn);
   },
@@ -648,6 +693,8 @@ if (deepLinkSession && deepLinkSessionOk) {
 await store.fetchProjects();
 await store.fetchSessions();
 store.fetchAnswerHere();
+store.fetchScribe();
+store.subscribe(() => store.fetchScribe());
 createApp(store).mount("#app");
 startPolling();
 

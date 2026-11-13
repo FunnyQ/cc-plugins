@@ -485,9 +485,64 @@ async fn answer_here(
     }
 }
 
+fn scribe_state(session: Option<&str>, project: Option<&str>) -> Response {
+    use crate::nudge_toggle::{NudgeState, read_scopes};
+    let cwd = std::path::PathBuf::from(project.unwrap_or_default());
+    let (session, project, user) = if cwd.as_os_str().is_empty() {
+        (None, None, config::get_user_nudge())
+    } else {
+        read_scopes(session, &cwd, registry::now_ms())
+    };
+    let (state, source) = [(session, "session"), (project, "project"), (user, "user")]
+        .into_iter()
+        .find_map(|(state, source)| state.map(|state| (state, source)))
+        .unwrap_or((NudgeState::Off, "default"));
+    json_response(
+        StatusCode::OK,
+        json!({
+            "scribe": state == NudgeState::On,
+            "user": user == Some(NudgeState::On),
+            "source": source,
+        }),
+    )
+}
+
+async fn scribe(
+    method: Method,
+    Query(query): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> Response {
+    use crate::nudge_toggle::NudgeState;
+    if method != Method::POST {
+        if !authorized(Some(query.get("token").map_or("", String::as_str))) {
+            return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+        }
+        return scribe_state(
+            query.get("session").map(String::as_str),
+            query.get("project").map(String::as_str),
+        );
+    }
+    let body = match parse(&body) {
+        Ok(body) => body,
+        Err(e) => return *e,
+    };
+    if !authorized(body.get("token").and_then(Value::as_str)) {
+        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+    }
+    let Some(on) = body.get("on").and_then(Value::as_bool) else {
+        return json_error(StatusCode::BAD_REQUEST, "invalid on");
+    };
+    config::set_user_nudge(Some(if on { NudgeState::On } else { NudgeState::Off }));
+    scribe_state(
+        body.get("session").and_then(Value::as_str),
+        body.get("project").and_then(Value::as_str),
+    )
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/wait", get(wait))
         .route("/api/respond", post(respond))
         .route("/api/answer-here", any(answer_here))
+        .route("/api/scribe", any(scribe))
 }
