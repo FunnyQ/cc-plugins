@@ -1047,16 +1047,15 @@ describe("server: transcript", () => {
     const session = `ses_parts_${crypto.randomUUID()}`;
     const timestamp = Date.now();
     const db = new Database(c.f.opencodeDb);
-    const parts = [
+    const content = [
       { type: "step-start" },
       { type: "text", text: "Answer" },
       { type: "reasoning", text: "Reason" },
       {
         type: "tool",
-        tool: "read",
+        name: "read",
         state: {
-          input: { filePath: "/repo/src/server/file.rs" },
-          output: "fallback",
+          input: { path: "/repo/src/server/file.rs" },
           metadata: { preview: "preview", display: { text: "display text" } },
         },
       },
@@ -1068,22 +1067,16 @@ describe("server: transcript", () => {
       { type: "step-finish" },
     ];
     try {
-      db.query("insert into message values (?, ?, ?, ?, ?)").run(
+      db.query(
+        "insert into session_message values (?, ?, ?, ?, ?, ?, ?)",
+      ).run(
         "msg_parts",
         session,
         timestamp,
         timestamp,
-        JSON.stringify({ role: "assistant" }),
-      );
-      parts.forEach((part, index) =>
-        db
-          .query("insert into part values (?, ?, ?, ?)")
-          .run(
-            `part_${index}`,
-            "msg_parts",
-            timestamp + index,
-            JSON.stringify(part),
-          ),
+        "assistant",
+        JSON.stringify({ content }),
+        0,
       );
       const s = await stream(
         url(c.d, "/api/transcript/stream", { session, provider: "opencode" }),
@@ -1117,17 +1110,21 @@ describe("server: transcript", () => {
           },
         });
         expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
-        db.query("update message set time_updated = ? where id = ?").run(
+        db.query("update session_message set time_updated = ? where id = ?").run(
           timestamp + 1000,
           "msg_parts",
         );
         await Bun.sleep(250);
-        db.query("insert into message values (?, ?, ?, ?, ?)").run(
+        db.query(
+          "insert into session_message values (?, ?, ?, ?, ?, ?, ?)",
+        ).run(
           "msg_parts_new",
           session,
           timestamp + 2000,
           timestamp + 2000,
-          JSON.stringify({ role: "user", text: "Next message" }),
+          "user",
+          JSON.stringify({ text: "Next message" }),
+          1,
         );
         expect(await s.next(2000)).toEqual({
           event: "message",
@@ -1329,12 +1326,16 @@ describe("server: transcript", () => {
       expect(await s.next()).toEqual({ event: "backlog-done", data: {} });
       const db = new Database(c.f.opencodeDb);
       try {
-        db.query("insert into message values (?, ?, ?, ?, ?)").run(
+        db.query(
+          "insert into session_message values (?, ?, ?, ?, ?, ?, ?)",
+        ).run(
           "msg_new",
           c.f.opencodeSessionId,
           Date.now() + 1000,
           Date.now() + 1000,
-          JSON.stringify({ role: "assistant", content: "New OpenCode answer" }),
+          "assistant",
+          JSON.stringify({ text: "New OpenCode answer" }),
+          1,
         );
       } finally {
         db.close();
@@ -2174,8 +2175,8 @@ describe("server: codex", () => {
 describe("server: opencode", () => {
   let bridge: ReturnType<typeof Bun.serve>;
   let mode: "unavailable" | "ready" | "missing" = "unavailable";
-  let appendBody: unknown = true;
-  let submitBody: unknown = true;
+  let promptBody: unknown = true;
+  let promptStatus = 200;
   const seen: Array<{
     method: string;
     path: string;
@@ -2190,7 +2191,7 @@ describe("server: opencode", () => {
         expect(req.headers.has("authorization")).toBe(false);
         const u = new URL(req.url);
         const body =
-          req.method === "POST" && u.pathname === "/tui/append-prompt"
+          req.method === "POST" && u.pathname.endsWith("/prompt")
             ? await req.json()
             : null;
         seen.push({
@@ -2199,19 +2200,18 @@ describe("server: opencode", () => {
           directory: u.searchParams.get("directory"),
           body,
         });
-        if (u.pathname === "/global/health")
-          return Response.json({ healthy: mode !== "unavailable" });
-        if (u.pathname.startsWith("/session/"))
+        if (process.env.CONTRACT_DEBUG)
+          console.log("BRIDGE", req.method, u.pathname, promptStatus, promptBody);
+        if (u.pathname === "/api/info")
+          return Response.json({ version: mode === "unavailable" ? "" : "2.2.7" });
+        if (u.pathname.endsWith("/prompt"))
+          return Response.json(promptBody, { status: promptStatus });
+        if (u.pathname.startsWith("/api/session/"))
           return mode === "missing"
             ? Response.json({}, { status: 404 })
             : Response.json({
-                id: u.pathname.slice(9),
-                directory: c.f.projectDir,
+                data: { location: { directory: c.f.projectDir } },
               });
-        if (u.pathname === "/tui/append-prompt")
-          return Response.json(appendBody);
-        if (u.pathname === "/tui/submit-prompt")
-          return Response.json(submitBody);
         return new Response("Not found", { status: 404 });
       },
     });
@@ -2225,7 +2225,7 @@ describe("server: opencode", () => {
   });
   test("reports unavailable when discovery has no healthy candidate", async () => {
     const error =
-      "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
+      "OpenCode background service unavailable. Start OpenCode (the TUI or opencode serve), or set OPENCODE_SERVER_URL=http://127.0.0.1:<port> — with OPENCODE_SERVER_PASSWORD when the service requires auth — before starting cockpit.";
     expect(
       await get(c.d, "/api/opencode-control/status", {
         session: c.f.opencodeSessionId,
@@ -2240,7 +2240,7 @@ describe("server: opencode", () => {
       ),
     ).toEqual({ error, warnings: [] });
   });
-  test("delivers through health, session, append and submit in that order", async () => {
+  test("delivers through info, session and prompt in that order", async () => {
     mode = "ready";
     seen.length = 0;
     expect(
@@ -2250,46 +2250,39 @@ describe("server: opencode", () => {
       }),
     ).toEqual({
       delivered: true,
-      delivery: "tui",
+      delivery: "prompt",
       serverUrl: `http://127.0.0.1:${bridge.port}`,
       warnings: [],
     });
     expect(seen).toEqual([
-      { method: "GET", path: "/global/health", directory: null, body: null },
+      { method: "GET", path: "/api/info", directory: null, body: null },
       {
         method: "GET",
-        path: `/session/${c.f.opencodeSessionId}`,
+        path: `/api/session/${c.f.opencodeSessionId}`,
         directory: null,
         body: null,
       },
       {
         method: "POST",
-        path: "/tui/append-prompt",
-        directory: c.f.projectDir,
-        body: { text: "Hello OpenCode" },
-      },
-      {
-        method: "POST",
-        path: "/tui/submit-prompt",
-        directory: c.f.projectDir,
-        body: null,
+        path: `/api/session/${c.f.opencodeSessionId}/prompt`,
+        directory: null,
+        body: { text: "Hello OpenCode", delivery: "queue" },
       },
     ]);
   });
-  test("requires true bodies and follows JavaScript truthiness for errors", async () => {
+  test("surfaces error bodies and JavaScript truthiness for failures", async () => {
     mode = "ready";
-    for (const [body, error] of [
-      [{ data: { message: "append denied" } }, "append denied"],
-      [
-        { data: { message: 0 }, message: false, error: "fallback error" },
-        "fallback error",
-      ],
-      [{ data: { message: 42 }, message: "ignored" }, "42"],
-      [{ data: { message: {} } }, "[object Object]"],
-      [{ data: { message: [] } }, "OpenCode send failed"],
-      [false, "OpenCode TUI append failed: 200"],
+    for (const [body, status, error] of [
+      [{ error: { message: "prompt denied" } }, 502, "prompt denied"],
+      [{ error: { message: 0 }, message: "fallback error" }, 502, "fallback error"],
+      [{ error: { message: 42 }, message: "ignored" }, 502, "42"],
+      [{ error: { message: {} } }, 502, "[object Object]"],
+      [{ error: { message: [] } }, 502, "OpenCode send failed"],
+      ["no json", 502, "OpenCode prompt failed: 502"],
+      [{}, 401, "OpenCode rejected the service password: 401"],
     ] as const) {
-      appendBody = body;
+      promptBody = body;
+      promptStatus = status;
       seen.length = 0;
       expect(
         await post(
@@ -2300,22 +2293,13 @@ describe("server: opencode", () => {
         ),
       ).toEqual({ error, warnings: [] });
       expect(seen.map((r) => r.path)).toEqual([
-        "/global/health",
-        `/session/${c.f.opencodeSessionId}`,
-        "/tui/append-prompt",
+        "/api/info",
+        `/api/session/${c.f.opencodeSessionId}`,
+        `/api/session/${c.f.opencodeSessionId}/prompt`,
       ]);
     }
-    appendBody = true;
-    submitBody = { message: "submit denied" };
-    expect(
-      await post(
-        c.d,
-        "/api/send-opencode-message",
-        { session: c.f.opencodeSessionId, text: "Hello" },
-        502,
-      ),
-    ).toEqual({ error: "submit denied", warnings: [] });
-    submitBody = true;
+    promptBody = true;
+    promptStatus = 200;
   });
   test("compares fresh daemon tokens including null without coercion", async () => {
     const path = join(c.h.cockpitHome, "daemon.json");
@@ -2383,8 +2367,8 @@ describe("server: opencode", () => {
       ),
     ).toEqual({ error: "OpenCode session not found", warnings: [] });
     expect(seen.map((r) => r.path)).toEqual([
-      "/global/health",
-      `/session/${c.f.opencodeSessionId}`,
+      "/api/info",
+      `/api/session/${c.f.opencodeSessionId}`,
     ]);
     expect(
       await get(
@@ -2416,7 +2400,7 @@ describe("server: opencode closed candidate", () => {
   }));
   test("returns unavailable status and 502 within two seconds per request", async () => {
     const error =
-      "OpenCode TUI server unavailable. Start the visible TUI with opencode --port <n>, or set OPENCODE_TUI_SERVER_URL=http://127.0.0.1:<n> before starting cockpit.";
+      "OpenCode background service unavailable. Start OpenCode (the TUI or opencode serve), or set OPENCODE_SERVER_URL=http://127.0.0.1:<port> — with OPENCODE_SERVER_PASSWORD when the service requires auth — before starting cockpit.";
     let started = performance.now();
     expect(
       await get(c.d, "/api/opencode-control/status", {
@@ -2441,52 +2425,51 @@ describe("server: opencode candidate timeouts and auth", () => {
   const bridges: Array<ReturnType<typeof Bun.serve>> = [];
   const seen: string[] = [];
   beforeAll(() => {
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < 2; index++) {
       bridges.push(
         Bun.serve({
           hostname: "127.0.0.1",
           port: 0,
           async fetch(req) {
             expect(req.headers.get("authorization")).toBe(
-              "Basic dXNlcjpzZWNyZXQ=",
+              "Basic b3BlbmNvZGU6c2VjcmV0",
             );
             const path = new URL(req.url).pathname;
             seen.push(`${index}:${path}`);
-            if (index < 2) {
+            if (index < 1) {
               await Bun.sleep(3500);
-              return Response.json({ healthy: true });
+              return Response.json({ version: "2.2.7" });
             }
-            if (path === "/global/health")
-              return Response.json({ healthy: true });
-            if (path.startsWith("/session/"))
-              return Response.json({ directory: "" });
-            expect(new URL(req.url).search).toBe("");
-            return Response.json(true);
+            if (path === "/api/info")
+              return Response.json({ version: "2.2.7" });
+            if (path.startsWith("/api/session/"))
+              return Response.json({ data: { location: { directory: "" } } });
+            return Response.json({ data: { id: "msg_1" } });
           },
         }),
       );
     }
   });
   const c = daemonPerDescribe((h) => {
-    const path = isolatedPath(h);
+    const servicePath = join(isolatedPath(h), "service.json");
     writeFileSync(
-      join(path, "ps"),
-      `#!/bin/sh
-printf '%s\n' 'COMMAND' 'opencode --port ${bridges[1].port}' '/usr/local/bin/opencode -p ${bridges[2].port} --hostname 127.0.0.1'
-`,
+      servicePath,
+      JSON.stringify({
+        url: `http://127.0.0.1:${bridges[1].port}`,
+        password: "secret",
+      }),
     );
     return {
-      PATH: path,
       OPENCODE_TUI_SERVER_URL: `http://127.0.0.1:${bridges[0].port}///`,
       OPENCODE_SERVER_URL: "http://127.0.0.1:1",
-      OPENCODE_SERVER_USERNAME: "user",
       OPENCODE_SERVER_PASSWORD: "secret",
+      COCKPIT_OPENCODE_SERVICE_JSON: servicePath,
     };
   });
   afterAll(() => {
     for (const bridge of bridges) bridge.stop(true);
   });
-  test("times out two candidates in TS order and delivers through the third", async () => {
+  test("times out the env candidate and delivers through the service-json one", async () => {
     const started = performance.now();
     expect(
       await post(c.d, "/api/send-opencode-message", {
@@ -2495,19 +2478,17 @@ printf '%s\n' 'COMMAND' 'opencode --port ${bridges[1].port}' '/usr/local/bin/ope
       }),
     ).toEqual({
       delivered: true,
-      delivery: "tui",
-      serverUrl: `http://127.0.0.1:${bridges[2].port}`,
+      delivery: "prompt",
+      serverUrl: `http://127.0.0.1:${bridges[1].port}`,
       warnings: [],
     });
     expect(seen).toEqual([
-      "0:/global/health",
-      "1:/global/health",
-      "2:/global/health",
-      `2:/session/${c.f.opencodeSessionId}`,
-      "2:/tui/append-prompt",
-      "2:/tui/submit-prompt",
+      "0:/api/info",
+      "1:/api/info",
+      `1:/api/session/${c.f.opencodeSessionId}`,
+      `1:/api/session/${c.f.opencodeSessionId}/prompt`,
     ]);
-    expect(performance.now() - started).toBeGreaterThanOrEqual(1900);
+    expect(performance.now() - started).toBeGreaterThanOrEqual(900);
     expect(performance.now() - started).toBeLessThan(3000);
   });
 });

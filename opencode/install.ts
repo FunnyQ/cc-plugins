@@ -17,7 +17,11 @@
 //    leftover is announced so it is not a surprise.
 // 4. RAISE-ONLY DEPTH. A value above 2 belongs to the user. An unparseable config
 //    is never rewritten — the manual edit is printed instead. Neither is a config
-//    carrying comments, because rewriting it would delete them.
+//    carrying comments, because rewriting it would delete them. OpenCode 2 reads
+//    the depth from `experimental.subagent_depth`; the top-level V1 field is
+//    accepted but ignored with a warning, so the decision and the write both
+//    target the nested field, and --apply drops the stale top-level field
+//    (rule 3 still spares it under --unlink).
 // 5. SKILL-NAME COLLISIONS. OpenCode's skill root is flat, but skill names are only
 //    unique per plugin: monitor and chronicle both ship a skill called `install`.
 //    Installing both under `skills/install` would silently drop one, so colliding
@@ -29,6 +33,9 @@
 //    invisible to every mode. orphanLinks finds them by the same test rule 2 uses —
 //    a symlink into this checkout — and --check fails on them, --apply and --unlink
 //    delete them. Rule 2 still holds: a real file or an outward link is untouched.
+//    The V1 plugin directory (`~/.config/opencode/plugin/`, singular) is scanned
+//    the same way: OpenCode 2 loads both `plugin/` and `plugins/`, so the link
+//    the V1 installer left there would fail as `Duplicate plugin ID: q-lab`.
 // 6. THE CONFIG FILE IS RESOLVED, NOT ASSUMED. OpenCode reads three global config
 //    names and lets the later one win: `config.json`, then `opencode.json`, then
 //    `opencode.jsonc`. Writing `opencode.json` while an `opencode.jsonc` exists
@@ -73,6 +80,24 @@ export type DepthDecision = {
   action: "ok" | "write" | "manual" | "unparsable";
   value: number;
 };
+
+/** OpenCode 2 ignores this field and warns about it on every start, so --apply
+ *  drops the top-level copy while raising the nested depth. */
+export function staleTopLevelDepth(config: unknown): boolean {
+  return isPlainObject(config) && "subagent_depth" in config;
+}
+
+export function depthConfigWrite(
+  config: unknown,
+  value: number,
+): Record<string, unknown> {
+  const rest: Record<string, unknown> = { ...(isPlainObject(config) ? config : {}) };
+  delete rest.subagent_depth;
+  const experimental = isPlainObject(rest.experimental)
+    ? rest.experimental
+    : {};
+  return { ...rest, experimental: { ...experimental, subagent_depth: value } };
+}
 
 export type Target = {
   group: "skill" | "plugin" | "agent" | "command" | "config";
@@ -265,7 +290,9 @@ export function buildTargets(repoRoot: string, home: string): Target[] {
       group: "plugin",
       name: "q-lab.ts",
       source: join(repoRoot, "opencode", "plugin.ts"),
-      installed: join(configRoot, "plugin", "q-lab.ts"),
+      // OpenCode 2 loads global plugins from `plugin/` and `plugins/`; the
+      // installer uses `plugins/` and retires the V1 link in `plugin/`.
+      installed: join(configRoot, "plugins", "q-lab.ts"),
     },
     ...agents,
     ...commands,
@@ -346,7 +373,16 @@ export function decideSubagentDepth(
     return { action: "unparsable", value: REQUIRED_SUBAGENT_DEPTH };
   }
 
-  const current = config.subagent_depth;
+  // OpenCode 2 reads the depth from `experimental.subagent_depth`; the
+  // top-level V1 field is ignored with a warning, so it never counts here.
+  const experimental = config.experimental;
+  if (experimental !== undefined && !isPlainObject(experimental)) {
+    return { action: "manual", value: REQUIRED_SUBAGENT_DEPTH };
+  }
+
+  const current = isPlainObject(experimental)
+    ? experimental.subagent_depth
+    : undefined;
   if (typeof current !== "number" || !Number.isFinite(current)) {
     // A commented config is understood but never rewritten — see rule 4.
     return {
@@ -374,15 +410,15 @@ export function buildApplyPlan(
   targets: Target[],
   linkStates: ReadonlyMap<string, LinkState>,
   depth: DepthDecision,
+  removeTopLevelDepth = false,
+  lossy = false,
 ): ApplyPlan {
   const operations = targets.map((target): PlanOperation => {
     if (target.group === "config") {
-      const action =
-        depth.action === "write"
-          ? "write"
-          : depth.action === "ok"
-            ? "keep"
-            : "skip";
+      const write =
+        depth.action === "write" ||
+        (depth.action === "ok" && removeTopLevelDepth && !lossy);
+      const action = write ? "write" : depth.action === "ok" ? "keep" : "skip";
       return { target, action, state: depth.action };
     }
     const state = linkStates.get(target.installed) ?? "missing";
@@ -418,12 +454,23 @@ function probeLink(path: string): {
   }
 }
 
+/** Directories the older installers wrote links into, beside the current
+ *  targets'. OpenCode 2 loads `plugin/` as well as `plugins/`, so the V1 link
+ *  left in `plugin/` would register `q-lab` twice. */
+function legacyLinkDirs(configRoot: string): string[] {
+  return [join(configRoot, "plugin")];
+}
+
 function retiredLinks(targets: Target[], repoRoot: string): string[] {
-  const dirs = new Set(
-    targets
+  const configRoot = dirname(
+    targets.find((target) => target.group === "config")!.installed,
+  );
+  const dirs = new Set([
+    ...targets
       .filter((target) => target.group !== "config")
       .map((target) => dirname(target.installed)),
-  );
+    ...legacyLinkDirs(configRoot),
+  ]);
   const entries: InstalledEntry[] = [];
   for (const dir of [...dirs].sort()) {
     if (!existsSync(dir)) continue;
@@ -463,7 +510,7 @@ function readConfig(path: string): {
 
 function manualDepthHint(path: string, reason: string): void {
   console.log(`${reason} Add this to ${path} by hand:`);
-  console.log('  "subagent_depth": 2');
+  console.log('  "experimental": { "subagent_depth": 2 }');
 }
 
 function legacyRelayWarning(home: string): void {
@@ -488,7 +535,12 @@ function targetLabel(target: Target): string {
   return `${target.group}:${target.name} ${target.installed}`;
 }
 
-function depthHintFor(action: DepthDecision["action"], path: string): void {
+function depthHintFor(
+  action: DepthDecision["action"],
+  path: string,
+  stale = false,
+  lossy = false,
+): void {
   if (action === "unparsable")
     manualDepthHint(
       path,
@@ -499,6 +551,10 @@ function depthHintFor(action: DepthDecision["action"], path: string): void {
       path,
       `${path} carries comments, which a rewrite would delete.`,
     );
+  if (stale && (action !== "ok" || lossy))
+    console.log(
+      `also remove the top-level "subagent_depth" from ${path} by hand — OpenCode 2 warns about it on every start.`,
+    );
 }
 
 function collectState(
@@ -507,6 +563,7 @@ function collectState(
 ): {
   states: Map<string, LinkState>;
   config: Record<string, unknown> | null;
+  lossy: boolean;
   depth: DepthDecision;
 } {
   const states = new Map<string, LinkState>();
@@ -524,6 +581,7 @@ function collectState(
   return {
     states,
     config: isPlainObject(loaded.config) ? loaded.config : null,
+    lossy: loaded.lossy,
     depth: loaded.parseFailed ? { ...depth, action: "unparsable" } : depth,
   };
 }
@@ -563,9 +621,15 @@ function runApply(
   repoRoot: string,
   dryRun: boolean,
 ): number {
-  const { states, config, depth } = collectState(targets, repoRoot);
-  const plan = buildApplyPlan(targets, states, depth);
+  const { states, config, lossy, depth } = collectState(targets, repoRoot);
+  const stale = staleTopLevelDepth(config);
+  const plan = buildApplyPlan(targets, states, depth, stale, lossy);
   for (const operation of plan.operations) reportOperation(operation);
+  if (stale && plan.operations.at(-1)?.action === "write") {
+    console.log(
+      'remove the stale top-level "subagent_depth" (OpenCode 2 warns about it on every start)',
+    );
+  }
   const retired = retiredLinks(targets, repoRoot);
   for (const path of retired) console.log(`remove retired ${path}`);
   if (
@@ -595,14 +659,14 @@ function runApply(
         mkdirSync(dirname(target.installed), { recursive: true });
         writeFileSync(
           target.installed,
-          `${JSON.stringify({ ...config, subagent_depth: REQUIRED_SUBAGENT_DEPTH }, null, 2)}\n`,
+          `${JSON.stringify(depthConfigWrite(config, depth.value), null, 2)}\n`,
         );
       }
     }
   }
 
   const configTarget = targets.find((target) => target.group === "config")!;
-  depthHintFor(depth.action, configTarget.installed);
+  depthHintFor(depth.action, configTarget.installed, stale, lossy);
   // S14 is only partially resolved: read timing (startup vs live) was never observed.
   if (depth.action === "write") {
     console.log(

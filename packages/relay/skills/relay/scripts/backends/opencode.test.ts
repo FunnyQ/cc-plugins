@@ -5,15 +5,19 @@ import { SPAWN_PROMPT, SPAWN_PROMPT_PIECES, spawnStub } from "./spawn-stub";
 
 describe("opencodeBackend", () => {
   describe("invokeLive", () => {
-    it("launches the TUI with the resolved model", () => {
+    it("has no live path when a model is set (the 2.x TUI rejects -m)", () => {
       const spec = opencodeBackend.invokeLive!("delegate", {
-        model: "opencode-go/deepseek-v4-flash",
+        model: "opencode-go/qwen3.8-max",
+        dangerous: true,
       });
 
-      expect(spec).toEqual({
-        agentBin: "opencode",
-        argv: ["-m", "opencode-go/deepseek-v4-flash"],
-      });
+      expect(spec).toBeNull();
+    });
+
+    it("launches the TUI without a model", () => {
+      const spec = opencodeBackend.invokeLive!("review", {});
+
+      expect(spec).toEqual({ agentBin: "opencode", argv: [] });
     });
 
     it("maps --dangerous to --auto (opencode's approval bypass), never headless flags", () => {
@@ -272,7 +276,7 @@ describe("parseJsonl", () => {
 });
 
 describe("parseError", () => {
-  it("returns the message of the JSONL error event", () => {
+  it("returns the message of a 1.x error event", () => {
     const raw = [
       JSON.stringify({ type: "step_start" }),
       JSON.stringify({
@@ -285,6 +289,29 @@ describe("parseError", () => {
     ].join("\n");
 
     expect(parseError(raw)).toBe("Model not found: x/y");
+  });
+
+  it("returns the message of a 2.x error event (opencode 2.2.6)", () => {
+    const raw = JSON.stringify({
+      type: "error",
+      timestamp: 1794286563104,
+      sessionID: "ses_e3c2fd102ffeAT3EMQWPTAwqRd",
+      error: {
+        type: "provider.no-route",
+        message: "Model unavailable: nope/bogus-model",
+      },
+    });
+
+    expect(parseError(raw)).toBe("Model unavailable: nope/bogus-model");
+  });
+
+  it("falls back to the 2.x error type when there is no message", () => {
+    const raw = JSON.stringify({
+      type: "error",
+      error: { type: "provider.no-route" },
+    });
+
+    expect(parseError(raw)).toBe("provider.no-route");
   });
 
   it("falls back to the error name when there is no message", () => {

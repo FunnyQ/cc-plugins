@@ -79,6 +79,14 @@ pub fn opencode_db() -> PathBuf {
             .join("opencode.db")
     })
 }
+
+pub fn opencode_service_json() -> PathBuf {
+    override_path("COCKPIT_OPENCODE_SERVICE_JSON").unwrap_or_else(|| {
+        override_path("OPENCODE_STATE_DIR")
+            .unwrap_or_else(|| home().join(".local/state"))
+            .join("opencode/service.json")
+    })
+}
 fn locate_plugin_root(path: &Path) -> Result<PathBuf, String> {
     if !path.is_file() {
         return Err(PLUGIN_ROOT_ERROR.to_owned());
@@ -116,6 +124,11 @@ pub(crate) mod tests {
         "COCKPIT_CODEX_STATE_DB",
         "COCKPIT_OPENCODE_DB",
         "OPENCODE_DATA_DIR",
+        "COCKPIT_OPENCODE_SERVICE_JSON",
+        "OPENCODE_STATE_DIR",
+        "OPENCODE_SERVER_URL",
+        "OPENCODE_TUI_SERVER_URL",
+        "OPENCODE_SERVER_PASSWORD",
         "COCKPIT_PLUGIN_ROOT",
         "COCKPIT_WAIT_TIMEOUT_MS",
         "COCKPIT_STASH_TTL_MS",

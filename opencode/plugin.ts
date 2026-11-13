@@ -1,12 +1,61 @@
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 type HookKind = "command" | "file_path";
 type HookResult = { exitCode: number; stdout: string; stderr: string };
 type EditArgs = {
-  filePath?: unknown;
+  path?: unknown;
   content?: unknown;
   oldString?: unknown;
   newString?: unknown;
+};
+
+// Declared locally: the plugin is loaded through a symlink whose parent has no
+// node_modules, so a bare `@opencode/plugin` import would fail to resolve.
+// Shapes are pinned from the npm @opencode/plugin@2.2.7 and
+// @opencode/schema@2.2.7 declarations — the release that matches the installed
+// binary, not the V1 @opencode-ai/plugin SDK beside the config.
+type SubscriptionEvent = {
+  type: string;
+  data?: {
+    sessionID?: string;
+    location?: { directory?: string };
+  };
+};
+type ContextEvent = {
+  sessionID?: string;
+  system: Array<{ type: "text"; text: string }>;
+};
+type ToolBeforeEvent = { tool: string; sessionID?: string; input: unknown };
+type ToolAfterEvent = {
+  tool: string;
+  sessionID?: string;
+  input: unknown;
+  status: "completed" | "error";
+  result?: { content?: string | ReadonlyArray<unknown>; output?: string };
+};
+type PluginContext = {
+  location: { directory: string };
+  event: {
+    subscribe(options?: {
+      signal?: AbortSignal;
+    }): AsyncIterable<SubscriptionEvent>;
+  };
+  session: {
+    hook(
+      name: "context",
+      callback: (event: ContextEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+  };
+  tool: {
+    hook(
+      name: "execute.before",
+      callback: (event: ToolBeforeEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+    hook(
+      name: "execute.after",
+      callback: (event: ToolAfterEvent) => void | Promise<void>,
+    ): Promise<unknown>;
+  };
 };
 
 const CHECK_BRANCH = "packages/chronicle/hooks/check-branch.sh";
@@ -32,31 +81,31 @@ const COMMENT_GUARDED =
 // than substituted — an upstream reword can never silently defeat a note that
 // only adds a sentence, the way a text substitution would.
 const OPENCODE_SPAWN_NOTE =
-  'OPENCODE: ignore any instruction above to spawn a "fork" subagent, in whatever form it is written — neither the Agent tool nor a fork subagent exists here. Spawn with the task tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
+  'OPENCODE: ignore any instruction above to spawn a "fork" subagent, in whatever form it is written — neither the Agent tool nor a fork subagent exists here. Spawn with the subagent tool as `general`, and pass the parent session id literally in the prompt, because an OpenCode subagent inherits no context.';
 
 // S19: the session scripts write guidance Claude consumes as hook context, but
 // OpenCode feeds the model from the system prompt, not from plugin output — a
-// console write would be red TUI noise the model never reads. The event hooks
-// seed this map synchronously, and experimental.chat.system.transform
-// materializes the seeds and injects the result into the requests of the turn,
-// so each message reaches the model the way Claude's additionalContext does.
+// console write would be red TUI noise the model never reads. The event
+// subscription seeds this map synchronously, and the session context hook
+// materializes the seeds and injects the result into the model requests of the
+// turn, so each message reaches the model the way Claude's additionalContext
+// does.
 //
-// Seeds, not messages (S20): opencode dispatches the `event` hook
-// fire-and-forget — `void hook["event"]?.(...)` is never awaited — but awaits
-// the transform. An async stash (spawn the script, then set the entry) could
-// lose the race to the first request, leaving the model with no guidance and
-// no error. A seed lands synchronously the instant the event is dispatched,
-// so the awaited transform always sees it; the transform runs the script
-// itself, exactly when a request makes the guidance worth materializing.
+// Seeds, not messages (S20): the subscription consumes the event stream
+// independently of model requests, so an async stash could lose the race to the
+// first request, leaving the model with no guidance and no error. A seed lands
+// synchronously the instant the event is dispatched; the awaited context hook
+// runs the script itself, exactly when a request makes the guidance worth
+// materializing.
 //
-// No consume-once (S21): the runtime triggers the transform for EVERY LLM
-// request in the session, and the first one is the throwaway title generator
-// (~2KB prompt; its output never surfaces). A consume-on-first-request design
-// hands the guidance to that request and the real one never sees it. A seed
-// therefore rides up to PUSH_CAP requests (the title request is harmless
-// noise), and the session.idle handler retires the entry at the turn
-// boundary — the guidance rides the first turn only, the per-turn nudge rides
-// the next turn.
+// No consume-once (S21): the context hook triggers for every agent-loop request
+// of the turn, and tool-driven continuations re-trigger it too. A
+// consume-on-first-request design hands the guidance to one request only; a
+// seed therefore rides up to PUSH_CAP requests, and the session.idle handler
+// retires the entry at the turn boundary — the guidance rides the first turn
+// only, the per-turn nudge rides the next turn. V2 gives the throwaway title
+// request its own hook, so unlike the V1 transform the context hook no longer
+// burns a push on it.
 //
 // Lifecycle: an entry that no request ever rides (a session that ends right
 // after its last nudge, or a created-seed for a session the user never sends
@@ -71,14 +120,12 @@ type PendingGuidance = {
   items: string[];
   /** How many requests of this turn already received the push. */
   pushes: number;
+  cwd?: string;
 };
 const PENDING_GUIDANCE = new Map<string, PendingGuidance>();
 const GUIDANCE_CAP = 32;
-// Title + real request (+ a retry) must all ride before the push stops.
 const PUSH_CAP = 3;
 
-// Placeholders the transform materializes by running the matching script.
-// \u0000 keeps them disjoint from any script output, which is plain text.
 const CREATED_SEED = "\u0000created-guidance";
 const IDLE_SEED = "\u0000idle-nudge";
 
@@ -110,7 +157,7 @@ function commentPayload(tool: string, args: EditArgs): string {
   return JSON.stringify({
     tool_name: tool === "write" ? "Write" : "Edit",
     tool_input: {
-      file_path: str(args.filePath),
+      file_path: str(args.path),
       content: str(args.content),
       old_string: str(args.oldString),
       new_string: str(args.newString),
@@ -148,12 +195,14 @@ function lintVerdict(exitCode: number, stderr: string): string | null {
 async function run(
   command: string[],
   stdin: string,
+  cwd?: string,
 ): Promise<HookResult | null> {
   try {
     const child = Bun.spawn(command, {
       stdin: new Blob([stdin]),
       stdout: "pipe",
       stderr: "pipe",
+      ...(cwd ? { cwd } : {}),
     });
     const [exitCode, stdout, stderr] = await Promise.all([
       child.exited,
@@ -188,187 +237,205 @@ function withOpenCodeNote(message: string | null): string | null {
   return trimmed ? `${trimmed}\n\n${OPENCODE_SPAWN_NOTE}` : null;
 }
 
-// client.app.log is the structured logging surface — plugin stderr would be
-// rendered red in the TUI, so genuine failures go here instead of the console.
-type PluginClient = {
-  app: {
-    log: (options: {
-      body: {
-        service: string;
-        level: "debug" | "info" | "error" | "warn";
-        message: string;
-      };
-    }) => Promise<unknown> | unknown;
-  };
-};
+// V2 dropped client.app.log and swallows plugin stderr (2.2.7), so a failure
+// written here reaches neither the model nor the server log; debug by writing
+// to a file.
+function logFailure(message: string): void {
+  console.error(`[q-lab] ${message}`);
+}
 
-async function logFailure(client: PluginClient | undefined, message: string) {
-  try {
-    await client?.app.log({
-      body: { service: "q-lab", level: "error", message },
+function patchWrites(
+  patchText: string,
+  cwd: string,
+): Array<{ tool: string; args: EditArgs }> {
+  const files: Array<{
+    tool: string;
+    path: string;
+    removed: string[];
+    added: string[];
+  }> = [];
+  let current: (typeof files)[number] | undefined;
+  for (const line of patchText.split(/\r?\n/)) {
+    const header = /^\*\*\* (Add|Update|Delete) File: (.+)$/.exec(line);
+    if (header) {
+      current =
+        header[1] === "Delete"
+          ? undefined
+          : {
+              tool: header[1] === "Add" ? "write" : "edit",
+              path: resolve(cwd, header[2].trim()),
+              removed: [],
+              added: [],
+            };
+      if (current) files.push(current);
+    } else if (current && line.startsWith("*** Move to: ")) {
+      current.path = resolve(cwd, line.slice("*** Move to: ".length).trim());
+    } else if (current && line.startsWith("+")) {
+      current.added.push(line.slice(1));
+    } else if (current && line.startsWith("-")) {
+      current.removed.push(line.slice(1));
+    }
+  }
+  return files.map(({ tool, path, removed, added }) => ({
+    tool,
+    args:
+      tool === "write"
+        ? { path, content: added.join("\n") }
+        : { path, oldString: removed.join("\n"), newString: added.join("\n") },
+  }));
+}
+
+function seedFromEvent(event: SubscriptionEvent): void {
+  const sessionID = event.data?.sessionID;
+  if (!sessionID) return;
+
+  if (event.type === "session.created") {
+    stashPending(PENDING_GUIDANCE, sessionID, {
+      items: [CREATED_SEED],
+      pushes: 0,
+      cwd: event.data?.location?.directory,
     });
-  } catch {
-    // The log endpoint is best-effort; never let it break a hook.
+  }
+
+  // V2 verified on 2.2.7: a CLI turn ends with execution.succeeded, not
+  // session.idle; handling both is idempotent.
+  const nudged =
+    event.type === "session.idle" ||
+    event.type === "session.execution.succeeded";
+  if (
+    nudged ||
+    event.type === "session.execution.failed" ||
+    event.type === "session.execution.interrupted"
+  ) {
+    const cwd = PENDING_GUIDANCE.get(sessionID)?.cwd;
+    PENDING_GUIDANCE.delete(sessionID);
+    stashPending(PENDING_GUIDANCE, sessionID, {
+      items: nudged ? [IDLE_SEED] : [],
+      pushes: 0,
+      cwd,
+    });
   }
 }
 
-const QLabPlugin = Object.assign(
-  async function QLabPlugin(context?: {
-    directory?: string;
-    worktree?: string;
-    client?: PluginClient;
-  }) {
+const definition = {
+  id: "q-lab",
+  // Hook registrations are disposed with the plugin; the subscription is the
+  // only resource this returns cleanup for.
+  async setup(ctx: PluginContext): Promise<() => void> {
     // S8: symlink-loaded modules expose the checkout's real directory here.
     const root = dirname(import.meta.dir);
-    // S11: the plugin context carries the session's worktree and directory.
-    const cwd = context?.worktree ?? context?.directory ?? process.cwd();
-    const client = context?.client;
+    // V2: ctx.location is the plugin instance's directory, not every session's.
+    const cwd = ctx.location.directory;
 
-    return {
-      // S1/S2: created is session-scoped and idle is turn-scoped.
-      event: async ({
-        event,
-      }: {
-        event: { type: string; properties?: { sessionID?: string } };
-      }) => {
-        const sessionID = event.properties?.sessionID;
-        if (!sessionID) return;
+    const contextHook = async (event: ContextEvent) => {
+      const pending = event.sessionID
+        ? PENDING_GUIDANCE.get(event.sessionID)
+        : undefined;
+      if (!pending || pending.pushes >= PUSH_CAP) return;
+      const payloadCwd = pending.cwd ?? cwd;
 
-        // S20: seed synchronously — never spawn here. The event dispatch is
-        // fire-and-forget, so anything async could land after the first
-        // request's transform has already read an empty stash. The transform
-        // materializes the seed by running the script (it is awaited). Map
-        // writes cannot throw, so this handler needs no failure path.
-        if (event.type === "session.created") {
-          stashPending(PENDING_GUIDANCE, sessionID, {
-            items: [CREATED_SEED],
-            pushes: 0,
-          });
+      const messages: string[] = [];
+      for (const item of pending.items) {
+        if (item === CREATED_SEED) {
+          // The payload names the session the guidance tells the model to
+          // scribe against. `provider` marks it as ours: a directory lookup
+          // would pick whichever OpenCode session touched this worktree last.
+          const result = await run(
+            [join(root, COCKPIT_SHIM), "hook", "session-start"],
+            JSON.stringify({
+              session_id: event.sessionID,
+              cwd: payloadCwd,
+              provider: "opencode",
+            }),
+          );
+          if (result?.stderr) logFailure(result.stderr.trimEnd());
+          const message = withOpenCodeNote(result?.stdout ?? null);
+          if (message) messages.push(message);
+        } else if (item === IDLE_SEED) {
+          // scribe-nudge reads its session id and cwd from stdin and returns
+          // immediately when that parse fails, so an empty stdin silently
+          // disables the nudge entirely. The payload is the behavior.
+          const result = await run(
+            [join(root, COCKPIT_SHIM), "hook", "stop"],
+            JSON.stringify({
+              session_id: event.sessionID,
+              cwd: payloadCwd,
+              provider: "opencode",
+            }),
+          );
+          if (result?.stderr) logFailure(result.stderr.trimEnd());
+          // S15: OpenCode receives the Claude hook wrapper, not plain
+          // reminder text.
+          const message = withOpenCodeNote(
+            result ? sessionMessage(result.stdout) : null,
+          );
+          if (message) messages.push(message);
+        } else {
+          // Already materialized by an earlier request of this turn.
+          messages.push(item);
         }
-
-        if (event.type === "session.idle") {
-          // S21: turn boundary — anything the turn already rode retires, and
-          // a fresh entry seeds the nudge for the next turn's requests.
-          PENDING_GUIDANCE.delete(sessionID);
-          stashPending(PENDING_GUIDANCE, sessionID, {
-            items: [IDLE_SEED],
-            pushes: 0,
-          });
-        }
-      },
-
-      // S19/S20/S21: the model reads guidance from the system prompt. The
-      // transform is triggered for EVERY LLM request in the session — the
-      // first is the throwaway title generator, so consume-once would hand
-      // the guidance to a request whose output never surfaces. A seed rides
-      // up to PUSH_CAP requests (the title request is harmless noise) and the
-      // turn-ending idle retires it. agent.generate triggers without a
-      // sessionID and no-ops here.
-      "experimental.chat.system.transform": async (
-        input: { sessionID?: string },
-        output: { system: string[] },
-      ) => {
-        const pending = input.sessionID
-          ? PENDING_GUIDANCE.get(input.sessionID)
-          : undefined;
-        if (!pending || pending.pushes >= PUSH_CAP) return;
-
-        const messages: string[] = [];
-        for (const item of pending.items) {
-          if (item === CREATED_SEED) {
-            // The payload names the session the guidance tells the model to
-            // scribe against. `provider` marks it as ours: a directory lookup
-            // would pick whichever OpenCode session touched this worktree last.
-            const result = await run(
-              [join(root, COCKPIT_SHIM), "hook", "session-start"],
-              JSON.stringify({
-                session_id: input.sessionID,
-                cwd,
-                provider: "opencode",
-              }),
-            );
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-            const message = withOpenCodeNote(result?.stdout ?? null);
-            if (message) messages.push(message);
-          } else if (item === IDLE_SEED) {
-            // scribe-nudge reads its session id and cwd from stdin and returns
-            // immediately when that parse fails, so an empty stdin silently
-            // disables the nudge entirely. The payload is the behavior.
-            const result = await run(
-              [join(root, COCKPIT_SHIM), "hook", "stop"],
-              JSON.stringify({
-                session_id: input.sessionID,
-                cwd,
-                provider: "opencode",
-              }),
-            );
-            if (result?.stderr) {
-              await logFailure(client, result.stderr.trimEnd());
-            }
-            // S15: OpenCode receives the Claude hook wrapper, not plain
-            // reminder text.
-            const message = withOpenCodeNote(
-              result ? sessionMessage(result.stdout) : null,
-            );
-            if (message) messages.push(message);
-          } else {
-            // Already materialized by an earlier request of this turn.
-            messages.push(item);
-          }
-        }
-        // Materialize once, then replay. Re-running a script per push would
-        // assume it is a pure function of its input; scribe-nudge is not —
-        // it writes a marker and throttles for 8 minutes, so a re-run inside
-        // the turn returns nothing and every request after the first would
-        // push an empty message. Caching the resolved strings is also what
-        // makes PUSH_CAP count requests instead of subprocess spawns.
-        pending.items = messages;
-        pending.pushes += 1;
-        if (messages.length) output.system.push(...messages);
-      },
-
-      "tool.execute.before": async (
-        input: { tool: string },
-        output: { args: { command?: unknown } },
-      ) => {
-        // S5: tool arguments live on the second handler parameter.
-        if (input.tool !== "bash" || typeof output.args.command !== "string")
-          return;
-        if (!COMMIT_COMMAND.test(output.args.command)) return;
-
-        const result = await run(
-          ["bash", join(root, CHECK_BRANCH)],
-          hookPayload("command", output.args.command),
+      }
+      // Materialize once, then replay. Re-running a script per push would
+      // assume it is a pure function of its input; scribe-nudge is not —
+      // it writes a marker and throttles for 8 minutes, so a re-run inside
+      // the turn returns nothing and every request after the first would
+      // push an empty message. Caching the resolved strings is also what
+      // makes PUSH_CAP count requests instead of subprocess spawns.
+      pending.items = messages;
+      pending.pushes += 1;
+      if (messages.length) {
+        event.system.push(
+          ...messages.map((text) => ({ type: "text" as const, text })),
         );
-        if (!result) return;
+      }
+    };
 
-        const message = guardVerdict(result.exitCode, result.stdout);
-        // S3: this throw blocks the command and surfaces the guard message verbatim.
-        // The branch guard is the module's only intentional failure path.
-        if (message) throw message;
-      },
+    const toolBefore = async (event: ToolBeforeEvent) => {
+      // V2 renamed the bash tool to `shell`; both spellings stay gated so a
+      // rename in either direction cannot silently drop the branch guard.
+      const command = (event.input as { command?: unknown } | undefined)
+        ?.command;
+      if (
+        (event.tool !== "shell" && event.tool !== "bash") ||
+        typeof command !== "string"
+      )
+        return;
+      if (!COMMIT_COMMAND.test(command)) return;
 
-      "tool.execute.after": async (
-        input: {
-          tool: string;
-          sessionID?: string;
-          callID?: string;
-          args: EditArgs;
-        },
-        output: { output: string },
-      ) => {
-        // S5a is before-hook-specific: after-hooks carry the arguments on the
-        // FIRST parameter (`input.args`) and the tool result on the second —
-        // reading output.args.filePath here throws and fails the write.
-        if (
-          (input.tool !== "write" && input.tool !== "edit") ||
-          typeof input.args.filePath !== "string"
-        ) {
-          return;
-        }
-        const filePath = input.args.filePath;
+      const result = await run(
+        ["bash", join(root, CHECK_BRANCH)],
+        hookPayload("command", command),
+        event.sessionID
+          ? (PENDING_GUIDANCE.get(event.sessionID)?.cwd ?? cwd)
+          : cwd,
+      );
+      if (!result) return;
+
+      const message = guardVerdict(result.exitCode, result.stdout);
+      // S3: this throw blocks the command and surfaces the guard message verbatim.
+      // The branch guard is the module's only intentional failure path.
+      if (message) throw message;
+    };
+
+    const toolAfter = async (event: ToolAfterEvent) => {
+      const sessionCwd = event.sessionID
+        ? (PENDING_GUIDANCE.get(event.sessionID)?.cwd ?? cwd)
+        : cwd;
+      const writes: Array<{ tool: string; args: EditArgs }> = [];
+      if (event.tool === "write" || event.tool === "edit") {
+        writes.push({ tool: event.tool, args: event.input as EditArgs });
+      } else if (event.tool === "patch") {
+        const patchText = (event.input as { patchText?: unknown } | undefined)
+          ?.patchText;
+        if (typeof patchText === "string")
+          writes.push(...patchWrites(patchText, sessionCwd));
+      }
+
+      let feedback = "";
+      for (const { tool, args } of writes) {
+        // V2 renamed the edit/write file argument from `filePath` to `path`.
+        if (typeof args.path !== "string") continue;
+        const filePath = args.path;
 
         // Two independent hooks share this event and their gates do not overlap,
         // so neither may return early on the other's behalf.
@@ -376,37 +443,75 @@ const QLabPlugin = Object.assign(
           const result = await run(
             ["bash", join(root, FLIGHTPLAN_LINT)],
             hookPayload("file_path", filePath),
+            sessionCwd,
           );
           const message = result && lintVerdict(result.exitCode, result.stderr);
           // S4: the write has landed, so append lint feedback without blocking it.
-          if (message) output.output += message;
+          if (message) feedback += message;
         }
 
-        // The path policy is the hook's own (`isGuardedPath`) and it re-checks on every run, so a copy here would only be a second place to drift.
         if (COMMENT_GUARDED.test(filePath)) {
           const result = await run(
             ["bun", join(root, COMMENT_GUARD)],
-            commentPayload(input.tool, input.args),
+            commentPayload(tool, args),
+            sessionCwd,
           );
           const message = result && lintVerdict(result.exitCode, result.stderr);
-          if (message) output.output += message;
+          if (message) feedback += message;
         }
-      },
+      }
+
+      // The runtime reads result.content back after this hook, so the feedback
+      // rides the result the model receives. An errored tool changed no file.
+      if (!feedback || event.status !== "completed" || !event.result) return;
+      // The runtime shows `output` only while `content` is empty, so content
+      // written here must carry the output with it.
+      const { content, output } = event.result;
+      event.result.content =
+        typeof content === "string" && content
+          ? content + feedback
+          : Array.isArray(content) && content.length
+            ? [...content, { type: "text" as const, text: feedback }]
+            : [{ type: "text" as const, text: `${output ?? ""}${feedback}` }];
     };
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({
+          signal: controller.signal,
+        })) {
+          seedFromEvent(event);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted)
+          logFailure(`event subscription ended: ${String(error)}`);
+      }
+    })();
+
+    await ctx.session.hook("context", contextHook);
+    await ctx.tool.hook("execute.before", toolBefore);
+    await ctx.tool.hook("execute.after", toolAfter);
+
+    return () => controller.abort();
   },
-  {
-    guardVerdict,
-    hookPayload,
-    commentPayload,
-    lintVerdict,
-    withOpenCodeNote,
-    stashPending,
-    GUIDANCE_CAP,
-    PUSH_CAP,
-    COMMIT_COMMAND,
-    FLIGHTPLAN_TASK,
-    COMMENT_GUARDED,
-  },
-);
+};
+
+const QLabPlugin = Object.assign(definition, {
+  seedFromEvent,
+  guardVerdict,
+  hookPayload,
+  commentPayload,
+  lintVerdict,
+  withOpenCodeNote,
+  stashPending,
+  GUIDANCE_CAP,
+  PENDING_GUIDANCE,
+  PUSH_CAP,
+  COMMIT_COMMAND,
+  FLIGHTPLAN_TASK,
+  COMMENT_GUARDED,
+});
 
 export { QLabPlugin };
+export default QLabPlugin;

@@ -8,7 +8,91 @@ This is the narrative log. The executable gate is `docs/opencode-compat/tasks/_c
 
 Seventeen of eighteen items are resolved from observed behavior. Only S12 remains open, and it was never a gate.
 
-Every entry describes the V1 plugin API, and 1.x is the only line this repo supports. OpenCode 2.x replaced the plugin API and removed the TUI bridge. A V2 port existed briefly and was dropped. Recover its shapes from git (`acfda97`, `ed1f03c`) if 2.x support returns.
+---
+
+## V2 — the 2.x port, observed on opencode 2.2.7 (2026-11-13)
+
+Every item below was verified live on 2.2.7 with an instrumented plugin plus
+stub cockpit payloads and headless `opencode run` sessions; the oracle for each
+model-visible claim required quoting exact text, with a NOTHING control.
+
+**V1 — the ported plugin contract.** Default export `{ id: "q-lab", setup(ctx)
+}` returning a cleanup function. `ctx.event.subscribe({signal})` (cleanup via
+AbortController), `ctx.session.hook("context")`, `ctx.tool.hook("execute.before"
+|"execute.after")`, `ctx.location.directory`. V1 hook keys (`event`,
+`tool.execute.before/after`, `experimental.chat.system.transform`) do not run;
+the 2.2.7 loader requires a default definition with an id and a setup or effect
+function and otherwise logs `failed to load plugin`.
+
+**V2 — events.** `session.created` carries `data.sessionID`,
+`data.location.directory` and `data.subpath` (empty string at a project root),
+and reaches the plugin subscription. **`session.idle` never fires for
+`opencode run` sessions on 2.2.7** — the turn boundary arrives as
+`session.execution.succeeded`; the port handles both and re-retiring on both is
+idempotent. The event stream delivers each event twice to one subscriber (each
+live plugin instance subscribes), so seed logic must stay idempotent.
+
+**V2 — model requests.** `ctx.session.hook("context")` runs once per agent-loop
+request and the title request does not trigger it (the shim ran exactly once per
+turn), so V1's S21 consume-once trap is gone. The hook pushes
+`{type:"text", text}` parts onto `event.system`; the model demonstrably reads
+them (created guidance and the idle nudge were both quoted verbatim).
+
+**V2 — tool hooks.** `execute.before` events carry
+`{tool, sessionID, agent, messageID, id, input}`; the tool is `shell` (was
+`bash`, input `{command}`) and write/edit take `path` (was `filePath`). A throw
+blocks the tool and surfaces the message: the branch guard blocked `git commit`
+on `main` with the repo's own git-flow message, and the model reported the text
+verbatim. `execute.after` events carry `status` and `result`; **the runtime
+reads `result.content` back after the hook** — appended feedback reached the
+model for both the flightplan lint and the comment guard.
+
+**V2 — cwd is per session, not per instance.** The server's process cwd is not
+the session's repo: the branch guard spawned without a cwd silently guarded
+nothing. `session.created`'s `data.location.directory` is the session's project
+directory; the port stashes it per session and passes it to every script spawn
+(fallback: the `ctx.location.directory` of the instance whose hook runs; a turn-boundary event carries no location, so it never stores one). One module evaluation is shared by every
+location's `setup`, so all instances see all sessions — the per-session cwd is
+what keeps a session's scripts inside its own repo.
+
+**V2 — stderr and reload.** Plugin stderr is swallowed: it is neither in the
+server log nor read by the model, and V2 has no `client.app.log` — debug by
+writing to a file. A plugin module is imported when a location boots;
+`touch`ing the plugin file re-imports it on the next location boot, but an
+already-booted location keeps the old module until `opencode service restart`
+(which also wipes the plugin's in-memory state). The TUI does not restart the
+service.
+
+**V2 — the TUI bridge is removed.** No `/tui/*` routes exist, the TUI takes no
+`--port` server, `/global/health` is gone, and `tui.prompt.append` /
+`tui.command.execute` are internal bus events consumed by the TUI process with
+no HTTP publisher. Sends now go through the background service: discover it
+from `~/.local/state/opencode/service.json` (`url` + `password`), health-check
+`GET /api/info`, resolve the session with `GET /api/session/{id}`, and deliver
+with `POST /api/session/{id}/prompt` body `{text, delivery:"queue"}`. Basic
+auth is always user `opencode`; pair each URL with its own password. The cockpit
+Rust send bridge (`packages/monitor/cockpit-rs/src/server/opencode.rs`) and the
+relay live path both use this route.
+
+**V2 — database.** Sessions live in `session_v2`, messages in
+`session_message` (a `type` column for the role, message parts inline in
+`data.content`, model nested as `model.id`). The legacy `session`, `message`
+and `part` tables are frozen after migration and fully overlap the new ones, so
+reading them would double-count; every cockpit reader
+(`atlas/opencode.rs`, `atlas/live.rs`, `views/sessions.rs`,
+`views/session_title.rs`, `transcript/opencode_rows.rs`, `find_session.rs`)
+reads only the V2 tables.
+
+**V2 — status.** Everything the plugin does on 2.x is verified except the
+behaviors that need a TUI: whether a TUI session ever emits `session.idle`, and
+live cockpit delivery into a visible TUI (the prompt route is verified against
+a headless service; relay's SKILL covers the user-facing behavior).
+
+---
+
+## V1 spike log (opencode 1.18.18, 2026-08-15)
+
+Every entry describes the V1 plugin API. OpenCode 2.x replaced the plugin API; the current `opencode/plugin.ts` is ported to it and verified live on 2.2.7 (see the V2 section above). The V1 observations below are history and a migration cross-check, not the current contract.
 
 ---
 

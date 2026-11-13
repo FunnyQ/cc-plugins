@@ -63,7 +63,7 @@ For brevity, the examples below write `relay.ts <backend> <mode> …` as shortha
 Inside herdr (`HERDR_ENV=1`) or a herdr-app terminal (`HC_TERMINAL_ID` set), `delegate` and `review` auto-route to a live TUI pane in a new tab.
 Before running in that environment, read `references/live.md`.
 It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous` / `--no-ask`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
-`image` stays headless/native.
+`image` stays headless/native. An opencode run with a model (from `--model` or the relay config) also runs headless, because the opencode 2.x TUI takes no `-m`; relay prints one stderr line and continues.
 
 **`--no-ask` is for callers with nobody at the pane.** A live TUI hands the agent an ask tool the headless form never gets, and relay reads the result file rather than the pane, so a question stops the run against a clock nobody is watching. The flag appends an unattended contract to the prompt file. Leave it off when you are sitting there: answering a good question beats guessing.
 
@@ -82,14 +82,13 @@ Editing capability is identical: same CLI, model, and write access. So "more pre
 Run this before step 1 of `delegate` and before `review`, for the `opencode` backend only. The suggested config covers only opencode, so a codex or claude run skips this section.
 In a non-interactive context (a sub-agent or headless caller), skip the questions below and run relay with the config as it is.
 
-1. Run `opencode --version` first. On `2.` or later, tell the user relay supports opencode 1.x only and suggest downgrading to 1.x. Stop.
-2. Run `relay.ts config check`. It prints a JSON report; branch on its exit code.
-3. On exit `4` (`malformed`), report `path` and `error` to the user. Stop. Do not offer an update or ask for a model.
-4. On exit `3` (`missing`, `no-version`, or `outdated`), show the user `suggested.models` beside their `models` and `version`.
+1. Run `relay.ts config check`. It prints a JSON report; branch on its exit code.
+2. On exit `4` (`malformed`), report `path` and `error` to the user. Stop. Do not offer an update or ask for a model.
+3. On exit `3` (`missing`, `no-version`, or `outdated`), show the user `suggested.models` beside their `models` and `version`.
    - Ask with the harness's question tool. Offer: Merge (keep models the user chose, refresh the ones an earlier apply wrote, fill the missing ones), Overwrite (replace with the suggested models), Skip this time.
    - For `missing`, merge and overwrite write the same file, so offer only Apply and Skip this time.
    - Apply the answer with `relay.ts config apply --merge` or `relay.ts config apply --overwrite`.
-5. On exit `0` (`current`), continue.
+4. On exit `0` (`current`), continue.
 
 ### Model pick
 

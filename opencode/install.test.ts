@@ -7,11 +7,13 @@ import {
   buildTargets,
   classifyLink,
   decideSubagentDepth,
+  depthConfigWrite,
   findSkillDirs,
   orphanLinks,
   parseJsonc,
   resolveGlobalConfig,
   resolveSkillNames,
+  staleTopLevelDepth,
   type LinkState,
 } from "./install";
 
@@ -155,6 +157,18 @@ describe("buildTargets", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+  test("installs the plugin where OpenCode 2 discovers global plugins", () => {
+    const plugin = targets.find((target) => target.group === "plugin");
+
+    expect(plugin?.installed).toBe(
+      join(home, ".config", "opencode", "plugins", "q-lab.ts"),
+    );
+    expect(plugin?.source).toBe(join(repoRoot, "opencode", "plugin.ts"));
+    expect(
+      targets.some((target) => target.installed.includes("/plugin/")),
+    ).toBe(false);
+  });
+
   test("keeps every installed path within the OpenCode config directory", () => {
     const root = join(home, ".config", "opencode");
 
@@ -274,35 +288,54 @@ describe("orphanLinks", () => {
 describe("decideSubagentDepth", () => {
   test.each([
     [{}, "write", 2],
-    [{ subagent_depth: 1 }, "write", 2],
-    [{ subagent_depth: 2 }, "ok", 2],
-    [{ subagent_depth: 5 }, "ok", 5],
-    [{ subagent_depth: "2" }, "write", 2],
+    [{ experimental: {} }, "write", 2],
+    [{ experimental: { subagent_depth: 1 } }, "write", 2],
+    [{ experimental: { subagent_depth: 2 } }, "ok", 2],
+    [{ experimental: { subagent_depth: 5 } }, "ok", 5],
+    [{ experimental: { subagent_depth: "2" } }, "write", 2],
+    // OpenCode 2 ignores the top-level V1 field with a warning, so a stale
+    // top-level value must not satisfy the check.
+    [{ subagent_depth: 5 }, "write", 2],
+    [{ experimental: "high" }, "manual", 2],
     [[], "unparsable", 2],
   ] as const)("decides %#", (config, action, value) => {
     expect(decideSubagentDepth(config)).toMatchObject({ action, value });
   });
 
   test("does not mutate input objects", () => {
-    const sufficient = { subagent_depth: 5, theme: "q" };
-    const insufficient = { subagent_depth: 1, theme: "q" };
+    const sufficient = {
+      experimental: { subagent_depth: 5 },
+      theme: "q",
+    };
+    const insufficient = {
+      experimental: { subagent_depth: 1 },
+      theme: "q",
+    };
 
     decideSubagentDepth(sufficient);
     decideSubagentDepth(insufficient);
 
-    expect(sufficient).toEqual({ subagent_depth: 5, theme: "q" });
-    expect(insufficient).toEqual({ subagent_depth: 1, theme: "q" });
+    expect(sufficient).toEqual({
+      experimental: { subagent_depth: 5 },
+      theme: "q",
+    });
+    expect(insufficient).toEqual({
+      experimental: { subagent_depth: 1 },
+      theme: "q",
+    });
   });
 
   test("downgrades a needed write to manual when the config carries comments", () => {
     expect(decideSubagentDepth({}, true)).toMatchObject({ action: "manual" });
-    expect(decideSubagentDepth({ subagent_depth: 1 }, true)).toMatchObject({
-      action: "manual",
-    });
+    expect(
+      decideSubagentDepth({ experimental: { subagent_depth: 1 } }, true),
+    ).toMatchObject({ action: "manual" });
   });
 
   test("leaves a sufficient commented config alone", () => {
-    expect(decideSubagentDepth({ subagent_depth: 3 }, true)).toMatchObject({
+    expect(
+      decideSubagentDepth({ experimental: { subagent_depth: 3 } }, true),
+    ).toMatchObject({
       action: "ok",
       value: 3,
     });
@@ -390,6 +423,47 @@ describe("resolveGlobalConfig", () => {
   });
 });
 
+describe("staleTopLevelDepth", () => {
+  test.each([
+    [{ subagent_depth: 2 }, true],
+    [{ subagent_depth: 1, theme: "q" }, true],
+    [{}, false],
+    [{ experimental: { subagent_depth: 2 } }, false],
+    ["not json", false],
+    [null, false],
+  ] as const)("decides %#", (config, expected) =>
+    expect(staleTopLevelDepth(config)).toBe(expected),
+  );
+});
+
+describe("depthConfigWrite", () => {
+  test("drops the stale top-level field and raises the nested depth", () => {
+    expect(
+      depthConfigWrite(
+        { $schema: "x", plugin: [], permission: "allow", subagent_depth: 2 },
+        2,
+      ),
+    ).toEqual({
+      $schema: "x",
+      plugin: [],
+      permission: "allow",
+      experimental: { subagent_depth: 2 },
+    });
+  });
+
+  test("merges into an existing experimental object", () => {
+    expect(depthConfigWrite({ experimental: { todo: true } }, 2)).toEqual({
+      experimental: { todo: true, subagent_depth: 2 },
+    });
+  });
+
+  test("keeps a user's higher value", () => {
+    expect(
+      depthConfigWrite({ experimental: { subagent_depth: 5 } }, 5),
+    ).toEqual({ experimental: { subagent_depth: 5 } });
+  });
+});
+
 describe("buildApplyPlan", () => {
   const targets = buildTargets(repoRoot, home);
   const symlinks = targets.filter((target) => target.group !== "config");
@@ -417,7 +491,7 @@ describe("buildApplyPlan", () => {
     const plan = buildApplyPlan(
       targets,
       states,
-      decideSubagentDepth({ subagent_depth: 2 }),
+      decideSubagentDepth({ experimental: { subagent_depth: 2 } }),
     );
 
     expect(
@@ -473,5 +547,37 @@ describe("buildApplyPlan", () => {
 
     expect(plan.operations.at(-1)?.action).toBe("skip");
     expect(plan.success).toBe(false);
+  });
+
+  test("rewrites the config only to drop the stale top-level depth", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as LinkState]),
+    );
+    const sufficient = decideSubagentDepth({
+      experimental: { subagent_depth: 2 },
+    });
+
+    expect(
+      buildApplyPlan(targets, states, sufficient).operations.at(-1)?.action,
+    ).toBe("keep");
+    expect(
+      buildApplyPlan(targets, states, sufficient, true).operations.at(-1)
+        ?.action,
+    ).toBe("write");
+  });
+
+  test("never rewrites a commented config to drop the stale top-level depth", () => {
+    const states = new Map(
+      symlinks.map((target) => [target.installed, "ok" as LinkState]),
+    );
+    const sufficient = decideSubagentDepth(
+      { subagent_depth: 2, experimental: { subagent_depth: 2 } },
+      true,
+    );
+
+    expect(
+      buildApplyPlan(targets, states, sufficient, true, true).operations.at(-1)
+        ?.action,
+    ).toBe("keep");
   });
 });

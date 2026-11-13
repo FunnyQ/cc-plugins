@@ -144,11 +144,11 @@ describe("timestampForPath", () => {
 describe("the shipped suggested config", () => {
   const suggested = JSON.parse(readFileSync(SUGGESTED_CONFIG_PATH, "utf-8"));
 
-  it("carries a version and provider/model ids for opencode delegate and review", () => {
+  it("defaults opencode to cli-default, so the live pane stays reachable", () => {
     expect(Number.isInteger(suggested.version)).toBe(true);
     expect(String(suggested.version)).toMatch(/^\d{10}$/);
     for (const mode of ["delegate", "review"]) {
-      expect(suggested.models.opencode[mode]).toMatch(/^[\w-]+\/.+/);
+      expect(suggested.models.opencode[mode]).toBe(CLI_DEFAULT);
       for (const id of suggested.suggestions.opencode[mode]) {
         expect(id).toMatch(/^[\w-]+\/.+/);
       }

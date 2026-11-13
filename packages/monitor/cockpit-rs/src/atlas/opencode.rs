@@ -281,7 +281,10 @@ fn read_db(
     message_rows: &mut usize,
 ) -> rusqlite::Result<()> {
     let conn = Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let mut stmt = conn.prepare("select id, directory, time_created, time_updated from session")?;
+    // The 2.x binary freezes the legacy session/message tables after migrating
+    // their rows, so reading them would double-count every pre-2.x session.
+    let mut stmt =
+        conn.prepare("select id, directory, time_created, time_updated from session_v2")?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -298,13 +301,9 @@ fn read_db(
         sessions_by_id.insert(id, session);
     }
 
-    let mut stmt = conn.prepare("select message_id, count(*) as tool_calls from part where json_extract(data, '$.type') = 'tool' group by message_id")?;
-    let tool_calls: HashMap<String, i64> = stmt
-        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?
-        .collect::<rusqlite::Result<_>>()?;
-
-    let mut stmt =
-        conn.prepare("select id, session_id, time_created, time_updated, data from message")?;
+    let mut stmt = conn.prepare(
+        "select id, session_id, time_created, time_updated, type, data from session_message",
+    )?;
     let rows = stmt
         .query_map([], |r| {
             Ok((
@@ -313,11 +312,12 @@ fn read_db(
                 r.get::<_, f64>(2)?,
                 r.get::<_, f64>(3)?,
                 r.get::<_, String>(4)?,
+                r.get::<_, String>(5)?,
             ))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     *message_rows = rows.len();
-    for (id, session_id, created, updated, data) in rows {
+    for (id, session_id, created, updated, kind, data) in rows {
         let Ok(parsed) = serde_json::from_str::<Value>(&data) else {
             continue;
         };
@@ -344,13 +344,32 @@ fn read_db(
             "time".into(),
             json!({"created": time_created, "completed": time_completed}),
         );
+        // V2 stores the role in the row's type column and the model nested as
+        // model.id; the ingest reads Claude-shaped roles and modelID.
+        obj.insert("role".into(), json!(kind));
+        if non_null(obj.get("modelID")).is_none() {
+            let model_id = non_null(obj.get("model").and_then(|m| m.get("id"))).cloned();
+            if let Some(model_id) = model_id {
+                obj.insert("modelID".into(), model_id);
+            }
+        }
+        let tool_calls = obj
+            .get("content")
+            .and_then(Value::as_array)
+            .map(|parts| {
+                parts
+                    .iter()
+                    .filter(|p| p.get("type").and_then(Value::as_str) == Some("tool"))
+                    .count() as i64
+            })
+            .unwrap_or(0);
         let fallback = if updated != 0.0 { updated } else { created };
         ingest.message(
             &info,
             &session_id,
             sessions_by_id.get(&session_id),
             fallback,
-            tool_calls.get(&id).copied().unwrap_or(0),
+            tool_calls,
         );
     }
     Ok(())
@@ -536,21 +555,42 @@ mod tests {
         }
     }
 
-    fn setup_db(env: &TestEnv, with_part: bool) -> PathBuf {
+    fn setup_db(env: &TestEnv, with_message: bool) -> PathBuf {
         let db = env.dir.path().join("oc/opencode.db");
         std::fs::create_dir_all(db.parent().unwrap()).unwrap();
         let conn = Connection::open(&db).unwrap();
         conn.execute_batch(
-            "create table session (id text, directory text, time_created integer, time_updated integer);
-             create table message (id text, session_id text, time_created integer, time_updated integer, data text);",
+            "create table session_v2 (id text primary key, directory text, time_created integer, time_updated integer);",
         )
         .unwrap();
-        if with_part {
-            conn.execute_batch("create table part (id text, message_id text, data text);")
-                .unwrap();
+        if with_message {
+            conn.execute_batch(
+                "create table session_message (id text primary key, session_id text, time_created integer, time_updated integer, type text, data text);",
+            )
+            .unwrap();
         }
         env.set("COCKPIT_OPENCODE_DB", &db);
         db
+    }
+
+    fn insert_session(db: &Path, id: &str, directory: &str, time: i64) {
+        Connection::open(db)
+            .unwrap()
+            .execute(
+                "insert into session_v2 values (?1, ?2, ?3, ?3)",
+                rusqlite::params![id, directory, time],
+            )
+            .unwrap();
+    }
+
+    fn insert_message(db: &Path, id: &str, session: &str, time: i64, kind: &str, data: Value) {
+        Connection::open(db)
+            .unwrap()
+            .execute(
+                "insert into session_message values (?1, ?2, ?3, ?3, ?4, ?5)",
+                rusqlite::params![id, session, time, kind, data.to_string()],
+            )
+            .unwrap();
     }
 
     fn write(path: &Path, value: Value) {
@@ -644,13 +684,8 @@ mod tests {
         let env = TestEnv::new();
         let db = setup_db(&env, true);
         legacy_message(&env);
-        Connection::open(&db)
-            .unwrap()
-            .execute(
-                "insert into message values ('m1', 'ses_d', 1700000000000, 1700000000000, ?1)",
-                [json!({"role": "user"}).to_string()],
-            )
-            .unwrap();
+        insert_session(&db, "ses_d", "/w", 1_700_000_000_000);
+        insert_message(&db, "m1", "ses_d", 1_700_000_000_000, "user", json!({}));
         let src = load(&ctx()).unwrap();
         assert_eq!(src.open_code_message_file_count, 1);
         assert_eq!(src.open_code_message_row_count, 1);
@@ -673,17 +708,49 @@ mod tests {
     }
 
     #[test]
-    fn missing_part_table_keeps_session_count_and_falls_back() {
+    fn v2_rows_map_role_model_and_content_tool_calls() {
+        let env = TestEnv::new();
+        let db = setup_db(&env, true);
+        insert_session(&db, "ses_v2", "/v2", 1_700_000_000_000);
+        insert_message(
+            &db,
+            "u1",
+            "ses_v2",
+            1_700_000_000_000,
+            "user",
+            json!({"text": "hi"}),
+        );
+        insert_message(
+            &db,
+            "a1",
+            "ses_v2",
+            1_700_000_000_500,
+            "assistant",
+            json!({
+                "model": {"id": "flash", "providerID": "opencode"},
+                "cost": 0.25,
+                "tokens": {"input": 10, "output": 5, "reasoning": 3, "cache": {"read": 2, "write": 1}},
+                "content": [{"type": "tool"}, {"type": "text"}]
+            }),
+        );
+        let src = load(&ctx()).unwrap();
+        assert_eq!(src.open_code_session_row_count, 1);
+        assert_eq!(src.usage.model_usage["opencode:flash"].input_tokens, 10);
+        assert_eq!(src.total_tool_calls, 1);
+        let row = &src.ledger[0];
+        assert_eq!(row.id, "opencode:ses_v2");
+        assert_eq!(row.interactions, 1);
+        assert_eq!(row.tool_calls, 1);
+        assert_eq!(row.model, "opencode:flash");
+        assert_eq!(row.project_path, "/v2");
+    }
+
+    #[test]
+    fn missing_message_table_keeps_session_count_and_falls_back() {
         let env = TestEnv::new();
         let db = setup_db(&env, false);
         legacy_message(&env);
-        Connection::open(&db)
-            .unwrap()
-            .execute(
-                "insert into session values ('ses_x', '/w', 1700000000000, 1700000000000)",
-                [],
-            )
-            .unwrap();
+        insert_session(&db, "ses_x", "/w", 1_700_000_000_000);
         let src = load(&ctx()).unwrap();
         assert_eq!(src.open_code_session_row_count, 1);
         assert_eq!(src.open_code_message_row_count, 0);

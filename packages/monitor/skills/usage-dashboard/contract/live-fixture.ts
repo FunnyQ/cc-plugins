@@ -97,7 +97,7 @@ export async function extendLiveFixture(home: string): Promise<void> {
   const oc = new Database(
     join(home, ".local", "share", "opencode", "opencode.db"),
   );
-  oc.query("insert into session values (?, ?, ?, ?, ?)").run(
+  oc.query("insert into session_v2 values (?, ?, ?, ?, ?)").run(
     LIVE_IDS.openCodeActive,
     FIXTURE_PROJECTS.a,
     "Live session",

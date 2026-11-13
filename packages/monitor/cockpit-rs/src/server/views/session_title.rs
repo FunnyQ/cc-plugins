@@ -80,7 +80,7 @@ pub fn resolve_historical_session_title(provider: Provider, session_id: &str) ->
         ),
         Provider::Opencode => database_title(
             &crate::paths::opencode_db(),
-            "select title from session where id = ?1 limit 1",
+            "select title from session_v2 where id = ?1 limit 1",
             session_id,
         ),
         Provider::Claude => claude_title(
@@ -165,7 +165,7 @@ mod tests {
         );
         assert!(!path.exists());
         let db = Connection::open(&path).unwrap();
-        db.execute_batch("create table threads (id text, title text); create table session (id text, title text); insert into threads values ('codex','  Codex  title  '), ('empty',' '); insert into session values ('opencode',' OpenCode title ');").unwrap();
+        db.execute_batch("create table threads (id text, title text); create table session_v2 (id text, title text); insert into threads values ('codex','  Codex  title  '), ('empty',' '); insert into session_v2 values ('opencode',' OpenCode title ');").unwrap();
         assert_eq!(
             resolve_historical_session_title(Provider::Codex, "codex"),
             Some("Codex title".into())

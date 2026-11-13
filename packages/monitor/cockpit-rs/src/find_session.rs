@@ -116,7 +116,7 @@ fn lookup(provider: Provider, project: &Path) -> Result<String, String> {
                 }
             )
         } else {
-            "select id from session where directory = ?1 and time_archived is null order by time_updated desc limit 1".to_owned()
+            "select id from session_v2 where directory = ?1 and time_archived is null order by time_updated desc limit 1".to_owned()
         };
         db.query_row(&sql, [project.to_string_lossy().as_ref()], |row| {
             row.get::<_, Option<String>>(0)
@@ -313,7 +313,7 @@ mod tests {
             ))
         );
         let db = Connection::open(paths::opencode_db()).unwrap();
-        db.execute_batch("create table session (id text primary key, directory text, time_updated integer, time_archived integer);").unwrap();
+        db.execute_batch("create table session_v2 (id text primary key, directory text, time_updated integer, time_archived integer);").unwrap();
         assert_eq!(
             lookup(Provider::Opencode, project),
             Err(format!(
@@ -328,7 +328,7 @@ mod tests {
             ("other", "/other", 9000, None),
         ] {
             db.execute(
-                "insert into session values (?1,?2,?3,?4)",
+                "insert into session_v2 values (?1,?2,?3,?4)",
                 rusqlite::params![id, cwd, updated, archived],
             )
             .unwrap();
@@ -354,7 +354,7 @@ mod tests {
                 Provider::Opencode,
                 "COCKPIT_OPENCODE_DB",
                 "OpenCode database",
-                "session",
+                "session_v2",
             ),
         ] {
             let path = fixture.dir.path().join(key);
