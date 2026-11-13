@@ -118,3 +118,54 @@ test("the data-health panel shows the newer-rollup alert only when the payload c
   expect(alert).toBeLessThan(details);
   expect(partial).toContain("{{ dataHealthAlert }}");
 });
+
+test("the session ledger leaves out sessions run under a temp dir", () => {
+  const app = App();
+  app.rangeKey = "all";
+  app.providerKey = "all";
+  const row = (id: string, projectPath: string) => ({
+    id,
+    projectPath,
+    provider: "claude",
+    date: "2026-01-01",
+    timestampMs: 1,
+  });
+  app.stats = {
+    daily: [],
+    ledger: [
+      row("app", "/Users/q/app"),
+      row("tmp", "/private/tmp/q-lab/oc-v2-smoke/repo10"),
+      row("bare", "/tmp"),
+      row("folders", "/var/folders/xy/T/repo"),
+      row("lookalike", "/tmpfiles/app"),
+    ],
+  };
+  const ids = app.filteredLedger.map((r: { id: string }) => r.id).sort();
+  expect(ids).toEqual(["app", "lookalike"]);
+});
+
+test("the 24h session ledger leaves out temp-dir sessions too", () => {
+  const app = App();
+  app.rangeKey = "24h";
+  app.rangeOffset = 0;
+  app.providerKey = "all";
+  const now = Date.now();
+  app.stats = {
+    ledger: [
+      {
+        id: "app",
+        projectPath: "/Users/q/app",
+        provider: "claude",
+        timestampMs: now - 1000,
+      },
+      {
+        id: "tmp",
+        projectPath: "/private/tmp/x",
+        provider: "claude",
+        timestampMs: now - 1000,
+      },
+    ],
+  };
+  expect(app.filteredLedger.map((r: { id: string }) => r.id)).toEqual(["app"]);
+  expect(app.rollingLedgerRows(1, 0)).toHaveLength(2);
+});

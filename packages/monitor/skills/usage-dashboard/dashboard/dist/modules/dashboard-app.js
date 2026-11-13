@@ -37,6 +37,7 @@ const charts = { trend: null, donut: null };
 const STATS_REFRESH_TIMEOUT_MS = 20_000;
 const LIVE_REFRESH_TIMEOUT_MS = 8_000;
 const ROLLING_24H_MS = 24 * 60 * 60 * 1000;
+const TEMP_PATH = /^(\/private)?\/(tmp|var\/folders)(\/|$)/;
 const RANGE_KEY_PULSE_HOLD_MS = 1_840;
 const LOADER_EXIT_MS = 800;
 const MIN_ELAPSED_PCT_FOR_PROJECTION = 5;
@@ -1468,9 +1469,9 @@ export function App() {
       if (!this.stats?.ledger) return [];
       if (this.rangeKey === "24h") {
         const { from, to } = this.hourlyWindowBounds(this.rangeOffset);
-        return this.rollingLedgerRows(from, to).sort((a, b) =>
-          this.compareLedgerRows(a, b),
-        );
+        return this.rollingLedgerRows(from, to)
+          .filter((row) => !TEMP_PATH.test(row.projectPath ?? ""))
+          .sort((a, b) => this.compareLedgerRows(a, b));
       }
       const dates = this.filteredDaily;
       const firstDate = this.rangeKey === "all" ? null : dates[0]?.date;
@@ -1481,6 +1482,7 @@ export function App() {
           if (this.providerKey !== "all" && row.provider !== this.providerKey) {
             return false;
           }
+          if (TEMP_PATH.test(row.projectPath ?? "")) return false;
           if (!firstDate || !lastDate) return true;
           return row.date >= firstDate && row.date <= lastDate;
         })
