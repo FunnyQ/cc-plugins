@@ -297,7 +297,8 @@ async function main() {
     const repoRoot = git(planDir, "rev-parse", "--show-toplevel").trim();
 
     const before: Record<string, string> = {};
-    const doneRefs: string[] = [];
+    const beforePath: Record<string, string> = {};
+    const doneRefs = doneInFlight(flight.entries);
     const tracked = git(
       repoRoot,
       "ls-tree",
@@ -316,10 +317,12 @@ async function main() {
       if (!parsed.ok) continue;
       const ref = refToString(parsed.task);
       before[ref] = content;
-      if (parsed.task.status === "done") doneRefs.push(ref);
+      beforePath[ref] = join(repoRoot, path);
+      if (parsed.task.status === "done") doneRefs.add(ref);
     }
 
-    const loaded = await loadAllTasks(tasksDir);
+    const loaded = await loadAllTasks(tasksAbs);
+    const unreadable = new Set(loaded.errors.map((e) => e.file));
     const after: Record<string, string> = {};
     for (const [ref, path] of Object.entries(loaded.pathByRef)) {
       after[ref] = await readFile(path, "utf-8");
@@ -346,7 +349,7 @@ async function main() {
       planMd: await readFile(plan, "utf-8"),
       before,
       after,
-      doneRefs,
+      doneRefs: [...doneRefs],
       justified: Array.isArray(justifiedJson)
         ? justifiedJson
         : (justifiedJson.justified ?? []),
@@ -363,7 +366,20 @@ async function main() {
           !(verdict === "defer" && path === deferredPath),
       )
       .map((path) => `unexpected file ${relative(repoRoot, path)}`);
-    const violations = [...(result.ok ? [] : result.violations), ...unexpected];
+    const misreadAsDeleted = new Set(
+      Object.keys(beforePath)
+        .filter((ref) => unreadable.has(beforePath[ref]))
+        .map((ref) => `deleted task ${ref}`),
+    );
+    const violations = [
+      ...(result.ok ? [] : result.violations).filter(
+        (v) => !misreadAsDeleted.has(v),
+      ),
+      ...loaded.errors.map(
+        (e) => `unparseable task ${relative(repoRoot, e.file)}: ${e.reason}`,
+      ),
+      ...unexpected,
+    ];
     const outcome = violations.length > 0 ? { ok: false, violations } : result;
     console.log(JSON.stringify(outcome));
     if (!outcome.ok) process.exit(1);
@@ -450,19 +466,25 @@ async function main() {
       deferredFile === undefined
         ? null
         : await readFile(deferredFile, "utf-8").catch(() => null);
-    const tasks = (await loadAllTasks(tasksDir)).byRef;
+    const loaded = await loadAllTasks(tasksDir);
+    const tasks = loaded.byRef;
+    const unreadable = loaded.errors.map((e) => `- ${e.file}: ${e.reason}`);
+    if (unreadable.length > 0) console.error(unreadable.join("\n"));
     const out = join(dirname(logFile), "FLIGHTREPORT.md");
+    const report = renderFlightReport(flight.entries, {
+      slug: flagValue(rest, "--slug") ?? slugFromLogPath(logFile),
+      status: flightStatus(flight.entries, tasks),
+      deferredMd:
+        deferredMd !== null && parseDeferred(deferredMd).length > 0
+          ? deferredMd
+          : null,
+      tasks,
+    });
     await writeFile(
       out,
-      renderFlightReport(flight.entries, {
-        slug: flagValue(rest, "--slug") ?? slugFromLogPath(logFile),
-        status: flightStatus(flight.entries, tasks),
-        deferredMd:
-          deferredMd !== null && parseDeferred(deferredMd).length > 0
-            ? deferredMd
-            : null,
-        tasks,
-      }),
+      unreadable.length > 0
+        ? `${report}\n## Unreadable tasks\n\n${unreadable.join("\n")}\n`
+        : report,
     );
     console.log(out);
     return;
@@ -539,6 +561,21 @@ function decodePayload(raw: string): EscalationPayload {
     }
   }
   return payload;
+}
+
+function doneInFlight(flightEntries: FlightlogEntry[]): Set<string> {
+  const latest = new Map<string, string>();
+  for (const e of flightEntries) {
+    if (e.kind === "state") latest.set(e.task, e.state);
+  }
+  const done = new Set(
+    [...latest].filter(([, state]) => state === "done").map(([ref]) => ref),
+  );
+  const lastEnd = flightEntries.findLast(
+    (e): e is RunEndEntry => e.kind === "run-end",
+  );
+  for (const ref of lastEnd?.completed ?? []) done.add(ref);
+  return done;
 }
 
 function requireFlight(

@@ -344,9 +344,10 @@ async function planFixture(
     "ui/01": "blocked",
     "ui/02": "todo",
   },
+  planRel = "docs/toy",
 ): Promise<Plan> {
   const root = await mkdtemp(join(tmpdir(), "flightlog-goal-"));
-  const planDir = join(root, "docs", "toy");
+  const planDir = join(root, planRel);
   const tasks = join(planDir, "tasks");
   await mkdir(join(tasks, "ui"), { recursive: true });
   const plan = join(planDir, "PLAN.md");
@@ -728,6 +729,23 @@ describe("goal-mode CLI", () => {
     }
   });
 
+  test("report --flight lists unreadable tasks and warns on stderr", async () => {
+    const p = await planFixture();
+    try {
+      await p.run("flight-start", p.log, "--plan", p.plan);
+      await writeFile(join(p.tasks, "ui", "02-second.md"), "no heading\n");
+      const res = await p.run("report", p.log, "--flight");
+      expect(res.code).toBe(0);
+      expect(res.err).toContain("02-second.md: missing H1");
+      const md = await readFile(res.out.trim(), "utf-8");
+      expect(md).toContain(
+        `## Unreadable tasks\n\n- ${join(p.tasks, "ui", "02-second.md")}: missing H1\n`,
+      );
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
   test("report --flight exits 2 without a flight entry", async () => {
     const p = await planFixture();
     try {
@@ -748,6 +766,7 @@ describe("goal-mode CLI", () => {
           verdict,
           justified: [
             { task: "ui/01", before: "- [ ] `bun test` passes", why: "x" },
+            { task: "ui/01", before: "- [ ] it works", why: "x" },
           ],
         }),
       );
@@ -881,6 +900,97 @@ describe("goal-mode CLI", () => {
         expect(JSON.parse(res.out).violations).toContain(
           "PLAN.md goal section changed since the flight started",
         );
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("a task marked done in the trail but not committed is protected", async () => {
+      const p = await planFixture({ "ui/01": "todo", "ui/02": "todo" });
+      try {
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        await p.run("state", p.log, "--task", "ui/01", "--state", "done");
+        await editGate(p, "todo");
+        const res = await guard(p);
+        expect(res.code).toBe(1);
+        expect(JSON.parse(res.out).violations).toContain(
+          "ui/01 is done and must not be edited",
+        );
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("a task completed in the last run-end is protected", async () => {
+      const p = await planFixture({ "ui/01": "todo", "ui/02": "todo" });
+      try {
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        await p.run(
+          "escalations",
+          p.log,
+          "--payload",
+          encodeURIComponent(
+            JSON.stringify({
+              escalations: [],
+              cleanupFailures: [],
+              drained: [],
+              aborted: null,
+              completed: ["ui/01"],
+              needsHuman: [],
+            }),
+          ),
+        );
+        await editGate(p, "todo");
+        const res = await guard(p);
+        expect(JSON.parse(res.out).violations).toContain(
+          "ui/01 is done and must not be edited",
+        );
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("an unparseable task is reported as such, not as deleted", async () => {
+      const p = await planFixture();
+      try {
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        await writeFile(join(p.tasks, "ui", "01-first.md"), "no heading\n");
+        const res = await guard(p);
+        expect(res.code).toBe(1);
+        expect(JSON.parse(res.out).violations).toEqual([
+          "unparseable task docs/toy/tasks/ui/01-first.md: missing H1",
+        ]);
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("a defer inside a waypoints leg passes with DEFERRED.md written", async () => {
+      const p = await planFixture(
+        { "ui/01": "blocked", "ui/02": "todo" },
+        "docs/p/legs/01-a",
+      );
+      try {
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        const file = join(p.tasks, "ui", "01-first.md");
+        await writeFile(
+          file,
+          (await readFile(file, "utf-8")).replace("- [ ] it works\n", ""),
+        );
+        await writeFile(
+          join(p.planDir, "DEFERRED.md"),
+          "# Deferred criteria — 01-a\n\n- [ ] it works\n  - from: ui/01 · deferred: 2026-11-14\n  - why: needs the next leg\n",
+        );
+        const res = await guard(p, "defer");
+        expect(JSON.parse(res.out)).toEqual({
+          ok: true,
+          reentry: { "ui/01": "dev" },
+        });
+        expect(res.code).toBe(0);
       } finally {
         await rm(p.root, { recursive: true });
       }
