@@ -1,5 +1,16 @@
 # Changelog
 
+## [monitor 8.6.0] - 2026-11-13
+
+_tracks tag `monitor-v8.6.0`_
+
+### Added
+- The cockpit dashboard's Decision Log header has a Scribe switch to turn automatic decision logging on or off, and it shows when a project or session setting overrides the global one.
+
+### Changed
+- The cockpit scribe (automatic decision logging) is now off by default, so after upgrading it stays off until you turn it on from the dashboard's Scribe switch or with `/monitor:scribe on --scope user|project`; this stops unwatched logging from spending tokens, including self-spawned forks on Codex and OpenCode.
+- `/monitor:nudge` is renamed `/monitor:scribe`, and `/monitor:thoughtful` now switches the scribe on for its own session first.
+
 ## [monitor 8.5.0] - 2026-11-13
 
 _tracks tag `monitor-v8.5.0`_
