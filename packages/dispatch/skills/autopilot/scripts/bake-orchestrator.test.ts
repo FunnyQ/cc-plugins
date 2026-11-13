@@ -77,6 +77,26 @@ describe("bakeOrchestrator", () => {
     ).toThrow("CFG.logFile must be an absolute path");
   });
 
+  test("bake accepts a reentry object and a deferredScope string", () => {
+    const script = bakeOrchestrator(DOC, {
+      ...scouted("/r"),
+      reentry: { "ui/01": { from: "verify", attempt: 4 } },
+      deferredScope: "- [ ] works offline, see leg 3",
+    });
+    expect(script).toMatch(
+      /^\s*reentry:\s*\{"ui\/01":\{"from":"verify","attempt":4\}\},\s*\/\/ /m,
+    );
+    expect(script).toMatch(
+      /^\s*deferredScope:\s*"- \[ \] works offline, see leg 3",\s*\/\/ /m,
+    );
+    expect(
+      () =>
+        new Function(
+          `return (async () => { ${script.replace(/^export const meta/m, "const meta")} })`,
+        ),
+    ).not.toThrow();
+  });
+
   test("refuses a field the CFG block does not carry", () => {
     expect(() => bakeOrchestrator(DOC, { ...scouted("/r"), typo: 1 })).toThrow(
       "config field not found in orchestrator script: typo",

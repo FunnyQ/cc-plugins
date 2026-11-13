@@ -9,6 +9,7 @@
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { type DeferredItem, parseDeferred } from "./deferred";
 import { FLIGHTLOG_DIRNAME } from "../../flightplan/scripts/lib/flightlog";
 
 export type LegStatus = "done" | "active" | "pending";
@@ -168,6 +169,7 @@ export function requireActiveLeg(roadmap: Roadmap): Leg {
 export function formatActive(
   roadmap: Roadmap,
   priorGoals: Record<string, string>,
+  deferred: Record<string, DeferredItem[]> = {},
 ): string {
   const active = requireActiveLeg(roadmap);
 
@@ -183,6 +185,9 @@ export function formatActive(
     if (leg.outcome) lines.push(`  outcome: ${leg.outcome}`);
     const goal = priorGoals[leg.slug];
     if (goal) lines.push(`  goal: ${goal}`);
+    for (const item of deferred[leg.slug] ?? []) {
+      lines.push(`  deferred: ${item.criterion} (from ${item.from})`);
+    }
   }
   return lines.join("\n");
 }
@@ -237,17 +242,27 @@ export function overviewFirstLine(md: string): string | null {
   return firstLineUnderSection(md, /^##\s+Overview\s*$/);
 }
 
-export function draftOutcome(runlog: string, planOverview: string): string {
+export function draftOutcome(
+  runlog: string,
+  planOverview: string,
+  deferredCount = 0,
+): string {
+  const suffix =
+    deferredCount > 0
+      ? ` · deferred ${deferredCount} criteria to a later leg`
+      : "";
   const finalReviewLine = firstFinalReviewLine(runlog);
-  if (finalReviewLine) return cleanOutcome(finalReviewLine);
+  if (finalReviewLine) return cleanOutcome(finalReviewLine) + suffix;
 
   const lastNarrativeLine = lastRunlogLine(runlog);
-  if (lastNarrativeLine) return cleanOutcome(lastNarrativeLine);
+  if (lastNarrativeLine) return cleanOutcome(lastNarrativeLine) + suffix;
 
   const firstPlanSentence = firstSentence(planOverview);
-  if (firstPlanSentence) return cleanOutcome(`planned: ${firstPlanSentence}`);
+  if (firstPlanSentence) {
+    return cleanOutcome(`planned: ${firstPlanSentence}`) + suffix;
+  }
 
-  return "landed (no RUNLOG summary available)";
+  return `landed (no RUNLOG summary available)${suffix}`;
 }
 
 export function advanceRoadmap(
@@ -382,6 +397,7 @@ async function main() {
           await readFile(join("docs", proj, "WAYPOINTS.md"), "utf-8"),
         );
         const priorGoals: Record<string, string> = {};
+        const deferred: Record<string, DeferredItem[]> = {};
         for (const leg of roadmap.legs.filter(
           (candidate) => candidate.status === "done",
         )) {
@@ -390,8 +406,14 @@ async function main() {
           );
           const goal = plan === null ? null : overviewFirstLine(plan);
           if (goal) priorGoals[leg.slug] = goal;
+          const items = parseDeferred(
+            (await readFileOrNull(
+              join("docs", proj, "legs", leg.slug, "DEFERRED.md"),
+            )) ?? "",
+          );
+          if (items.length > 0) deferred[leg.slug] = items;
         }
-        console.log(formatActive(roadmap, priorGoals));
+        console.log(formatActive(roadmap, priorGoals, deferred));
         return;
       }
       case "leg-scaffold": {
@@ -469,7 +491,16 @@ async function main() {
         const planOverview =
           (plan === null ? null : overviewFirstLine(plan)) || "";
 
-        const draftedOutcome = draftOutcome(runlog, planOverview);
+        const activeDeferred = parseDeferred(
+          (await readFileOrNull(
+            join("docs", proj, "legs", activeLeg.slug, "DEFERRED.md"),
+          )) ?? "",
+        );
+        const draftedOutcome = draftOutcome(
+          runlog,
+          planOverview,
+          activeDeferred.length,
+        );
         if (dryRun || !outcome) {
           console.log(`DRAFT OUTCOME: ${draftedOutcome}`);
           return;

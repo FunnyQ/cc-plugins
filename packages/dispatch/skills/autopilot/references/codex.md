@@ -79,6 +79,7 @@ Preserve an existing run's base ref when resuming that flight.
 ## Flight agreement and model ladder
 
 Replace Step 2's Claude-only model and Workflow questions with a Codex flight brief.
+Goal mode is Claude Code only; do not offer the Flight mode question.
 State the task count, plan goal, worktree paths, plan concurrency cap, native agent capacity, role models, external review provider, and retry caps.
 Default `maxAttempts` to 3 and `finalReviewMaxAttempts` to 2.
 Use the current Codex model for native roles unless the flight agreement selects another available Codex model.

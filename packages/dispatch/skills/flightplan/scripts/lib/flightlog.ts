@@ -1,11 +1,16 @@
 /**
  * Flightlog — the append-only audit trail for an autopilot run.
  *
- * Three kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
+ * Seven kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
  *
- *   - `score` — a deterministic verdict appended by `score-task.ts --log`.
- *   - `note`  — agent narrative appended by `flightlog.ts log`.
- *   - `state` — node declaration appended by `flightlog.ts state`.
+ *   - `score`      — a deterministic verdict appended by `score-task.ts --log`.
+ *   - `note`       — agent narrative appended by `flightlog.ts log`.
+ *   - `state`      — node declaration appended by `flightlog.ts state`.
+ *   - `flight`     — a goal-mode flight boundary, from `flightlog.ts flight-start`.
+ *   - `escalation` — a run's stop, from `flightlog.ts escalations` or adopted
+ *                    by `flight-start`.
+ *   - `run-end`    — a run's closing facts, from `flightlog.ts escalations`.
+ *   - `repair`     — a goal-mode repair verdict, from `flightlog.ts repair`.
  *
  * The orchestrator script can't touch the filesystem, so logging always comes
  * from a bundled script run by a tool-capable agent. Every entry records an
@@ -71,7 +76,68 @@ export type StateFields = {
 
 export type StateEntry = { kind: "state" } & StateFields;
 
-export type FlightlogEntry = ScoreEntry | NoteEntry | StateEntry;
+export type EscalationClass =
+  | "plan-defect"
+  | "capped"
+  | "infrastructure"
+  | "divergence"
+  | "stall"
+  | "leak"
+  | "budget-floor"
+  | "cleanup-failure";
+
+export type RepairVerdict =
+  "fix" | "defer" | "not-plan" | "refuse" | "infra-retry" | "halt";
+
+export type FlightEntry = {
+  kind: "flight";
+  ts: string;
+  task: "(flight)";
+  goalHash: string;
+  planPath: string;
+};
+
+export type EscalationEntry = {
+  kind: "escalation";
+  ts: string;
+  task: string;
+  attempt: number;
+  class: EscalationClass;
+  infrastructure: boolean;
+  parked: boolean;
+  reason: string;
+};
+
+export type RunEndEntry = {
+  kind: "run-end";
+  ts: string;
+  task: "(flight)";
+  aborted: boolean;
+  completed: string[];
+  drained: string[];
+  needsHuman: { task: string; criteria: string[] }[];
+};
+
+export type RepairEntry = {
+  kind: "repair";
+  ts: string;
+  task: string;
+  verdict: RepairVerdict;
+  reason: string;
+  pattern?: string;
+  changed?: string[];
+  reentry?: Record<string, "dev" | "verify">;
+  diff?: string;
+};
+
+export type FlightlogEntry =
+  | ScoreEntry
+  | NoteEntry
+  | StateEntry
+  | FlightEntry
+  | EscalationEntry
+  | RunEndEntry
+  | RepairEntry;
 
 export const FLIGHTLOG_DIRNAME = ".flightlog";
 
@@ -98,7 +164,11 @@ export function parseLines(lines: string[]): FlightlogEntry[] {
         parsed &&
         (parsed.kind === "score" ||
           parsed.kind === "note" ||
-          parsed.kind === "state")
+          parsed.kind === "state" ||
+          parsed.kind === "flight" ||
+          parsed.kind === "escalation" ||
+          parsed.kind === "run-end" ||
+          parsed.kind === "repair")
       ) {
         entries.push(parsed);
       }
@@ -113,6 +183,7 @@ export function renderRunlog(
 ): string {
   const sorted = [...entries]
     .filter((e) => !(e.kind === "note" && e.phase === "start"))
+    .filter((e) => e.kind !== "flight" && e.kind !== "run-end")
     .sort((a, b) => a.ts.localeCompare(b.ts));
 
   const order: string[] = [];
@@ -137,6 +208,13 @@ export function renderRunlog(
 }
 
 function renderLine(e: FlightlogEntry): string {
+  if (e.kind === "escalation") {
+    return `- escalation — ${e.class}: ${singleSpaced(e.reason)}`;
+  }
+  if (e.kind === "repair") {
+    return `- repair — ${e.verdict}: ${singleSpaced(e.reason)}`;
+  }
+  if (e.kind === "flight" || e.kind === "run-end") return "";
   const agent = e.agentLabel ? ` _(agent: ${e.agentLabel})_` : "";
   if (e.kind === "state") {
     const message = e.message ? `: ${singleSpaced(e.message)}` : "";

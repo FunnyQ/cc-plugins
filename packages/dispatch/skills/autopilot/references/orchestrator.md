@@ -70,6 +70,8 @@ const CFG = {
   resumeFrom: "dev", // 'dev' | 'verify' | 'judge' — the step the FIRST resumed attempt starts at; every later attempt runs the whole pipeline
   resumeAttempt: 1, // the attempt number the resumed run starts counting at, so the flightlog and the score rows keep rising
   attestationFile: "", // ABSOLUTE path to a human attestation naming which gate items a person performed; REQUIRED when resumeFrom is 'judge'
+  reentry: {}, // { "<ref>": { from: 'dev' | 'verify', attempt: N } } — after a plan repair, where each repaired task enters this whole-tree flight and the attempt it counts from; never with resumeTask
+  deferredScope: "", // free text: criteria a waypoints leg deferred to a later leg, shown to the Final review as out of scope ('' = none)
 };
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -278,6 +280,40 @@ const RESUME = !CFG.resumeTask
         attempt,
       };
     })();
+
+// ── Per-task re-entry ───────────────────────────────────────────────────────
+// After a plan repair the main agent re-flies the whole tree once, and each
+// repaired task enters at the step the repair left valid: `verify` when its kept
+// worktree holds work and only gate sections changed, else `dev`. Its numbering
+// continues from the trail for the same reason a resume's does. `judge` is
+// refused: skipping the gate needs a person's signed attestation, which a
+// repair does not produce. Validated at script start, like RESUME, because a
+// bad entry would otherwise surface mid-wave as a task that never ran.
+const REENTRY = (() => {
+  const reentry = CFG.reentry ?? {};
+  const refs = Object.keys(reentry);
+  if (refs.length > 0 && CFG.resumeTask) {
+    throw new Error(
+      "reentry cannot be combined with resumeTask — a resume flies one task with no wave loop, a reentry rides a whole-tree flight",
+    );
+  }
+  for (const ref of refs) {
+    const { from, attempt } = reentry[ref] ?? {};
+    if (from !== "dev" && from !== "verify") {
+      throw new Error(
+        `reentry "${ref}": unknown from ${JSON.stringify(from)} — must be dev or verify`,
+      );
+    }
+    if (!Number.isInteger(attempt) || attempt < 1) {
+      throw new Error(
+        `reentry "${ref}": attempt must be a whole number 1 or greater (got ${JSON.stringify(attempt)})`,
+      );
+    }
+  }
+  return reentry;
+})();
+const entryFor = (ref) =>
+  RESUME && RESUME.ref === ref ? RESUME : (REENTRY[ref] ?? null);
 
 // Returns the remaining budget when it has fallen below the floor, else null.
 // Both "no floor configured" and "no budget declared" are null — not a throw and
@@ -651,7 +687,7 @@ Use the identical label in both start and end calls.
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}). Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, leanness, efficiency).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md is MISSING, is empty, or begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run, and the orchestrator fails this round's gate whatever you fix, so the round is re-run under its cap.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the three Claude lenses (behaviour-preserving). On the ABSTRACTION axis the two lenses point opposite ways on purpose: \`reuse\` may ask for more code, \`leanness\` only ever asks for less. Where they land on the same span, that is a genuine trade-off for you to settle — not a contradiction to route around. This split says nothing about \`efficiency\`: a cheaper approach that needs a cache, a batch, or an index is a normal fix, so never reject an efficiency finding merely because it adds code. For any finding you reject, say why.
-3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met. ${BASE_REF_RULE}
+3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.${DEFERRED_SCOPE_RULE ? ` ${DEFERRED_SCOPE_RULE}\n` : " "}${BASE_REF_RULE}
 ${attempt > 1 ? "This is re-loop attempt " + attempt + " (capped at " + FINAL_MAX + "). The previous round was rejected:\n" + feedback + "\nEnsure the new findings + your fixes address that." : ""}
 ${STATUS_RULE}
 ${NO_COMMIT_RULE}
@@ -697,6 +733,13 @@ async function runFinalReview(ref, path, attempt, attempts, fixChoice) {
 // are ALL tagged, so a tagged plan always leaves the verifier real work.
 // A plan is written before the run, so it cannot name the commit the run starts from.
 const BASE_REF_RULE = `Where a Verification command or criterion says \`<baseRef>\`, substitute ${CFG.baseRef}, the commit this run started from. That substitution is the one edit "exactly as written" allows.`;
+// A waypoints leg defers some criteria to a later leg. Every Final-review agent
+// that judges the PLAN goal gets it — the fixer, the verifier and the judge —
+// because a `verify` reentry skips the fixer, and a judge that never saw it
+// would fail the goal over work this leg was never meant to do.
+const DEFERRED_SCOPE_RULE = CFG.deferredScope
+  ? `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${CFG.deferredScope}`
+  : "";
 
 const HUMAN_GATE_RULE = `A gate item written \`- [ ] (human) …\` in ## Acceptance criteria or ## Verification is one the PLAN declares only a person can perform — a physical action, a visual sweep, a device or UI interaction no command reaches. Do not invent a way to run it, and do not fail the task for it. Return each one verbatim as written in the file in humanPending, and name it in summary as not machine-checked.
 The tag exempts that ONE item. Every untagged item is yours exactly as before: run it, and any non-zero exit is passed=false. You may never add the tag yourself, or treat an untagged item as human-only because it looked hard to run — an item you believe is unrunnable is a plan defect, so leave it standing and let it fail.`;
@@ -715,16 +758,24 @@ The attestation covers ONLY the items it names. It is not a blanket pass and it 
 // attempt has no dev row. Without it RUNLOG.md shows a verify at attempt 3 under
 // nothing, and a reader cannot tell a resume from a lost dev step. The
 // orchestrator cannot write the row itself — it has no filesystem access — so it
-// rides the one agent that is already logging there.
-const resumeNote = (ref, attempt, role) =>
-  RESUME &&
-  RESUME.from !== "dev" &&
-  RESUME.from === role &&
-  attempt === RESUME.attempt
-    ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ""}"\n`
+// rides the one agent that is already logging there. A reentry writes the same
+// row. It keys off the attempt's actual `startAt`, not the entry, because a
+// `verify` reentry whose worktree was gone ran dev after all.
+const resumeNote = (ref, attempt, role, startAt) =>
+  startAt !== "dev" && startAt === role
+    ? RESUME
+      ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ""}"\n`
+      : `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${attempt} --agent "<your label>" --message "re-entered at the ${startAt} step after a plan repair; the steps before it were taken as already satisfied"\n`
     : "";
 
-const verifyPrompt = (ref, path, attempt, wtPath, reverify = false) => {
+const verifyPrompt = (
+  ref,
+  path,
+  attempt,
+  wtPath,
+  reverify = false,
+  { startAt = "dev", finalReview = false } = {},
+) => {
   const role = reverify ? "reverify" : "verify";
   const closing = reverify
     ? `Run this check because the main tree changed after this task's snapshot. A failure means the merged result is broken.
@@ -734,7 +785,7 @@ Never clean, restore, reset, stash or otherwise rewrite the tree to obtain a cle
 Run every Verification command exactly as written. Any non-zero exit is passed=false.`;
   return `
 ${reverify ? `Work in the repo root: ${CFG.repoRoot}. Run every command from that directory.\n` : worktreeRules(wtPath)}First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase start
-${resumeNote(ref, attempt, role)}Then proceed.
+${resumeNote(ref, attempt, role, startAt)}Then proceed.
 Use the identical label in both start and end calls.
 
 You are an INDEPENDENT verifier for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -745,7 +796,7 @@ Do NOT trust the dev's claims. Open the task file at ${path}, then:
 Report passed=true ONLY if all verification commands succeed AND all acceptance criteria hold.
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
 ${HUMAN_GATE_RULE}
-${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ""}
+${finalReview && DEFERRED_SCOPE_RULE ? `${DEFERRED_SCOPE_RULE}\n` : ""}${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ""}
 ${reverify ? "" : `${PLAN_DEFECT_MEANING} Return planDefect as null by default. When a plan defect decided a failing item, set planDefect to one line naming the item and why no implementation can pass it, and report passed=false as usual. The task is parked for a person to fix the plan instead of spending another attempt.\n`}${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
@@ -763,10 +814,17 @@ const humanGateSummary = () =>
   `Read that file: it names which gate items were checked, and when. Ground the correctness dimension in it exactly as you would in a verifier's raw output. ` +
   `Treat every gate item the file does NOT name as unverified — say so in your rationale and score correctness accordingly. Do not assume an unnamed item passed.`;
 
-const judgePrompt = (ref, path, gateSummary, attempt, wtPath) => `
+const judgePrompt = (
+  ref,
+  path,
+  gateSummary,
+  attempt,
+  wtPath,
+  { startAt = "dev", finalReview = false } = {},
+) => `
 ${worktreeRules(wtPath)}
 First, announce yourself: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role judge --attempt ${attempt} --agent "<your label>" --phase start
-${resumeNote(ref, attempt, "judge")}Then proceed.
+${resumeNote(ref, attempt, "judge", startAt)}Then proceed.
 Use the identical label in both start and end calls.
 
 You are the rubric judge for flightplan task ${ref} (tree: ${CFG.tasksDir}).
@@ -774,7 +832,7 @@ ${NO_RESTORE_RULE}
 The independent binary gate already PASSED with this evidence:
 ${gateSummary}
 Open the task file at ${path} and its ## Eval rubric. Score EACH dimension 0–scaleMax based on the real code and the verification evidence above — ground the correctness dimension in that evidence, not opinion.
-Make a fresh scratch directory and use the path it prints as <dir> below. Never reuse a fixed path: another run may have left a file there.
+${finalReview && DEFERRED_SCOPE_RULE ? `${DEFERRED_SCOPE_RULE}\n` : ""}Make a fresh scratch directory and use the path it prints as <dir> below. Never reuse a fixed path: another run may have left a file there.
   ${scratchDir("judge", ref, attempt)}
 Write the scores JSON into it, then run score-task.ts to compute and persist the verdict:
   echo '<scores-json>' > <dir>/scores.json
@@ -857,6 +915,7 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
   task: ref,
   passed: false,
   infrastructure: true,
+  class: "infrastructure",
   // The attempt that was actually running. Compute WAS consumed; reporting 0
   // here would misrepresent the run.
   attempt,
@@ -951,6 +1010,8 @@ const checkAbort = () => {
   if (aborted) throw new Error(`run aborted: ${aborted.reason}`);
 };
 const live = new Map();
+// Every ref `executeTask` started, so the end sweep can tell a reentry that never ran.
+const entered = new Set();
 const cleanupFailures = [];
 const wtArgs = `--repo ${CFG.repoRoot} --slug ${CFG.slug} --plan-dir ${CFG.planDir}`;
 const wtCommand = (args) => `bun ${S}/worktree.ts ${args} ${wtArgs}`;
@@ -1090,6 +1151,7 @@ const removeLanded = async (ref, path) => {
 // ── Per-task retry pipeline ─────────────────────────────────────────────────
 async function executeTask(item) {
   const { ref, finalReview, path } = item;
+  entered.add(ref);
   const header = parseModels(item.modelsRaw);
   const choices = { ...MODEL, ...header };
   const devLast = header.dev ? raise(header.dev) : MODEL.devLast;
@@ -1103,7 +1165,11 @@ async function executeTask(item) {
   // `first` at 1 the two are equal and the ladder is byte-identical to before,
   // but on a resume at attempt 3 a cap-keyed `attempt >= cap` is already true on
   // the first rung, which would raise effort immediately on every attempt.
-  const first = RESUME && RESUME.ref === ref ? RESUME.attempt : 1;
+  // A reentry numbers its attempts the same way, from the attempt it was given.
+  const entry = entryFor(ref);
+  const first = entry ? entry.attempt : 1;
+  // Moves to `dev` when a `verify` reentry finds its kept worktree gone.
+  let entryFrom = entry?.from;
   const last = first + cap - 1;
   const attempts = [];
   // `(human)` items nobody has attested to. Carried out of the PASSING gate, so
@@ -1131,13 +1197,32 @@ async function executeTask(item) {
               false,
             );
           }
+        } else if (entryFrom === "verify") {
+          const shown = await wtCall(
+            `wt-show:${ref}`,
+            wtCommand(`show ${ref}`),
+            WT_SCHEMA.show,
+          );
+          if (shown.exists) {
+            live.set(ref, shown.path);
+            return shown;
+          }
+          // Unlike a resume, a reentry does not fail here: the repair only
+          // promised the work would still be there, so redo it from dev.
+          entryFrom = "dev";
         }
         const create = wtCommand(`create ${ref}`);
+        // The orchestrator has no filesystem, so the trail row rides the create
+        // agent; stdout is dropped because the agent returns create's JSON.
+        const fresh =
+          entry && !RESUME && entryFrom !== entry.from
+            ? `{ bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${first} --message "kept worktree gone; re-entering at dev" >/dev/null; ${create}; }`
+            : create;
         const created = await wtCall(
           `wt-create:${ref}`,
           RESUME
             ? create
-            : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${create}`,
+            : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${fresh}`,
           WT_SCHEMA.create,
         );
         if (created.drained === true) return created;
@@ -1167,7 +1252,7 @@ async function executeTask(item) {
     // the attempt the resume starts. If that attempt fails its gate, the retry
     // runs the whole pipeline — a red verify means the skipped work genuinely
     // does need redoing, including the expensive Final review round.
-    const startAt = RESUME && attempt === first ? RESUME.from : "dev";
+    const startAt = entry && attempt === first ? entryFrom : "dev";
     let attemptModel = "final-review";
     const rejected = (gateSummary) =>
       attempts.push({
@@ -1185,6 +1270,7 @@ async function executeTask(item) {
         task: ref,
         passed: false,
         infrastructure: false,
+        class: "plan-defect",
         attempt,
         parked: await parkBlocked(ref, path, reason),
         reason: withKeptWorktree(ref, reason),
@@ -1293,12 +1379,18 @@ async function executeTask(item) {
         ? { passed: true, summary: humanGateSummary(), humanPending: [] }
         : await resilient(
             (retryModel) =>
-              agent(verifyPrompt(ref, path, attempt, wt?.path), {
-                label: `verify:${ref}#${attempt}`,
-                phase: "Execute",
-                ...pick(retryModel ?? choices.verify),
-                schema: GATE_SCHEMA,
-              }),
+              agent(
+                verifyPrompt(ref, path, attempt, wt?.path, false, {
+                  startAt,
+                  finalReview,
+                }),
+                {
+                  label: `verify:${ref}#${attempt}`,
+                  phase: "Execute",
+                  ...pick(retryModel ?? choices.verify),
+                  schema: GATE_SCHEMA,
+                },
+              ),
             MODEL.structuredRetry,
           );
     checkAbort();
@@ -1333,7 +1425,10 @@ async function executeTask(item) {
     // score row already holds the whole structured verdict. Until that exists,
     // a judge throw parks, which is the pre-existing behaviour and never worse.
     const judged = await agent(
-      judgePrompt(ref, path, gate.summary, attempt, wt?.path),
+      judgePrompt(ref, path, gate.summary, attempt, wt?.path, {
+        startAt,
+        finalReview,
+      }),
       {
         label: `judge:${ref}#${attempt}`,
         phase: "Execute",
@@ -1534,6 +1629,7 @@ async function executeTask(item) {
     task: ref,
     passed: false,
     infrastructure: false,
+    class: "capped",
     attempt: last,
     parked: parkedOk,
     reason: withKeptWorktree(ref, history),
@@ -1643,7 +1739,11 @@ return (async () => {
             scoutFailed ||
             lastScout?.unfinished.some(
               (item) => item.ref === ref && item.state === "blocked",
-            ),
+            ) ||
+            // A repaired task reads `todo`, not `blocked`, so a reentry that
+            // never became ready this flight would lose the worktree its next
+            // `verify` reentry needs. One that ran is tracked by `live`.
+            (Object.hasOwn(REENTRY, ref) && !entered.has(ref)),
         )
         .map(({ ref, path }) => [ref, path]),
     );
@@ -1679,6 +1779,7 @@ return (async () => {
       task: "(worktree)",
       attempt: 0,
       infrastructure: true,
+      class: "infrastructure",
       parked: false,
       reason,
     });
@@ -1719,6 +1820,7 @@ return (async () => {
       task: "(commit)",
       attempt: 0,
       infrastructure: true,
+      class: "infrastructure",
       parked: false,
       reason,
     });
@@ -1862,6 +1964,7 @@ return (async () => {
         task: "(scout)",
         attempt: 0,
         infrastructure: true,
+        class: "infrastructure",
         parked: false,
         reason,
       });
@@ -1888,6 +1991,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1902,6 +2006,7 @@ return (async () => {
         task: "(scout)",
         attempt: 0,
         infrastructure: true,
+        class: "infrastructure",
         parked: false,
         reason,
       });
@@ -1920,6 +2025,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1938,6 +2044,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1948,13 +2055,17 @@ return (async () => {
     lastScout = snap;
     if (wave === 1) {
       try {
+        // A reentry ref's task is reset to todo by the repair, so the blocked
+        // filter alone would sweep the worktree a `verify` reentry needs.
         startKept = (
-          await sweep(
-            "start",
-            unfinished
-              .filter((item) => item.state === "blocked")
-              .map((item) => item.ref),
-          )
+          await sweep("start", [
+            ...new Set([
+              ...unfinished
+                .filter((item) => item.state === "blocked")
+                .map((item) => item.ref),
+              ...Object.keys(REENTRY),
+            ]),
+          ])
         ).kept;
         await baseline();
       } catch (error) {
@@ -1993,6 +2104,7 @@ return (async () => {
         task: "(divergence)",
         attempt: 0,
         infrastructure: true,
+        class: "divergence",
         parked: false,
         reason,
       });
@@ -2007,11 +2119,33 @@ return (async () => {
     );
 
     // Empty ready set + unfinished tasks = stalled. Report the counts AND the refs.
-    // Tasks this run already parked are excluded: they carry their own escalation,
-    // and re-reporting them as a fresh stall would double-count every parked run.
+    // A task this run parked, a task left blocked by an earlier run, and every
+    // task whose unmet dependencies lead only to those is waiting, not stalled:
+    // the parked ones carry their own escalation, and a dependent of a park in
+    // the same wave as a pass would otherwise end the run as a phantom stall.
     if (fresh.length === 0) {
       const outstanding = unfinished.filter((u) => !parked.has(u.ref));
-      if (outstanding.length === 0) break; // nothing left but what we already escalated
+      const waiting = new Set(
+        unfinished
+          .filter((u) => parked.has(u.ref) || u.state === "blocked")
+          .map((u) => u.ref),
+      );
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const u of unfinished) {
+          const unmet = Array.isArray(u.unmet) ? u.unmet : [];
+          if (
+            !waiting.has(u.ref) &&
+            u.state === "todo" &&
+            unmet.length > 0 &&
+            unmet.every((ref) => waiting.has(ref))
+          ) {
+            waiting.add(u.ref);
+            grew = true;
+          }
+        }
+      }
+      if (unfinished.every((u) => waiting.has(u.ref))) break; // every stop already escalated or parked before this run
       const remaining = outstanding
         .map((u) => `${u.ref} (${u.state})`)
         .join(", ");
@@ -2023,6 +2157,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -2068,6 +2203,7 @@ return (async () => {
         task: "(budget)",
         attempt: 0,
         infrastructure: true,
+        class: "budget-floor",
         parked: false,
         reason,
       });
@@ -2133,6 +2269,7 @@ return (async () => {
         task: item.ref,
         attempt: r?.attempt ?? 0,
         infrastructure: r?.infrastructure ?? true,
+        class: r?.class ?? "infrastructure",
         parked: r?.parked ?? false,
         reason:
           r?.reason ??
@@ -2174,6 +2311,7 @@ return (async () => {
         task: item.ref,
         attempt: r?.attempt ?? 0,
         infrastructure: r?.infrastructure ?? true,
+        class: r?.class ?? "infrastructure",
         parked: r?.parked ?? false,
         reason:
           r?.reason ??
@@ -2224,6 +2362,40 @@ return (async () => {
     }
   }
 
+  // Every flight leaves its stops in run.jsonl, so goal mode and `--status` read
+  // them from the trail rather than from a reply. The payload rides one shell
+  // argument: single quotes keep it literal, and `encodeURIComponent` leaves
+  // only `'` able to close them, hence the extra replace. A failed write is
+  // reported beside the result and never becomes an escalation itself.
+  cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref));
+  const payload = encodeURIComponent(
+    JSON.stringify({
+      escalations,
+      cleanupFailures,
+      drained,
+      aborted,
+      completed,
+      needsHuman,
+    }),
+  ).replace(/'/g, "%27");
+  const command = `bun ${S}/flightlog.ts escalations ${CFG.logFile} --payload '${payload}'`;
+  const { value: logged } = await settled(() =>
+    resilient(async (retryModel) => {
+      const result = await agent(
+        `Run exactly this one command: ${command}\nIt prints nothing on success. Return ok: true when it exits 0, false otherwise, through StructuredOutput.\n${RETURN_CONTRACT}`,
+        {
+          label: "log-escalations",
+          phase: "Execute",
+          ...pick(retryModel ?? MODEL.worktree),
+          schema: wtObject({ ok: { type: "boolean" } }),
+        },
+      );
+      if (result === null)
+        throw new Error("log-escalations: no structured result");
+      return result;
+    }, MODEL.structuredRetry),
+  );
+
   return {
     slug: CFG.slug,
     aborted,
@@ -2232,7 +2404,9 @@ return (async () => {
     needsHuman,
     drained,
     worktrees: keptWorktrees(),
-    cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)),
+    cleanupFailures,
+    logFailed: logged?.ok !== true,
+    failedInMainTree: [...failedInMainTree].sort(),
   };
 })();
 ```
@@ -2241,11 +2415,13 @@ return (async () => {
 
 - `aborted` — `null` or the first `{ reason, paths }` that stopped the run. Report the cause and leak paths. Inspect the retained worktrees before resuming; the run performed no further commits or end sweep after this abort.
 - `completed` — tasks that passed their rubric **and** whose `mark-done` transition was confirmed, this invocation only. It includes the Final review task, if the run finished cleanly. It is not a tree-completion count; see the note on `counts.done` below.
-- `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
+- `escalations` — `[{ task, attempt, infrastructure, class, parked, reason }]`. `class` is the `EscalationClass` goal mode sorts on: `plan-defect` (a `PLAN DEFECT reported by …` park), `capped` (the attempt cap ran out), `infrastructure` (any infrastructure failure, `(scout)`, `(worktree)`, `(commit)`), `stall` (`(tree)`), `divergence`, and `budget-floor`. A leak abort shows in `aborted`; the tasks it stopped report `infrastructure`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
 - `needsHuman` — `[{ task, criteria }]`, the `(human)` gate items that passed with no machine check and no attestation. Report it **separately from `escalations`**: those tasks are genuinely `done`, nothing is parked, and nothing needs a Status reset. Print the criteria verbatim as the user's closing checklist, and say that `mark-done.ts` ticked their boxes like any other, so the task file no longer shows the check is outstanding.
 - `worktrees` — report the sorted `{ ref, path }` union of live worktrees and blocked leftovers retained from the start sweep. If a scout failed, preserve the returned worktree list without filtering it further.
 - `drained` — ready tasks left `todo` because `<planDir>/.flightlog/drain` existed at their dispatch. Report them as not started, not as failures. Tell the user to delete the drain file before the next run.
 - `cleanupFailures` — report landed worktrees whose removal could not be confirmed, separately from kept worktrees. A removal failure alone leaves the task completed, with no escalation.
+- `failedInMainTree` — the sorted refs of each Final review that failed after its fixer edited the main tree. Those edits are ungated, so the run committed nothing after them and left them uncommitted. Never commit them as they stand; goal mode saves them under a ref first (`goal-mode.md` step 5.1).
+- `logFailed` — `true` when the closing `log-escalations` call did not confirm that `flightlog.ts escalations` wrote the escalations and the `run-end` entry to `run.jsonl`. The other fields are unaffected. Tell the user the trail is missing this run's stops, so `--status` and goal mode cannot see them. A retried log call may append duplicate escalation and `run-end` rows, so readers must take each ref's latest.
 - A task ref appears in exactly one of `completed`, `escalations`, and `drained`. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, follow `SKILL.md` → "Escalation — park & continue, then resume".
@@ -2280,7 +2456,7 @@ Preserve unlanded work when a main-tree leak aborts the run. Resume each non-fin
 
 - **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop validates and checks the parsed `errors` array **before** the completion test instead of asking the scout to understand it.
 
-- **The stall check excludes tasks this run already parked.** Every parked task carries its own escalation, and the very next wave necessarily sees it as unfinished-and-not-ready. Counting it again would append a phantom `(tree)` stall to every run that parked anything, so the run would report two problems where there is one. When the only unfinished tasks are ones already escalated, the loop just breaks.
+- **The stall check excludes every task that is waiting, not stuck.** A task this run parked, a task an earlier run left `blocked`, and a `todo` task whose unmet dependencies (each unfinished item's `unmet`, from the scout) all lead to one of those are waiting. Every parked task carries its own escalation, and the very next wave necessarily sees it and its dependents as unfinished-and-not-ready. Counting them would append a phantom `(tree)` stall to every run that parked anything: a capped task beside a passing one in the same wave, with a Final review depending on both, would report a stall and end a goal-mode flight `exhausted` before its one real stop was repaired. When every unfinished task is waiting, the loop just breaks. A `todo` task whose dependencies are all met but is still not ready, an `in-progress` task, or a dependency on one of those is still a stall.
 
 - **The script has a deterministic fixture.** `scripts/orchestrator-script.test.ts` extracts this exact fenced block, runs it with stubbed `agent`/`parallel`, and asserts the termination rules, the quality-vs-infrastructure split, and the "every task lands in `completed` XOR `escalations`" invariant. No agent is spawned. **Edit the block and run `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts`** — a syntax error or a broken loop shows up there instead of mid-flight.
 

@@ -130,13 +130,14 @@ Before touching Workflow, gather the work-list in the main conversation:
 
 ## Step 2 — Confirm the flight with the user
 
-**Ask in two `AskUserQuestion` calls.** The first carries three independent choices: dev engine, cross-vendor reviewer, final-review lens model. The second carries the ones that depend on those answers — the codex dev model, the codex review model, and live panes when the env allows — and is skipped entirely when none applies. Do not silently default.
+**Ask in two `AskUserQuestion` calls.** The first carries four independent choices: dev engine, cross-vendor reviewer, final-review lens model, flight mode. The second carries the ones that depend on those answers — the codex dev model, the codex review model, and live panes when the env allows — and is skipped entirely when none applies. Do not silently default.
 
 The split is not cosmetic. Neither codex-model question is worth asking until the first call has said whether codex took that role at all, and the live-panes question offers a dev-delegate option only when the dev engine turned out external. Folding them into one call would ask every dependent question blind, and would also breach `AskUserQuestion`'s four-question cap.
 
 - **Dev engine** (`CFG.devEngine`) — Choose **Claude** (default; Opus/low, then Opus/high on the last Claude rung), **Codex** (`'codex'`, via `codex-run.ts`), or **OpenCode** (`'opencode'`, via `opencode-run.ts`). With Codex or OpenCode, an Opus/low driver writes the external CLI's instruction file. Keep the Claude judge in a separate call.
 - **Cross-vendor reviewer** (`CFG.reviewEngine`) — **Codex** (default) or **OpenCode** — the external bug/correctness lens in the closing Final review.
 - **Final-review lens model** (`CFG.reviewLensModel`) — **Opus** (default) or **Fable** (`'fable'`) — the model for the three Claude quality lenses (reuse / leanness / efficiency) in the closing Final review. Both run the lenses at high effort. This choice affects **only** those three lenses. Keep the fixer and rubric judge on their per-role model choices, including task header overrides. **Fable is Anthropic's most capable model tier and is priced above Opus** ($10/$50 per MTok vs Opus's $4/$20) — pick it for maximum lens quality on a hard review, not to save cost. Never describe it to the user as the cheaper option.
+- **Flight mode** — **Standard (Recommended)** parks and escalates as described under Escalation. **Goal mode** self-repairs plan defects and capped tasks until the tree completes or the repair budget runs out; see [Goal mode](#goal-mode). Offer this question under Claude Code only.
 - **Codex dev model** (`CFG.codexDevModel`) — **Relay config** (default), **gpt-6.1-sol**, or **gpt-6-astra** — ask **only when the dev engine resolved to codex**. This is the model that writes each task.
 - **Codex review model** (`CFG.codexReviewModel`) — **Relay config** (default), **gpt-6-astra**, or **gpt-6.1-sol** — ask **only when the cross-vendor reviewer resolved to codex**, which is the default, so a default flight does get asked. This is the model that reviews the branch diff.
 
@@ -152,7 +153,9 @@ If the live-pane env is not fulfilled, omit the live-panes question from the sec
 
 Then show the user a one-screen brief. State the slug and how many tasks there are. State that non-final tasks run in isolated worktrees at `<repo-parent>/.<repo-name>-autopilot/<slug>/<bucket>-<NN>`. State the per-role model map and any task whose `> **Models**:` header overrides it. State the chosen dev engine, cross-vendor reviewer, and final-review lens model. State each codex model whose role resolved to codex. State the two caps (`maxAttempts` and `finalReviewMaxAttempts`) and the model policy. State the plan's `Max parallel` when it is declared. State that each wave is committed before the next one starts. State that capped tasks will be parked and escalated, not silently skipped. State that Final review ends with the chosen external CLI review. This step **sends the branch diff to an external service** — OpenAI for codex, the configured opencode provider for opencode.
 
-State that the user's latest message is relayed verbatim to every agent in the run, framed as the only user voice and ranked above that agent's task. An imperative meant for you, such as "stop and fix plan", therefore reaches every dev and verifier as an order: in one run all eight refused their task and parked it with no work done. When the latest message is such an imperative, ask the user to send a plain go-ahead first.
+In goal mode, also state: the repair budget is `3 per task / 10 per flight`; a repair may edit a gate item, and every gate edit is reported in `FLIGHTREPORT.md`; the worst case is `12 attempts per task, 30 extra per flight`.
+
+Do not ask for a plain go-ahead to shield the agents from the user's latest message. Workflow agents receive no user message, on the launch turn or on a `/goal` continuation turn: each gets only the task the script computes, framed as carrying no user authority. An earlier runtime relayed that message to every agent, which is why this advice once existed.
 
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
 
@@ -181,6 +184,14 @@ EOF
 ```
 
 The script requires `slug`, `repoRoot`, `tasksDir`, `planPath`, `logFile`, `planGoal`, `scriptsDir`, and `baseRef`. It rejects a relative path and any key the `CFG` block does not carry. It derives `planDir` from `planPath`, so a plan nested deeper than `docs/<slug>/` — a waypoints leg — keeps its own Status edits out of the worktree leak check. Omit a field you did not scout, and it keeps the block's default. It writes `<plan dir>/.flightlog/orchestrator.js`, drops the `.flightlog/` self-ignore, and prints that absolute path. On a non-zero exit, fix the reported field and re-run.
+
+Set `deferredScope` whenever `<plan dir>/DEFERRED.md` parses to at least one item, in standard and goal mode alike, so a Final review never fails the goal for a criterion a waypoints leg already deferred:
+
+```bash
+bun -e 'const [mod, file] = process.argv.slice(1); const { parseDeferred } = await import(mod); const f = Bun.file(file); const md = (await f.exists()) ? await f.text() : ""; console.log(parseDeferred(md).length ? md : "")' "$WAYPOINTS"/deferred.ts <plan dir>/DEFERRED.md
+```
+
+Pass what it prints as `deferredScope`; leave the field out when it prints an empty line. `$WAYPOINTS` is `<base>/../waypoints/scripts`, absolute.
 
 Then call `Workflow({ scriptPath: <the printed path> })`. No `args` needed. Do not rely on the Workflow `args` global.
 
@@ -251,6 +262,8 @@ The fan-out happens at the orchestrator level. See `references/orchestrator.md` 
 
 ## Step 4 — Report
 
+In goal mode, run [Goal mode](#goal-mode) from step 2 after each Workflow return, and report only when its loop ends.
+
 After the workflow returns:
 
 1. Run the flightlog report to render the audit trail. (`$SCRIPTS` is the path you resolved in Step 1.)
@@ -260,6 +273,23 @@ After the workflow returns:
    This writes `docs/<slug>/.flightlog/RUNLOG.md`: every attempt and verdict, each linked to its agent label for drill-down.
 2. Tell the user: tasks completed, tasks escalated and why, and where `RUNLOG.md` lives. If everything passed, including Final review, say so plainly and point at what to verify or ship.
 3. **Report `needsHuman` separately from `escalations`.** It lists `{ task, criteria }` for every `(human)` gate item that passed without a machine check and without an attestation. Those tasks are genuinely `done` — nothing is parked and nothing needs resetting — so print them as a closing checklist of what the user still owes, quoting each criterion. Say plainly that `mark-done.ts` ticked those boxes like any other, so the task file alone no longer shows the check is outstanding.
+4. In goal mode, also print the outcome and the `FLIGHTREPORT.md` path from Goal mode step 7.
+
+## Goal mode
+
+Run this loop only when the user picked **Goal mode** in Step 2, under Claude Code. Repairs happen in this conversation, between Workflow runs, because a task-file edit during a run trips the leak check. Take every command and placeholder value from [references/goal-mode.md](references/goal-mode.md).
+
+1. Before the first launch, run `flightlog.ts flight-start`. It needs a clean working tree and refuses, writing nothing, when the repo holds uncommitted changes outside `<plan dir>/.flightlog/`; show the user the paths it lists, tell them to commit or stash first, and run it again. It adopts every task already `blocked` as an escalation of this flight. Then show the user the exact `/goal …` line from `goal-mode.md` to type, and wait until they have set it. `/goal` is a session Stop hook only the user can set. When it adopted any task, review those escalations first, from step 3, and let step 6 make the first launch.
+2. After each Workflow return, check `logFailed`. When it is `true`, stop and report that the trail is incomplete, so `repairs --status` cannot be trusted, and ask the user to type `/goal clear`. Ask the same whenever the loop stops before step 7. A Workflow that throws or returns no result is an infrastructure stop for the round: re-launch once, and halt the flight when it repeats.
+3. Run `flightlog.ts repairs --status`. On `complete` or `exhausted`, go to step 7.
+4. Sort each escalation by its `class`, following the table in `goal-mode.md`. Record each `infra-retry` or `halt` with `flightlog.ts repair` before acting on it.
+5. For each `plan-defect` or `capped` escalation, check the repair budget with `flightlog.ts repairs --json`, then spawn the repair reviewer with [references/repair.md](references/repair.md). Spawn reviewers one at a time. Before the first spawn of a round, and before step 6 when none ran, save a failed Final review's ungated edits under `refs/autopilot/ungated/`, unless `commitBetweenWaves` is `false` or a `(commit)` escalation left the tree mixed with gated work: then save nothing, record `halt`, tell the user it needs a person, and ask for `/goal clear`. Then commit the tree so that nothing is uncommitted; when something stays uncommitted, stop and report. On `fix`, `defer`, or `not-plan`, run `flightlog.ts guard`:
+   - On `refuse`, a missing verdict file, a guard rejection, or a failed `lint-task.ts` run after the guard, restore each changed file with `git show HEAD:<path> > <path>` and record `refuse`.
+   - When the guard and the lint pass, record `repair` with the guard's `reentry`, write `DEFERRED.md` for `defer` through `appendDeferred`, and commit the task files as `plan repair: <pattern>`.
+6. Reset the repaired tasks to `todo` and commit. Bake with `reentry` for the repaired and `infra-retry` tasks and for the last launch's reentry tasks that never ran, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` as Step 3 says. Re-launch, then go to step 2.
+7. Run `flightlog.ts report --flight`, then `flightlog.ts repairs --status` again. Print that outcome and the `FLIGHTREPORT.md` path.
+
+Print the `repairs --status` line as the last line of every goal-mode turn. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".
 
 The rest of this document is reference material.
 
@@ -348,3 +378,5 @@ The remaining shared tools — `score-task.ts`, `mark-done.ts`, `codex-run.ts`, 
 ## Additional resources
 
 - `references/orchestrator.md` — the canonical Workflow script (wave loop, per-task retry pipeline, inline score gate, agent prompts and schemas). Bake it with `scripts/bake-orchestrator.ts`. Do not write one from scratch.
+- `references/goal-mode.md` — the commands for each Goal mode step.
+- `references/repair.md` — the goal-mode repair reviewer prompt.

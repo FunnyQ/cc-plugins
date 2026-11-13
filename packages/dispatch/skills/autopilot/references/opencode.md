@@ -26,6 +26,8 @@ parallel-wave scheduling and no orchestrator process: whoever invoked the skill
 drives the waves by hand, one at a time, and stays at the keyboard between
 them. Do not report it to the user as an unattended flight.
 
+Goal mode is Claude Code only; do not offer the Flight mode question.
+
 ## Script root
 
 There is no _"Base directory for this skill"_ banner; `CLAUDE_PLUGIN_ROOT` is

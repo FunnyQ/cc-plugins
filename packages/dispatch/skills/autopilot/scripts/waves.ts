@@ -40,6 +40,7 @@ export function remainingWaves(
 export function currentWave(entries: FlightlogEntry[]): number {
   let current = 0;
   for (const entry of entries) {
+    if (!("agentLabel" in entry)) continue;
     const parsed = parseAgentLabel(entry.agentLabel ?? "");
     if (parsed.role === "scout" && parsed.wave !== undefined) {
       current = Math.max(current, parsed.wave);

@@ -272,3 +272,81 @@ describe("state entries", () => {
     }
   });
 });
+
+describe("goal-mode entries", () => {
+  const FLIGHT: FlightlogEntry = {
+    kind: "flight",
+    ts: "2026-06-01T08:00:00.000Z",
+    task: "(flight)",
+    goalHash: "abc123",
+    planPath: "docs/x/PLAN.md",
+  };
+  const ESCALATION: FlightlogEntry = {
+    kind: "escalation",
+    ts: "2026-06-01T10:05:00.000Z",
+    task: "ui/01",
+    attempt: 3,
+    class: "capped",
+    infrastructure: false,
+    parked: true,
+    reason: "hit  the  attempt cap",
+  };
+  const RUN_END: FlightlogEntry = {
+    kind: "run-end",
+    ts: "2026-06-01T11:00:00.000Z",
+    task: "(flight)",
+    aborted: false,
+    completed: ["ui/02"],
+    drained: [],
+    needsHuman: [{ task: "ui/01", criteria: ["renders"] }],
+  };
+  const REPAIR: FlightlogEntry = {
+    kind: "repair",
+    ts: "2026-06-01T10:10:00.000Z",
+    task: "ui/01",
+    verdict: "fix",
+    reason: "criterion  was wrong",
+    reentry: { "ui/01": "dev" },
+  };
+
+  test("parseLog keeps flight, escalation, run-end and repair entries", () => {
+    const all = [FLIGHT, ESCALATION, RUN_END, REPAIR];
+    const content = all.map(formatEntry).join("\n");
+    expect(parseLog(content)).toEqual(all);
+  });
+
+  test("renderRunlog renders escalation and repair lines under their task", () => {
+    const out = renderRunlog([ESCALATION, REPAIR], { slug: "x" });
+    expect(out).toContain("## ui/01");
+    expect(out).toContain("- escalation — capped: hit the attempt cap");
+    expect(out).toContain("- repair — fix: criterion was wrong");
+  });
+
+  test("renderRunlog skips flight and run-end entries", () => {
+    const out = renderRunlog([FLIGHT, RUN_END, NOTE], { slug: "x" });
+    expect(out).not.toContain("(flight)");
+    expect(out).toContain("## ui/03");
+  });
+
+  test("an old trail renders byte-identically", () => {
+    const state: StateEntry = {
+      kind: "state",
+      ts: "2026-06-01T09:00:00.000Z",
+      task: "ui/03",
+      state: "done",
+      message: "ok",
+    };
+    expect(renderRunlog([SCORE, NOTE, state], { slug: "x" })).toBe(
+      [
+        "# Run log — x",
+        "",
+        "## ui/03",
+        "",
+        "- state — done: ok",
+        "- attempt 2 · dev — Fixed the boundary case the judge flagged. _(agent: dev-ui-03-a2)_",
+        "- attempt 2 · judge — score 4.40 > 4 → PASS ✅ _(agent: judge-ui-03-a2)_",
+        "",
+      ].join("\n"),
+    );
+  });
+});

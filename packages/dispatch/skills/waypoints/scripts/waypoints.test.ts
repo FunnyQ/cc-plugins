@@ -170,6 +170,40 @@ PRIOR LANDED LEGS:
   });
 });
 
+describe("formatActive deferred", () => {
+  test("lists deferred items under the landed leg", () => {
+    const out = formatActive(
+      parseRoadmap(SAMPLE),
+      {},
+      {
+        "01-auth": [
+          {
+            criterion: "p95 under 200ms",
+            from: "t/02.md",
+            date: "d",
+            why: "w",
+          },
+        ],
+      },
+    );
+
+    expect(out).toContain(
+      "- 01-auth — users can sign up / sign in with email\n  outcome: also added rate-limiting\n  deferred: p95 under 200ms (from t/02.md)",
+    );
+  });
+});
+
+describe("draftOutcome deferred", () => {
+  test("appends the deferred count", () => {
+    expect(draftOutcome("## Final review\nAll good.\n", "", 2)).toBe(
+      "All good. · deferred 2 criteria to a later leg",
+    );
+    expect(draftOutcome("## Final review\nAll good.\n", "", 0)).toBe(
+      "All good.",
+    );
+  });
+});
+
 describe("draftOutcome", () => {
   test("uses first narrative line under final review", () => {
     expect(
@@ -409,6 +443,22 @@ describe("advance CLI", () => {
     expect(
       await readFile(join(dir, "docs", "demo", "WAYPOINTS.md"), "utf-8"),
     ).toBe(before);
+  });
+
+  test("bare advance reports deferred criteria of the active leg", async () => {
+    const dir = await writeProject("demo", SAMPLE, {
+      runlog: "## Final review\nAll tasks passed.\n",
+    });
+    await writeFile(
+      join(dir, "docs", "demo", "legs", "02-profile", "DEFERRED.md"),
+      "# Deferred criteria — 02-profile\n\n- [ ] fast\n  - from: t/1.md · deferred: 2026-07-04\n  - why: later\n",
+    );
+
+    const result = await runWaypoints(dir, ["advance", "demo"]);
+
+    expect(result.stdout).toContain(
+      "DRAFT OUTCOME: All tasks passed. · deferred 1 criteria to a later leg",
+    );
   });
 
   test("outcome writes transition with supplied date", async () => {

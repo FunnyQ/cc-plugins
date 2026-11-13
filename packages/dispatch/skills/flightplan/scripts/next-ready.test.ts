@@ -449,8 +449,8 @@ describe("summarizeTree", () => {
     expect(counts.inProgress).toBe(1);
     expect(counts.todo).toBe(1);
     expect(unfinished).toEqual([
-      { ref: "ui/01", state: "inProgress" },
-      { ref: "ui/02", state: "todo" },
+      { ref: "ui/01", state: "inProgress", unmet: [] },
+      { ref: "ui/02", state: "todo", unmet: ["ui/01"] },
     ]);
   });
 
@@ -461,13 +461,13 @@ describe("summarizeTree", () => {
       "ui/03.md": MALFORMED_DONE("ui", "03", "none"),
     });
     expect(unfinished).toEqual([
-      { ref: "ui/02", state: "blocked" },
-      { ref: "ui/03", state: "invalid" },
+      { ref: "ui/02", state: "blocked", unmet: [] },
+      { ref: "ui/03", state: "invalid", unmet: [] },
     ]);
   });
 
   test("a blocked dependency chain leaves no ready work", async () => {
-    const { ready, counts } = await summarize({
+    const { ready, counts, unfinished } = await summarize({
       "ui/01.md": TASK("ui", "01", "none", "blocked"),
       "ui/02.md": TASK("ui", "02", "ui/01", "todo"),
       "ui/03.md": TASK("ui", "03", "ui/02", "todo"),
@@ -476,6 +476,11 @@ describe("summarizeTree", () => {
     expect(counts.blocked).toBe(1);
     expect(counts.todo).toBe(2);
     expect(sumsToTotal(counts)).toBe(true);
+    expect(unfinished.map((u) => [u.ref, u.unmet])).toEqual([
+      ["ui/01", []],
+      ["ui/02", ["ui/01"]],
+      ["ui/03", ["ui/02"]],
+    ]);
   });
 
   test("a mixed tree still offers independent ready work", async () => {

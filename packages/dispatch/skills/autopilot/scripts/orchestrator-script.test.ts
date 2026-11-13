@@ -86,12 +86,15 @@ type RunResult = {
     attempt: number;
     infrastructure?: boolean;
     parked?: boolean;
+    class?: string;
     reason: string;
   }[];
   needsHuman: { task: string; criteria: string[] }[];
   worktrees: { ref: string; path: string }[];
   cleanupFailures: { ref: string; path: string }[];
   drained?: string[];
+  logFailed?: boolean;
+  failedInMainTree?: string[];
 };
 
 type Scenario = {
@@ -144,6 +147,7 @@ type Scenario = {
   >;
   devThrows?: string[];
   devReply?: Record<string, string[]>;
+  logEscalations?: ({ ok: boolean } | Throws | null)[];
   devHolds?: Record<string, Promise<void>>;
   parkHolds?: Record<string, Promise<void>>;
   doneHolds?: Record<string, Promise<void>>;
@@ -225,6 +229,7 @@ async function runOrchestrator(
   let budgetSpent = scenario.budget?.spent ?? 0;
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
+  const logAnswers = [...(scenario.logEscalations ?? [])];
   const queues = new Map<string, unknown[]>();
   const take = (bucket: string, ref: string, fallback: unknown) => {
     const key = `${bucket}:${ref}`;
@@ -271,6 +276,11 @@ async function runOrchestrator(
 
     if (label.startsWith("scout-wave-")) {
       const next = scouts.length > 0 ? scouts.shift() : null;
+      if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
+      return next;
+    }
+    if (label === "log-escalations") {
+      const next = logAnswers.length > 0 ? logAnswers.shift() : { ok: true };
       if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
       return next;
     }
@@ -1105,6 +1115,8 @@ describe("orchestrator failure handling", () => {
       "attempt 1 (ran on final-review)",
     );
     expect(exhausted.labels).not.toContain("commit-post-loop");
+    expect(exhausted.result.failedInMainTree).toEqual(["review/final"]);
+    expect(log.result.failedInMainTree).toEqual([]);
   });
 
   test("a null judge is an infrastructure failure", async () => {
@@ -2378,6 +2390,324 @@ describe("orchestrator single-task resume", () => {
   });
 });
 
+describe("orchestrator per-task reentry", () => {
+  const REENTRY = `{ "ui/01": { from: "verify", attempt: 4 } }`;
+
+  test("reentry rejects judge", async () => {
+    await expect(
+      runOrchestrator(
+        { scouts: [wave("ui/01", 1, 0), complete(1)] },
+        { reentry: `{ "ui/01": { from: "judge", attempt: 2 } }` },
+      ),
+    ).rejects.toThrow('reentry "ui/01"');
+  });
+
+  test.each([
+    [`{ "ui/01": { from: "dev", attempt: 0 } }`],
+    [`{ "ui/01": { from: "dev", attempt: 2.5 } }`],
+    [`{ "ui/01": { from: "dev" } }`],
+  ])("reentry rejects a bad attempt (%s)", async (reentry) => {
+    await expect(
+      runOrchestrator(
+        { scouts: [wave("ui/01", 1, 0), complete(1)] },
+        { reentry },
+      ),
+    ).rejects.toThrow('reentry "ui/01"');
+  });
+
+  test("reentry plus resumeTask throws", async () => {
+    await expect(
+      runOrchestrator(
+        { scouts: [] },
+        {
+          resumeTask: "'ui/01'",
+          resumeTaskPath: "'/abs/repo/docs/my-plan/tasks/ui/01.md'",
+          reentry: REENTRY,
+        },
+      ),
+    ).rejects.toThrow("reentry cannot be combined with resumeTask");
+  });
+
+  test("a reentry task starts at verify on its given attempt number", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: REENTRY },
+    );
+
+    const steps = log.labels.filter((label) =>
+      /^(dev|verify|judge)[^:]*:ui\/01#/.test(label),
+    );
+    expect(steps[0]).toBe("verify:ui/01#4");
+    expect(log.labels).not.toContain("wt-create:ui/01");
+    expect(log.labels).toContain("wt-show:ui/01");
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(log.result.escalations).toEqual([]);
+  });
+
+  test("a failed reentry attempt keeps counting from its given number", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        gate: { "ui/01": [{ passed: false, summary: "red" }] },
+      },
+      { reentry: REENTRY },
+    );
+
+    expect(log.labels).toContain("verify:ui/01#4");
+    expect(log.labels).toContain("dev:ui/01#5");
+    expect(log.labels).not.toContain("dev:ui/01#4");
+  });
+
+  test("a dev reentry starts at dev on its given attempt number", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: `{ "ui/01": { from: "dev", attempt: 3 } }` },
+    );
+
+    expect(log.labels).toContain("wt-create:ui/01");
+    expect(log.labels).not.toContain("wt-show:ui/01");
+    expect(log.labels.find((label) => label.startsWith("dev:"))).toBe(
+      "dev:ui/01#3",
+    );
+  });
+
+  test("the start sweep keeps reentry refs", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: REENTRY },
+    );
+
+    expect(promptFor(log, "wt-sweep:start")).toContain("--keep ui/01");
+  });
+
+  test("a reentry ref that never runs keeps its worktree through the end sweep", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "ui/02", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "ui/02", state: "todo" }],
+          }),
+        ],
+      },
+      { reentry: `{ "ui/02": { from: "verify", attempt: 2 } }` },
+    );
+
+    expect(log.labels.some((l) => /:ui\/02#/.test(l))).toBe(false);
+    expect(promptFor(log, "wt-sweep:end")).toContain("--keep ui/02");
+    expect(log.result.worktrees).toContainEqual({
+      ref: "ui/02",
+      path: "/wt/ui/02",
+    });
+  });
+
+  test("a reentry ref that ran and passed is not kept by the end sweep", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "ui/02", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [ready("ui/02")],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "ui/02", state: "todo" }],
+          }),
+          complete(2),
+        ],
+      },
+      { reentry: `{ "ui/02": { from: "verify", attempt: 2 } }` },
+    );
+
+    expect(log.labels).toContain("verify:ui/02#2");
+    expect(promptFor(log, "wt-sweep:end")).not.toContain("ui/02");
+    expect(log.result.worktrees).not.toContainEqual({
+      ref: "ui/02",
+      path: "/wt/ui/02",
+    });
+  });
+
+  test("a verify reentry with a missing worktree falls back to dev", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        worktree: {
+          "wt-show:ui/01": [{ path: "/wt/ui/01", base: null, exists: false }],
+        },
+      },
+      { reentry: REENTRY },
+    );
+
+    const create = promptFor(log, "wt-create:ui/01");
+    expect(create).toContain("--role reentry");
+    expect(create).toContain("kept worktree gone; re-entering at dev");
+    const steps = log.labels.filter((label) =>
+      /^(dev|verify|judge)[^:]*:ui\/01#/.test(label),
+    );
+    expect(steps[0]).toBe("dev:ui/01#4");
+    expect(log.result.completed).toEqual(["ui/01"]);
+  });
+
+  test("a Final-review verify reentry skips the review round in the main tree", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(1),
+        ],
+      },
+      { reentry: `{ "review/01": { from: "verify", attempt: 3 } }` },
+    );
+
+    expect(log.labels.some((l) => l.startsWith("review:"))).toBe(false);
+    expect(log.labels.some((l) => l.startsWith("wt-show:"))).toBe(false);
+    expect(log.labels).toContain("verify:review/01#3");
+    expect(log.result.completed).toEqual(["review/01"]);
+  });
+
+  test("deferredScope reaches only the Final-review fixer, verifier and judge", async () => {
+    const scope = "- [ ] works offline (leg 3)";
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "review/01", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(2),
+        ],
+      },
+      { deferredScope: JSON.stringify(scope) },
+    );
+
+    const deferred = `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${scope}`;
+    for (const label of [
+      "fix:review/01#1",
+      "verify:review/01#1",
+      "judge:review/01#1",
+    ]) {
+      expect(promptFor(log, label)).toContain(deferred);
+    }
+    const carriers = log.labels.filter((_, i) =>
+      log.prompts[i].includes(scope),
+    );
+    expect(carriers).toEqual([
+      "fix:review/01#1",
+      "verify:review/01#1",
+      "judge:review/01#1",
+    ]);
+  });
+
+  test("a Final-review verify reentry hands deferredScope to its verifier and judge", async () => {
+    const scope = "- [ ] works offline (leg 3)";
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(1),
+        ],
+      },
+      {
+        reentry: `{ "review/01": { from: "verify", attempt: 3 } }`,
+        deferredScope: JSON.stringify(scope),
+      },
+    );
+
+    const deferred = `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${scope}`;
+    expect(log.labels.some((l) => l.startsWith("fix:"))).toBe(false);
+    expect(promptFor(log, "verify:review/01#3")).toContain(deferred);
+    expect(promptFor(log, "judge:review/01#3")).toContain(deferred);
+  });
+
+  test("a verify reentry logs why its attempt has no dev row, and only that attempt", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        gate: { "ui/01": [{ passed: false, summary: "red" }] },
+      },
+      { reentry: REENTRY },
+    );
+
+    const note =
+      "re-entered at the verify step after a plan repair; the steps before it were taken as already satisfied";
+    const first = promptFor(log, "verify:ui/01#4");
+    expect(first).toContain(note);
+    expect(first).toContain("--role reentry --attempt 4");
+    expect(promptFor(log, "verify:ui/01#5")).not.toContain(note);
+    expect(log.prompts.filter((p) => p.includes(note))).toHaveLength(1);
+  });
+
+  test("a verify reentry that fell back to dev, or a dev reentry, logs no reentry note", async () => {
+    const fellBack = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        worktree: {
+          "wt-show:ui/01": [{ path: "/wt/ui/01", base: null, exists: false }],
+        },
+      },
+      { reentry: REENTRY },
+    );
+    const dev = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: `{ "ui/01": { from: "dev", attempt: 3 } }` },
+    );
+
+    for (const log of [fellBack, dev]) {
+      expect(log.prompts.some((p) => p.includes("re-entered at the"))).toBe(
+        false,
+      );
+    }
+  });
+
+  test("an empty deferredScope leaves the Final-review prompt as before", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: [ready("review/01", true)],
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref: "review/01", state: "todo" }],
+        }),
+        complete(1),
+      ],
+    });
+
+    expect(promptFor(log, "fix:review/01#1")).toMatch(
+      /is met\. Where a Verification command/,
+    );
+  });
+});
+
 describe("per-role model and effort choices", () => {
   const modelWave = (modelsRaw: string | null, finalReview = false) =>
     snapshot({
@@ -2656,6 +2986,7 @@ describe("task worktree isolation", () => {
       "scout-wave-2",
       "wt-sweep:end",
       "commit-post-loop",
+      "log-escalations",
     ]);
     expect(log.result.worktrees).toEqual([]);
     expect(log.result.cleanupFailures).toEqual([]);
@@ -4178,7 +4509,7 @@ describe("cockpit-rust flight fixes", () => {
     });
     expect(log.labels).not.toContain("wt-create:ui/02");
     expect(log.labels).not.toContain("commit-wave-2");
-    expect(log.labels.at(-1)).toBe("commit-post-loop");
+    expect(log.labels.at(-2)).toBe("commit-post-loop");
     expect(log.result.completed).toEqual([ref]);
     expect(log.result.escalations).toEqual([]);
     expect(log.result.drained).toEqual(["ui/02"]);
@@ -4213,7 +4544,7 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.completed).toEqual([ref]);
     expect(log.result.drained).toEqual(["ui/02"]);
     expect(log.result.escalations).toEqual([]);
-    expect(log.labels.at(-1)).toBe("commit-post-loop");
+    expect(log.labels.at(-2)).toBe("commit-post-loop");
   });
 
   test("a create that returns an empty path parks the task instead of running dev in the main tree", async () => {
@@ -4226,5 +4557,205 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.escalations).toEqual([
       expect.objectContaining({ task: ref, infrastructure: true }),
     ]);
+  });
+});
+
+describe("escalation classes and the flightlog trail", () => {
+  const ref = "ui/01";
+  const parkedEnd = () =>
+    snapshot({
+      counts: counts({ total: 1, blocked: 1 }),
+      unfinished: [{ ref, state: "blocked" }],
+    });
+  const payloadOf = (log: RunLog) => {
+    const prompt = promptFor(log, "log-escalations");
+    const raw = / --payload '([^']*)'/.exec(prompt)?.[1];
+    if (raw === undefined) throw new Error("no --payload argument");
+    return JSON.parse(decodeURIComponent(raw));
+  };
+
+  test("every escalations.push site in the extracted script sets class", async () => {
+    const script = extractScript(await readFile(ORCHESTRATOR, "utf-8"));
+    const marker = "escalations.push({";
+    const blocks: string[] = [];
+    for (let at = script.indexOf(marker); at !== -1;) {
+      let depth = 0;
+      let end = at + marker.length - 1;
+      for (; end < script.length; end++) {
+        if (script[end] === "{") depth++;
+        if (script[end] === "}" && --depth === 0) break;
+      }
+      blocks.push(script.slice(at, end + 1));
+      at = script.indexOf(marker, end);
+    }
+    expect(blocks.length).toBe(12);
+    for (const block of blocks) expect(block).toContain("class:");
+  });
+
+  test("a capped task escalates with class capped", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      judge: {
+        [ref]: [
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+        ],
+      },
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: ref, class: "capped" }),
+    ]);
+  });
+
+  test("a dev PLAN DEFECT escalates with class plan-defect", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      devReply: { [ref]: ["PLAN DEFECT: the gate cannot pass\nrest"] },
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: ref, class: "plan-defect" }),
+    ]);
+  });
+
+  test("park beside a pass: a dependent waiting on the parked task is not a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        multiWave(["a/01", "b/01"]),
+        snapshot({
+          counts: counts({ total: 3, done: 1, blocked: 1, todo: 1 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "review/01", state: "todo", unmet: ["a/01"] },
+          ],
+        }),
+      ],
+      judge: {
+        "a/01": [
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+        ],
+      },
+    });
+    expect(log.result.completed).toEqual(["b/01"]);
+    expect(log.result.escalations.map((e) => [e.task, e.class])).toEqual([
+      ["a/01", "capped"],
+    ]);
+  });
+
+  test("a task blocked by an earlier run, with todo dependents, is not a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 3, blocked: 1, todo: 2 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "a/02", state: "todo", unmet: ["a/01"] },
+            { ref: "a/03", state: "todo", unmet: ["a/02"] },
+          ],
+        }),
+      ],
+    });
+    expect(log.result.escalations).toEqual([]);
+  });
+
+  test("a todo task whose dependencies are all done, still not ready, is a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 3, blocked: 1, todo: 1, done: 1 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "b/02", state: "todo", unmet: [] },
+          ],
+        }),
+      ],
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: "(tree)", class: "stall" }),
+    ]);
+  });
+
+  test("an infrastructure failure and a stall carry their classes", async () => {
+    const infra = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      gate: { [ref]: [null] },
+    });
+    expect(infra.result.escalations[0].class).toBe("infrastructure");
+    const stalled = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref, state: "todo" }],
+        }),
+      ],
+    });
+    expect(stalled.result.escalations).toEqual([
+      expect.objectContaining({ task: "(tree)", class: "stall" }),
+    ]);
+  });
+
+  test("the run ends with one log-escalations call whose payload decodes to the returned escalations", async () => {
+    const rationale = `it's "wrong"\n100% of the gate is red`;
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      judge: {
+        [ref]: [
+          { verdict: fail, rationale },
+          { verdict: fail, rationale },
+          { verdict: fail, rationale },
+        ],
+      },
+    });
+    expect(callsTo(log.labels, "log-escalations")).toBe(1);
+    expect(log.labels.at(-1)).toBe("log-escalations");
+    expect(promptFor(log, "log-escalations")).toContain(
+      "flightlog.ts escalations /abs/repo/docs/my-plan/.flightlog/run.jsonl --payload '",
+    );
+    expect(modelFor(log, "log-escalations")).toBe("haiku");
+    const payload = payloadOf(log);
+    expect(payload.escalations[0].reason).toContain(rationale);
+    expect(payload).toEqual({
+      escalations: log.result.escalations,
+      cleanupFailures: log.result.cleanupFailures,
+      drained: log.result.drained,
+      aborted: log.result.aborted,
+      completed: log.result.completed,
+      needsHuman: log.result.needsHuman,
+    });
+    expect(log.result.logFailed).toBe(false);
+  });
+
+  test("a clean run still logs an empty trail record", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+    });
+    expect(payloadOf(log)).toMatchObject({
+      escalations: [],
+      completed: [ref],
+    });
+  });
+
+  test("a log-escalations failure sets logFailed and leaves escalations unchanged", async () => {
+    const scenario = () => ({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      gate: { [ref]: [null] },
+    });
+    const logged = await runOrchestrator(scenario());
+    for (const answers of [
+      [THROWS, THROWS],
+      [null, null],
+      [{ ok: false }],
+    ] as Scenario["logEscalations"][]) {
+      const failed = await runOrchestrator({
+        ...scenario(),
+        logEscalations: answers,
+      });
+      expect(failed.result.logFailed).toBe(true);
+      const { logFailed: _failed, ...rest } = failed.result;
+      const { logFailed: _logged, ...expected } = logged.result;
+      expect(rest).toEqual(expected);
+    }
   });
 });
