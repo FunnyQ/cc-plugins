@@ -35,6 +35,35 @@ describe("deferred file", () => {
     expect(second.match(/^# Deferred criteria/gm)).toHaveLength(1);
   });
 
+  test("appendDeferred collapses whitespace so no item is dropped", () => {
+    const md = appendDeferred(null, "02-profile", [
+      {
+        criterion: "line one\n  line two\t end ",
+        from: " a\nb ",
+        date: "2026-07-04",
+        why: "x\n\ny",
+      },
+    ]);
+
+    expect(parseDeferred(md)).toEqual([
+      {
+        criterion: "line one line two end",
+        from: "a b",
+        date: "2026-07-04",
+        why: "x y",
+      },
+    ]);
+  });
+
+  test("parseDeferred accepts ticked items", () => {
+    const md =
+      "# Deferred criteria — 02-profile\n\n- [x] done later\n  - from: t/1.md · deferred: 2026-07-04\n  - why: ok\n";
+
+    expect(parseDeferred(md).map((item) => item.criterion)).toEqual([
+      "done later",
+    ]);
+  });
+
   test("parseDeferred of an empty file is empty", () => {
     expect(parseDeferred("")).toEqual([]);
   });

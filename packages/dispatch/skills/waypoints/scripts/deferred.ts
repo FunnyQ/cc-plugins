@@ -6,7 +6,7 @@ export type DeferredItem = {
 };
 
 const ITEM_REGEX =
-  /^- \[ \] (.+)\n {2}- from: (.*?) · deferred: (\S+)\n {2}- why: (.*)$/gm;
+  /^- \[[ x]\] (.+)\n {2}- from: (.*?) · deferred: (\S+)\n {2}- why: (.*)$/gm;
 
 export function parseDeferred(md: string): DeferredItem[] {
   return [...md.replace(/\r\n/g, "\n").matchAll(ITEM_REGEX)].map((m) => ({
@@ -25,9 +25,10 @@ export function appendDeferred(
   const head = md?.trim()
     ? md.replace(/\s+$/, "")
     : `# Deferred criteria — ${legSlug}`;
+  const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
   const body = items.map(
     (item) =>
-      `- [ ] ${item.criterion}\n  - from: ${item.from} · deferred: ${item.date}\n  - why: ${item.why}`,
+      `- [ ] ${oneLine(item.criterion)}\n  - from: ${oneLine(item.from)} · deferred: ${item.date}\n  - why: ${oneLine(item.why)}`,
   );
   return `${[head, ...body].join("\n\n")}\n`;
 }
