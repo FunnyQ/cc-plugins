@@ -70,6 +70,8 @@ const CFG = {
   resumeFrom: "dev", // 'dev' | 'verify' | 'judge' — the step the FIRST resumed attempt starts at; every later attempt runs the whole pipeline
   resumeAttempt: 1, // the attempt number the resumed run starts counting at, so the flightlog and the score rows keep rising
   attestationFile: "", // ABSOLUTE path to a human attestation naming which gate items a person performed; REQUIRED when resumeFrom is 'judge'
+  reentry: {}, // { "<ref>": { from: 'dev' | 'verify', attempt: N } } — after a plan repair, where each repaired task enters this whole-tree flight and the attempt it counts from; never with resumeTask
+  deferredScope: "", // free text: criteria a waypoints leg deferred to a later leg, shown to the Final review as out of scope ('' = none)
 };
 
 // ── Model policy (tune here — one place) ───────────────────────────────────
@@ -278,6 +280,40 @@ const RESUME = !CFG.resumeTask
         attempt,
       };
     })();
+
+// ── Per-task re-entry ───────────────────────────────────────────────────────
+// After a plan repair the main agent re-flies the whole tree once, and each
+// repaired task enters at the step the repair left valid: `verify` when its kept
+// worktree holds work and only gate sections changed, else `dev`. Its numbering
+// continues from the trail for the same reason a resume's does. `judge` is
+// refused: skipping the gate needs a person's signed attestation, which a
+// repair does not produce. Validated at script start, like RESUME, because a
+// bad entry would otherwise surface mid-wave as a task that never ran.
+const REENTRY = (() => {
+  const reentry = CFG.reentry ?? {};
+  const refs = Object.keys(reentry);
+  if (refs.length > 0 && CFG.resumeTask) {
+    throw new Error(
+      "reentry cannot be combined with resumeTask — a resume flies one task with no wave loop, a reentry rides a whole-tree flight",
+    );
+  }
+  for (const ref of refs) {
+    const { from, attempt } = reentry[ref] ?? {};
+    if (from !== "dev" && from !== "verify") {
+      throw new Error(
+        `reentry "${ref}": unknown from ${JSON.stringify(from)} — must be dev or verify`,
+      );
+    }
+    if (!Number.isInteger(attempt) || attempt < 1) {
+      throw new Error(
+        `reentry "${ref}": attempt must be a whole number 1 or greater (got ${JSON.stringify(attempt)})`,
+      );
+    }
+  }
+  return reentry;
+})();
+const entryFor = (ref) =>
+  RESUME && RESUME.ref === ref ? RESUME : (REENTRY[ref] ?? null);
 
 // Returns the remaining budget when it has fallen below the floor, else null.
 // Both "no floor configured" and "no budget declared" are null — not a throw and
@@ -651,7 +687,7 @@ Use the identical label in both start and end calls.
 You are the FINAL REVIEW fixer for flightplan ${CFG.slug} (task ${ref}). Independent reviewers have each written findings to ${reviewDir(attempt)}/ (one file per lens: ${reviewEngine.label}, reuse, leanness, efficiency).
 1. Read EVERY file in ${reviewDir(attempt)}/. If ${reviewEngine.label}.md is MISSING, is empty, or begins with "${reviewEngine.token}", call that out prominently — the cross-vendor pass did not run, and the orchestrator fails this round's gate whatever you fix, so the round is re-run under its cap.
 2. Apply the real fixes (you have Edit/Write). Use judgement: fix correctness / integration / regression issues from the cross-vendor lens, and the safe quality cleanups from the three Claude lenses (behaviour-preserving). On the ABSTRACTION axis the two lenses point opposite ways on purpose: \`reuse\` may ask for more code, \`leanness\` only ever asks for less. Where they land on the same span, that is a genuine trade-off for you to settle — not a contradiction to route around. This split says nothing about \`efficiency\`: a cheaper approach that needs a cache, a batch, or an index is a normal fix, so never reject an efficiency finding merely because it adds code. For any finding you reject, say why.
-3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met. ${BASE_REF_RULE}
+3. VERIFY. Open the task file at ${path} and run its ## Verification commands yourself; confirm green and that the PLAN goal ("${CFG.planGoal}") is met.${CFG.deferredScope ? ` These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${CFG.deferredScope}\n` : " "}${BASE_REF_RULE}
 ${attempt > 1 ? "This is re-loop attempt " + attempt + " (capped at " + FINAL_MAX + "). The previous round was rejected:\n" + feedback + "\nEnsure the new findings + your fixes address that." : ""}
 ${STATUS_RULE}
 ${NO_COMMIT_RULE}
@@ -1104,7 +1140,11 @@ async function executeTask(item) {
   // `first` at 1 the two are equal and the ladder is byte-identical to before,
   // but on a resume at attempt 3 a cap-keyed `attempt >= cap` is already true on
   // the first rung, which would raise effort immediately on every attempt.
-  const first = RESUME && RESUME.ref === ref ? RESUME.attempt : 1;
+  // A reentry numbers its attempts the same way, from the attempt it was given.
+  const entry = entryFor(ref);
+  const first = entry ? entry.attempt : 1;
+  // Moves to `dev` when a `verify` reentry finds its kept worktree gone.
+  let entryFrom = entry?.from;
   const last = first + cap - 1;
   const attempts = [];
   // `(human)` items nobody has attested to. Carried out of the PASSING gate, so
@@ -1132,13 +1172,32 @@ async function executeTask(item) {
               false,
             );
           }
+        } else if (entryFrom === "verify") {
+          const shown = await wtCall(
+            `wt-show:${ref}`,
+            wtCommand(`show ${ref}`),
+            WT_SCHEMA.show,
+          );
+          if (shown.exists) {
+            live.set(ref, shown.path);
+            return shown;
+          }
+          // Unlike a resume, a reentry does not fail here: the repair only
+          // promised the work would still be there, so redo it from dev.
+          entryFrom = "dev";
         }
         const create = wtCommand(`create ${ref}`);
+        // The orchestrator has no filesystem, so the trail row rides the create
+        // agent; stdout is dropped because the agent returns create's JSON.
+        const fresh =
+          entry && !RESUME && entryFrom !== entry.from
+            ? `{ bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${first} --message "kept worktree gone; re-entering at dev" >/dev/null; ${create}; }`
+            : create;
         const created = await wtCall(
           `wt-create:${ref}`,
           RESUME
             ? create
-            : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${create}`,
+            : `test -e ${DRAIN} && echo '{"drained":true,"path":"","base":""}' || ${fresh}`,
           WT_SCHEMA.create,
         );
         if (created.drained === true) return created;
@@ -1168,7 +1227,7 @@ async function executeTask(item) {
     // the attempt the resume starts. If that attempt fails its gate, the retry
     // runs the whole pipeline — a red verify means the skipped work genuinely
     // does need redoing, including the expensive Final review round.
-    const startAt = RESUME && attempt === first ? RESUME.from : "dev";
+    const startAt = entry && attempt === first ? entryFrom : "dev";
     let attemptModel = "final-review";
     const rejected = (gateSummary) =>
       attempts.push({
@@ -1958,13 +2017,17 @@ return (async () => {
     lastScout = snap;
     if (wave === 1) {
       try {
+        // A reentry ref's task is reset to todo by the repair, so the blocked
+        // filter alone would sweep the worktree a `verify` reentry needs.
         startKept = (
-          await sweep(
-            "start",
-            unfinished
-              .filter((item) => item.state === "blocked")
-              .map((item) => item.ref),
-          )
+          await sweep("start", [
+            ...new Set([
+              ...unfinished
+                .filter((item) => item.state === "blocked")
+                .map((item) => item.ref),
+              ...Object.keys(REENTRY),
+            ]),
+          ])
         ).kept;
         await baseline();
       } catch (error) {

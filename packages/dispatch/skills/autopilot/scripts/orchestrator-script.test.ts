@@ -2387,6 +2387,188 @@ describe("orchestrator single-task resume", () => {
   });
 });
 
+describe("orchestrator per-task reentry", () => {
+  const REENTRY = `{ "ui/01": { from: "verify", attempt: 4 } }`;
+
+  test("reentry rejects judge", async () => {
+    await expect(
+      runOrchestrator(
+        { scouts: [wave("ui/01", 1, 0), complete(1)] },
+        { reentry: `{ "ui/01": { from: "judge", attempt: 2 } }` },
+      ),
+    ).rejects.toThrow('reentry "ui/01"');
+  });
+
+  test.each([
+    [`{ "ui/01": { from: "dev", attempt: 0 } }`],
+    [`{ "ui/01": { from: "dev", attempt: 2.5 } }`],
+    [`{ "ui/01": { from: "dev" } }`],
+  ])("reentry rejects a bad attempt (%s)", async (reentry) => {
+    await expect(
+      runOrchestrator(
+        { scouts: [wave("ui/01", 1, 0), complete(1)] },
+        { reentry },
+      ),
+    ).rejects.toThrow('reentry "ui/01"');
+  });
+
+  test("reentry plus resumeTask throws", async () => {
+    await expect(
+      runOrchestrator(
+        { scouts: [] },
+        {
+          resumeTask: "'ui/01'",
+          resumeTaskPath: "'/abs/repo/docs/my-plan/tasks/ui/01.md'",
+          reentry: REENTRY,
+        },
+      ),
+    ).rejects.toThrow("reentry cannot be combined with resumeTask");
+  });
+
+  test("a reentry task starts at verify on its given attempt number", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: REENTRY },
+    );
+
+    const steps = log.labels.filter((label) =>
+      /^(dev|verify|judge)[^:]*:ui\/01#/.test(label),
+    );
+    expect(steps[0]).toBe("verify:ui/01#4");
+    expect(log.labels).not.toContain("wt-create:ui/01");
+    expect(log.labels).toContain("wt-show:ui/01");
+    expect(log.result.completed).toEqual(["ui/01"]);
+    expect(log.result.escalations).toEqual([]);
+  });
+
+  test("a failed reentry attempt keeps counting from its given number", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        gate: { "ui/01": [{ passed: false, summary: "red" }] },
+      },
+      { reentry: REENTRY },
+    );
+
+    expect(log.labels).toContain("verify:ui/01#4");
+    expect(log.labels).toContain("dev:ui/01#5");
+    expect(log.labels).not.toContain("dev:ui/01#4");
+  });
+
+  test("a dev reentry starts at dev on its given attempt number", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: `{ "ui/01": { from: "dev", attempt: 3 } }` },
+    );
+
+    expect(log.labels).toContain("wt-create:ui/01");
+    expect(log.labels).not.toContain("wt-show:ui/01");
+    expect(log.labels.find((label) => label.startsWith("dev:"))).toBe(
+      "dev:ui/01#3",
+    );
+  });
+
+  test("the start sweep keeps reentry refs", async () => {
+    const log = await runOrchestrator(
+      { scouts: [wave("ui/01", 1, 0), complete(1)] },
+      { reentry: REENTRY },
+    );
+
+    expect(promptFor(log, "wt-sweep:start")).toContain("--keep ui/01");
+  });
+
+  test("a verify reentry with a missing worktree falls back to dev", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave("ui/01", 1, 0), complete(1)],
+        worktree: {
+          "wt-show:ui/01": [{ path: "/wt/ui/01", base: null, exists: false }],
+        },
+      },
+      { reentry: REENTRY },
+    );
+
+    const create = promptFor(log, "wt-create:ui/01");
+    expect(create).toContain("--role reentry");
+    expect(create).toContain("kept worktree gone; re-entering at dev");
+    const steps = log.labels.filter((label) =>
+      /^(dev|verify|judge)[^:]*:ui\/01#/.test(label),
+    );
+    expect(steps[0]).toBe("dev:ui/01#4");
+    expect(log.result.completed).toEqual(["ui/01"]);
+  });
+
+  test("a Final-review verify reentry skips the review round in the main tree", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 1, todo: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(1),
+        ],
+      },
+      { reentry: `{ "review/01": { from: "verify", attempt: 3 } }` },
+    );
+
+    expect(log.labels.some((l) => l.startsWith("review:"))).toBe(false);
+    expect(log.labels.some((l) => l.startsWith("wt-show:"))).toBe(false);
+    expect(log.labels).toContain("verify:review/01#3");
+    expect(log.result.completed).toEqual(["review/01"]);
+  });
+
+  test("deferredScope reaches only the Final-review verify prompt", async () => {
+    const scope = "- [ ] works offline (leg 3)";
+    const log = await runOrchestrator(
+      {
+        scouts: [
+          snapshot({
+            ready: [ready("ui/01")],
+            counts: counts({ total: 2, todo: 2 }),
+            unfinished: [
+              { ref: "ui/01", state: "todo" },
+              { ref: "review/01", state: "todo" },
+            ],
+          }),
+          snapshot({
+            ready: [ready("review/01", true)],
+            counts: counts({ total: 2, todo: 1, done: 1 }),
+            unfinished: [{ ref: "review/01", state: "todo" }],
+          }),
+          complete(2),
+        ],
+      },
+      { deferredScope: JSON.stringify(scope) },
+    );
+
+    const deferred = `These criteria were deferred to a later leg and are out of scope here; do not fail the goal for them:\n${scope}`;
+    expect(promptFor(log, "fix:review/01#1")).toContain(deferred);
+    const carriers = log.labels.filter((_, i) =>
+      log.prompts[i].includes(scope),
+    );
+    expect(carriers).toEqual(["fix:review/01#1"]);
+  });
+
+  test("an empty deferredScope leaves the Final-review prompt as before", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          ready: [ready("review/01", true)],
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref: "review/01", state: "todo" }],
+        }),
+        complete(1),
+      ],
+    });
+
+    expect(promptFor(log, "fix:review/01#1")).toMatch(
+      /is met\. Where a Verification command/,
+    );
+  });
+});
+
 describe("per-role model and effort choices", () => {
   const modelWave = (modelsRaw: string | null, finalReview = false) =>
     snapshot({
