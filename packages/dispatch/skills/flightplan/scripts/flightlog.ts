@@ -20,17 +20,20 @@
  *
  * Goal mode (budget, status, guard and report all count from the latest
  * `flight` entry):
- *   bun flightlog.ts flight-start <logfile> --plan <PLAN.md>
+ *   bun flightlog.ts flight-start <logfile> --plan <PLAN.md> [--tasks <dir>]
  *   bun flightlog.ts escalations <logfile> --payload <uri-encoded JSON>
  *   bun flightlog.ts guard <logfile> --plan <PLAN.md> --tasks <dir> \
  *       --verdict fix|defer --justified <json file> --kept <ref,ref|"">
  *   bun flightlog.ts repair <logfile> --task <ref>|--flight --verdict <v> \
- *       --reason-file <f> [--pattern <text>] [--changed <ref,ref>] \
- *       [--reentry <json>] [--diff-file <f>]
+ *       --reason-file <f> [--verdict-file <json>] [--reentry <json>] \
+ *       [--diff-file <f>]
  *   bun flightlog.ts repairs <logfile> --tasks <dir> --status|--json
  *   bun flightlog.ts report <logfile> --flight [--deferred <DEFERRED.md>]
  *
  * `report --flight` writes FLIGHTREPORT.md beside the log instead of RUNLOG.md.
+ * `flight-start` adopts every task already `blocked` (tasks dir defaults to
+ * the plan's sibling `tasks/`) as an escalation of the new flight, and prints
+ * the adopted escalations as a JSON array.
  */
 import { readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join, basename, relative, resolve, sep } from "node:path";
@@ -57,6 +60,7 @@ import {
   currentFlight,
   flightStatus,
   goalHash,
+  type FlightStatus,
   guardRepair,
   renderFlightReport,
   repairCounts,
@@ -215,13 +219,42 @@ async function main() {
     if (!logFile) usage();
     const plan = flagValue(rest, "--plan");
     if (!plan) fail("flightlog flight-start requires --plan");
+    const tasksDir = flagValue(rest, "--tasks") ?? join(dirname(plan), "tasks");
+    const earlier = await readLog(logFile);
+    const { byRef } = await loadAllTasks(tasksDir);
+    const ts = new Date().toISOString();
     await appendEntry(logFile, {
       kind: "flight",
-      ts: new Date().toISOString(),
+      ts,
       task: "(flight)",
       goalHash: goalHash(await readFile(plan, "utf-8")),
       planPath: plan,
     });
+    const adopted: EscalationEntry[] = Object.keys(byRef)
+      .filter((ref) => byRef[ref].status === "blocked")
+      .sort()
+      .map((ref) => {
+        const last = earlier.findLast(
+          (e): e is EscalationEntry => e.kind === "escalation" && e.task === ref,
+        );
+        return {
+          kind: "escalation",
+          ts,
+          task: ref,
+          attempt: last?.attempt ?? 0,
+          class:
+            last?.class === "capped" || last?.class === "plan-defect"
+              ? last.class
+              : "plan-defect",
+          infrastructure: false,
+          parked: true,
+          reason:
+            last?.reason ??
+            "parked before this goal-mode flight; no reason in the trail",
+        };
+      });
+    for (const entry of adopted) await appendEntry(logFile, entry);
+    console.log(JSON.stringify(adopted.map(({ kind, ts, ...e }) => e)));
     return;
   }
 
@@ -356,6 +389,7 @@ async function main() {
       kept: keptRaw.split(",").filter(Boolean),
       devReportedDefect,
       workedRefs,
+      deferred: Array.isArray(justifiedJson) ? [] : (justifiedJson.defer ?? []),
     });
 
     const deferredPath = join(planDir, "DEFERRED.md");
@@ -413,8 +447,18 @@ async function main() {
       console.error(admitted.error);
       process.exit(1);
     }
-    const pattern = flagValue(rest, "--pattern", { allowDashValue: true });
-    const changed = flagValue(rest, "--changed");
+    const verdictFile = flagValue(rest, "--verdict-file");
+    const reviewed: { pattern?: unknown; changed?: unknown } =
+      verdictFile === undefined
+        ? {}
+        : JSON.parse(await readFile(verdictFile, "utf-8"));
+    const pattern =
+      typeof reviewed.pattern === "string" && reviewed.pattern !== ""
+        ? reviewed.pattern
+        : undefined;
+    const changed = Array.isArray(reviewed.changed)
+      ? reviewed.changed.filter((ref): ref is string => typeof ref === "string")
+      : undefined;
     const reentry = flagValue(rest, "--reentry");
     const diffFile = flagValue(rest, "--diff-file");
     const entry: RepairEntry = {
@@ -424,9 +468,7 @@ async function main() {
       verdict,
       reason: await readFile(reasonFile, "utf-8"),
       ...(pattern === undefined ? {} : { pattern }),
-      ...(changed === undefined
-        ? {}
-        : { changed: changed.split(",").filter(Boolean) }),
+      ...(changed === undefined ? {} : { changed }),
       ...(reentry === undefined ? {} : { reentry: JSON.parse(reentry) }),
       ...(diffFile === undefined
         ? {}
@@ -445,11 +487,7 @@ async function main() {
       fail("flightlog repairs requires --tasks and one of --status or --json");
     }
     const flight = requireFlight(await readLog(logFile));
-    const loaded = await loadAllTasks(tasksDir);
-    if (loaded.errors.length > 0) {
-      fail(loaded.errors.map((e) => `${e.file}: ${e.reason}`).join("\n"));
-    }
-    const result = flightStatus(flight.entries, loaded.byRef);
+    const result = await treeStatus(flight.entries, tasksDir);
     console.log(
       status
         ? result
@@ -471,11 +509,10 @@ async function main() {
     const loaded = await loadAllTasks(tasksDir);
     const tasks = loaded.byRef;
     const unreadable = loaded.errors.map((e) => `- ${e.file}: ${e.reason}`);
-    if (unreadable.length > 0) console.error(unreadable.join("\n"));
     const out = join(dirname(logFile), "FLIGHTREPORT.md");
     const report = renderFlightReport(flight.entries, {
       slug: flagValue(rest, "--slug") ?? slugFromLogPath(logFile),
-      status: flightStatus(flight.entries, tasks),
+      status: await treeStatus(flight.entries, tasksDir),
       deferredMd:
         deferredMd !== null && parseDeferred(deferredMd).length > 0
           ? deferredMd
@@ -565,6 +602,22 @@ function decodePayload(raw: string): EscalationPayload {
   return payload;
 }
 
+// A tree with an unparseable or invalid task cannot be trusted to read
+// `complete`, and no repair round can run over it, so it ends the flight.
+async function treeStatus(
+  flightEntries: FlightlogEntry[],
+  tasksDir: string,
+): Promise<FlightStatus> {
+  const loaded = await loadAllTasks(tasksDir);
+  const problems = [
+    ...loaded.errors.map((e) => `${e.file}: ${e.reason}`),
+    ...loaded.invalid.map((i) => `${i.ref} (${i.file}): ${i.reason}`),
+  ];
+  if (problems.length === 0) return flightStatus(flightEntries, loaded.byRef);
+  console.error(problems.join("\n"));
+  return "exhausted";
+}
+
 function doneInFlight(flightEntries: FlightlogEntry[]): Set<string> {
   const latest = new Map<string, string>();
   for (const e of flightEntries) {
@@ -643,10 +696,10 @@ function usage(): never {
       "  bun flightlog.ts progress <logfile> [--task <ref>] [--json]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
       "  bun flightlog.ts report <logfile> --flight [--deferred <DEFERRED.md>] [--tasks <dir>] [--slug <slug>]",
-      "  bun flightlog.ts flight-start <logfile> --plan <PLAN.md>",
+      "  bun flightlog.ts flight-start <logfile> --plan <PLAN.md> [--tasks <dir>]",
       "  bun flightlog.ts escalations <logfile> --payload <uri-encoded JSON>",
       '  bun flightlog.ts guard <logfile> --plan <PLAN.md> --tasks <dir> --verdict fix|defer --justified <json file> --kept <ref,ref|"">',
-      "  bun flightlog.ts repair <logfile> --task <ref>|--flight --verdict <verdict> --reason-file <f> [--pattern <text>] [--changed <ref,ref>] [--reentry <json>] [--diff-file <f>]",
+      "  bun flightlog.ts repair <logfile> --task <ref>|--flight --verdict <verdict> --reason-file <f> [--verdict-file <json>] [--reentry <json>] [--diff-file <f>]",
       "  bun flightlog.ts repairs <logfile> --tasks <dir> --status|--json",
     ].join("\n"),
   );

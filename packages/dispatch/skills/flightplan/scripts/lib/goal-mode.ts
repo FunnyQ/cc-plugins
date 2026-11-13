@@ -4,6 +4,7 @@ import type {
   EscalationEntry,
   FlightEntry,
   FlightlogEntry,
+  NoteEntry,
   RepairEntry,
   RepairVerdict,
   RunEndEntry,
@@ -93,21 +94,23 @@ export function flightStatus(
 
   const repairs = repairsIn(flightEntries);
   const counts = repairCounts(flightEntries);
-  if (
-    repairs.some(
-      (r) =>
-        (r.task === "(flight)" || r.task === "(tree)") && r.verdict === "halt",
-    )
-  ) {
+  // A synthetic ref has no Status to reset, so a halt on it would re-launch
+  // into the same stop without bound.
+  if (repairs.some((r) => r.task.startsWith("(") && r.verdict === "halt")) {
     return "exhausted";
   }
   if (counts.flight >= FLIGHT_REPAIR_CAP) return "exhausted";
   // A leak abort pushes no escalation of its own and its stopped tasks report
   // `infrastructure`, so only the run-end's flag keeps them from an infra-retry.
-  const lastEnd = flightEntries.findLast(
-    (e): e is RunEndEntry => e.kind === "run-end",
+  const ends = flightEntries.flatMap((e, at) =>
+    e.kind === "run-end" ? [at] : [],
   );
+  const lastEnd = flightEntries[ends.at(-1) ?? -1] as RunEndEntry | undefined;
   if (lastEnd?.aborted) return "exhausted";
+  if (lastEnd && ends.length >= 2 && lastEnd.completed.length === 0) {
+    const round = flightEntries.slice(ends.at(-2)! + 1, ends.at(-1));
+    if (repairCounts(round).flight === 0) return "exhausted";
+  }
 
   const ready = new Set(findReady(tasks).map((r) => `${r.bucket}/${r.nn}`));
   const stopped = new Set(
@@ -121,11 +124,11 @@ export function flightStatus(
       .map((e) => e.task),
   );
   const repairable = Object.entries(tasks).some(([ref, task]) => {
+    if (stopped.has(ref)) return false;
     if (ready.has(ref) || task.status === "in-progress") return true;
     return (
       task.status === "blocked" &&
       seen.has(ref) &&
-      !stopped.has(ref) &&
       (counts.byTask[ref] ?? 0) < TASK_REPAIR_CAP
     );
   });
@@ -184,6 +187,7 @@ export type GuardInput = {
   kept: string[];
   devReportedDefect: string[];
   workedRefs: string[];
+  deferred: { task: string; criterion: string }[];
 };
 
 const PREAMBLE = "";
@@ -210,15 +214,35 @@ function splitSections(text: string): Map<string, string> {
 }
 
 const GATE_ITEM = /^\s*[-*]\s+\[[ xX]\]\s*(.*)$/;
+const TICKED_ITEM = /^\s*[-*]\s+\[[xX]\]/;
 
 const itemText = (line: string): string =>
   (GATE_ITEM.exec(line)?.[1] ?? line).trim();
 
-function gateItems(sections: Map<string, string>, heading: string): string[] {
+function gateLines(sections: Map<string, string>, heading: string): string[] {
   return (sections.get(heading) ?? "")
     .split("\n")
-    .filter((l) => GATE_ITEM.test(l))
+    .filter((l) => GATE_ITEM.test(l));
+}
+
+const gateItems = (sections: Map<string, string>, heading: string): string[] =>
+  gateLines(sections, heading).map(itemText);
+
+const tickedItems = (
+  sections: Map<string, string>,
+  heading: string,
+): string[] =>
+  gateLines(sections, heading)
+    .filter((l) => TICKED_ITEM.test(l))
     .map(itemText);
+
+function statusOf(text: string): string | null {
+  for (const line of text.split("\n")) {
+    if (line.startsWith("## ")) return null;
+    const match = matchStatusLine(line.replace(/^>\s?/, ""));
+    if (match) return match.raw.trim().toLowerCase();
+  }
+  return null;
 }
 
 function withoutEach(items: string[], remove: string[]): string[] {
@@ -263,11 +287,18 @@ export function guardRepair(
       violations.push(`${ref} is done and must not be edited`);
     }
 
+    if (statusOf(afterText) === "done" && statusOf(beforeText) !== "done") {
+      violations.push(`${ref} set Status to done`);
+    }
+
     const before = splitSections(beforeText);
     const after = splitSections(afterText);
     const justified = input.justified
       .filter((j) => j.task === ref)
       .map((j) => itemText(j.before));
+    const deferred = input.deferred
+      .filter((d) => d.task === ref)
+      .map((d) => itemText(d.criterion));
 
     for (const heading of GATE_SECTIONS) {
       const old = gateItems(before, heading);
@@ -277,10 +308,25 @@ export function guardRepair(
       if (tagged(now) > tagged(old)) {
         violations.push(`${ref} ${heading}: added a (human) tag`);
       }
+      for (const ticked of withoutEach(
+        tickedItems(after, heading),
+        tickedItems(before, heading),
+      )) {
+        violations.push(`${ref} ${heading}: ticked a box: ${ticked}`);
+      }
       for (const gone of withoutEach(old, now)) {
         if (!justified.includes(gone)) {
           violations.push(
             `${ref} ${heading}: removed or reworded without justification: ${gone}`,
+          );
+        }
+        if (
+          heading === "Acceptance criteria" &&
+          input.verdict === "defer" &&
+          !deferred.includes(gone)
+        ) {
+          violations.push(
+            `${ref} Acceptance criteria: removed under defer but not in the defer list: ${gone}`,
           );
         }
       }
@@ -456,5 +502,13 @@ export function renderFlightReport(
     criteria.map((c) => `- [ ] ${task}: ${oneLine(c)}`),
   );
   out.push("## Needs a person", "", ...none(human), "");
+
+  const ungated = entries
+    .filter(
+      (e): e is NoteEntry =>
+        e.kind === "note" && e.task === "(flight)" && e.role === "ungated",
+    )
+    .map((e) => `- ${e.ts} · ${oneLine(e.message)}`);
+  if (ungated.length > 0) out.push("## Ungated trees", "", ...ungated, "");
   return out.join("\n");
 }

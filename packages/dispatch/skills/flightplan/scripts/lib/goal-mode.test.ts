@@ -297,8 +297,66 @@ describe("flightStatus", () => {
   });
 
   test("a later non-aborted run-end after an aborted one continues again", () => {
-    const entries = [runEnd({ aborted: true }), runEnd()];
+    const entries = [
+      runEnd({ aborted: true }),
+      runEnd({ completed: ["ui/09"] }),
+    ];
     expect(flightStatus(entries, tree({ "ui/01": {} }))).toBe("continue");
+  });
+
+  test("a halt on any synthetic ref exhausts the flight even with ready work", () => {
+    for (const ref of ["(scout)", "(worktree)", "(divergence)", "(commit)"]) {
+      const entries = [
+        escalation(ref, "infra", "infrastructure"),
+        repair(ref, "infra-retry"),
+        runEnd({ completed: ["ui/09"] }),
+        escalation(ref, "infra again", "infrastructure"),
+        repair(ref, "halt"),
+      ];
+      expect(flightStatus(entries, tree({ "ui/01": {} }))).toBe("exhausted");
+    }
+  });
+
+  test("a diverged ref back at todo does not keep a (divergence) halt alive", () => {
+    expect(
+      flightStatus(
+        [repair("(divergence)", "halt"), runEnd()],
+        tree({ "ui/01": {} }),
+      ),
+    ).toBe("exhausted");
+  });
+
+  test("a halted task reset to todo is stopped, not ready", () => {
+    const entries = [
+      escalation("ui/01", "agent died", "infrastructure"),
+      repair("ui/01", "infra-retry"),
+      runEnd(),
+      escalation("ui/01", "agent died again", "infrastructure"),
+      repair("ui/01", "halt"),
+    ];
+    expect(flightStatus(entries, tree({ "ui/01": {} }))).toBe("exhausted");
+    expect(
+      flightStatus(
+        [repair("ui/01", "refuse")],
+        tree({ "ui/01": { status: "in-progress" } }),
+      ),
+    ).toBe("exhausted");
+  });
+
+  test("a run that completed nothing after a round with no counted repair exhausts the flight", () => {
+    const tasks = tree({ "ui/01": {}, "ui/02": { status: "blocked" } });
+    const first = [escalation("ui/02"), runEnd()];
+    expect(flightStatus(first, tasks)).toBe("continue");
+    const idle = [...first, repair("ui/02", "refuse"), runEnd()];
+    expect(flightStatus(idle, tasks)).toBe("exhausted");
+    const progressed = [
+      ...first,
+      repair("ui/02", "refuse"),
+      runEnd({ completed: ["ui/03"] }),
+    ];
+    expect(flightStatus(progressed, tasks)).toBe("continue");
+    const repaired = [...first, repair("ui/02", "fix"), runEnd()];
+    expect(flightStatus(repaired, tasks)).toBe("continue");
   });
 });
 
@@ -364,6 +422,7 @@ const guardInput = (over: Partial<GuardInput> = {}): GuardInput => ({
   kept: ["ui/01"],
   devReportedDefect: [],
   workedRefs: ["ui/01"],
+  deferred: [],
   ...over,
 });
 
@@ -459,14 +518,44 @@ describe("guardRepair", () => {
     });
   });
 
-  test("ticking a gate checkbox is not a reworded item", () => {
+  test("guardRepair rejects ticking a gate checkbox", () => {
     const after = {
       "ui/01": taskFile("ui/01", {
         status: "blocked",
         acceptance: ["- [x] it works", "- [ ] it is fast"],
       }),
     };
-    expect(guardRepair(guardInput({ before, after })).ok).toBe(true);
+    expect(guardRepair(guardInput({ before, after }))).toEqual({
+      ok: false,
+      violations: ["ui/01 Acceptance criteria: ticked a box: it works"],
+    });
+  });
+
+  test("guardRepair rejects a sibling flipped from todo to done with its boxes ticked", () => {
+    const sibling = { "ui/02": taskFile("ui/02", { dependsOn: "ui/01" }) };
+    const flipped = {
+      "ui/02": taskFile("ui/02", {
+        status: "done",
+        dependsOn: "ui/01",
+        acceptance: ["- [x] it works", "- [x] it is fast"],
+        verification: ["- [x] `bun test` passes"],
+      }),
+    };
+    const result = guardRepair(
+      guardInput({
+        before: { ...before, ...sibling },
+        after: { ...before, ...flipped },
+      }),
+    );
+    expect(result).toEqual({
+      ok: false,
+      violations: [
+        "ui/02 set Status to done",
+        "ui/02 Acceptance criteria: ticked a box: it works",
+        "ui/02 Acceptance criteria: ticked a box: it is fast",
+        "ui/02 Verification: ticked a box: `bun test` passes",
+      ],
+    });
   });
 
   test("rejects a changed goal section", () => {
@@ -587,9 +676,55 @@ describe("guardRepair", () => {
       violations: [expect.stringContaining("Acceptance criteria")],
     });
     const defer = guardRepair(
-      guardInput({ before, after, justified, verdict: "defer", isLeg: true }),
+      guardInput({
+        before,
+        after,
+        justified,
+        verdict: "defer",
+        isLeg: true,
+        deferred: [{ task: "ui/01", criterion: "it is fast" }],
+      }),
     );
     expect(defer).toEqual({ ok: true, reentry: { "ui/01": "verify" } });
+  });
+
+  test("guardRepair rejects a criterion removed under defer but missing from the defer list", () => {
+    const after = {
+      "ui/01": taskFile("ui/01", { acceptance: ["- [ ] it works"] }),
+    };
+    const justified = [{ task: "ui/01", before: "it is fast" }];
+    const elsewhere = [{ task: "ui/02", criterion: "it is fast" }];
+    for (const deferred of [[], elsewhere]) {
+      expect(
+        guardRepair(
+          guardInput({
+            before,
+            after,
+            justified,
+            verdict: "defer",
+            isLeg: true,
+            deferred,
+          }),
+        ),
+      ).toEqual({
+        ok: false,
+        violations: [
+          "ui/01 Acceptance criteria: removed under defer but not in the defer list: it is fast",
+        ],
+      });
+    }
+    expect(
+      guardRepair(
+        guardInput({
+          before,
+          after,
+          justified,
+          verdict: "defer",
+          isLeg: true,
+          deferred: [{ task: "ui/01", criterion: "- [ ] it is fast" }],
+        }),
+      ).ok,
+    ).toBe(true);
   });
 
   test("guardRepair rejects defer outside a leg", () => {
@@ -817,6 +952,25 @@ describe("renderFlightReport", () => {
     );
     expect(section).toContain("- ui/03: Verification fixed");
     expect(section).toContain("- ui/04: PLAN DEFECT reported by dev");
+  });
+
+  test("lists each ungated tree saved before a repair round", () => {
+    const saved = renderFlightReport(
+      [
+        ...entries,
+        {
+          kind: "note",
+          ts: ts(),
+          task: "(flight)",
+          role: "ungated",
+          message: "refs/autopilot/ungated/demo/2",
+        },
+      ],
+      { slug: "demo", status: "exhausted", deferredMd: null, tasks },
+    );
+    expect(saved).toContain("## Ungated trees");
+    expect(saved).toContain("refs/autopilot/ungated/demo/2");
+    expect(report).not.toContain("## Ungated trees");
   });
 
   test("needs a person comes from the last run-end", () => {

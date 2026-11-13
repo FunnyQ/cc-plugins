@@ -1,11 +1,16 @@
 /**
  * Flightlog — the append-only audit trail for an autopilot run.
  *
- * Three kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
+ * Seven kinds of entry land in one JSONL file under `docs/<slug>/.flightlog/`:
  *
- *   - `score` — a deterministic verdict appended by `score-task.ts --log`.
- *   - `note`  — agent narrative appended by `flightlog.ts log`.
- *   - `state` — node declaration appended by `flightlog.ts state`.
+ *   - `score`      — a deterministic verdict appended by `score-task.ts --log`.
+ *   - `note`       — agent narrative appended by `flightlog.ts log`.
+ *   - `state`      — node declaration appended by `flightlog.ts state`.
+ *   - `flight`     — a goal-mode flight boundary, from `flightlog.ts flight-start`.
+ *   - `escalation` — a run's stop, from `flightlog.ts escalations` or adopted
+ *                    by `flight-start`.
+ *   - `run-end`    — a run's closing facts, from `flightlog.ts escalations`.
+ *   - `repair`     — a goal-mode repair verdict, from `flightlog.ts repair`.
  *
  * The orchestrator script can't touch the filesystem, so logging always comes
  * from a bundled script run by a tool-capable agent. Every entry records an

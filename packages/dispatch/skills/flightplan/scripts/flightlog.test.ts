@@ -314,11 +314,11 @@ const taskMd = (
     "",
     "## Acceptance criteria",
     "",
-    "- [ ] it works",
+    `- [${opts.status === "done" ? "x" : " "}] it works`,
     "",
     "## Verification",
     "",
-    `- [ ] ${opts.verification ?? "`bun test` passes"}`,
+    `- [${opts.status === "done" ? "x" : " "}] ${opts.verification ?? "`bun test` passes"}`,
     "",
     "## Eval rubric",
     "",
@@ -440,12 +440,20 @@ describe("goal-mode CLI", () => {
     }
   });
 
-  test("flight-start then repairs --status prints continue for a task blocked in this flight", async () => {
+  test("flight-start adopts a task parked before the flight as a current escalation", async () => {
     const p = await planFixture();
     try {
-      expect((await p.run("flight-start", p.log, "--plan", p.plan)).code).toBe(
-        0,
-      );
+      const start = await p.run("flight-start", p.log, "--plan", p.plan);
+      expect(start.code).toBe(0);
+      const adopted = {
+        task: "ui/01",
+        attempt: 0,
+        class: "plan-defect",
+        infrastructure: false,
+        parked: true,
+        reason: "parked before this goal-mode flight; no reason in the trail",
+      };
+      expect(JSON.parse(start.out)).toEqual([adopted]);
       expect(await readEntries(p.log)).toEqual([
         {
           kind: "flight",
@@ -454,26 +462,8 @@ describe("goal-mode CLI", () => {
           goalHash: goalHash(PLAN_MD),
           planPath: p.plan,
         },
+        { kind: "escalation", ts: expect.any(String), ...adopted },
       ]);
-      const before = await p.run(
-        "repairs",
-        p.log,
-        "--tasks",
-        p.tasks,
-        "--status",
-      );
-      expect(before).toEqual({ code: 0, out: "exhausted\n", err: "" });
-      const escalated = escalationPayload([
-        {
-          task: "ui/01",
-          attempt: 3,
-          class: "capped",
-          infrastructure: false,
-          parked: true,
-          reason: "capped at 3",
-        },
-      ]);
-      await p.run("escalations", p.log, "--payload", escalated);
       const res = await p.run("repairs", p.log, "--tasks", p.tasks, "--status");
       expect(res).toEqual({ code: 0, out: "continue\n", err: "" });
 
@@ -484,6 +474,122 @@ describe("goal-mode CLI", () => {
         byTask: {},
         status: "continue",
       });
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("flight-start keeps the class and reason of the task's last capped escalation", async () => {
+    const p = await planFixture();
+    try {
+      await p.run(
+        "escalations",
+        p.log,
+        "--payload",
+        escalationPayload([
+          {
+            task: "ui/01",
+            attempt: 3,
+            class: "capped",
+            infrastructure: false,
+            parked: true,
+            reason: "capped at 3",
+          },
+        ]),
+      );
+      const start = await p.run("flight-start", p.log, "--plan", p.plan);
+      expect(JSON.parse(start.out)).toEqual([
+        expect.objectContaining({
+          task: "ui/01",
+          attempt: 3,
+          class: "capped",
+          reason: "capped at 3",
+        }),
+      ]);
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("an adopted task stops being repairable once refused or out of budget", async () => {
+    const p = await planFixture();
+    try {
+      await p.run("flight-start", p.log, "--plan", p.plan);
+      const reasonFile = join(p.root, "reason.txt");
+      await writeFile(reasonFile, "x");
+      const record = (verdict: string) =>
+        p.run(
+          "repair",
+          p.log,
+          "--task",
+          "ui/01",
+          "--verdict",
+          verdict,
+          "--reason-file",
+          reasonFile,
+        );
+      const status = async () =>
+        (await p.run("repairs", p.log, "--tasks", p.tasks, "--status")).out;
+      for (let round = 0; round < 3; round++) {
+        expect(await status()).toBe("continue\n");
+        expect((await record("fix")).code).toBe(0);
+      }
+      expect(await status()).toBe("exhausted\n");
+
+      const q = await planFixture();
+      try {
+        await q.run("flight-start", q.log, "--plan", q.plan);
+        await writeFile(join(q.root, "reason.txt"), "x");
+        await q.run(
+          "repair",
+          q.log,
+          "--task",
+          "ui/01",
+          "--verdict",
+          "refuse",
+          "--reason-file",
+          join(q.root, "reason.txt"),
+        );
+        expect(
+          (await q.run("repairs", q.log, "--tasks", q.tasks, "--status")).out,
+        ).toBe("exhausted\n");
+      } finally {
+        await rm(q.root, { recursive: true });
+      }
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("repairs prints exhausted when a task file does not parse", async () => {
+    const p = await planFixture();
+    try {
+      await p.run("flight-start", p.log, "--plan", p.plan);
+      await writeFile(join(p.tasks, "ui", "02-second.md"), "no heading\n");
+      const res = await p.run("repairs", p.log, "--tasks", p.tasks, "--status");
+      expect(res.code).toBe(0);
+      expect(res.out).toBe("exhausted\n");
+      expect(res.err).toContain("02-second.md: missing H1");
+      const json = await p.run("repairs", p.log, "--tasks", p.tasks, "--json");
+      expect(JSON.parse(json.out).status).toBe("exhausted");
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("repairs reads an invalid done task as exhausted, not complete", async () => {
+    const p = await planFixture({ "ui/01": "done", "ui/02": "done" });
+    try {
+      await p.run("flight-start", p.log, "--plan", p.plan);
+      const file = join(p.tasks, "ui", "02-second.md");
+      await writeFile(
+        file,
+        (await readFile(file, "utf-8")).replace("- [x] it works", "- [ ] it works"),
+      );
+      const res = await p.run("repairs", p.log, "--tasks", p.tasks, "--status");
+      expect(res.code).toBe(0);
+      expect(res.out).toBe("exhausted\n");
+      expect(res.err).toContain("ui/02");
     } finally {
       await rm(p.root, { recursive: true });
     }
@@ -591,6 +697,16 @@ describe("goal-mode CLI", () => {
       await p.run("flight-start", p.log, "--plan", p.plan);
       const reasonFile = join(p.root, "reason.txt");
       await writeFile(reasonFile, "Verification greps a path no task makes");
+      const verdictFile = join(p.root, "verdict.json");
+      await writeFile(
+        verdictFile,
+        JSON.stringify({
+          verdict: "fix",
+          pattern: "grep of an uncreated `path` $(rm -rf /)",
+          changed: ["ui/01", "ui/02"],
+          note: "n",
+        }),
+      );
       const fix = () =>
         p.run(
           "repair",
@@ -601,10 +717,8 @@ describe("goal-mode CLI", () => {
           "fix",
           "--reason-file",
           reasonFile,
-          "--pattern",
-          "grep of an uncreated path",
-          "--changed",
-          "ui/01,ui/02",
+          "--verdict-file",
+          verdictFile,
           "--reentry",
           '{"ui/01":"verify","ui/02":"dev"}',
         );
@@ -623,7 +737,7 @@ describe("goal-mode CLI", () => {
         task: "ui/01",
         verdict: "fix",
         reason: "Verification greps a path no task makes",
-        pattern: "grep of an uncreated path",
+        pattern: "grep of an uncreated `path` $(rm -rf /)",
         changed: ["ui/01", "ui/02"],
         reentry: { "ui/01": "verify", "ui/02": "dev" },
       });
@@ -718,10 +832,13 @@ describe("goal-mode CLI", () => {
       expect(res.out).toBe(`${out}\n`);
       const md = await readFile(out, "utf-8");
       expect(md).toContain("# Flight report — toy");
-      expect(md).toContain("Outcome: **exhausted**");
+      expect(md).toContain("Outcome: **continue**");
       expect(md).toContain("## Deferred criteria");
       expect(md).toContain("- [ ] it is fast");
-      expect(md).toContain("- ui/01: no escalation or repair recorded");
+      expect(md).toContain(
+        "- ui/01: parked before this goal-mode flight; no reason in the trail",
+      );
+      expect(md).toContain("- ui/02: no escalation or repair recorded");
       expect(await readFile(runlog, "utf-8")).toBe("previous runlog\n");
     } finally {
       await rm(p.root, { recursive: true });
@@ -788,6 +905,10 @@ describe("goal-mode CLI", () => {
             { task: "ui/01", before: "- [ ] `bun test` passes", why: "x" },
             { task: "ui/01", before: "- [ ] it works", why: "x" },
           ],
+          defer:
+            verdict === "defer"
+              ? [{ task: "ui/01", criterion: "it works", why: "x" }]
+              : [],
         }),
       );
       return p.run(
@@ -832,6 +953,21 @@ describe("goal-mode CLI", () => {
         commitAll(p);
         await p.run("flight-start", p.log, "--plan", p.plan);
         await devDone(p, "built it");
+        await p.run(
+          "escalations",
+          p.log,
+          "--payload",
+          escalationPayload([
+            {
+              task: "ui/01",
+              attempt: 1,
+              class: "capped",
+              infrastructure: false,
+              parked: true,
+              reason: "capped at 1",
+            },
+          ]),
+        );
         await editGate(p);
         const res = await guard(p, "fix", "ui/01");
         expect(JSON.parse(res.out)).toEqual({
@@ -850,6 +986,21 @@ describe("goal-mode CLI", () => {
         commitAll(p);
         await p.run("flight-start", p.log, "--plan", p.plan);
         await devDone(p, "built it");
+        await p.run(
+          "escalations",
+          p.log,
+          "--payload",
+          escalationPayload([
+            {
+              task: "ui/01",
+              attempt: 1,
+              class: "capped",
+              infrastructure: false,
+              parked: true,
+              reason: "capped at 1",
+            },
+          ]),
+        );
         await editGate(p);
         const res = await guard(p, "fix", "");
         expect(JSON.parse(res.out)).toEqual({
