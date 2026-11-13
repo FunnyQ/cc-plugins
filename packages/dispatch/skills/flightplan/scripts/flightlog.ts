@@ -359,11 +359,13 @@ async function main() {
     });
 
     const deferredPath = join(planDir, "DEFERRED.md");
-    const unexpected = changedPaths(repoRoot, planDir)
+    const flightlogDir = join(planDir, FLIGHTLOG_DIRNAME);
+    const unexpected = changedPaths(repoRoot)
       .filter(
         (path) =>
           !isTaskPath(path, tasksAbs) &&
-          !(verdict === "defer" && path === deferredPath),
+          !(verdict === "defer" && path === deferredPath) &&
+          !path.startsWith(flightlogDir + sep),
       )
       .map((path) => `unexpected file ${relative(repoRoot, path)}`);
     const misreadAsDeleted = new Set(
@@ -607,15 +609,13 @@ function isTaskPath(path: string, tasksDir: string): boolean {
   );
 }
 
-function changedPaths(repoRoot: string, dir: string): string[] {
+function changedPaths(repoRoot: string): string[] {
   const records = git(
     repoRoot,
     "status",
     "--porcelain=v1",
     "-z",
     "--untracked-files=all",
-    "--",
-    relative(repoRoot, dir),
   ).split("\0");
   const paths: string[] = [];
   for (let i = 0; i < records.length; i++) {

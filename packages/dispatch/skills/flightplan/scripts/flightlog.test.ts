@@ -759,7 +759,8 @@ describe("goal-mode CLI", () => {
 
   describe("guard", () => {
     const guard = async (p: Plan, verdict = "fix", kept = "") => {
-      const justified = join(p.root, "verdict.json");
+      await mkdir(dirname(p.log), { recursive: true });
+      const justified = join(dirname(p.log), "verdict.json");
       await writeFile(
         justified,
         JSON.stringify({
@@ -1002,13 +1003,48 @@ describe("goal-mode CLI", () => {
         commitAll(p);
         await p.run("flight-start", p.log, "--plan", p.plan);
         await writeFile(join(p.planDir, "ATTESTATION.md"), "I attest\n");
-        await writeFile(join(p.root, "outside.md"), "not in the plan\n");
         const res = await guard(p);
         expect(res.code).toBe(1);
         expect(JSON.parse(res.out)).toEqual({
           ok: false,
           violations: ["unexpected file docs/toy/ATTESTATION.md"],
         });
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("a source file created outside the plan dir fails as unexpected", async () => {
+      const p = await planFixture();
+      try {
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        await editGate(p);
+        await mkdir(join(p.root, "src"));
+        await writeFile(join(p.root, "src", "x.ts"), "export const x = 1;\n");
+        const res = await guard(p);
+        expect(res.code).toBe(1);
+        expect(JSON.parse(res.out)).toEqual({
+          ok: false,
+          violations: ["unexpected file src/x.ts"],
+        });
+      } finally {
+        await rm(p.root, { recursive: true });
+      }
+    });
+
+    test("a tracked file edited outside the plan dir fails as unexpected", async () => {
+      const p = await planFixture();
+      try {
+        await writeFile(join(p.root, "README.md"), "readme\n");
+        commitAll(p);
+        await p.run("flight-start", p.log, "--plan", p.plan);
+        await writeFile(join(p.root, "README.md"), "changed\n");
+        const res = await guard(p);
+        expect(res.code).toBe(1);
+        expect(JSON.parse(res.out).violations).toEqual([
+          "unexpected file README.md",
+        ]);
       } finally {
         await rm(p.root, { recursive: true });
       }

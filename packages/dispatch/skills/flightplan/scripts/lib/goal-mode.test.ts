@@ -573,6 +573,101 @@ describe("guardRepair", () => {
   });
 });
 
+describe("guardRepair rubric", () => {
+  const rubric = (
+    opts: {
+      pass?: string;
+      veto?: string;
+      rows?: [string, string][];
+    } = {},
+  ) =>
+    [
+      `> Each dimension 0–5; weighted average ${opts.pass ?? "> 4.0"} to pass;${opts.veto ?? " Correctness < 4 is an automatic veto."}`,
+      "",
+      "| Dimension | Weight | 0–1 | 2–3 | 4–5 |",
+      "| --- | --- | --- | --- | --- |",
+      ...(
+        opts.rows ?? [
+          ["Correctness", "×3"],
+          ["Test coverage", "×2"],
+        ]
+      ).map(([name, weight]) => `| ${name} | ${weight} | bad | meh | good |`),
+    ].join("\n");
+  const before = { "ui/01": taskFile("ui/01", { rubric: rubric() }) };
+  const run = (opts: Parameters<typeof rubric>[0]) =>
+    guardRepair(
+      guardInput({
+        before,
+        after: { "ui/01": taskFile("ui/01", { rubric: rubric(opts) }) },
+      }),
+    );
+  const rejected = (what: string) => ({
+    ok: false as const,
+    violations: [
+      expect.stringMatching(new RegExp(`^weakened rubric ui/01: .*${what}`)),
+    ],
+  });
+
+  test("passes an unchanged rubric beside a justified Verification edit", () => {
+    const after = {
+      "ui/01": taskFile("ui/01", {
+        rubric: rubric(),
+        verification: ["- [ ] `bun test lib` passes"],
+      }),
+    };
+    expect(
+      guardRepair(
+        guardInput({
+          before,
+          after,
+          justified: [{ task: "ui/01", before: "`bun test` passes" }],
+        }),
+      ),
+    ).toEqual({ ok: true, reentry: { "ui/01": "verify" } });
+  });
+
+  test("rejects a lower threshold", () => {
+    expect(run({ pass: "> 3.5" })).toEqual(rejected("threshold"));
+  });
+
+  test("rejects a changed passOp", () => {
+    expect(run({ pass: ">= 4.0" })).toEqual(rejected("pass operator"));
+  });
+
+  test("rejects a removed hard-fail veto", () => {
+    expect(run({ veto: "" })).toEqual(rejected("veto"));
+  });
+
+  test("rejects a removed dimension", () => {
+    expect(run({ rows: [["Correctness", "×3"]] })).toEqual(
+      rejected("removed dimension Test coverage"),
+    );
+  });
+
+  test("rejects a changed weight", () => {
+    expect(
+      run({
+        rows: [
+          ["Correctness", "×2"],
+          ["Test coverage", "×2"],
+        ],
+      }),
+    ).toEqual(rejected("weight of Correctness"));
+  });
+
+  test("rejects an added dimension", () => {
+    expect(
+      run({
+        rows: [
+          ["Correctness", "×3"],
+          ["Test coverage", "×2"],
+          ["Style", "×1"],
+        ],
+      }),
+    ).toEqual(rejected("added dimension Style"));
+  });
+});
+
 describe("renderFlightReport", () => {
   const entries: FlightlogEntry[] = [
     escalation("ui/01", "capped at 3 attempts"),

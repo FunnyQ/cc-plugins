@@ -9,7 +9,13 @@ import type {
   RunEndEntry,
   ScoreEntry,
 } from "./flightlog";
-import { GATE_SECTIONS, matchStatusLine, type ParsedTask } from "./parse-task";
+import {
+  GATE_SECTIONS,
+  matchStatusLine,
+  parseRubric,
+  type ParsedTask,
+  type Rubric,
+} from "./parse-task";
 
 export const TASK_REPAIR_CAP = 3;
 export const FLIGHT_REPAIR_CAP = 10;
@@ -278,6 +284,13 @@ export function guardRepair(
       }
     }
 
+    for (const what of rubricWeakenings(
+      parseRubric(beforeText),
+      parseRubric(afterText),
+    )) {
+      violations.push(`weakened rubric ${ref}: ${what}`);
+    }
+
     const differing = [...new Set([...before.keys(), ...after.keys()])].filter(
       (heading) => before.get(heading) !== after.get(heading),
     );
@@ -294,6 +307,48 @@ export function guardRepair(
   return violations.length > 0
     ? { ok: false, violations }
     : { ok: true, reentry };
+}
+
+function rubricWeakenings(old: Rubric | null, now: Rubric | null): string[] {
+  if (old === null) return [];
+  if (now === null) return ["rubric removed or unparseable"];
+  const found: string[] = [];
+  if (now.passThreshold < old.passThreshold) {
+    found.push(
+      `threshold lowered from ${old.passThreshold} to ${now.passThreshold}`,
+    );
+  }
+  if (now.passOp !== old.passOp) {
+    found.push(`pass operator changed from ${old.passOp} to ${now.passOp}`);
+  }
+  for (const veto of old.hardFails) {
+    const kept = now.hardFails.some(
+      (v) =>
+        v.dimension === veto.dimension &&
+        v.op === veto.op &&
+        v.value === veto.value,
+    );
+    if (!kept) {
+      found.push(`removed veto ${veto.dimension} ${veto.op} ${veto.value}`);
+    }
+  }
+  for (const veto of withoutEach(old.unknownVetoes, now.unknownVetoes)) {
+    found.push(`removed veto ${veto}`);
+  }
+  const weights = new Map(now.dimensions.map((d) => [d.name, d.weight]));
+  const oldNames = new Set(old.dimensions.map((d) => d.name));
+  for (const d of old.dimensions) {
+    const weight = weights.get(d.name);
+    if (weight === undefined) {
+      found.push(`removed dimension ${d.name}`);
+    } else if (weight !== d.weight) {
+      found.push(`weight of ${d.name} changed from ${d.weight} to ${weight}`);
+    }
+  }
+  for (const d of now.dimensions) {
+    if (!oldNames.has(d.name)) found.push(`added dimension ${d.name}`);
+  }
+  return found;
 }
 
 const oneLine = (text: string): string => text.replace(/\s+/g, " ").trim();

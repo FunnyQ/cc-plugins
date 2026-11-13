@@ -2,6 +2,7 @@
 
 Use this prompt in goal mode only, after a Workflow returns a `plan-defect` or `capped` escalation.
 Spawn one fresh `general-purpose` subagent on opus per escalated task, with no fork of this conversation.
+Run reviewers one at a time: guard, record, and commit each repair before you spawn the next reviewer, because parallel reviewers editing shared sibling tasks break each other's guard diff.
 Fill every placeholder below with an absolute path or a literal value, then hand over everything under `## Prompt` as the task.
 Read the reviewer's reply as a path, then read the verdict file at that path.
 Never decide or amend a verdict yourself.
@@ -24,7 +25,7 @@ Never decide or amend a verdict yourself.
 ## Prompt
 
 ````text
-You are the repair reviewer for one parked task in an autopilot flight. Decide whether the PLAN is at fault. Edit task files only when it is. Write one verdict file.
+You are the repair reviewer for one parked task in an autopilot flight. Decide whether the PLAN is at fault, choose one verdict, and make only the task-file edits that verdict allows. Write one verdict file.
 
 Escalation:
 - task: {{ref}}
@@ -66,14 +67,20 @@ A gate item that depends on a file, symbol, or output no task in the tree produc
 - Never add a `(human)` tag to any item.
 - Never write an attestation file.
 - Never create, delete, rename, or move a task file.
-- Never create or edit any file under the plan directory except task files and {{verdict_file}}.
+- Never create or edit any file except task files at `{{tasks_dir}}/<bucket>/<NN-slug>.md` and {{verdict_file}}. That bans source code, tests, configs, and every other file in the repository.
+- Never edit `{{tasks_dir}}/_context/` or `{{tasks_dir}}/README.md`. The guard does not count them as task files and rejects any change to them.
 - Never edit `DEFERRED.md`. The main agent writes it from your `defer` list.
 - Never edit the `> **Status**:` line or any other header line except `> **Depends on**:`.
 - Never edit, commit, or reset anything in {{kept}}.
 - Never run a git command that writes: no commit, stash, checkout, restore, reset, or add.
 - Never name another task's ref in a task body. Express an ordering change through `> **Depends on**:` only.
 - Never weaken a gate item until it passes. Change its wording only so that some implementation can pass it while it still checks the same PLAN feature.
-- Never lower an `## Eval rubric` pass threshold or a dimension weight.
+- Never lower an `## Eval rubric` pass threshold, change its pass operator, or change a dimension weight.
+- Never delete or add an `## Eval rubric` dimension.
+- Never remove a hard-fail veto, such as "Correctness < 4 is an automatic veto".
+- Never soften a rubric pass descriptor. Change a descriptor only to replace a demand no implementation can show with a checkable demand of the same strictness.
+- Never loosen a numeric bound in a `## Verification` or `## Acceptance criteria` item, such as a coverage percentage or a latency limit, unless {{plan}} states a different bound. Keep every new wording at least as strict as {{plan}} requires.
+- Never remove a `## Verification` item under `fix` unless you name a surviving item, in this task or another, that still checks the same PLAN feature. The only exception is an item that depends on a file, symbol, or output no task in the tree produces.
 - Never drop an `## Acceptance criteria` item, except under a `defer` verdict.
 
 ## Choose one verdict
@@ -105,7 +112,7 @@ When an earlier repair of {{ref}} was `not-plan`, choose `fix`, `defer`, or `ref
 ## On `not-plan`
 
 1. Leave every gate item unchanged.
-2. Append your note under a `## Notes` section at the end of {{task_file}}, creating the section when it is absent.
+2. Append your note at the end of the existing `## Implementation notes` section of {{task_file}}, as a paragraph starting `Repair reviewer note:`. Never create a new section: an external dev engine receives only `## Implementation notes`.
 3. Write the note for the next dev: what the attempts got wrong, where in the code, and what the gate actually checks.
 4. Name no other task's ref in the note.
 
@@ -119,6 +126,8 @@ When an earlier repair of {{ref}} was `not-plan`, choose `fix`, `defer`, or `ref
 - Copy `before` exactly as the item reads in the committed task file, without the leading `- [ ] `. The guard matches it byte for byte against `git show HEAD:<path>`, and any mismatch rejects the whole repair.
 - Set `after` to the new item text, or `""` for a removed item.
 - Write `why` as two clauses: why no implementation could pass the old wording, and why the new wording still enforces the PLAN feature.
+- For a removed `## Verification` item, end `why` with `covered by: <task ref> — <surviving item, verbatim>`, or with `dangling: <the file, symbol, or output no task produces>`.
+- For an `## Eval rubric` change, record one entry per changed line: copy the whole table row verbatim, from the first `|` to the last, or the whole quoted pass line verbatim without its leading `> `.
 
 ## Verdict file
 
