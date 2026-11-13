@@ -86,12 +86,14 @@ type RunResult = {
     attempt: number;
     infrastructure?: boolean;
     parked?: boolean;
+    class?: string;
     reason: string;
   }[];
   needsHuman: { task: string; criteria: string[] }[];
   worktrees: { ref: string; path: string }[];
   cleanupFailures: { ref: string; path: string }[];
   drained?: string[];
+  logFailed?: boolean;
 };
 
 type Scenario = {
@@ -144,6 +146,7 @@ type Scenario = {
   >;
   devThrows?: string[];
   devReply?: Record<string, string[]>;
+  logEscalations?: ({ ok: boolean } | Throws | null)[];
   devHolds?: Record<string, Promise<void>>;
   parkHolds?: Record<string, Promise<void>>;
   doneHolds?: Record<string, Promise<void>>;
@@ -225,6 +228,7 @@ async function runOrchestrator(
   let budgetSpent = scenario.budget?.spent ?? 0;
   const scouts = [...scenario.scouts];
   const commits = [...(scenario.commit ?? [])];
+  const logAnswers = [...(scenario.logEscalations ?? [])];
   const queues = new Map<string, unknown[]>();
   const take = (bucket: string, ref: string, fallback: unknown) => {
     const key = `${bucket}:${ref}`;
@@ -271,6 +275,11 @@ async function runOrchestrator(
 
     if (label.startsWith("scout-wave-")) {
       const next = scouts.length > 0 ? scouts.shift() : null;
+      if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
+      return next;
+    }
+    if (label === "log-escalations") {
+      const next = logAnswers.length > 0 ? logAnswers.shift() : { ok: true };
       if (next === THROWS) throw new Error(NO_STRUCTURED_OUTPUT);
       return next;
     }
@@ -2656,6 +2665,7 @@ describe("task worktree isolation", () => {
       "scout-wave-2",
       "wt-sweep:end",
       "commit-post-loop",
+      "log-escalations",
     ]);
     expect(log.result.worktrees).toEqual([]);
     expect(log.result.cleanupFailures).toEqual([]);
@@ -4178,7 +4188,7 @@ describe("cockpit-rust flight fixes", () => {
     });
     expect(log.labels).not.toContain("wt-create:ui/02");
     expect(log.labels).not.toContain("commit-wave-2");
-    expect(log.labels.at(-1)).toBe("commit-post-loop");
+    expect(log.labels.at(-2)).toBe("commit-post-loop");
     expect(log.result.completed).toEqual([ref]);
     expect(log.result.escalations).toEqual([]);
     expect(log.result.drained).toEqual(["ui/02"]);
@@ -4213,7 +4223,7 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.completed).toEqual([ref]);
     expect(log.result.drained).toEqual(["ui/02"]);
     expect(log.result.escalations).toEqual([]);
-    expect(log.labels.at(-1)).toBe("commit-post-loop");
+    expect(log.labels.at(-2)).toBe("commit-post-loop");
   });
 
   test("a create that returns an empty path parks the task instead of running dev in the main tree", async () => {
@@ -4226,5 +4236,146 @@ describe("cockpit-rust flight fixes", () => {
     expect(log.result.escalations).toEqual([
       expect.objectContaining({ task: ref, infrastructure: true }),
     ]);
+  });
+});
+
+describe("escalation classes and the flightlog trail", () => {
+  const ref = "ui/01";
+  const parkedEnd = () =>
+    snapshot({
+      counts: counts({ total: 1, blocked: 1 }),
+      unfinished: [{ ref, state: "blocked" }],
+    });
+  const payloadOf = (log: RunLog) => {
+    const prompt = promptFor(log, "log-escalations");
+    const raw = / --payload '([^']*)'/.exec(prompt)?.[1];
+    if (raw === undefined) throw new Error("no --payload argument");
+    return JSON.parse(decodeURIComponent(raw));
+  };
+
+  test("every escalations.push site in the extracted script sets class", async () => {
+    const script = extractScript(await readFile(ORCHESTRATOR, "utf-8"));
+    const marker = "escalations.push({";
+    const blocks: string[] = [];
+    for (let at = script.indexOf(marker); at !== -1;) {
+      let depth = 0;
+      let end = at + marker.length - 1;
+      for (; end < script.length; end++) {
+        if (script[end] === "{") depth++;
+        if (script[end] === "}" && --depth === 0) break;
+      }
+      blocks.push(script.slice(at, end + 1));
+      at = script.indexOf(marker, end);
+    }
+    expect(blocks.length).toBeGreaterThanOrEqual(11);
+    for (const block of blocks) expect(block).toContain("class:");
+  });
+
+  test("a capped task escalates with class capped", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      judge: {
+        [ref]: [
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+        ],
+      },
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: ref, class: "capped" }),
+    ]);
+  });
+
+  test("a dev PLAN DEFECT escalates with class plan-defect", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      devReply: { [ref]: ["PLAN DEFECT: the gate cannot pass\nrest"] },
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: ref, class: "plan-defect" }),
+    ]);
+  });
+
+  test("an infrastructure failure and a stall carry their classes", async () => {
+    const infra = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      gate: { [ref]: [null] },
+    });
+    expect(infra.result.escalations[0].class).toBe("infrastructure");
+    const stalled = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 1, todo: 1 }),
+          unfinished: [{ ref, state: "todo" }],
+        }),
+      ],
+    });
+    expect(stalled.result.escalations).toEqual([
+      expect.objectContaining({ task: "(tree)", class: "stall" }),
+    ]);
+  });
+
+  test("the run ends with one log-escalations call whose payload decodes to the returned escalations", async () => {
+    const rationale = `it's "wrong"\n100% of the gate is red`;
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      judge: {
+        [ref]: [
+          { verdict: fail, rationale },
+          { verdict: fail, rationale },
+          { verdict: fail, rationale },
+        ],
+      },
+    });
+    expect(callsTo(log.labels, "log-escalations")).toBe(1);
+    expect(log.labels.at(-1)).toBe("log-escalations");
+    expect(promptFor(log, "log-escalations")).toContain(
+      "flightlog.ts escalations /abs/repo/docs/my-plan/.flightlog/run.jsonl --payload '",
+    );
+    expect(modelFor(log, "log-escalations")).toBe("haiku");
+    const payload = payloadOf(log);
+    expect(payload.escalations[0].reason).toContain(rationale);
+    expect(payload).toEqual({
+      escalations: log.result.escalations,
+      cleanupFailures: log.result.cleanupFailures,
+      drained: log.result.drained,
+      aborted: log.result.aborted,
+      completed: log.result.completed,
+      needsHuman: log.result.needsHuman,
+    });
+    expect(log.result.logFailed).toBe(false);
+  });
+
+  test("a clean run still logs an empty trail record", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+    });
+    expect(payloadOf(log)).toMatchObject({
+      escalations: [],
+      completed: [ref],
+    });
+  });
+
+  test("a log-escalations failure sets logFailed and leaves escalations unchanged", async () => {
+    const scenario = () => ({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      gate: { [ref]: [null] },
+    });
+    const logged = await runOrchestrator(scenario());
+    for (const answers of [
+      [THROWS, THROWS],
+      [null, null],
+      [{ ok: false }],
+    ] as Scenario["logEscalations"][]) {
+      const failed = await runOrchestrator({
+        ...scenario(),
+        logEscalations: answers,
+      });
+      expect(failed.result.logFailed).toBe(true);
+      const { logFailed: _failed, ...rest } = failed.result;
+      const { logFailed: _logged, ...expected } = logged.result;
+      expect(rest).toEqual(expected);
+    }
   });
 });

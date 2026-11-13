@@ -857,6 +857,7 @@ const infrastructureFailure = (ref, attempt, cause, parked) => ({
   task: ref,
   passed: false,
   infrastructure: true,
+  class: "infrastructure",
   // The attempt that was actually running. Compute WAS consumed; reporting 0
   // here would misrepresent the run.
   attempt,
@@ -1185,6 +1186,7 @@ async function executeTask(item) {
         task: ref,
         passed: false,
         infrastructure: false,
+        class: "plan-defect",
         attempt,
         parked: await parkBlocked(ref, path, reason),
         reason: withKeptWorktree(ref, reason),
@@ -1534,6 +1536,7 @@ async function executeTask(item) {
     task: ref,
     passed: false,
     infrastructure: false,
+    class: "capped",
     attempt: last,
     parked: parkedOk,
     reason: withKeptWorktree(ref, history),
@@ -1679,6 +1682,7 @@ return (async () => {
       task: "(worktree)",
       attempt: 0,
       infrastructure: true,
+      class: "infrastructure",
       parked: false,
       reason,
     });
@@ -1719,6 +1723,7 @@ return (async () => {
       task: "(commit)",
       attempt: 0,
       infrastructure: true,
+      class: "infrastructure",
       parked: false,
       reason,
     });
@@ -1862,6 +1867,7 @@ return (async () => {
         task: "(scout)",
         attempt: 0,
         infrastructure: true,
+        class: "infrastructure",
         parked: false,
         reason,
       });
@@ -1888,6 +1894,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1902,6 +1909,7 @@ return (async () => {
         task: "(scout)",
         attempt: 0,
         infrastructure: true,
+        class: "infrastructure",
         parked: false,
         reason,
       });
@@ -1920,6 +1928,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1938,6 +1947,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -1993,6 +2003,7 @@ return (async () => {
         task: "(divergence)",
         attempt: 0,
         infrastructure: true,
+        class: "divergence",
         parked: false,
         reason,
       });
@@ -2023,6 +2034,7 @@ return (async () => {
         task: "(tree)",
         attempt: 0,
         infrastructure: true,
+        class: "stall",
         parked: false,
         reason,
       });
@@ -2068,6 +2080,7 @@ return (async () => {
         task: "(budget)",
         attempt: 0,
         infrastructure: true,
+        class: "budget-floor",
         parked: false,
         reason,
       });
@@ -2133,6 +2146,7 @@ return (async () => {
         task: item.ref,
         attempt: r?.attempt ?? 0,
         infrastructure: r?.infrastructure ?? true,
+        class: r?.class ?? "infrastructure",
         parked: r?.parked ?? false,
         reason:
           r?.reason ??
@@ -2174,6 +2188,7 @@ return (async () => {
         task: item.ref,
         attempt: r?.attempt ?? 0,
         infrastructure: r?.infrastructure ?? true,
+        class: r?.class ?? "infrastructure",
         parked: r?.parked ?? false,
         reason:
           r?.reason ??
@@ -2224,6 +2239,40 @@ return (async () => {
     }
   }
 
+  // Every flight leaves its stops in run.jsonl, so goal mode and `--status` read
+  // them from the trail rather than from a reply. The payload rides one shell
+  // argument: single quotes keep it literal, and `encodeURIComponent` leaves
+  // only `'` able to close them, hence the extra replace. A failed write is
+  // reported beside the result and never becomes an escalation itself.
+  cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref));
+  const payload = encodeURIComponent(
+    JSON.stringify({
+      escalations,
+      cleanupFailures,
+      drained,
+      aborted,
+      completed,
+      needsHuman,
+    }),
+  ).replace(/'/g, "%27");
+  const command = `bun ${S}/flightlog.ts escalations ${CFG.logFile} --payload '${payload}'`;
+  const { value: logged } = await settled(() =>
+    resilient(async (retryModel) => {
+      const result = await agent(
+        `Run exactly this one command: ${command}\nIt prints nothing on success. Return ok: true when it exits 0, false otherwise, through StructuredOutput.\n${RETURN_CONTRACT}`,
+        {
+          label: "log-escalations",
+          phase: "Execute",
+          ...pick(retryModel ?? MODEL.worktree),
+          schema: wtObject({ ok: { type: "boolean" } }),
+        },
+      );
+      if (result === null)
+        throw new Error("log-escalations: no structured result");
+      return result;
+    }, MODEL.structuredRetry),
+  );
+
   return {
     slug: CFG.slug,
     aborted,
@@ -2232,7 +2281,8 @@ return (async () => {
     needsHuman,
     drained,
     worktrees: keptWorktrees(),
-    cleanupFailures: cleanupFailures.sort((a, b) => a.ref.localeCompare(b.ref)),
+    cleanupFailures,
+    logFailed: logged?.ok !== true,
   };
 })();
 ```
@@ -2241,11 +2291,12 @@ return (async () => {
 
 - `aborted` — `null` or the first `{ reason, paths }` that stopped the run. Report the cause and leak paths. Inspect the retained worktrees before resuming; the run performed no further commits or end sweep after this abort.
 - `completed` — tasks that passed their rubric **and** whose `mark-done` transition was confirmed, this invocation only. It includes the Final review task, if the run finished cleanly. It is not a tree-completion count; see the note on `counts.done` below.
-- `escalations` — `[{ task, attempt, infrastructure, parked, reason }]`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
+- `escalations` — `[{ task, attempt, infrastructure, class, parked, reason }]`. `class` is the `EscalationClass` goal mode sorts on: `plan-defect` (a `PLAN DEFECT reported by …` park), `capped` (the attempt cap ran out), `infrastructure` (any infrastructure failure, `(scout)`, `(worktree)`, `(commit)`), `stall` (`(tree)`), `divergence`, and `budget-floor`. A leak abort shows in `aborted`; the tasks it stopped report `infrastructure`. For each one, surface it to the user. In a cockpit session, use `needs_your_call` + `cockpit wait`. Otherwise, use `AskUserQuestion`. Include the last `reason` — the judge rationale, the gate output, or the infrastructure cause. `infrastructure: true` identifies a pipeline or mechanical failure; report the cause rather than claiming the work was rejected. When the cause says "landed, but Status was not marked done", tell the user to run `mark-done.ts` by hand before another run. `parked: false` means the task was NOT confirmed as `blocked`; report its Status as unknown and follow the escalation's recovery instruction.
 - `needsHuman` — `[{ task, criteria }]`, the `(human)` gate items that passed with no machine check and no attestation. Report it **separately from `escalations`**: those tasks are genuinely `done`, nothing is parked, and nothing needs a Status reset. Print the criteria verbatim as the user's closing checklist, and say that `mark-done.ts` ticked their boxes like any other, so the task file no longer shows the check is outstanding.
 - `worktrees` — report the sorted `{ ref, path }` union of live worktrees and blocked leftovers retained from the start sweep. If a scout failed, preserve the returned worktree list without filtering it further.
 - `drained` — ready tasks left `todo` because `<planDir>/.flightlog/drain` existed at their dispatch. Report them as not started, not as failures. Tell the user to delete the drain file before the next run.
 - `cleanupFailures` — report landed worktrees whose removal could not be confirmed, separately from kept worktrees. A removal failure alone leaves the task completed, with no escalation.
+- `logFailed` — `true` when the closing `log-escalations` call did not confirm that `flightlog.ts escalations` wrote the escalations and the `run-end` entry to `run.jsonl`. The other fields are unaffected. Tell the user the trail is missing this run's stops, so `--status` and goal mode cannot see them.
 - A task ref appears in exactly one of `completed`, `escalations`, and `drained`. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
 - **Resume**: after the user unblocks a parked task, follow `SKILL.md` → "Escalation — park & continue, then resume".
