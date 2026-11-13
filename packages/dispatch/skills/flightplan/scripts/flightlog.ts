@@ -228,14 +228,16 @@ async function main() {
     });
     if (top.exitCode === 0) {
       const repoRoot = top.stdout.toString().trim();
-      const flightlogDir = join(planAbs, ".flightlog") + sep;
+      const flightlogRel = toPosix(
+        relative(repoRoot, join(planAbs, ".flightlog")),
+      );
       const dirty = changedPaths(repoRoot).filter(
-        (path) => !path.startsWith(flightlogDir),
+        (path) => !path.startsWith(flightlogRel + "/"),
       );
       if (dirty.length > 0) {
         fail(
-          `flight-start needs a clean working tree; uncommitted changes outside ${relative(repoRoot, flightlogDir) || ".flightlog"}:\n` +
-            dirty.map((path) => `  ${relative(repoRoot, path)}`).join("\n") +
+          `flight-start needs a clean working tree; uncommitted changes outside ${flightlogRel || ".flightlog"}:\n` +
+            dirty.map((path) => `  ${path}`).join("\n") +
             "\nCommit or stash them first, then start the flight again.",
         );
       }
@@ -360,7 +362,7 @@ async function main() {
       "-z",
       "HEAD",
       "--",
-      relative(repoRoot, tasksAbs),
+      toPosix(relative(repoRoot, tasksAbs)),
     )
       .split("\0")
       .filter((path) => isTaskPath(join(repoRoot, path), tasksAbs));
@@ -414,14 +416,16 @@ async function main() {
 
     const deferredPath = join(planDir, "DEFERRED.md");
     const flightlogDir = join(planDir, FLIGHTLOG_DIRNAME);
+    const deferredRel = toPosix(relative(repoRoot, deferredPath));
+    const flightlogRel = toPosix(relative(repoRoot, flightlogDir));
     const unexpected = changedPaths(repoRoot)
       .filter(
         (path) =>
-          !isTaskPath(path, tasksAbs) &&
-          !(verdict === "defer" && path === deferredPath) &&
-          !path.startsWith(flightlogDir + sep),
+          !isTaskPath(join(repoRoot, path), tasksAbs) &&
+          !(verdict === "defer" && path === deferredRel) &&
+          !path.startsWith(flightlogRel + "/"),
       )
-      .map((path) => `unexpected file ${relative(repoRoot, path)}`);
+      .map((path) => `unexpected file ${path}`);
     const misreadAsDeleted = new Set(
       Object.keys(beforePath)
         .filter((ref) => unreadable.has(beforePath[ref]))
@@ -432,7 +436,7 @@ async function main() {
         (v) => !misreadAsDeleted.has(v),
       ),
       ...loaded.errors.map(
-        (e) => `unparseable task ${relative(repoRoot, e.file)}: ${e.reason}`,
+        (e) => `unparseable task ${toPosix(relative(repoRoot, e.file))}: ${e.reason}`,
       ),
       ...unexpected,
     ];
@@ -682,6 +686,10 @@ function isTaskPath(path: string, tasksDir: string): boolean {
   );
 }
 
+export function toPosix(path: string, separator: string = sep): string {
+  return path.split(separator).join("/");
+}
+
 function changedPaths(repoRoot: string): string[] {
   const records = git(
     repoRoot,
@@ -694,9 +702,9 @@ function changedPaths(repoRoot: string): string[] {
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
     if (!record) continue;
-    paths.push(join(repoRoot, record.slice(3)));
+    paths.push(record.slice(3));
     if (record[0] === "R" || record[0] === "C") {
-      paths.push(join(repoRoot, records[++i]));
+      paths.push(records[++i]);
     }
   }
   return paths;

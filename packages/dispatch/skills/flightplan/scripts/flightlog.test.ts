@@ -1,8 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { buildNoteEntry, buildStateEntry, slugFromLogPath } from "./flightlog";
+import { dirname, join, win32 } from "node:path";
+import {
+  buildNoteEntry,
+  buildStateEntry,
+  slugFromLogPath,
+  toPosix,
+} from "./flightlog";
 import { goalHash } from "./lib/goal-mode";
 
 const SCRIPT = join(import.meta.dir, "flightlog.ts");
@@ -425,6 +430,16 @@ const escalationPayload = (escalations: unknown[]) =>
       needsHuman: [],
     }),
   );
+
+describe("toPosix", () => {
+  test("turns a win32 relative path into the forward-slash form git reports", () => {
+    const rel = win32.relative("C:\\repo", "C:\\repo\\docs\\toy\\01-first.md");
+    expect(toPosix(rel, win32.sep)).toBe("docs/toy/01-first.md");
+  });
+  test("leaves an already-posix path alone", () => {
+    expect(toPosix("docs/toy/01-first.md", "/")).toBe("docs/toy/01-first.md");
+  });
+});
 
 describe("goal-mode CLI", () => {
   test("repairs --status exits 2 on a trail with no flight entry", async () => {
