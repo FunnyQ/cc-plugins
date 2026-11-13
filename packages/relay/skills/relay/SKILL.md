@@ -38,7 +38,7 @@ If the user says "生圖", "畫圖", "Generate image" → use `image` (codex onl
 
 Every command below runs the bundled `scripts/relay.ts`.
 
-`${CLAUDE_PLUGIN_ROOT}` is Claude Code's official plugin-root variable. Inside an agent Bash call it is **not reliably set**. Under Codex it is empty. Under OpenCode it is also empty. Do not depend on it.
+Never put a `$`-prefixed plugin-root variable in a command: it is unset inside an agent Bash call and empty under Codex and OpenCode.
 
 Do not use a repo-relative path such as `packages/relay/...`. That path exists only inside the source repo.
 
@@ -151,15 +151,11 @@ relay.ts claude review "Review changes since main"
 
 Generate an image via codex, which uses its built-in imagegen skill. **Image mode is codex-only.**
 
-If **prompt** is missing, ask the user:
-
-```
-AskUserQuestion("要生什麼圖？")
-```
+If **prompt** is missing, ask the user for it with the harness's question tool.
 
 If **--out** is missing, ask the user (offer default: `./generated/image.png`).
 
-In non-interactive contexts (invoked by a sub-agent or headless), do not block on AskUserQuestion. Fail fast with a clear message naming the missing argument.
+In non-interactive contexts (invoked by a sub-agent or headless), do not block on a question. Fail fast with a clear message naming the missing argument.
 
 Once both are known, run:
 
@@ -210,11 +206,7 @@ When the user passes an explicit `--model` flag:
    relay.ts <backend> <mode> --model "<provider/model>" ...
    ```
 
-2. After a successful run, ask via AskUserQuestion:
-
-   ```
-   AskUserQuestion("儲存 <model> 作為 <backend> <mode> 的預設值嗎？")
-   ```
+2. After a successful run, ask with the harness's question tool whether to save `<model>` as the `<backend> <mode>` default.
 
 3. If the user approves, save it through the relay config command:
    ```bash

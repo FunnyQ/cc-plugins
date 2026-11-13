@@ -1,6 +1,6 @@
 # Backend Reference — CLI flags, headless output, and install
 
-> Verified locally (2026-06-15). Each backend section translates a `relay` mode into the canonical CLI invocation.
+> Each backend section translates a `relay` mode into the canonical CLI invocation and names the CLI version it was verified against.
 
 ## Live-pane mode (herdr or herdr-app)
 
@@ -18,7 +18,7 @@ Per-backend live launch (argv extras only — never `exec`/`-p`/`-o`):
 | -------- | --------------------- | ------------------------------------------ | --------------------------------------------------------- |
 | codex    | `codex` (`CODEX_BIN`) | `-m <model>`                               | `--dangerously-bypass-approvals-and-sandbox`              |
 | claude   | `claude`              | `--model <model>`, plus `--effort <level>` | `--dangerously-skip-permissions`                          |
-| opencode | `opencode`            | `-m <model>`                               | `--auto` (auto-approve permissions not explicitly denied) |
+| opencode | `opencode`            | none — a run with a model goes headless    | `--auto` (auto-approve permissions not explicitly denied) |
 
 `--dangerous` is a **uniform YOLO switch** across all three live backends. It lets an **unattended** run proceed without stopping on approval prompts.
 
@@ -57,10 +57,10 @@ codex exec -s danger-full-access -o <lastfile> -
 > `--approve-for-me` is **not** the escape hatch: it forces the workspace-write
 > sandbox by definition, so it reintroduces exactly the failure being avoided.
 >
-> codex ≥ 0.139 removed the old `-a never` approval flag. Passing it now errors
-> with `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
+> codex-cli has no `-a` approval flag; passing one errors with
+> `unexpected argument '-a' found`. Verified against codex-cli 0.139.0.
 >
-> `codex review` takes no `-s` flag (only `-c`), so the review path is unchanged.
+> `codex review` takes no `-s` flag (only `-c`), so review passes no sandbox flag.
 > Verified against codex-cli 0.147.0.
 
 Dangerous opt-in (only if user explicitly asks):
@@ -198,7 +198,7 @@ Install through the repo's OpenCode installer, run from the checkout — it syml
 bun opencode/install.ts --apply
 ```
 
-**Remove the legacy `~/.claude/skills/relay` symlink.** These docs used to tell users to create it by hand. OpenCode scans both `~/.claude/skills/` and `~/.config/opencode/skills/`, so keeping it alongside a fresh installer run surfaces **two skills named `relay`**:
+**Remove any `~/.claude/skills/relay` symlink.** OpenCode scans both `~/.claude/skills/` and `~/.config/opencode/skills/`, so one beside the installer's link surfaces **two skills named `relay`**; `install.ts --check` warns when it finds one:
 
 ```bash
 # legacy — remove if present
