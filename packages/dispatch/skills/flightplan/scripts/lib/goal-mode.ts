@@ -225,8 +225,16 @@ export function guardRepair(
     ...new Set([...Object.keys(input.before), ...Object.keys(input.after)]),
   ].sort();
   for (const ref of refs) {
-    const beforeText = input.before[ref] ?? "";
-    const afterText = input.after[ref] ?? "";
+    const beforeText = input.before[ref];
+    const afterText = input.after[ref];
+    if (afterText === undefined) {
+      violations.push(`deleted task ${ref}`);
+      continue;
+    }
+    if (beforeText === undefined) {
+      violations.push(`created task ${ref}`);
+      continue;
+    }
     if (beforeText === afterText) continue;
     if (input.doneRefs.includes(ref)) {
       violations.push(`${ref} is done and must not be edited`);
@@ -241,10 +249,10 @@ export function guardRepair(
     for (const heading of GATE_SECTIONS) {
       const old = gateItems(before, heading);
       const now = gateItems(after, heading);
-      for (const added of withoutEach(now, old)) {
-        if (added.includes("(human)")) {
-          violations.push(`${ref} ${heading}: added a (human) tag: ${added}`);
-        }
+      const tagged = (items: string[]) =>
+        items.filter((i) => i.includes("(human)")).length;
+      if (tagged(now) > tagged(old)) {
+        violations.push(`${ref} ${heading}: added a (human) tag`);
       }
       for (const gone of withoutEach(old, now)) {
         if (!justified.includes(gone)) {
@@ -295,32 +303,36 @@ function errorLine(e: EscalationEntry | ScoreEntry | RunEndEntry): string {
   return `- ${e.ts} · (flight) · run aborted${drained}`;
 }
 
-function stillParked(entries: FlightlogEntry[]): string[] {
-  const last = new Map<string, { at: number; reason: string; stop: boolean }>();
-  const completedAt = new Map<string, number>();
-  entries.forEach((e, at) => {
-    if (e.kind === "escalation") {
-      last.set(e.task, { at, reason: e.reason, stop: true });
-    } else if (e.kind === "repair" && e.task !== "(flight)") {
-      const stop = !COUNTED.has(e.verdict);
-      last.set(e.task, { at, reason: e.reason, stop });
-    } else if (e.kind === "run-end") {
-      for (const task of e.completed) completedAt.set(task, at);
-    } else if (e.kind === "state" && e.state === "done") {
-      completedAt.set(e.task, at);
-    }
-  });
-  const lines: string[] = [];
-  for (const [task, { at, reason, stop }] of last) {
-    if (!stop || (completedAt.get(task) ?? -1) > at) continue;
-    lines.push(`- ${task}: ${oneLine(reason)}`);
-  }
-  return lines;
+function stillParked(
+  entries: FlightlogEntry[],
+  tasks: Record<string, ParsedTask>,
+): string[] {
+  return Object.keys(tasks)
+    .filter((ref) => tasks[ref].status !== "done")
+    .sort()
+    .map((ref) => {
+      const repair = entries.findLast(
+        (e): e is RepairEntry => e.kind === "repair" && e.task === ref,
+      );
+      const escalation = entries.findLast(
+        (e): e is EscalationEntry => e.kind === "escalation" && e.task === ref,
+      );
+      const reason =
+        repair?.reason ??
+        escalation?.reason ??
+        "no escalation or repair recorded";
+      return `- ${ref}: ${oneLine(reason)}`;
+    });
 }
 
 export function renderFlightReport(
   flightEntries: FlightlogEntry[],
-  opts: { slug: string; status: FlightStatus; deferredMd: string | null },
+  opts: {
+    slug: string;
+    status: FlightStatus;
+    deferredMd: string | null;
+    tasks: Record<string, ParsedTask>;
+  },
 ): string {
   const entries = [...flightEntries].sort((a, b) => a.ts.localeCompare(b.ts));
   const used = repairCounts(entries).flight;
@@ -358,7 +370,12 @@ export function renderFlightReport(
     if (r.diff) out.push("```diff", r.diff.trimEnd(), "```", "");
   }
 
-  out.push("## Still parked", "", ...none(stillParked(entries)), "");
+  out.push(
+    "## Still parked",
+    "",
+    ...none(stillParked(entries, opts.tasks)),
+    "",
+  );
 
   const lastEnd = entries.findLast(
     (e): e is RunEndEntry => e.kind === "run-end",

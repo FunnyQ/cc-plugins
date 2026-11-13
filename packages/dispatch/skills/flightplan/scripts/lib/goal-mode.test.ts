@@ -465,6 +465,45 @@ describe("guardRepair", () => {
     });
   });
 
+  test("allows a justified rewording of an item already tagged (human)", () => {
+    const tagged = {
+      "ui/01": taskFile("ui/01", {
+        verification: ["- [ ] `bun test` passes", "- [ ] (human) eyeball it"],
+      }),
+    };
+    const after = {
+      "ui/01": taskFile("ui/01", {
+        verification: [
+          "- [ ] `bun test` passes",
+          "- [ ] (human) eyeball the page",
+        ],
+      }),
+    };
+    expect(
+      guardRepair(
+        guardInput({
+          before: tagged,
+          after,
+          justified: [{ task: "ui/01", before: "(human) eyeball it" }],
+        }),
+      ),
+    ).toEqual({ ok: true, reentry: { "ui/01": "verify" } });
+  });
+
+  test("rejects a deleted task", () => {
+    expect(guardRepair(guardInput({ before, after: {} }))).toEqual({
+      ok: false,
+      violations: ["deleted task ui/01"],
+    });
+  });
+
+  test("rejects a created task", () => {
+    expect(guardRepair(guardInput({ before: {}, after: before }))).toEqual({
+      ok: false,
+      violations: ["created task ui/01"],
+    });
+  });
+
   test("rejects a reworded Verification item missing from justified", () => {
     const result = guardRepair(guardInput({ before, after: verifyEdit }));
     expect(result).toEqual({
@@ -538,10 +577,20 @@ describe("renderFlightReport", () => {
     }),
   ];
 
+  const tasks = tree({
+    "ui/01": {
+      status: "done",
+      acceptance: ["- [x] it works", "- [x] it is fast"],
+      verification: ["- [x] `bun test` passes"],
+    },
+    "ui/02": { status: "blocked" },
+  });
+
   const report = renderFlightReport(entries, {
     slug: "demo",
     status: "exhausted",
     deferredMd: "- ui/03: moved",
+    tasks,
   });
 
   test("puts the sections in order", () => {
@@ -569,6 +618,7 @@ describe("renderFlightReport", () => {
       slug: "demo",
       status: "complete",
       deferredMd: null,
+      tasks,
     });
     expect(plain).not.toContain("## Deferred criteria");
     expect(plain).toContain("complete");
@@ -607,6 +657,29 @@ describe("renderFlightReport", () => {
     expect(section).toContain("ui/02");
     expect(section).toContain("refuse reason");
     expect(section).not.toContain("ui/01");
+  });
+
+  test("still parked lists a repaired task that never re-flew before a flight halt", () => {
+    const halted = renderFlightReport(
+      [
+        escalation("ui/03", "capped at 3 attempts"),
+        repair("ui/03", "fix", { reason: "Verification fixed" }),
+        escalation("ui/04", "PLAN DEFECT reported by dev", "plan-defect"),
+        repair("(flight)", "halt", { reason: "leak abort" }),
+      ],
+      {
+        slug: "demo",
+        status: "exhausted",
+        deferredMd: null,
+        tasks: tree({ "ui/03": {}, "ui/04": { status: "blocked" } }),
+      },
+    );
+    const section = halted.slice(
+      halted.indexOf("## Still parked"),
+      halted.indexOf("## Needs a person"),
+    );
+    expect(section).toContain("- ui/03: Verification fixed");
+    expect(section).toContain("- ui/04: PLAN DEFECT reported by dev");
   });
 
   test("needs a person comes from the last run-end", () => {
