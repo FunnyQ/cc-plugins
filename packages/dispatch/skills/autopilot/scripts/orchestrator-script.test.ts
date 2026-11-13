@@ -94,6 +94,7 @@ type RunResult = {
   cleanupFailures: { ref: string; path: string }[];
   drained?: string[];
   logFailed?: boolean;
+  failedInMainTree?: string[];
 };
 
 type Scenario = {
@@ -1114,6 +1115,8 @@ describe("orchestrator failure handling", () => {
       "attempt 1 (ran on final-review)",
     );
     expect(exhausted.labels).not.toContain("commit-post-loop");
+    expect(exhausted.result.failedInMainTree).toEqual(["review/final"]);
+    expect(log.result.failedInMainTree).toEqual([]);
   });
 
   test("a null judge is an infrastructure failure", async () => {
@@ -4612,6 +4615,65 @@ describe("escalation classes and the flightlog trail", () => {
     });
     expect(log.result.escalations).toEqual([
       expect.objectContaining({ task: ref, class: "plan-defect" }),
+    ]);
+  });
+
+  test("park beside a pass: a dependent waiting on the parked task is not a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        multiWave(["a/01", "b/01"]),
+        snapshot({
+          counts: counts({ total: 3, done: 1, blocked: 1, todo: 1 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "review/01", state: "todo", unmet: ["a/01"] },
+          ],
+        }),
+      ],
+      judge: {
+        "a/01": [
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+          { verdict: fail, rationale: "weak" },
+        ],
+      },
+    });
+    expect(log.result.completed).toEqual(["b/01"]);
+    expect(log.result.escalations.map((e) => [e.task, e.class])).toEqual([
+      ["a/01", "capped"],
+    ]);
+  });
+
+  test("a task blocked by an earlier run, with todo dependents, is not a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 3, blocked: 1, todo: 2 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "a/02", state: "todo", unmet: ["a/01"] },
+            { ref: "a/03", state: "todo", unmet: ["a/02"] },
+          ],
+        }),
+      ],
+    });
+    expect(log.result.escalations).toEqual([]);
+  });
+
+  test("a todo task whose dependencies are all done, still not ready, is a stall", async () => {
+    const log = await runOrchestrator({
+      scouts: [
+        snapshot({
+          counts: counts({ total: 3, blocked: 1, todo: 1, done: 1 }),
+          unfinished: [
+            { ref: "a/01", state: "blocked", unmet: [] },
+            { ref: "b/02", state: "todo", unmet: [] },
+          ],
+        }),
+      ],
+    });
+    expect(log.result.escalations).toEqual([
+      expect.objectContaining({ task: "(tree)", class: "stall" }),
     ]);
   });
 

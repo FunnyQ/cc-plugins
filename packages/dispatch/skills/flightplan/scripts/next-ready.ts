@@ -10,7 +10,11 @@
  * Usage:
  *   bun next-ready.ts <tasks-dir>              # one ref per line
  *   bun next-ready.ts <tasks-dir> --json       # [{ref,finalReview,path,modelsRaw}]
- *   bun next-ready.ts <tasks-dir> --summary    # {ready,counts,invalid,errors,maxParallel}
+ *   bun next-ready.ts <tasks-dir> --summary    # {ready,counts,unfinished,invalid,errors,maxParallel}
+ *
+ * Each `unfinished` item is `{ref, state, unmet}`, `unmet` naming the
+ * dependencies not yet validly done, so the orchestrator can tell a task
+ * waiting on a parked one from a stall.
  *
  * Exits 0 when the tree is clean and either lists ready tasks or prints
  * nothing (so a shell loop is safe). Exits 1 when any task file fails to
@@ -132,13 +136,19 @@ export type TreeCounts = {
   invalid: number;
 };
 
+export type UnfinishedRef = {
+  ref: string;
+  state: keyof Omit<TreeCounts, "total">;
+  unmet: string[];
+};
+
 export function summarizeTree(
   byRef: Record<string, ParsedTask>,
   pathByRef: Record<string, string>,
 ): {
   ready: ReadyRef[];
   counts: TreeCounts;
-  unfinished: { ref: string; state: keyof Omit<TreeCounts, "total"> }[];
+  unfinished: UnfinishedRef[];
 } {
   const counts: TreeCounts = {
     total: 0,
@@ -148,8 +158,8 @@ export function summarizeTree(
     blocked: 0,
     invalid: 0,
   };
-  const unfinished: { ref: string; state: keyof Omit<TreeCounts, "total"> }[] =
-    [];
+  const unfinished: UnfinishedRef[] = [];
+  const nodes = nodesFromParsedTasks(byRef);
 
   for (const [ref, task] of Object.entries(byRef)) {
     counts.total += 1;
@@ -161,7 +171,13 @@ export function summarizeTree(
     else if (task.status === "blocked") state = "blocked";
     else state = "todo";
     counts[state] += 1;
-    if (state !== "done") unfinished.push({ ref, state });
+    if (state !== "done") {
+      unfinished.push({
+        ref,
+        state,
+        unmet: unmetNodeDependencies(nodes[ref]!, nodes),
+      });
+    }
   }
 
   unfinished.sort((a, b) => a.ref.localeCompare(b.ref));

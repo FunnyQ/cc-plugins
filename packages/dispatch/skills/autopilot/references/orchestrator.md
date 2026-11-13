@@ -2119,11 +2119,33 @@ return (async () => {
     );
 
     // Empty ready set + unfinished tasks = stalled. Report the counts AND the refs.
-    // Tasks this run already parked are excluded: they carry their own escalation,
-    // and re-reporting them as a fresh stall would double-count every parked run.
+    // A task this run parked, a task left blocked by an earlier run, and every
+    // task whose unmet dependencies lead only to those is waiting, not stalled:
+    // the parked ones carry their own escalation, and a dependent of a park in
+    // the same wave as a pass would otherwise end the run as a phantom stall.
     if (fresh.length === 0) {
       const outstanding = unfinished.filter((u) => !parked.has(u.ref));
-      if (outstanding.length === 0) break; // nothing left but what we already escalated
+      const waiting = new Set(
+        unfinished
+          .filter((u) => parked.has(u.ref) || u.state === "blocked")
+          .map((u) => u.ref),
+      );
+      for (let grew = true; grew;) {
+        grew = false;
+        for (const u of unfinished) {
+          const unmet = Array.isArray(u.unmet) ? u.unmet : [];
+          if (
+            !waiting.has(u.ref) &&
+            u.state === "todo" &&
+            unmet.length > 0 &&
+            unmet.every((ref) => waiting.has(ref))
+          ) {
+            waiting.add(u.ref);
+            grew = true;
+          }
+        }
+      }
+      if (unfinished.every((u) => waiting.has(u.ref))) break; // every stop already escalated or parked before this run
       const remaining = outstanding
         .map((u) => `${u.ref} (${u.state})`)
         .join(", ");
@@ -2384,6 +2406,7 @@ return (async () => {
     worktrees: keptWorktrees(),
     cleanupFailures,
     logFailed: logged?.ok !== true,
+    failedInMainTree: [...failedInMainTree].sort(),
   };
 })();
 ```
@@ -2397,6 +2420,7 @@ return (async () => {
 - `worktrees` — report the sorted `{ ref, path }` union of live worktrees and blocked leftovers retained from the start sweep. If a scout failed, preserve the returned worktree list without filtering it further.
 - `drained` — ready tasks left `todo` because `<planDir>/.flightlog/drain` existed at their dispatch. Report them as not started, not as failures. Tell the user to delete the drain file before the next run.
 - `cleanupFailures` — report landed worktrees whose removal could not be confirmed, separately from kept worktrees. A removal failure alone leaves the task completed, with no escalation.
+- `failedInMainTree` — the sorted refs of each Final review that failed after its fixer edited the main tree. Those edits are ungated, so the run committed nothing after them and left them uncommitted. Never commit them as they stand; goal mode saves them under a ref first (`goal-mode.md` step 5.1).
 - `logFailed` — `true` when the closing `log-escalations` call did not confirm that `flightlog.ts escalations` wrote the escalations and the `run-end` entry to `run.jsonl`. The other fields are unaffected. Tell the user the trail is missing this run's stops, so `--status` and goal mode cannot see them. A retried log call may append duplicate escalation and `run-end` rows, so readers must take each ref's latest.
 - A task ref appears in exactly one of `completed`, `escalations`, and `drained`. A ref in `needsHuman` is always also in `completed`.
 - Then render the trail. Run `bun <scriptsDir>/flightlog.ts report <logFile>` → `RUNLOG.md`.
@@ -2432,7 +2456,7 @@ Preserve unlanded work when a main-tree leak aborts the run. Resume each non-fin
 
 - **`counts` describes what parsed, not the tree.** A file that fails to parse — no H1, a duplicate `bucket/NN` — never enters `byRef`, so it never enters `counts`. Delete four broken files from a five-task tree and `counts` reads `{total: 1, done: 1}`: `done === total` holds, and the run reports clean completion over a tree it could not read. That is why the loop validates and checks the parsed `errors` array **before** the completion test instead of asking the scout to understand it.
 
-- **The stall check excludes tasks this run already parked.** Every parked task carries its own escalation, and the very next wave necessarily sees it as unfinished-and-not-ready. Counting it again would append a phantom `(tree)` stall to every run that parked anything, so the run would report two problems where there is one. When the only unfinished tasks are ones already escalated, the loop just breaks.
+- **The stall check excludes every task that is waiting, not stuck.** A task this run parked, a task an earlier run left `blocked`, and a `todo` task whose unmet dependencies (each unfinished item's `unmet`, from the scout) all lead to one of those are waiting. Every parked task carries its own escalation, and the very next wave necessarily sees it and its dependents as unfinished-and-not-ready. Counting them would append a phantom `(tree)` stall to every run that parked anything: a capped task beside a passing one in the same wave, with a Final review depending on both, would report a stall and end a goal-mode flight `exhausted` before its one real stop was repaired. When every unfinished task is waiting, the loop just breaks. A `todo` task whose dependencies are all met but is still not ready, an `in-progress` task, or a dependency on one of those is still a stall.
 
 - **The script has a deterministic fixture.** `scripts/orchestrator-script.test.ts` extracts this exact fenced block, runs it with stubbed `agent`/`parallel`, and asserts the termination rules, the quality-vs-infrastructure split, and the "every task lands in `completed` XOR `escalations`" invariant. No agent is spawned. **Edit the block and run `bun test packages/dispatch/skills/autopilot/scripts/orchestrator-script.test.ts`** — a syntax error or a broken loop shows up there instead of mid-flight.
 
