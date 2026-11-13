@@ -3,7 +3,7 @@ import type { Backend, InvokeOpts, LiveSpec, Mode } from "../types";
 /**
  * No model is pinned: hosted ids churn, and a pinned default rotted once already.
  *
- * Verified against opencode 2.2.6. The 2.x TUI takes no `-m`, so a run with a
+ * Verified against opencode 2.2.7. The 2.x TUI takes no `-m`, so a run with a
  * model always goes headless (see invokeLive).
  *
  * Permissions: `--dangerous` maps to `--auto` on BOTH paths (headless invoke

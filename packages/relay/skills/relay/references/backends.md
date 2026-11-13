@@ -96,7 +96,7 @@ Unset by default, so codex uses its own configured model. When a caller passes `
 
 ## opencode (2.x)
 
-Verified on opencode 2.2.6. The 2.x TUI takes no `-m`, so a run with a model (from `--model` or the relay config) has no live path and runs headless, with a one-line stderr note. Relay still parses the 1.x error event shape.
+Verified on opencode 2.2.7. The 2.x TUI takes no `-m`, so a run with a model (from `--model` or the relay config) has no live path and runs headless, with a one-line stderr note. Relay still parses the 1.x error event shape.
 
 Binary: `opencode`. Headless subcommand: `opencode run`, prompt on stdin.
 

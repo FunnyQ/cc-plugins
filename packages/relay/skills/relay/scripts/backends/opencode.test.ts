@@ -291,7 +291,7 @@ describe("parseError", () => {
     expect(parseError(raw)).toBe("Model not found: x/y");
   });
 
-  it("returns the message of a 2.x error event (opencode 2.2.6)", () => {
+  it("returns the message of a 2.x error event (opencode 2.2.7)", () => {
     const raw = JSON.stringify({
       type: "error",
       timestamp: 1794286563104,
