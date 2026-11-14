@@ -199,9 +199,25 @@ The typed leg goal pre-approves three things: running the owed checks, fixing th
 
 Post-flight fixes pass through no judge and no rubric, only the Verification commands step 3 re-runs. Say so in the report and name every `fix(after-run)` commit.
 
+## Suspected skill defects
+
+When a stop traces to this skill's own instructions or scripts rather than to the plan or the code, log it. Cite the skill file and line, quote the instruction, and name the input that failed:
+
+```bash
+bun $SCRIPTS/flightlog.ts log <log> --task <ref> --role skill-defect --message "<skill file>:<line> — <quoted instruction> — <failing input>"
+```
+
+`flightlog.ts log` refuses a `skill-defect` message without that shape. Log one note per task it hit; the flight report groups them by citation, so a defect that hit five tasks reads as one item.
+
+A note changes nothing: the escalation still follows its class, and its repair still goes through the reviewer, the guard and the lint.
+
+Never edit a skill file, the plugin cache, or the baked `orchestrator.js`. When the defect blocks the flight, propose a workaround in your own steps between launches, such as running `bun install` in `<root>` before a re-launch, and ask the user, as [Reporting while the goal runs](#reporting-while-the-goal-runs) says. On their go, apply it for the rest of this session and log it with `--task "(flight)"`, appending ` · workaround: <what you now do>` to the same `skill-defect` message.
+
+A workaround reaches only the main agent's own steps. Workflow agents get no user message and run the baked script as written, so a defect inside an agent's prompt can be worked around only through a plan repair. The flight report lists every workaround for the maintainers to fix in the skill.
+
 ## Reporting while the goal runs
 
-Write to the user only when the loop needs them: a halt, a `/goal clear` request, a refused or failed fix in step 8, or a decision the goal does not cover. Name a decision the goal does not cover when it costs money, such as a paid API call, or changes behavior a user sees beyond what the plan specifies. A plan defect the repair reviewer fixed is not a problem: the trail and `FLIGHTREPORT.md` carry it, so report nothing for it between launches.
+Write to the user only when the loop needs them: a halt, a `/goal clear` request, a refused or failed fix in step 8, a skill defect that blocks the flight, or a decision the goal does not cover. Name a decision the goal does not cover when it costs money, such as a paid API call, or changes behavior a user sees beyond what the plan specifies. A plan defect the repair reviewer fixed is not a problem: the trail and `FLIGHTREPORT.md` carry it, so report nothing for it between launches.
 
 ## Every goal-mode turn
 

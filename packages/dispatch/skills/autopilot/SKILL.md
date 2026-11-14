@@ -290,7 +290,9 @@ Run this loop only when the user picked **Goal mode** in Step 2, under Claude Co
 7. Run `flightlog.ts report --flight`, then `flightlog.ts repairs --status` again. Print that outcome and the `FLIGHTREPORT.md` path.
 8. Under the leg goal, on `complete`, close the leg: try each owed `(human)` check with your own tools and record its evidence, fix what fails and re-run the Verification commands, then `waypoints.ts advance` with the drafted outcome. Offer the leg goal in step 1 only when the plan is a waypoints leg.
 
-Between launches, write to the user only when the loop needs them: a halt, a `/goal clear` request, a failed step-8 fix, or a decision that costs money or changes user-visible behavior beyond the plan. A plan defect fixed under the goal is not a problem to report.
+When a stop traces to this skill's own instructions, log a cited `skill-defect` note as `goal-mode.md` says; never edit a skill file or the plugin cache, and adopt a workaround in your own steps only on the user's go.
+
+Between launches, write to the user only when the loop needs them: a halt, a `/goal clear` request, a failed step-8 fix, a skill defect that blocks the flight, or a decision that costs money or changes user-visible behavior beyond the plan. A plan defect fixed under the goal is not a problem to report.
 
 Print the `repairs --status` line as the last line of every goal-mode turn, or the `leg-close:` line once step 8 has started. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".
 
