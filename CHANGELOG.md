@@ -1,5 +1,19 @@
 # Changelog
 
+## [dispatch 5.11.0] - 2026-11-14
+
+_tracks tag `dispatch-v5.11.0`_
+
+### Added
+- Autopilot runs can now record skill defects in the flight log, and the flight report groups them by cited skill location so one bug hitting several tasks reads as one item; a note must cite the skill file, line, quoted instruction and failing input, and the docs say it is a record only and that any workaround needs your go.
+- Goal mode now handles a waypoints leg end to end: after a complete flight the agent tries each owed check itself, records evidence, re-runs Verification and advances the leg.
+- Flightplan lint now catches Verification gates that can never pass: whole-tree git diffs, banned commands such as git checkout or docker run, and git status inside the plan directory.
+
+### Fixed
+- The flight report's "Needs a person" section no longer loses owed checks from earlier runs when a flight is re-launched.
+- Autopilot's reverify step can now report a plan defect, so a gate made impossible by a sibling task's edits parks as plan-defect instead of burning every attempt and ending capped.
+- Waypoints accepts split leg ids such as 8b1, so `advance` and DEFERRED.md no longer misread legs that were split during re-planning.
+
 ## [dispatch 5.10.0] - 2026-11-14
 
 _tracks tag `dispatch-v5.10.0`_
