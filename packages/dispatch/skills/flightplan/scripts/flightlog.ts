@@ -101,6 +101,8 @@ export function slugFromLogPath(logFile: string): string {
   return basename(dir) || "run";
 }
 
+const SKILL_DEFECT_REGEX = /^\S+:\d+ — .+ — .+/;
+
 async function main() {
   const [cmd, logFile, ...rest] = process.argv.slice(2);
 
@@ -115,6 +117,11 @@ async function main() {
     }
     if (!task || !role || (!message && phase !== "start")) {
       fail("flightlog log requires --task, --role and --message");
+    }
+    if (role === "skill-defect" && !SKILL_DEFECT_REGEX.test(message ?? "")) {
+      fail(
+        "a skill-defect message must read <skill file>:<line> — <quoted instruction> — <failing input>",
+      );
     }
     const attemptRaw = flagValue(rest, "--attempt");
     const entry = buildNoteEntry({

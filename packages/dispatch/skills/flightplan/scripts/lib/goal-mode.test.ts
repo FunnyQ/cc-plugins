@@ -973,6 +973,38 @@ describe("renderFlightReport", () => {
     expect(report).not.toContain("## Ungated trees");
   });
 
+  test("groups suspected skill defects by the instruction they cite", () => {
+    const note = (task: string, message: string): FlightlogEntry => ({
+      kind: "note",
+      ts: ts(),
+      task,
+      role: "skill-defect",
+      message,
+    });
+    const cite = "skills/flightplan/scripts/worktree.ts:441";
+    const flagged = renderFlightReport(
+      [
+        ...entries,
+        note("web/01", `${cite} — symlinks the plan dir — report unseen`),
+        note("web/05", `${cite} — symlinks the plan dir — report unseen`),
+        note(
+          "(flight)",
+          "skills/autopilot/references/goal-mode.md:12 — x — y · workaround: bun install in the main tree before each re-launch",
+        ),
+      ],
+      { slug: "demo", status: "complete", deferredMd: null, tasks },
+    );
+    const section = flagged.slice(
+      flagged.indexOf("## Suspected skill defects"),
+    );
+    expect(section).toContain(`### ${cite} — web/01, web/05`);
+    expect(section).toContain(
+      "- web/01: symlinks the plan dir — report unseen",
+    );
+    expect(section).toContain("workaround: bun install in the main tree");
+    expect(report).not.toContain("## Suspected skill defects");
+  });
+
   test("needs a person lists the last run-end's checks", () => {
     const section = report.slice(report.indexOf("## Needs a person"));
     expect(section).toContain("ui/01");

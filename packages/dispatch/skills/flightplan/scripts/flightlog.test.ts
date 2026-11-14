@@ -124,6 +124,40 @@ describe("flightlog CLI", () => {
     await rm(root, { recursive: true });
   });
 
+  test("a skill-defect note needs a cited instruction and a failing input", async () => {
+    const root = await mkdtemp(join(tmpdir(), "flightlog-cli-"));
+    const logFile = join(root, "run.jsonl");
+    const log = (message: string) =>
+      Bun.spawn(
+        [
+          "bun",
+          SCRIPT,
+          "log",
+          logFile,
+          "--task",
+          "ui/03",
+          "--role",
+          "skill-defect",
+          "--message",
+          message,
+        ],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+    const bare = log("the verifier cannot see the report");
+    expect(await bare.exited).toBe(2);
+    expect(await new Response(bare.stderr).text()).toContain(
+      "<skill file>:<line> — <quoted instruction> — <failing input>",
+    );
+    const cited = log(
+      "skills/flightplan/scripts/worktree.ts:441 — symlinks the plan dir — `git status -- docs/p/report.md` is empty in the worktree",
+    );
+    expect(await cited.exited).toBe(0);
+    expect(JSON.parse(await readFile(logFile, "utf-8"))).toMatchObject({
+      role: "skill-defect",
+    });
+    await rm(root, { recursive: true });
+  });
+
   test("start phase works without a message", async () => {
     const root = await mkdtemp(join(tmpdir(), "flightlog-cli-"));
     const logFile = join(root, "run.jsonl");

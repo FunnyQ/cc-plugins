@@ -513,5 +513,22 @@ export function renderFlightReport(
     )
     .map((e) => `- ${e.ts} · ${oneLine(e.message)}`);
   if (ungated.length > 0) out.push("## Ungated trees", "", ...ungated, "");
+
+  const byCite = new Map<string, string[]>();
+  for (const e of entries) {
+    if (e.kind !== "note" || e.role !== "skill-defect") continue;
+    const [cite, ...rest] = e.message.split(" — ");
+    const lines = byCite.get(cite) ?? [];
+    lines.push(`${e.task}: ${oneLine(rest.join(" — "))}`);
+    byCite.set(cite, lines);
+  }
+  if (byCite.size > 0) {
+    out.push("## Suspected skill defects", "");
+    for (const [cite, lines] of byCite) {
+      const tasks = [...new Set(lines.map((l) => l.split(":")[0]))];
+      out.push(`### ${cite} — ${tasks.join(", ")}`, "");
+      out.push(...lines.map((l) => `- ${l}`), "");
+    }
+  }
   return out.join("\n");
 }
