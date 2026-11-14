@@ -68,7 +68,7 @@ For a nested waypoints leg, pass its actual plan directory to every worktree com
 Read `PLAN.md` and the task tree's required context.
 Run `bun "$SCRIPTS/next-ready.ts" "$TASKS" --summary`.
 Run `bun "$SCRIPTS/lint-task.ts" "$TASKS"` before dispatch.
-Resolve `scope-git-status` violations and `serial-undeclared` advisories as Step 1 of `SKILL.md` requires for an isolated-worktree flight.
+Resolve `scope-git-status`, `scope-git-diff`, `plan-dir-git-status`, and `refused-command` violations and `serial-undeclared` advisories as Step 1 of `SKILL.md` requires for an isolated-worktree flight.
 For a live resource that worktrees cannot isolate, set `> **Max parallel**: 1` in the plan.
 Keep independent build directories parallel when worktrees isolate them.
 Before resetting stale `in-progress` tasks to `todo`, confirm that no prior agent is still writing their worktrees.
@@ -197,6 +197,7 @@ Regenerate conflicting lockfiles through their package manager instead of hand-m
 When resolution succeeds, require independent main-tree re-verification even without drift.
 When resolution cannot be completed confidently, park as infrastructure without spending another dev attempt.
 When re-verification fails, unland and rebase under the lock before consuming an attempt with `REVERIFY FAIL` feedback.
+When re-verification fails with a non-null `planDefect`, unland and rebase the same way, then park the task as a plan defect without consuming an attempt.
 When re-verification returns no valid result after one retry, unland and park as infrastructure without rebasing or starting another dev attempt.
 When land reports `leak`, abort dispatch and report its paths without reverting changes.
 Before a non-final wave ends, use `fingerprint --expect` to detect writes outside managed lands.
@@ -275,6 +276,7 @@ For drift or resolved conflicts, run the same check in `$REPO` as role `reverify
 Substitute only the captured `<baseRef>` value in task commands.
 Return `{"passed":boolean,"summary":string,"humanPending":string[],"planDefect":string|null}` in the assigned JSON file.
 Include commands, exit codes, and raw decisive output in `summary`.
+Set `planDefect` when an item fails on edits a landed sibling left in the main tree, needs a command you may not run (`git checkout`, `git restore`, `git reset`, `git clean`, `docker run`), or needs a person without a `(human)` tag.
 Return `passed: false` for any failed untagged command or criterion.
 For an existing `(human)` item, skip its machine check and quote it verbatim in `humanPending`.
 Never add `(human)` tags or convert hard checks into waivers.

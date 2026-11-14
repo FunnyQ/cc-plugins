@@ -448,7 +448,7 @@ const JUDGE_SCHEMA = {
 // ── Prompts ───────────────────────────────────────────────────────────────
 // A defect no attempt can fix must stop the retry loop, not feed it: one run spent
 // three attempts on a `pgrep` gate that matched other sessions' processes.
-const PLAN_DEFECT_MEANING = `A plan defect is a task instruction or gate item that no implementation can satisfy as written: it contradicts another item or the task's own scope, or it depends on state outside the task's control, such as other processes on the machine or a service the task forbids contacting. Code that is merely wrong or hard to write is not a plan defect.`;
+const PLAN_DEFECT_MEANING = `A plan defect is a task instruction or gate item that no implementation can satisfy as written: it contradicts another item or the task's own scope, or it depends on state outside the task's control, such as other processes on the machine, a service the task forbids contacting, or edits a landed sibling task left in the main tree; or it needs a command you are forbidden to run, such as \`git checkout\`, \`git restore\`, \`git reset\`, \`git clean\`, or \`docker run\`. An untagged item that only a person could perform is a plan defect too, never a human check. Code that is merely wrong or hard to write is not a plan defect.`;
 const DEV_PLAN_DEFECT = `${PLAN_DEFECT_MEANING} If you hit one, stop and make the FIRST line of your reply exactly \`PLAN DEFECT: <one line naming the item and why no implementation can pass it>\`. The task is then parked for a person to fix the plan, and no further attempt is spent on it.`;
 const planDefectOf = (reply) =>
   typeof reply === "string"
@@ -797,7 +797,8 @@ Report passed=true ONLY if all verification commands succeed AND all acceptance 
 Put the raw evidence (commands, exit codes, failing output) in summary. Do not make subjective quality judgements — that is the rubric judge's job.
 ${HUMAN_GATE_RULE}
 ${finalReview && DEFERRED_SCOPE_RULE ? `${DEFERRED_SCOPE_RULE}\n` : ""}${BASE_REF_RULE}${CFG.attestationFile ? attestationRule(path) : ""}
-${reverify ? "" : `${PLAN_DEFECT_MEANING} Return planDefect as null by default. When a plan defect decided a failing item, set planDefect to one line naming the item and why no implementation can pass it, and report passed=false as usual. The task is parked for a person to fix the plan instead of spending another attempt.\n`}${closing}
+${PLAN_DEFECT_MEANING} Return planDefect as null by default. When a plan defect decided a failing item, set planDefect to one line naming the item and why no implementation can pass it, and report passed=false as usual. The task is parked for a person to fix the plan instead of spending another attempt.
+${closing}
 Finally, record completion: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role ${role} --attempt ${attempt} --agent "<your label>" --phase end --message "<PASS or FAIL> — <one line: which command or criterion decided it>"
 The message MUST start with the bare word PASS or FAIL. The dashboard colours the row from that word, and a message that starts with neither leaves the row uncoloured — it does not default to green.
 When humanPending is not empty, end that same message with " — NEEDS HUMAN: <n> item(s)". The run's final report reads the structured list, but RUNLOG.md is what a person opens weeks later, and a pending check that appears in neither is a check nobody makes.
@@ -1527,6 +1528,11 @@ async function executeTask(item) {
               await parkBlocked(ref, path, cause),
             );
           }
+          if (
+            typeof reverified.planDefect === "string" &&
+            reverified.planDefect.trim()
+          )
+            return planDefectFailure("reverify", reverified.planDefect.trim());
           rejected(`REVERIFY FAIL:\n${reverified.summary}`);
           continue;
         }
@@ -2510,7 +2516,7 @@ Preserve unlanded work when a main-tree leak aborts the run. Resume each non-fin
 
 - **Use a land op id per attempt.** The next attempt's land must act instead of replaying an old result.
 
-- **A plan defect parks at once.** A dev reply whose first line is `PLAN DEFECT: <why>`, or a verifier returning a non-empty `planDefect`, parks the task with that text as the reason and starts no further attempt. `contract/03` otherwise spent three attempts on a `pgrep -f` gate that matched live sessions. The dev reports it as a text line rather than through a schema, because the dev step has no schema: adding one would turn a dev that writes its payload as text into a thrown pipeline that parks finished work.
+- **A plan defect parks at once.** A dev reply whose first line is `PLAN DEFECT: <why>`, or a verifier or reverify returning a non-empty `planDefect`, parks the task with that text as the reason and starts no further attempt. A reverify's plan defect unlands and rebases first, so the kept worktree holds the judged work for a `--from verify` re-entry; a no-touch gate over a directory a landed sibling edited otherwise spent every attempt on correct code. `contract/03` otherwise spent three attempts on a `pgrep -f` gate that matched live sessions. The dev reports it as a text line rather than through a schema, because the dev step has no schema: adding one would turn a dev that writes its payload as text into a thrown pipeline that parks finished work.
 
 - **`<planDir>/.flightlog/drain` stops dispatch without stopping the run.** The scout reports whether it exists, and every non-resume `wt-create` runs behind `test -e <drain>`, so a task queued for a slot inside a wave is caught too. A drained task stays `todo` with no worktree and lands in `drained`, never in `escalations`. In-flight tasks finish and land, the wave loop stops, and the post-loop commit runs as usual. The file is never deleted by the run.
 

@@ -107,7 +107,7 @@ Before touching Workflow, gather the work-list in the main conversation:
 
    **Act on a `[serial-undeclared]` advisory before flying.** Check PLAN.md and `_context/` for serial execution or lock requirements without a `> **Max parallel**:` header. Under Claude Code, lower **Max parallel** only when tasks share an **external live resource** that a worktree cannot isolate: a live device, a LaunchAgent or service that a verification reinstalls, or a local database that a migration rewrites. For that external live resource, set `> **Max parallel**: 1`. Under Claude Code, keep a shared build target uncapped because each task builds in its own worktree. When the plan will run under OpenCode, set `> **Max parallel**: 1` for a shared build target that compiles every file: the hand-driven loop still shares one working tree (see `autopilot/references/opencode.md`). When `Depends on` edges already sequence every conflict, write `unlimited` or omit the line. Read the header through the scout every wave.
 
-   **Fix a `scope-git-status` violation in the task file.** A whole-tree `git status` gate fails a correct task as soon as a sibling in the same wave leaves its own edits uncommitted; narrow the command with a `--` pathspec listing that task's own files. Do not fly a tree with violations outstanding.
+   **Fix a `scope-git-status` violation in the task file.** A whole-tree `git status` gate fails a correct task as soon as a sibling in the same wave leaves its own edits uncommitted; narrow the command with a `--` pathspec listing that task's own files. Fix a `scope-git-diff` violation the same way. Fix a `plan-dir-git-status` violation by gating the plan-dir file with `test -s <path>`, because the plan dir is an untracked symlink inside each worktree. Fix a `refused-command` violation by proving the property without `git checkout`, `git restore`, `git reset`, `git stash`, `git clean`, or `docker run`, which the verifier and agents refuse. Do not fly a tree with violations outstanding.
 
 6. **Capture the base ref** for the Final review diff scope:
 
@@ -288,8 +288,11 @@ Run this loop only when the user picked **Goal mode** in Step 2, under Claude Co
    - When the guard and the lint pass, record `repair` with the guard's `reentry`, write `DEFERRED.md` for `defer` through `appendDeferred`, and commit the task files as `plan repair: <pattern>`.
 6. Reset the repaired tasks to `todo` and commit. Bake with `reentry` for the repaired and `infra-retry` tasks and for the last launch's reentry tasks that never ran, taking each task's attempt from `flightlog.ts progress --task <ref> --json`, and with `deferredScope` as Step 3 says. Re-launch, then go to step 2.
 7. Run `flightlog.ts report --flight`, then `flightlog.ts repairs --status` again. Print that outcome and the `FLIGHTREPORT.md` path.
+8. Under the leg goal, on `complete`, close the leg: try each owed `(human)` check with your own tools and record its evidence, fix what fails and re-run the Verification commands, then `waypoints.ts advance` with the drafted outcome. Offer the leg goal in step 1 only when the plan is a waypoints leg.
 
-Print the `repairs --status` line as the last line of every goal-mode turn. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".
+Between launches, write to the user only when the loop needs them: a halt, a `/goal clear` request, a failed step-8 fix, or a decision that costs money or changes user-visible behavior beyond the plan. A plan defect fixed under the goal is not a problem to report.
+
+Print the `repairs --status` line as the last line of every goal-mode turn, or the `leg-close:` line once step 8 has started. The `/goal` evaluator reads only the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback".
 
 The rest of this document is reference material.
 

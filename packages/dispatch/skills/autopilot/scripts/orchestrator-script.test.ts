@@ -4415,6 +4415,41 @@ describe("cockpit-rust flight fixes", () => {
     expect(promptFor(log, `verify:${ref}#1`)).toContain("planDefect");
   });
 
+  test("a reverify-reported plan defect unlands, then parks without another attempt", async () => {
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), parkedEnd()],
+      worktree: { [`wt-land:${ref}`]: [{ ...cleanLand, drift: true }] },
+      reverify: {
+        [ref]: [
+          {
+            passed: false,
+            summary: "routes dirty",
+            planDefect: "no-touch gate covers routes a landed sibling edited",
+          } as never,
+        ],
+      },
+    });
+    const start = log.labels.indexOf(`reverify:${ref}#1`);
+    expect(log.labels.slice(start, start + 3)).toEqual([
+      `reverify:${ref}#1`,
+      `wt-unland:${ref}`,
+      `wt-rebase:${ref}`,
+    ]);
+    expect(log.labels).not.toContain(`dev:${ref}#2`);
+    expect(log.labels).not.toContain(`done:${ref}`);
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      attempt: 1,
+      class: "plan-defect",
+      parked: true,
+      infrastructure: false,
+    });
+    expect(log.result.escalations[0].reason).toStartWith(
+      "PLAN DEFECT reported by reverify on attempt 1: no-touch gate covers routes a landed sibling edited",
+    );
+    expect(promptFor(log, `reverify:${ref}#1`)).toContain("planDefect");
+  });
+
   test("a land runs on opus and resolves its own conflict before a separate reverify", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0), complete(1)],
