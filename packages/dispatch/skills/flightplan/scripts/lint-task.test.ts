@@ -1672,3 +1672,160 @@ describe("scope-pgrep rule", () => {
     expect(await lintGate("- [ ] Run `pgrep cockpit-channel`")).toEqual([]);
   });
 });
+
+describe("scope-git-diff rule", () => {
+  const lintGate = async (item: string) => {
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": VALID_TASK.replace(
+        "- [ ] Run `bun test`",
+        item,
+      ),
+    });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations.filter((v) => v.rule === "scope-git-diff");
+  };
+
+  test("flags git diff --quiet and --exit-code with no pathspec", async () => {
+    const quiet = await lintGate("- [ ] Run `git diff --quiet`");
+    expect(quiet).toHaveLength(1);
+    expect(quiet[0].detail).toContain("-- <paths>");
+    expect(
+      await lintGate("- [ ] Run `git diff --exit-code HEAD && echo clean`"),
+    ).toHaveLength(1);
+  });
+
+  test("passes a diff narrowed with -- pathspec", async () => {
+    expect(
+      await lintGate("- [ ] Run `git diff --quiet -- src/app.ts`"),
+    ).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `git diff --exit-code HEAD -- README.md`"),
+    ).toEqual([]);
+  });
+
+  test("ignores the Final review's --name-only form and plain git diff", async () => {
+    expect(
+      await lintGate("- [ ] Run `git diff --name-only <baseRef>`"),
+    ).toEqual([]);
+    expect(await lintGate("- [ ] Run `git diff` and quote it")).toEqual([]);
+  });
+
+  test("does not let a later segment's -- scope the diff", async () => {
+    expect(
+      await lintGate("- [ ] Run `git diff --quiet && grep -q x -- a.ts`"),
+    ).toHaveLength(1);
+  });
+});
+
+describe("refused-command rule", () => {
+  const lintGate = async (item: string, section = "Verification") => {
+    const body =
+      section === "Verification"
+        ? VALID_TASK.replace("- [ ] Run `bun test`", item)
+        : VALID_TASK.replace("- [ ] One", item);
+    const root = await writeTree({
+      "tasks/ui/01-fixture-state-shell.md": body,
+    });
+    const violations = await lintFile(
+      join(root, "tasks/ui/01-fixture-state-shell.md"),
+    );
+    await rm(root, { recursive: true, force: true });
+    return violations.filter((v) => v.rule === "refused-command");
+  };
+
+  test("flags each refused git subcommand and docker run", async () => {
+    for (const cmd of [
+      "git checkout -- src/app.ts",
+      "git restore src/app.ts",
+      "git reset --hard",
+      "git stash && bun test && git stash pop",
+      "git clean -fd",
+      "docker run --rm postgres:16",
+    ]) {
+      const hits = await lintGate(`- [ ] Run \`${cmd}\``);
+      expect(hits).toHaveLength(1);
+      expect(hits[0].detail).toContain("never pass");
+    }
+  });
+
+  test("flags a refused command after a shell separator or under git -C", async () => {
+    expect(
+      await lintGate("- [ ] Run `bun test; git reset --hard HEAD`"),
+    ).toHaveLength(1);
+    expect(await lintGate("- [ ] Run `git -C app stash`")).toHaveLength(1);
+  });
+
+  test("skips the acceptance criteria, where a span names a ban in prose", async () => {
+    expect(
+      await lintGate(
+        "- [ ] `NO_RESTORE_RULE` still bans `git checkout` and `git reset`",
+        "Acceptance criteria",
+      ),
+    ).toEqual([]);
+  });
+
+  test("ignores prose and a refused command quoted as an argument", async () => {
+    expect(
+      await lintGate("- [ ] The script does not call git reset anywhere"),
+    ).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `grep -c 'git reset' bin/deploy` and expect 0"),
+    ).toEqual([]);
+    expect(await lintGate("- [ ] Run `git diff --quiet -- a.ts`")).toEqual([]);
+  });
+});
+
+describe("plan-dir-git-status rule", () => {
+  const TASK = "docs/proj/legs/08c-work/tasks/ui/01-fixture-state-shell.md";
+  const lintGate = async (item: string, withGit = true) => {
+    const root = await writeTree({
+      [TASK]: VALID_TASK.replace("- [ ] Run `bun test`", item),
+    });
+    if (withGit) await mkdir(join(root, ".git"));
+    const violations = await lintFile(join(root, TASK));
+    await rm(root, { recursive: true, force: true });
+    return violations.filter((v) => v.rule === "plan-dir-git-status");
+  };
+
+  test("flags a git status pathspec inside the plan dir", async () => {
+    const hits = await lintGate(
+      "- [ ] Run `git status --short -- docs/proj/legs/08c-work/report.md`",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].detail).toContain("test -s");
+  });
+
+  test("flags a git diff pathspec at the plan dir or naming the task file", async () => {
+    expect(
+      await lintGate(
+        "- [ ] Run `git diff --quiet -- ./docs/proj/legs/08c-work/`",
+      ),
+    ).toHaveLength(1);
+    expect(
+      await lintGate(`- [ ] Run \`git status --short -- README.md ${TASK}\``),
+    ).toHaveLength(1);
+  });
+
+  test("passes pathspecs outside the plan dir", async () => {
+    expect(
+      await lintGate(
+        "- [ ] Run `git status --short -- README.md docs/proj/legs/08c-workbench.md`",
+      ),
+    ).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `test -s docs/proj/legs/08c-work/report.md`"),
+    ).toEqual([]);
+  });
+
+  test("skips the rule when no repo root is found", async () => {
+    expect(
+      await lintGate(
+        "- [ ] Run `git status --short -- docs/proj/legs/08c-work/report.md`",
+        false,
+      ),
+    ).toEqual([]);
+  });
+});

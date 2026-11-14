@@ -183,7 +183,7 @@ You check the plan is still heading where it says it is going:
 You check that every gate actually checks. For every \`## Verification\` command
 and every \`## Acceptance criteria\` item, run two thought experiments:
 
-1. A correct implementation — would it pass? Flag a check that cannot pass: malformed shell (\`grep -c\` asked to print content, an unquoted placeholder), a pattern that also matches legitimate content (tests, fixtures, a namespace URL), a wrong expected value, a check that forbids an edit the task itself requires.
+1. A correct implementation — would it pass? Flag a check that cannot pass: malformed shell (\`grep -c\` asked to print content, an unquoted placeholder), a pattern that also matches legitimate content (tests, fixtures, a namespace URL), a wrong expected value, a check that forbids an edit the task itself requires, a step that needs \`git checkout\`, \`docker run\` or a second database, which the verifier and agents refuse.
 2. A deliberately broken implementation — would it fail? Flag a criterion loose enough to pass a regression: "not 404" that also accepts a 500, "behaves as before" with no recorded baseline.
 3. Checks no command can make must be tagged \`(human)\`, and a human check still needs a fixed sample and a pass condition.
 4. Eval rubric quality — dimensions specific to the task, a pass threshold that makes sense for what is built.
@@ -195,7 +195,7 @@ You hold every file to every other file:
 
 1. Contradictions — two files disagreeing on a name, type, path, default, flag, or required behavior. Name both sides.
 2. Propagation — a renamed symbol or changed decision that some file still states the old way. Search the bundle for the old term.
-3. Ownership and order — a task whose check needs work a later task does, or a task that edits a file another task owns.
+3. Ownership and order — a task whose check needs work a later task does, a task that edits a file another task owns, or a no-touch gate (a path stays unchanged) that does not exclude every directory a sibling edits.
 4. Dependencies — an ordering assumption missing from "Depends on:", and a Final review task whose "Depends on:" does not reach every other task.
 5. Self-containment — each task can be done from _context/ plus its own file, without PLAN.md or a sibling task.
 6. Task scope — a task too large for one session, or one that mixes concerns; suggest the split.

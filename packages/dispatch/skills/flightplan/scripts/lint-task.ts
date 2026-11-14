@@ -28,8 +28,9 @@
  *
  * Exits 0 if all files pass; 1 if any violation is found.
  */
+import { existsSync } from "node:fs";
 import { readFile, stat, readdir } from "node:fs/promises";
-import { basename, dirname, resolve, relative } from "node:path";
+import { basename, dirname, join, resolve, relative, sep } from "node:path";
 import {
   GATE_SECTIONS,
   parseTask,
@@ -145,6 +146,121 @@ export function scopePgrepChecks(task: ParsedTask): string[] {
         }
       }
     }
+  }
+  return hits;
+}
+
+const CODE_SPAN_REGEX = /`([^`\n]+)`/g;
+
+// Commands are read from code spans only and split on `;`, `&&`, `||`, `|`, so a
+// refused command a plan writes as bare prose, or hides in `sh -c '…'`, passes.
+// Upgrade to a shell parser if plans start writing gates that way.
+function gateCommands(item: string): string[][] {
+  const commands: string[][] = [];
+  for (const span of item.matchAll(CODE_SPAN_REGEX)) {
+    for (const segment of span[1].split(/;|&&|\|\||\||\$\(|\)/)) {
+      const tokens = segment
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((t) => t.replace(/^['"]|['"]$/g, ""));
+      while (tokens[0] === "!" || tokens[0] === "(") tokens.shift();
+      if (tokens.length > 0) commands.push(tokens);
+    }
+  }
+  return commands;
+}
+
+function gitSubcommand(
+  tokens: string[],
+): { sub: string; args: string[] } | null {
+  if (tokens[0] !== "git") return null;
+  let i = 1;
+  while (i < tokens.length && tokens[i].startsWith("-")) {
+    i += tokens[i] === "-C" || tokens[i] === "-c" ? 2 : 1;
+  }
+  if (i >= tokens.length) return null;
+  return { sub: tokens[i], args: tokens.slice(i + 1) };
+}
+
+function gateItems(task: ParsedTask): string[] {
+  return GATE_SECTIONS.flatMap((heading) =>
+    checklistItems(extractSection(task.body, heading)),
+  );
+}
+
+export function scopeGitDiffChecks(task: ParsedTask): string[] {
+  const hits: string[] = [];
+  for (const item of gateItems(task)) {
+    const unscoped = gateCommands(item).some((tokens) => {
+      const git = gitSubcommand(tokens);
+      if (git?.sub !== "diff") return false;
+      if (!git.args.some((a) => a === "--quiet" || a === "--exit-code"))
+        return false;
+      const dash = git.args.indexOf("--");
+      return dash === -1 || dash === git.args.length - 1;
+    });
+    if (unscoped) hits.push(item.split("\n")[0].trim());
+  }
+  return hits;
+}
+
+const REFUSED_GIT = new Set(["checkout", "restore", "reset", "stash", "clean"]);
+
+export function refusedCommandItems(task: ParsedTask): string[] {
+  const hits: string[] = [];
+  for (const item of checklistItems(
+    extractSection(task.body, "Verification"),
+  )) {
+    const refused = gateCommands(item).some((tokens) => {
+      if (tokens[0] === "docker" && tokens[1] === "run") return true;
+      const git = gitSubcommand(tokens);
+      return git !== null && REFUSED_GIT.has(git.sub);
+    });
+    if (refused) hits.push(item.split("\n")[0].trim());
+  }
+  return hits;
+}
+
+function repoRootOf(start: string): string | null {
+  let dir = start;
+  while (true) {
+    if (existsSync(join(dir, ".git"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+function pathspecsOf(sub: string, args: string[]): string[] {
+  const dash = args.indexOf("--");
+  if (sub === "diff") return dash === -1 ? [] : args.slice(dash + 1);
+  if (dash !== -1) return args.slice(dash + 1);
+  return args.filter((a) => !a.startsWith("-"));
+}
+
+export function planDirGitStatusItems(
+  task: ParsedTask,
+  filePath: string,
+): string[] {
+  if (!inferRefFromPath(filePath)) return [];
+  const abs = resolve(filePath);
+  const planDir = dirname(dirname(dirname(abs)));
+  const root = repoRootOf(planDir);
+  if (root === null) return [];
+  const planRel = relative(root, planDir).split(sep).join("/");
+  if (planRel === "") return [];
+  const hits: string[] = [];
+  for (const item of gateItems(task)) {
+    const inside = gateCommands(item).some((tokens) => {
+      const git = gitSubcommand(tokens);
+      if (git?.sub !== "status" && git?.sub !== "diff") return false;
+      return pathspecsOf(git.sub, git.args).some((spec) => {
+        const path = spec.replace(/^\.\//, "").replace(/\/+$/, "");
+        return path === planRel || path.startsWith(`${planRel}/`);
+      });
+    });
+    if (inside) hits.push(item.split("\n")[0].trim());
   }
   return hits;
 }
@@ -347,6 +463,27 @@ export async function lintFile(
     push(
       "scope-pgrep",
       `\`pgrep -f\` matches process command lines machine-wide, so another session's process can satisfy or fail this gate. Anchor the pattern to a flag or path this task itself passes, e.g. \`pgrep -f 'server.ts --port 5999'\`: ${item}`,
+    );
+  }
+
+  for (const item of scopeGitDiffChecks(task)) {
+    push(
+      "scope-git-diff",
+      `a \`git diff --quiet\` or \`--exit-code\` gate with no \`--\` pathspec reads the WHOLE working tree, which no task owns: a parallel sibling's uncommitted edits, and the runner's own Status edit to this task file, fail a correct implementation. Narrow it to this task's own files with \`-- <paths>\`: ${item}`,
+    );
+  }
+
+  for (const item of refusedCommandItems(task)) {
+    push(
+      "refused-command",
+      `this gate runs \`git checkout\`, \`git restore\`, \`git reset\`, \`git stash\`, \`git clean\` or \`docker run\`, so it can never pass: the verifier is forbidden to rewrite the tree and agents cannot start a container. Prove the property without either, e.g. \`git diff --quiet -- <file>\` after the check, or the existing dev database: ${item}`,
+    );
+  }
+
+  for (const item of planDirGitStatusItems(task, filePath)) {
+    push(
+      "plan-dir-git-status",
+      `a \`git status\` or \`git diff\` pathspec inside the plan dir sees nothing under autopilot: each task runs in a worktree where the plan dir is an untracked symlink to the main tree, so a file written there never shows. Gate a report file with \`test -s <path>\` instead: ${item}`,
     );
   }
 

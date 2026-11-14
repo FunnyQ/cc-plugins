@@ -204,7 +204,7 @@ Before finalizing a task file, verify each:
 - [ ] Write file paths relative to the repo root (no "in the auth folder" hand-waving).
 - [ ] Every acceptance criterion is verifiable (no "looks good").
 - [ ] Verification steps are concrete commands or manual checks, not vague QA notes, with paths relative to the repo root.
-- [ ] Every `git status` gate carries a `--` pathspec and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
+- [ ] Every `git status` and `git diff --quiet` gate carries a `--` pathspec outside the plan dir and claims nothing about other paths. See "Always narrow a `git status` gate to a pathspec" below.
 - [ ] Every Final review gate that checks which files changed uses `git diff --name-only <baseRef> -- <paths>`, never `git status`.
 - [ ] Every criterion about a report names the report's file in backticks, for example ``The report at `docs/<slug>/review-notes.md` lists …``. In the Final review, `lint-task.ts` flags "the report" with no path as the `report-path` rule, because a verifier checks disk and finds nothing to check.
 - [ ] Each gate section holds at least one item a verifier can run itself — an all-`(human)` section fails lint. See "Human-only gate items" below.
@@ -219,7 +219,9 @@ A gate that reads `git status` without a `--` pathspec reads the **whole working
 - ❌ ``Run `git status --short` — expect `README.md` as the only modified path.``
 - ❌ `` `git status --short` shows nothing else modified. ``
 - ❌ ``Run `git status --short` and quote it. Expect `README.md`, plus at most this task file. Any OTHER path is a real scope violation.``
-- ✅ ``Run `git status --short -- README.md docs/<slug>/tasks/<bucket>/NN-<slug>.md` and confirm both paths are dirty.``
+- ✅ ``Run `git status --short -- README.md src/app.ts` and confirm both paths are dirty.``
+
+Leave the task file and every other plan-dir path out of the pathspec. Under Claude Code each task runs in a worktree where the plan dir is an untracked symlink to the main tree, so `git status` there never lists a plan-dir file.
 
 A whole-tree form fails a correct task for two reasons:
 
@@ -231,6 +233,17 @@ A whole-tree form fails a correct task for two reasons:
 `lint-task.ts` enforces this as the `scope-git-status` rule: a `git status` in `## Acceptance criteria` or `## Verification` with no `--` pathspec fails, and a pathspec-limited one still fails if it claims exclusivity. Option flags such as `--short` and `--porcelain` do not count as a pathspec.
 
 The `scope-pgrep` rule is the same class of check: a `pgrep -f` pattern in a gate that carries no `/` and no flag token matches processes machine-wide (other sessions), so anchor it to a flag or path the task itself passes.
+
+The `scope-git-diff` rule holds `git diff --quiet` and `git diff --exit-code` to the same standard: with no `--` pathspec they read the whole tree, so a sibling's edits and the runner's own Status edit fail a correct task. Narrow them with `-- <paths>`. The Final review's `git diff --name-only` form is exempt.
+
+The `plan-dir-git-status` rule fails a `git status` or `git diff` pathspec that points inside the plan dir, the task file itself included. When a gate checks a report written under the plan dir, gate it with `test -s <path>`.
+
+The `refused-command` rule fails a `## Verification` item that runs `git checkout`, `git restore`, `git reset`, `git stash`, `git clean`, or `docker run`. The verifier is forbidden the git commands and agents cannot start a container, so the gate can never pass. Prove the property without rewriting the tree or starting a container, for example with `git diff --quiet -- <file>` after the check, or against the existing dev database. The rule reads commands inside code spans only, so prose such as "does not call git reset" passes. It skips `## Acceptance criteria`, where a code span usually names a command in prose rather than runs it; keep refused commands out of acceptance criteria by hand.
+
+Two more rules hold that no lint can check:
+
+- When a gate asserts a path is unchanged, exclude every directory a sibling task edits. A reverify after a drifted land runs in the shared main tree, where the landed siblings' edits sit.
+- Never plan a step that needs `git checkout`, `docker run`, or a second database. The verifier and agents refuse them, so the step cannot run.
 
 ## Sizing
 
