@@ -7,6 +7,7 @@ Follow this file for every step of `SKILL.md` → "Goal mode". Goal mode is Clau
 - `$SCRIPTS` and `$OWN`: the paths Step 1 resolved.
 - `$WAYPOINTS`: `<base>/../waypoints/scripts`, absolute.
 - `<root>`, `<slug>`, `<plan dir>`, `<PLAN.md>`, `<tasks dir>`, `<log>`: the values baked into `CFG` as `repoRoot`, `slug`, `planDir`, `planPath`, `tasksDir`, `logFile`.
+- `<proj>`, `<leg>`: the `proj` and `slug` that `legOf(<PLAN.md>)` returns, for a waypoints leg only.
 - `<round>`: the repair round in this flight. Start at 1, and add 1 after each re-launch.
 - `<ref-slug>`: the ref with `/` replaced by `-`, such as `ui-01`. Use `flight` for a `--flight` record and `tree` for `(tree)`.
 - `<scratch>`: `<plan dir>/.flightlog/repair/<round>-<ref-slug>`. Create `<plan dir>/.flightlog/repair/` when it is absent. The `.flightlog/` self-ignore keeps every file there out of git and out of the guard.
@@ -27,6 +28,12 @@ Show the user this line, filled in, and ask them to type it:
 
 ```text
 /goal The autopilot flight for docs/<slug> has ended: the last line of the latest turn reads "repairs --status: complete" or "repairs --status: exhausted", and that turn printed the path of <plan dir>/.flightlog/FLIGHTREPORT.md.
+```
+
+When `<PLAN.md>` is a waypoints leg, `docs/<proj>/legs/<leg>/PLAN.md` (`legOf` in `$WAYPOINTS/deferred.ts` returns non-null), offer the leg goal beside the flight goal and let the user pick one. The leg goal runs step 8 after a `complete` flight: it works through the owed `(human)` checks, fixes what they find, and advances the roadmap.
+
+```text
+/goal The autopilot leg docs/<proj>/legs/<leg> has ended: the last line of the latest turn reads "leg-close: closed", "leg-close: open", or "repairs --status: exhausted", and that turn printed the path of <plan dir>/.flightlog/FLIGHTREPORT.md.
 ```
 
 Keep the condition a description of a state, never an imperative. Do not set the goal through a tool: `/goal` is a session Stop hook the user sets, and a model-proposed goal is unverified. Launch only after the user has set it.
@@ -169,9 +176,36 @@ bun $SCRIPTS/flightlog.ts repairs <log> --tasks <tasks dir> --status
 
 The first command writes `<plan dir>/.flightlog/FLIGHTREPORT.md` and prints its path. Print the outcome the second command prints now, not one read earlier in the turn, and that path. Then report as Step 4 says.
 
+Under the leg goal, go to step 8 when the outcome is `complete`. On `exhausted`, stop here: the leg stays active.
+
+## 8. Close the leg (leg goal only)
+
+The typed leg goal pre-approves three things: running the owed checks, fixing the code they find broken, and confirming the drafted `advance` outcome. It approves nothing that costs money or changes what a user sees beyond what the plan specifies; ask for those as [Reporting while the goal runs](#reporting-while-the-goal-runs) says, and leave the check `owed` until the user answers.
+
+1. Read the `## Needs a person` checklist in `FLIGHTREPORT.md`. Number its items in order as `<n>`.
+2. For each item, try to perform it with the tools you have: a browser skill, the dev server, a command. Write what you did and what you saw to `<plan dir>/.flightlog/after-run/<n>-<ref-slug>.md`, ending with one verdict: `PASS`, `FAIL`, or `OWED` when no tool reaches it. Log it:
+   ```bash
+   bun $SCRIPTS/flightlog.ts log <log> --task <ref> --role after-run --message "<PASS|FAIL|OWED> — <n>: <one line>"
+   ```
+3. On `FAIL`, fix the code in the main tree. Then run every Verification command of the item's task, and of the Final review task, from `<root>`. When they pass and the check passes again, commit the fix and its evidence file with `git commit -m "fix(after-run): <one line>"`, and log `FIXED — <n>: <one line>` as step 2 shows. When the fix still fails after 2 tries, restore the tree as **Restore the tree** says, log `FAIL`, and go to step 5 without advancing.
+4. Advance the roadmap. Run `bun $WAYPOINTS/waypoints.ts advance <proj>` to print the drafted outcome, then write it:
+   ```bash
+   bun $WAYPOINTS/waypoints.ts advance <proj> --outcome "<drafted outcome> · after-run: <fixed> fixed, <owed> owed"
+   git -C <root> add docs/<proj>/WAYPOINTS.md
+   git -C <root> commit -m "docs(waypoints): land <leg>"
+   ```
+   It promotes the next leg to `[~]` and plans nothing; the next leg still needs its own flightplan run.
+5. Print the `OWED` and unfixed `FAIL` items as a checklist the user still owes, each with its evidence path. End the turn with `leg-close: closed` after step 4 ran, or `leg-close: open` when step 3 stopped it.
+
+Post-flight fixes pass through no judge and no rubric, only the Verification commands step 3 re-runs. Say so in the report and name every `fix(after-run)` commit.
+
+## Reporting while the goal runs
+
+Write to the user only when the loop needs them: a halt, a `/goal clear` request, a refused or failed fix in step 8, or a decision the goal does not cover. Name a decision the goal does not cover when it costs money, such as a paid API call, or changes behavior a user sees beyond what the plan specifies. A plan defect the repair reviewer fixed is not a problem: the trail and `FLIGHTREPORT.md` carry it, so report nothing for it between launches.
+
 ## Every goal-mode turn
 
-End every goal-mode turn with the line `repairs --status: <status>`, holding the latest `repairs --status` output. The `/goal` evaluator judges from the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback". A turn that does not print the line cannot end the goal.
+End every goal-mode turn with the line `repairs --status: <status>`, holding the latest `repairs --status` output. Under the leg goal, once step 8 has started, end it with the `leg-close:` line instead. The `/goal` evaluator judges from the transcript, never the filesystem, and a continuation turn arrives as "Stop hook feedback". A turn that does not print the line cannot end the goal.
 
 ## Measured on Claude Code
 

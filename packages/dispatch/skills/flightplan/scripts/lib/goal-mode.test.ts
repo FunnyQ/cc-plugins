@@ -973,9 +973,32 @@ describe("renderFlightReport", () => {
     expect(report).not.toContain("## Ungated trees");
   });
 
-  test("needs a person comes from the last run-end", () => {
+  test("needs a person lists the last run-end's checks", () => {
     const section = report.slice(report.indexOf("## Needs a person"));
     expect(section).toContain("ui/01");
     expect(section).toContain("looks right");
+  });
+
+  test("needs a person keeps checks from every round, the latest per task", () => {
+    const rounds = renderFlightReport(
+      [
+        runEnd({
+          completed: ["ui/01", "ui/02"],
+          needsHuman: [
+            { task: "ui/01", criteria: ["old check"] },
+            { task: "ui/02", criteria: ["sidebar folds"] },
+          ],
+        }),
+        runEnd({
+          completed: ["ui/01"],
+          needsHuman: [{ task: "ui/01", criteria: ["looks right"] }],
+        }),
+      ],
+      { slug: "demo", status: "complete", deferredMd: "", tasks },
+    );
+    const section = rounds.slice(rounds.indexOf("## Needs a person"));
+    expect(section).toContain("- [ ] ui/02: sidebar folds");
+    expect(section).toContain("- [ ] ui/01: looks right");
+    expect(section).not.toContain("old check");
   });
 });

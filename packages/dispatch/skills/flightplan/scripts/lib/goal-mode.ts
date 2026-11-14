@@ -495,10 +495,13 @@ export function renderFlightReport(
     "",
   );
 
-  const lastEnd = entries.findLast(
-    (e): e is RunEndEntry => e.kind === "run-end",
-  );
-  const human = (lastEnd?.needsHuman ?? []).flatMap(({ task, criteria }) =>
+  const latestByTask = new Map<string, string[]>();
+  for (const e of entries) {
+    if (e.kind !== "run-end") continue;
+    for (const { task, criteria } of e.needsHuman ?? [])
+      latestByTask.set(task, criteria);
+  }
+  const human = [...latestByTask].flatMap(([task, criteria]) =>
     criteria.map((c) => `- [ ] ${task}: ${oneLine(c)}`),
   );
   out.push("## Needs a person", "", ...none(human), "");
