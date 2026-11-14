@@ -1,5 +1,17 @@
 # Changelog
 
+## [dispatch 5.12.0] - 2026-11-15
+
+_tracks tag `dispatch-v5.12.0`_
+
+### Added
+- `flightlog recover` reports tasks an interrupted run left stuck at in-progress and, with `--apply`, resets them to todo so autopilot can pick them up again instead of you editing them by hand.
+- Autopilot can now resume a flight after a crash or closed terminal: a recovery planner classifies the last run as clean, live or interrupted and works out which step and attempt each task re-enters at, and a live run is refused with exit 3 and never reset.
+
+### Changed
+- Autopilot now runs `recover` before takeoff and asks you before applying it, since idle time alone cannot prove a run is dead; the Codex path writes no run-end and skips it.
+- The reentry note on recovered runs now says the run was recovered, not only that the plan was repaired.
+
 ## [dispatch 5.11.0] - 2026-11-14
 
 _tracks tag `dispatch-v5.11.0`_
