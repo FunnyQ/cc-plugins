@@ -2660,7 +2660,7 @@ describe("orchestrator per-task reentry", () => {
     );
 
     const note =
-      "re-entered at the verify step after a plan repair; the steps before it were taken as already satisfied";
+      "re-entered at the verify step after a plan repair or a recovered run; the steps before it were taken as already satisfied";
     const first = promptFor(log, "verify:ui/01#4");
     expect(first).toContain(note);
     expect(first).toContain("--role reentry --attempt 4");

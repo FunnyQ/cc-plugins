@@ -765,7 +765,7 @@ const resumeNote = (ref, attempt, role, startAt) =>
   startAt !== "dev" && startAt === role
     ? RESUME
       ? `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role resume --attempt ${attempt} --agent "<your label>" --message "resumed at the ${RESUME.from} step; the steps before it were taken as already satisfied${CFG.attestationFile ? `; human attestation at ${CFG.attestationFile}` : ""}"\n`
-      : `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${attempt} --agent "<your label>" --message "re-entered at the ${startAt} step after a plan repair; the steps before it were taken as already satisfied"\n`
+      : `Then record why this attempt has no dev step: bun ${S}/flightlog.ts log ${CFG.logFile} --task ${ref} --role reentry --attempt ${attempt} --agent "<your label>" --message "re-entered at the ${startAt} step after a plan repair or a recovered run; the steps before it were taken as already satisfied"\n`
     : "";
 
 const verifyPrompt = (
