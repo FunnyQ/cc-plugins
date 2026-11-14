@@ -96,7 +96,13 @@ Before touching Workflow, gather the work-list in the main conversation:
    ```bash
    bun $SCRIPTS/next-ready.ts docs/<slug>/tasks --summary
    ```
-   A non-zero exit means the tree is malformed — the printed `invalid` array names each offending task and why; run `lint-task.ts` and fix it before flying. If `counts.done === counts.total`, the tree is already done — report that and stop before Step 2. If `ready` is empty while tasks remain unfinished, reset any stale `in-progress` task to `todo` first.
+   A non-zero exit means the tree is malformed — the printed `invalid` array names each offending task and why; run `lint-task.ts` and fix it before flying. If `counts.done === counts.total`, the tree is already done — report that and stop before Step 2. Before reading `ready`, run the recovery check in the next item.
+   **Recover an interrupted run.** When `<plan dir>/.flightlog/run.jsonl` exists, run:
+   ```bash
+   bun $SCRIPTS/flightlog.ts recover docs/<slug>/.flightlog/run.jsonl --tasks docs/<slug>/tasks
+   ```
+   It prints one JSON object. On `clean`, the last run closed; when `stranded` names tasks, a park failed and left them `in-progress`: tell the user and, on their word, reset each to `todo` by hand. On `live` (exit 3), the last run has no `run-end` and logged within 15 minutes. On `interrupted`, it has been silent longer. **In both cases ask the user before going on**: idle time is the only liveness signal, and a live external dev step can stay silent past 40 minutes, so name the idle minutes and the `reset` refs and ask whether that run is still going in another session. Applying recovery to a live run deletes its worktrees and flies its tasks twice. Only on the user's word, re-run with `--apply` (and `--stale-minutes 0` after a `live`) to set the refs to `todo`, re-run the scout above, and bake the printed `reentry` object as `CFG.reentry` in Step 3, so each task counts on from its highest attempt and re-enters at the step the interrupted run supports. In goal mode, also carry over the last launch's baked reentry for tasks that never ran, and commit every uncommitted change, not only the reset, before `flight-start`.
+
 5. **Lint the whole tree before flying:**
 
    ```bash
@@ -352,7 +358,7 @@ The orchestrator sweeps `<repo-parent>/.<repo-name>-autopilot/<slug>/` at run st
 
 **A `(divergence)` escalation is not a park.** It means a task passed, was confirmed `done`, and then something rewrote its file back to unfinished — a parallel task running `git checkout`/`git restore`, or a hand edit. Do not just reset and re-run: find what rolled the file back first, or the next run loses the same work again. The `reason` names the affected refs, and their code changes are often already committed, so check that before deciding whether to restore each `Status` to `done` or reset it to `todo`.
 
-Crash recovery note: an interrupted run can leave task files at `Status: in-progress`. `next-ready` only offers `todo`. Reset stale `in-progress` tasks to `todo` before re-running autopilot.
+Crash recovery: an interrupted run leaves task files at `Status: in-progress`, which `next-ready` never offers. Step 1's `flightlog.ts recover` finds them and re-enters them; never reset them by hand.
 
 How the orchestrator decides to park — the quality-vs-infrastructure split, the reread that confirms each status transition, and the guards around a schema'd `agent()` — lives in `references/orchestrator.md`.
 
@@ -374,6 +380,7 @@ You run these yourself, all in the sibling `skills/flightplan/scripts/` director
 - `next-ready.ts <tasks-dir> [--json | --summary]` — the scout of Step 1 and of every wave. **`--summary` is what the orchestrator uses**: one `{ready, counts, unfinished, invalid, errors}` object, printed even when the command exits 1, so a malformed tree still names its refs. It exits non-zero rather than return a ready set that would unlock work behind a fake `done`.
 - `lint-task.ts <tasks-dir | task-file>` — run it during scout when `next-ready` reports a malformed tree, and fix the tree before flying.
 - `flightlog.ts report <run.jsonl>` — Step 4's audit render. `flightlog.ts log` is the in-run narrative entry point.
+- `flightlog.ts recover <run.jsonl> --tasks <dir> [--stale-minutes N] [--apply]` — whether the last run closed, may still be running (exit 3), or was interrupted, and for an interrupted run the `in-progress` refs to reset and the `reentry` to bake.
 - `flightlog.ts progress <run.jsonl> [--task <ref>] [--json]` — where a task stopped, and the `--from` / `--attempt` a resume should use. Read it before every resume; never hand-count attempts out of the JSONL.
 
 Plus `bun "$OWN"/flightdeck.ts` for the monitor — the one file the launch step runs from autopilot's own `scripts/` directory, whose other modules are flightdeck's server, launcher, and pure derivations, each with a `.test.ts` beside it.

@@ -405,6 +405,6 @@ State that `mark-done.ts` ticks those boxes even while the human checks remain o
 Claim tree completion only after a valid nonempty scout confirms all tasks done, including Final review.
 
 Describe this path as an agent-driven parallel flight rather than a detached Workflow process.
-After a session interruption, recover from task files, worktree state, and `flightlog.ts progress` before continuing.
+After a session interruption, recover from task files, worktree state, and `flightlog.ts progress` before continuing. Do not run `flightlog.ts recover`: this path writes no `run-end`, so every Codex trail reads as an open run.
 Do not promise execution while the primary session is stopped.
 Disclose the remaining differences from Claude Code: native Codex role models, no automatic Claude fallback for dev, relay live panes for the closing review only, no Claude pane mod, and no cross-vendor signal when the selected reviewer also uses OpenAI.
