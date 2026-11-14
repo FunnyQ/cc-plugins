@@ -1356,3 +1356,64 @@ describe("goal-mode CLI", () => {
     });
   });
 });
+
+describe("recover CLI", () => {
+  const interrupted = async () => {
+    const p = await planFixture({ "ui/01": "in-progress", "ui/02": "todo" });
+    await p.run("log", p.log, "--task", "ui/01", "--role", "dev", "--attempt", "1", "--phase", "start");
+    return p;
+  };
+  const statusOf = async (p: Plan) =>
+    (await readFile(join(p.tasks, "ui", "01-first.md"), "utf-8")).match(/\*\*Status\*\*: (\S+)/)?.[1];
+
+  test("refuses with exit 3 while the open run is recent", async () => {
+    const p = await interrupted();
+    try {
+      const res = await p.run("recover", p.log, "--tasks", p.tasks, "--apply");
+      expect(res.code).toBe(3);
+      expect(JSON.parse(res.out).state).toBe("live");
+      expect(await statusOf(p)).toBe("in-progress");
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("reports without --apply and leaves the task files alone", async () => {
+    const p = await interrupted();
+    try {
+      const res = await p.run("recover", p.log, "--tasks", p.tasks, "--stale-minutes", "0");
+      expect(res.code).toBe(0);
+      const out = JSON.parse(res.out);
+      expect(out.state).toBe("interrupted");
+      expect(out.reset).toEqual(["ui/01"]);
+      expect(out.reentry["ui/01"].from).toBe("dev");
+      expect(await statusOf(p)).toBe("in-progress");
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("--apply resets in-progress tasks to todo", async () => {
+    const p = await interrupted();
+    try {
+      const res = await p.run("recover", p.log, "--tasks", p.tasks, "--stale-minutes", "0", "--apply");
+      expect(res.code).toBe(0);
+      expect(await statusOf(p)).toBe("todo");
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+
+  test("a closed run is clean", async () => {
+    const p = await planFixture({ "ui/01": "todo", "ui/02": "todo" });
+    try {
+      await p.run("log", p.log, "--task", "ui/01", "--role", "dev", "--attempt", "1", "--phase", "start");
+      await p.run("escalations", p.log, "--payload", escalationPayload([]));
+      const res = await p.run("recover", p.log, "--tasks", p.tasks, "--stale-minutes", "0");
+      expect(res.code).toBe(0);
+      expect(JSON.parse(res.out)).toEqual({ state: "clean", stranded: [] });
+    } finally {
+      await rm(p.root, { recursive: true });
+    }
+  });
+});

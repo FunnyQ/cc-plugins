@@ -14,6 +14,7 @@
  *   bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed \
  *       [--agent <label>] [--message "<why>"]
  *   bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]
+ *   bun flightlog.ts recover <logfile> --tasks <dir> [--stale-minutes 15] [--apply]
  *
  * `report` parses the JSONL trail and writes a grouped, human-readable
  * RUNLOG.md (default: sibling of the log file).
@@ -65,7 +66,8 @@ import {
   renderFlightReport,
   repairCounts,
 } from "./lib/goal-mode";
-import { parseTask, refToString } from "./lib/parse-task";
+import { matchStatusLine, parseTask, refToString } from "./lib/parse-task";
+import { planRecovery } from "./lib/recover";
 import { resumePoint, tasksIn } from "./lib/resume-point";
 
 export function buildNoteEntry(meta: {
@@ -160,6 +162,37 @@ async function main() {
           ? { ts, task, state, agentLabel, message }
           : fail("flightlog state requires --message for blocked or failed");
     await appendEntry(logFile, buildStateEntry(fields));
+    return;
+  }
+
+  if (cmd === "recover") {
+    if (!logFile) usage();
+    const tasksDir = flagValue(rest, "--tasks");
+    if (!tasksDir) fail("flightlog recover requires --tasks");
+    const staleMinutes = Number(flagValue(rest, "--stale-minutes") ?? "15");
+    if (!Number.isFinite(staleMinutes) || staleMinutes < 0) {
+      fail("flightlog recover --stale-minutes must be a number 0 or greater");
+    }
+    const { byRef, pathByRef } = await loadAllTasks(tasksDir);
+    const statusByRef = Object.fromEntries(
+      Object.entries(byRef).map(([ref, task]) => [ref, task.status]),
+    );
+    const recovery = planRecovery(
+      await readLog(logFile),
+      statusByRef,
+      Date.now(),
+      staleMinutes * 60_000,
+    );
+    if (recovery.state === "interrupted" && rest.includes("--apply")) {
+      for (const ref of recovery.reset) {
+        const lines = (await readFile(pathByRef[ref], "utf-8")).split("\n");
+        const at = lines.findIndex((line) => matchStatusLine(line));
+        lines[at] = `${matchStatusLine(lines[at])!.prefix}todo`;
+        await writeFile(pathByRef[ref], lines.join("\n"));
+      }
+    }
+    console.log(JSON.stringify(recovery));
+    if (recovery.state === "live") process.exit(3);
     return;
   }
 
@@ -729,6 +762,7 @@ function usage(): never {
       "  bun flightlog.ts log <logfile> --task <ref> --role <role> [--attempt N] [--agent <label>] [--phase <start|end>] [--message <text>]",
       "  bun flightlog.ts state <logfile> --task <ref> --state done|blocked|failed [--agent <label>] [--message <why>]",
       "  bun flightlog.ts progress <logfile> [--task <ref>] [--json]",
+      "  bun flightlog.ts recover <logfile> --tasks <dir> [--stale-minutes 15] [--apply]",
       "  bun flightlog.ts report <logfile> [--slug <slug>] [--out <RUNLOG.md>]",
       "  bun flightlog.ts report <logfile> --flight [--deferred <DEFERRED.md>] [--tasks <dir>] [--slug <slug>]",
       "  bun flightlog.ts flight-start <logfile> --plan <PLAN.md> [--tasks <dir>]",
