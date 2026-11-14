@@ -32,6 +32,22 @@ const SAMPLE = `# MyApp — Waypoints
       → legs/03-billing/
 `;
 
+const SPLIT = `# Split — Waypoints
+
+## Legs
+
+- [x] 3. Auth — users can sign in
+      → legs/03-auth/ · landed 2026-07-01 · outcome: ok
+- [x] 8a. API — endpoints exist
+      → legs/08a-api/ · landed 2026-07-02 · outcome: ok
+- [~] 8b1. Work core — core works
+      → legs/08b1-work-core/
+- [ ] 8b2. Work edge — edges work
+      → legs/08b2-work-edge/
+- [ ] 8c. Work — rest works
+      → legs/08c-work/
+`;
+
 const tempDirs: string[] = [];
 
 afterEach(async () => {
@@ -52,7 +68,7 @@ describe("parseRoadmap", () => {
       "pending",
     ]);
     expect(roadmap.legs[0]).toEqual({
-      num: 1,
+      id: "1",
       nn: "01",
       slug: "01-auth",
       status: "done",
@@ -81,6 +97,25 @@ describe("parseRoadmap", () => {
     expect(roadmap.legs[0].doneState).toBe(
       "users can sign up / sign in with email",
     );
+  });
+
+  test("parses split leg ids and zero-pads the number", () => {
+    const roadmap = parseRoadmap(SPLIT);
+
+    expect(roadmap.legs.map((leg) => [leg.id, leg.nn, leg.slug])).toEqual([
+      ["3", "03", "03-auth"],
+      ["8a", "08a", "08a-api"],
+      ["8b1", "08b1", "08b1-work-core"],
+      ["8b2", "08b2", "08b2-work-edge"],
+      ["8c", "08c", "08c-work"],
+    ]);
+    expect(roadmap.legs.map((leg) => leg.status)).toEqual([
+      "done",
+      "done",
+      "active",
+      "pending",
+      "pending",
+    ]);
   });
 
   test("prefers list number when pointer NN disagrees", () => {
@@ -113,6 +148,41 @@ describe("serializeRoadmap", () => {
   });
 });
 
+describe("split legs", () => {
+  test("serialize round-trips split ids exactly", () => {
+    const roadmap = parseRoadmap(SPLIT);
+    const serialized = serializeRoadmap(roadmap);
+
+    expect(serialized).toContain("- [~] 8b1. Work core — core works");
+    expect(serialized).toContain("      → legs/08c-work/");
+    expect(parseRoadmap(serialized)).toEqual(roadmap);
+  });
+
+  test("advance promotes 8b2 after 8b1 by file order", () => {
+    const advanced = advanceRoadmap(
+      parseRoadmap(SPLIT),
+      "Core landed.",
+      "2026-07-03",
+    );
+
+    expect(advanced.legs.map((leg) => [leg.id, leg.status])).toEqual([
+      ["3", "done"],
+      ["8a", "done"],
+      ["8b1", "done"],
+      ["8b2", "active"],
+      ["8c", "pending"],
+    ]);
+    expect(advanced.legs[2].landedDate).toBe("2026-07-03");
+  });
+
+  test("a continuation stops at the next split leg line", () => {
+    const roadmap = parseRoadmap(SPLIT);
+
+    expect(roadmap.legs[2].outcome).toBeUndefined();
+    expect(roadmap.legs[1].outcome).toBe("ok");
+  });
+});
+
 describe("assertSingleActive", () => {
   test("accepts zero active legs", () => {
     expect(() =>
@@ -120,7 +190,7 @@ describe("assertSingleActive", () => {
         title: "Done",
         legs: [
           {
-            num: 1,
+            id: "1",
             nn: "01",
             slug: "01-auth",
             status: "done",
@@ -496,14 +566,20 @@ describe("validation", () => {
   test("accepts valid leg slugs and buckets", () => {
     expect(() => validateLegSlug("01-auth")).not.toThrow();
     expect(() => validateLegSlug("12-profile2")).not.toThrow();
+    expect(() => validateLegSlug("08c-work")).not.toThrow();
+    expect(() => validateLegSlug("08b1-work-core")).not.toThrow();
     expect(() => validateBucket("work")).not.toThrow();
     expect(() => validateBucket("review2")).not.toThrow();
   });
 
   test("rejects invalid leg slugs and dashed buckets", () => {
-    expect(() => validateLegSlug("1-auth")).toThrow(/NN-slug/);
-    expect(() => validateLegSlug("01-1auth")).toThrow(/NN-slug/);
-    expect(() => validateLegSlug("01-auth/extra")).toThrow(/NN-slug/);
+    expect(() => validateLegSlug("1-auth")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("8-x")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("008-x")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("08B-x")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("08bb-x")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("01-1auth")).toThrow(/NN\[a\]\[n\]-slug/);
+    expect(() => validateLegSlug("01-auth/extra")).toThrow(/NN\[a\]\[n\]-slug/);
     expect(() => validateBucket("my-bucket")).toThrow(/bucket/);
     expect(() => validateBucket("1work")).toThrow(/bucket/);
   });

@@ -109,9 +109,10 @@ Use 1-2 questions per turn. When the shape is apparent, recommend an answer.
 Stop interviewing when:
 
 - The project has a stable slug for `docs/<proj>/`.
-- Each leg has a number, title, mandatory `legs/NN-slug/` pointer, and done-state.
+- Each leg has an id, title, mandatory `legs/NN[a][n]-slug/` pointer, and done-state.
 - Exactly one first leg is marked `[~]`; all later legs are `[ ]`.
 - The order is defensible by dependency or risk.
+- Split a leg by giving the parts letter ids, e.g. 8 → 8a, 8b; split 8b again → 8b1, 8b2.
 - No leg is secretly a task breakdown.
 
 Then draft the roadmap in the conversation and take it through the approval gate in `SKILL.md` before writing `docs/<proj>/WAYPOINTS.md`. Until `flightplan` is invoked for the active leg, do not scaffold leg tasks.

@@ -4,7 +4,7 @@
  *
  * Usage:
  *   bun waypoints.ts active <proj>
- *   bun waypoints.ts leg-scaffold <proj> <NN-slug> <bucket>[,<bucket>...]
+ *   bun waypoints.ts leg-scaffold <proj> <NN[a][n]-slug> <bucket>[,<bucket>...]
  *   bun waypoints.ts advance <proj> [--dry-run] [--outcome "<text>"] [--date YYYY-MM-DD]
  */
 import { mkdir, readFile } from "node:fs/promises";
@@ -15,7 +15,7 @@ import { FLIGHTLOG_DIRNAME } from "../../flightplan/scripts/lib/flightlog";
 export type LegStatus = "done" | "active" | "pending";
 
 export type Leg = {
-  num: number;
+  id: string;
   nn: string;
   slug: string;
   status: LegStatus;
@@ -51,7 +51,7 @@ const GLYPH_BY_STATUS: Record<LegStatus, string> = {
   pending: " ",
 };
 
-const LEG_SLUG_REGEX = /^\d{2}-[a-z][a-z0-9-]*$/;
+const LEG_SLUG_REGEX = /^\d{2}(?:[a-z]\d*)?-[a-z][a-z0-9-]*$/;
 const BUCKET_REGEX = /^[a-z][a-z0-9]*$/;
 const PROJ_SLUG_REGEX = /^[a-z][a-z0-9-]*$/;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -68,23 +68,22 @@ export function parseRoadmap(md: string): Roadmap {
   for (let i = legsStart + 1; i < lines.length; i++) {
     const line = lines[i];
     if (/^##\s+/.test(line)) break;
-    const item = /^- \[([x~ ])\] (\d+)\. (.+)$/.exec(line);
+    const item = /^- \[([x~ ])\] (\d+(?:[a-z]\d*)?)\. (.+)$/.exec(line);
     if (!item) continue;
 
-    const [, glyph, rawNum, body] = item;
-    const num = Number(rawNum);
-    const nn = String(num).padStart(2, "0");
+    const [, glyph, id, body] = item;
+    const nn = id.replace(/^\d+/, (digits) => digits.padStart(2, "0"));
     const split = body.split(" — ");
     if (split.length < 2) {
       throw new Error(
-        `Malformed leg ${num}: missing padded em dash separator.`,
+        `Malformed leg ${id}: missing padded em dash separator.`,
       );
     }
     const title = split[0].trim();
     const doneState = split.slice(1).join(" — ").trim();
     if (!title || !doneState) {
       throw new Error(
-        `Malformed leg ${num}: title and done-state are required.`,
+        `Malformed leg ${id}: title and done-state are required.`,
       );
     }
 
@@ -92,7 +91,7 @@ export function parseRoadmap(md: string): Roadmap {
     const pointer = /→\s+legs\/([^/]+)\//.exec(continuation);
     if (!pointer) {
       throw new Error(
-        `Malformed leg ${num}: missing mandatory → legs/NN-slug/ pointer.`,
+        `Malformed leg ${id}: missing mandatory → legs/NN[a][n]-slug/ pointer.`,
       );
     }
     const slug = normalizePointerSlug(pointer[1], nn);
@@ -103,7 +102,7 @@ export function parseRoadmap(md: string): Roadmap {
     const outcome = /(?:^|\s)· outcome: (.+)$/.exec(afterPointer)?.[1]?.trim();
 
     legs.push({
-      num,
+      id,
       nn,
       slug,
       status: STATUS_BY_GLYPH[glyph],
@@ -130,7 +129,7 @@ export function serializeRoadmap(roadmap: Roadmap): string {
 
   for (const leg of roadmap.legs) {
     lines.push(
-      `- [${GLYPH_BY_STATUS[leg.status]}] ${leg.num}. ${leg.title} — ${leg.doneState}`,
+      `- [${GLYPH_BY_STATUS[leg.status]}] ${leg.id}. ${leg.title} — ${leg.doneState}`,
     );
     let pointer = `      → legs/${leg.slug}/`;
     if (leg.landedDate) pointer += ` · landed ${leg.landedDate}`;
@@ -206,7 +205,7 @@ export function validateProjectSlug(proj: string): void {
 export function validateLegSlug(nnSlug: string): void {
   if (!LEG_SLUG_REGEX.test(nnSlug)) {
     throw new Error(
-      `NN-slug must match NN-kebab-slug, e.g. 01-auth (got: ${JSON.stringify(nnSlug)})`,
+      `NN[a][n]-slug must match NN[a][n]-kebab-slug, e.g. 01-auth or 08b1-work-core (got: ${JSON.stringify(nnSlug)})`,
     );
   }
 }
@@ -331,7 +330,7 @@ function parseTitle(lines: string[]): string {
 function collectContinuation(lines: string[], start: number): string {
   const continuation: string[] = [];
   for (let i = start; i < lines.length; i++) {
-    if (/^- \[[x~ ]\] \d+\. /.test(lines[i])) break;
+    if (/^- \[[x~ ]\] \d+(?:[a-z]\d*)?\. /.test(lines[i])) break;
     if (/^##\s+/.test(lines[i])) break;
     if (lines[i].trim()) continuation.push(lines[i].trim());
   }
@@ -339,7 +338,7 @@ function collectContinuation(lines: string[], start: number): string {
 }
 
 function normalizePointerSlug(pointerSlug: string, nn: string): string {
-  const suffix = /^\d{2}-(.+)$/.exec(pointerSlug)?.[1] ?? pointerSlug;
+  const suffix = /^\d{2}(?:[a-z]\d*)?-(.+)$/.exec(pointerSlug)?.[1] ?? pointerSlug;
   return `${nn}-${suffix}`;
 }
 
@@ -420,7 +419,7 @@ async function main() {
         const [proj, nnSlug, rawBuckets] = args;
         if (!proj || !nnSlug || !rawBuckets) {
           throw new Error(
-            "Usage: bun waypoints.ts leg-scaffold <proj> <NN-slug> <bucket>[,<bucket>...]",
+            "Usage: bun waypoints.ts leg-scaffold <proj> <NN[a][n]-slug> <bucket>[,<bucket>...]",
           );
         }
         validateProjectSlug(proj);

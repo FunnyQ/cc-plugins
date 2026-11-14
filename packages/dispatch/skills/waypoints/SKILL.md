@@ -65,9 +65,9 @@ PRIOR LANDED LEGS:
   goal: <first line of legs/01-auth/PLAN.md Overview, if present>
 ```
 
-### `leg-scaffold <proj> <NN-slug> <buckets>`
+### `leg-scaffold <proj> <NN[a][n]-slug> <buckets>`
 
-Called by flightplan's waypoint mode, not by this skill. Creates `docs/<proj>/legs/<NN-slug>/tasks/_context/` and one `tasks/<bucket>/` per comma-separated bucket. `<NN-slug>` must match `^\d{2}-[a-z][a-z0-9-]*$`; each bucket is one lowercase token with no dashes. The leg dir is created non-recursively, so an existing leg throws `EEXIST` instead of being reused.
+Called by flightplan's waypoint mode, not by this skill. Creates `docs/<proj>/legs/<NN[a][n]-slug>/tasks/_context/` and one `tasks/<bucket>/` per comma-separated bucket. `<NN[a][n]-slug>` must match `^\d{2}(?:[a-z]\d*)?-[a-z][a-z0-9-]*$`, e.g. `03-auth` or `08b1-work-core`; each bucket is one lowercase token with no dashes. The leg dir is created non-recursively, so an existing leg throws `EEXIST` instead of being reused.
 
 ### `advance <proj>`
 
@@ -76,14 +76,14 @@ bun "$SCRIPTS"/waypoints.ts advance <proj>                                   # p
 bun "$SCRIPTS"/waypoints.ts advance <proj> --outcome "<confirmed line>" [--date YYYY-MM-DD]
 ```
 
-The preview drafts one outcome line from `docs/<proj>/legs/<NN-slug>/.flightlog/RUNLOG.md` and the leg's PLAN.md goal, printed as `DRAFT OUTCOME: <line>`. `--dry-run` forces a preview even with `--outcome`.
+The preview drafts one outcome line from `docs/<proj>/legs/<NN[a][n]-slug>/.flightlog/RUNLOG.md` and the leg's PLAN.md goal, printed as `DRAFT OUTCOME: <line>`. `--dry-run` forces a preview even with `--outcome`.
 
 `--outcome` is the confirmation gate. It flips the active leg `[~]` → `[x]`, appends `· landed <date> · outcome: <line>` (`--date` defaults to today), promotes the next `[ ]` to `[~]` or reports the roadmap complete, and rewrites `WAYPOINTS.md`.
 
 ## What waypoints does NOT do
 
 - No task breakdown. Milestones only. `flightplan` owns per-leg tasks.
-- No auto-walk-roadmap. A human lands each leg and confirms the outcome before the next leg becomes active.
+- No auto-walk-roadmap. A human lands each leg and confirms the outcome before the next leg becomes active. Autopilot's leg goal is the one exception: the `/goal` line the human typed pre-confirms the drafted outcome for that one leg, and the next leg still needs its own flightplan run.
 - No sidecar status. Roadmap state lives only in `docs/<proj>/WAYPOINTS.md`.
 
 ## Additional resources

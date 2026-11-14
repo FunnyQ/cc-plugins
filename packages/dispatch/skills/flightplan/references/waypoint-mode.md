@@ -16,7 +16,7 @@ If multiple roadmaps exist and none is named, ask which. Don't guess. If the req
 Resolve the sibling script from this skill's load-time base directory:
 `WAYPOINTS_SCRIPT="<base-dir>/../waypoints/scripts/waypoints.ts"`.
 
-1. Read the active leg — its `NN-slug`, `DONE-STATE`, and the prior-legs digest:
+1. Read the active leg — its `NN[a][n]-slug`, `DONE-STATE`, and the prior-legs digest:
    ```bash
    bun "$WAYPOINTS_SCRIPT" active <proj>
    ```
@@ -25,13 +25,13 @@ Resolve the sibling script from this skill's load-time base directory:
 4. Scaffold with the waypoints script, not `scaffold.ts`:
 
    ```bash
-   bun "$WAYPOINTS_SCRIPT" leg-scaffold <proj> <NN-slug> <buckets>
+   bun "$WAYPOINTS_SCRIPT" leg-scaffold <proj> <NN[a][n]-slug> <buckets>
    ```
 
    Each leg is its own lintable tree with its own closing gate, so end `<buckets>` with `review` exactly as a normal plan does. The leg's final review task goes at `review/01`.
 
-   When the interview chose impeccable, run SKILL.md Step 6's design phase right after `leg-scaffold`, which creates the leg directory non-recursively and throws when it already exists. Replace `docs/<slug>/` with `docs/<proj>/legs/<NN-slug>/` in every path it names, so the mock lands at `docs/<proj>/legs/<NN-slug>/design/mock.html`.
+   When the interview chose impeccable, run SKILL.md Step 6's design phase right after `leg-scaffold`, which creates the leg directory non-recursively and throws when it already exists. Replace `docs/<slug>/` with `docs/<proj>/legs/<NN[a][n]-slug>/` in every path it names, so the mock lands at `docs/<proj>/legs/<NN[a][n]-slug>/design/mock.html`.
 
-5. Write the leg's spec + `tasks/` into `docs/<proj>/legs/<NN-slug>/`, using the same split as SKILL.md Step 6: author the spec and `_context/` yourself, run SKILL.md Step 7's design gate over them (Standard and Deep), then fan the task files out one forked subagent each.
+5. Write the leg's spec + `tasks/` into `docs/<proj>/legs/<NN[a][n]-slug>/`, using the same split as SKILL.md Step 6: author the spec and `_context/` yourself, run SKILL.md Step 7's design gate over them (Standard and Deep), then fan the task files out one forked subagent each.
 6. Run `lint-task.ts`, `build-readme.ts`, and then SKILL.md Step 7's tree gate against that leg path. The scripts already accept arbitrary paths.
-7. Execution is unchanged: `/autopilot docs/<proj>/legs/<NN-slug>`.
+7. Execution is unchanged: `/autopilot docs/<proj>/legs/<NN[a][n]-slug>`.

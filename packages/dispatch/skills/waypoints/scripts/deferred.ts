@@ -34,7 +34,7 @@ export function appendDeferred(
 }
 
 export function legOf(planPath: string): { proj: string; slug: string } | null {
-  const m = /(?:^|\/)docs\/([^/]+)\/legs\/(\d{2}-[^/]+)\/PLAN\.md$/.exec(
+  const m = /(?:^|\/)docs\/([^/]+)\/legs\/(\d{2}(?:[a-z]\d*)?-[^/]+)\/PLAN\.md$/.exec(
     planPath.replace(/\\/g, "/"),
   );
   return m ? { proj: m[1], slug: m[2] } : null;

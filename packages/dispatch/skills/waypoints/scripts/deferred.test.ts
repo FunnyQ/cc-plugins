@@ -77,6 +77,11 @@ describe("deferred file", () => {
       proj: "demo",
       slug: "02-profile",
     });
+    expect(legOf("docs/demo/legs/08b1-work-core/PLAN.md")).toEqual({
+      proj: "demo",
+      slug: "08b1-work-core",
+    });
+    expect(legOf("docs/demo/legs/08c-work/PLAN.md")?.slug).toBe("08c-work");
     expect(legOf("docs/x/PLAN.md")).toBeNull();
   });
 });

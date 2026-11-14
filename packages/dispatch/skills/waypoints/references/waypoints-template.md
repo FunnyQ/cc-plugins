@@ -24,9 +24,10 @@ Use this file shape for `docs/<proj>/WAYPOINTS.md`. The roadmap is the single so
 
 - Each leg is one top-level `- [ ]` / `- [~]` / `- [x]` item under `## Legs`: pending (not planned in detail yet), active (the only leg `flightplan` plans next), landed.
 - Exactly one leg is `[~]` while the roadmap is in progress; zero only when every leg is `[x]`. The script rejects more than one.
-- `N.` is the leg number; its zero-padded form is the directory prefix: leg `2.` → `legs/02-<slug>/`.
+- `N.` is the leg id: a number, optionally followed by a letter and a digit (`8`, `8b`, `8b1`). Zero-pad the number to 2 digits for the directory prefix: leg `2.` → `legs/02-<slug>/`, leg `8b1.` → `legs/08b1-<slug>/`.
+- Leg order is file order, not id order.
 - `—` (space-padded em dash, U+2014) is the only separator between the milestone title and the done-state, which states what must be true when the leg lands.
-- Every leg, pending ones included, carries the `→ legs/NN-slug/` pointer on its continuation line. `advance` appends `· landed <date> · outcome: <one line>` there.
+- Every leg, pending ones included, carries the `→ legs/NN[a][n]-slug/` pointer on its continuation line. `advance` appends `· landed <date> · outcome: <one line>` there.
 - `advance` rewrites the whole file in this shape, so anything outside the title and `## Legs` is lost.
 
 ## Filled example
