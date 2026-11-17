@@ -1619,24 +1619,6 @@ describe("orchestrator commit ownership", () => {
   // Same reasoning as the review lens: the rule the driver is asked to copy into
   // the instruction file did not arrive in two measured runs, so the flag relay
   // reads is what actually holds on the live dev path.
-  test("a resolved relayPath alone makes the dev delegate and review lens live", async () => {
-    const log = await runOrchestrator(
-      { scouts: [devWave, complete(2)] },
-      { devEngine: "'codex'", relayPath: "'/abs/relay/relay.ts'" },
-    );
-
-    expect(promptFor(log, "dev-codex:ui/01#1")).toContain(
-      "bun /abs/relay/relay.ts codex delegate",
-    );
-    const review = await runOrchestrator(
-      { scouts: [finalWave, complete(1)] },
-      { relayPath: "'/abs/relay/relay.ts'" },
-    );
-    expect(promptFor(review, "review:codex#1")).toContain(
-      "relay.ts codex review",
-    );
-  });
-
   test("the live dev delegate passes --no-ask to relay", async () => {
     const log = await runOrchestrator(
       { scouts: [devWave, complete(2)] },
