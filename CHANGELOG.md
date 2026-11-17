@@ -1,5 +1,13 @@
 # Changelog
 
+## [dispatch 5.12.4] - 2026-11-18
+
+_tracks tag `dispatch-v5.12.4`_
+
+### Fixed
+- Autopilot now treats a worktree create that returns a non-absolute path, or a leak or land fingerprint that is not a git tree id, as an infrastructure failure; before, a refusing agent's placeholder answer passed, so dev ran outside its worktree and the leak check passed silently.
+- Autopilot's docs once again say to launch only on a plain go-ahead, because the user's latest typed message is relayed to every workflow agent, which can obey it as a task order.
+
 ## [relay 0.11.3] - 2026-11-18
 
 _tracks tag `relay-v0.11.3`_
