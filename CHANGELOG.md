@@ -1,5 +1,12 @@
 # Changelog
 
+## [dispatch 5.12.2] - 2026-11-18
+
+_tracks tag `dispatch-v5.12.2`_
+
+### Changed
+- Autopilot's reentry docs now say the baked `attempt` is the next attempt number, not the last one run, and that a reseeded task gets a full `maxAttempts` window from there, so attempts before the repair do not count against it. Behaviour is unchanged.
+
 ## [dispatch 5.12.1] - 2026-11-18
 
 _tracks tag `dispatch-v5.12.1`_
