@@ -213,7 +213,7 @@ A note changes nothing: the escalation still follows its class, and its repair s
 
 Never edit a skill file, the plugin cache, or the baked `orchestrator.js`. When the defect blocks the flight, propose a workaround in your own steps between launches, such as running `bun install` in `<root>` before a re-launch, and ask the user, as [Reporting while the goal runs](#reporting-while-the-goal-runs) says. On their go, apply it for the rest of this session and log it with `--task "(flight)"`, appending ` · workaround: <what you now do>` to the same `skill-defect` message.
 
-A workaround reaches only the main agent's own steps. Workflow agents get no user message and run the baked script as written, so a defect inside an agent's prompt can be worked around only through a plan repair. The flight report lists every workaround for the maintainers to fix in the skill.
+A workaround reaches only the main agent's own steps. Workflow agents run the baked script as written, so a defect inside an agent's prompt can be worked around only through a plan repair. The flight report lists every workaround for the maintainers to fix in the skill.
 
 ## Reporting while the goal runs
 
@@ -225,6 +225,6 @@ End every goal-mode turn with the line `repairs --status: <status>`, holding the
 
 ## Measured on Claude Code
 
-- Workflow agents receive no user message, on the goal-setting turn or on a `/goal` continuation turn. Each gets only the task the script computes, framed as carrying no user authority. The goal text therefore never reaches a dev or verifier.
+- A launch from a turn the user typed relays that message verbatim to every Workflow agent, ranked above the computed task (2.1.326, 3 of 3 runs). A launch from the goal-setting turn, a `/goal` continuation turn or an agent-message turn relays nothing (4 of 4 runs). Relaunch from a continuation turn only after checking whether the user typed since, because a message typed mid-turn is relayed too. When they did, ask for a plain go-ahead first.
 - The `/goal` evaluator reads the transcript, not the filesystem.
 - Only the user sets `/goal`, by typing it. Whether the model can propose one through a tool is unverified.

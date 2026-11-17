@@ -21,6 +21,13 @@ import { join } from "node:path";
 import { parseModels } from "../../flightplan/scripts/lib/parse-task";
 import { bakeConfig, extractScript } from "./bake-orchestrator";
 
+const tree = (tag: string) => tag.padEnd(40, "0");
+const F0 = tree("f0");
+const LANDED = tree("a1");
+const LEAKED = tree("1e");
+const RESUME_FRESH = tree("be");
+const LATER = tree("1a");
+
 const ORCHESTRATOR = join(
   import.meta.dir,
   "..",
@@ -306,14 +313,16 @@ async function runOrchestrator(
           drift: false,
           files: [],
           paths: [],
-          fingerprint: `f${role === "wt-land" ? ++fingerprint : fingerprint}`,
+          fingerprint: tree(
+            `f${role === "wt-land" ? ++fingerprint : fingerprint}`,
+          ),
           previous: /--expect (\S+)/.exec(prompt)?.[1] ?? "",
         },
         "wt-rebase": { path, base: "b1", conflicted: landFiles.get(ref) ?? [] },
         "wt-unland": { restored: [] },
         "wt-remove": { removed: true },
         "wt-show": { path, base: "b0", exists: true },
-        "wt-leak": { fingerprint: "f0", paths: [] },
+        "wt-leak": { fingerprint: F0, paths: [] },
         "wt-sweep": {
           removed: [],
           kept: (/--keep (\S+)/.exec(prompt)?.[1].split(",") ?? []).map(
@@ -2986,8 +2995,8 @@ describe("task worktree isolation", () => {
     drift: false,
     files: [],
     paths: [],
-    fingerprint: "landed",
-    previous: "f0",
+    fingerprint: LANDED,
+    previous: F0,
   };
   const kept = { ref: "old/01", path: "/old/worktree" };
   const blockedWave = () =>
@@ -3090,7 +3099,7 @@ describe("task worktree isolation", () => {
     expect(prompts).toHaveLength(2);
     for (const prompt of prompts) {
       expect(prompt).toContain(
-        `land ${ref} --expect f0 --op a1-land --repo /abs/repo --slug my-plan`,
+        `land ${ref} --expect ${F0} --op a1-land --repo /abs/repo --slug my-plan`,
       );
     }
     expect(modelsFor(log, `wt-land:${ref}`)).toEqual(["opus", "opus"]);
@@ -3225,7 +3234,7 @@ describe("task worktree isolation", () => {
     expect(log.schemas[log.labels.indexOf(`reverify:${ref}#1`)]).toEqual(
       log.schemas[log.labels.indexOf(`verify:${ref}#1`)],
     );
-    expect(promptFor(log, "wt-land:ui/02")).toContain("--expect landed");
+    expect(promptFor(log, "wt-land:ui/02")).toContain(`--expect ${LANDED}`);
   });
 
   test("drift fail unlands and rebases before a new dev attempt", async () => {
@@ -3263,7 +3272,7 @@ describe("task worktree isolation", () => {
     const lands = log.prompts.filter(
       (_, i) => log.labels[i] === `wt-land:${ref}`,
     );
-    expect(lands[1]).toContain("--expect f0 --op a2-land");
+    expect(lands[1]).toContain(`--expect ${F0} --op a2-land`);
     expect(log.result.completed).toEqual([ref]);
   });
 
@@ -3498,7 +3507,7 @@ describe("task worktree isolation", () => {
       scouts: [multiWave([ref, "ui/02"]), complete(2)],
       worktree: { [`wt-land:${ref}`]: [cleanLand] },
     });
-    expect(promptFor(log, "wt-land:ui/02")).toContain("--expect landed");
+    expect(promptFor(log, "wt-land:ui/02")).toContain(`--expect ${LANDED}`);
   });
 
   test("final review stays in the main tree while run sweeps still execute", async () => {
@@ -3591,6 +3600,55 @@ describe("task worktree isolation", () => {
     expect(log.labels).not.toContain(`dev:${ref}#1`);
     expect(log.result.escalations[0].reason).not.toContain("Worktree kept at");
     expect(promptFor(log, `block:${ref}`)).not.toContain("Worktree kept at");
+  });
+
+  test("a create path that is not absolute is an infrastructure failure", async () => {
+    const quoted = { path: '""', base: '""', drained: false };
+    const log = await runOrchestrator({
+      scouts: [multiWave([ref, "ui/02"]), complete(2)],
+      worktree: { [`wt-create:${ref}`]: [quoted, quoted] },
+    });
+    expect(callsTo(log.labels, `wt-create:${ref}`)).toBe(2);
+    expect(log.result.completed).toEqual(["ui/02"]);
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      infrastructure: true,
+    });
+    expect(log.labels).not.toContain(`dev:${ref}#1`);
+  });
+
+  test("a baseline fingerprint that is not a tree id stops the run", async () => {
+    const refused = {
+      fingerprint: "NOT_RUN: the relayed user request",
+      paths: [],
+    };
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: { "wt-leak:baseline": [refused, refused] },
+    });
+    expect(callsTo(log.labels, "wt-leak:baseline")).toBe(2);
+    expect(
+      log.result.escalations.some(
+        (e) => e.infrastructure && e.reason.includes("wt-leak:baseline"),
+      ),
+    ).toBe(true);
+    expect(log.labels).not.toContain(`wt-create:${ref}`);
+  });
+
+  test("a wave-end fingerprint that is not a tree id aborts the run", async () => {
+    const refused = {
+      fingerprint: "NOT_RUN: the relayed user request",
+      paths: [],
+    };
+    const log = await runOrchestrator({
+      scouts: [wave(ref, 1, 0), complete(1)],
+      worktree: { "wt-leak:1": [refused, refused] },
+    });
+    expect(log.result.aborted).toEqual({
+      reason: "wave-end leak check returned no result",
+      paths: [],
+    });
+    expect(log.labels.some((label) => label.startsWith("commit-"))).toBe(false);
   });
 
   test("a land resolving its conflict blocks a sibling land until it returns", async () => {
@@ -3707,8 +3765,8 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
     drift: false,
     files: [],
     paths: [],
-    fingerprint: "landed",
-    previous: "f0",
+    fingerprint: LANDED,
+    previous: F0,
   };
   const leak = { ...cleanLand, status: "leak", paths: ["src/leaked.ts"] };
   const cappedWave = (maxParallel: number) =>
@@ -3865,7 +3923,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
       worktree: {
         "wt-sweep:start": [{ removed: [], kept: [kept] }],
         [`wt-land:${a}`]: [cleanLand],
-        "wt-leak:1": [{ fingerprint: "leaked", paths: leak.paths }],
+        "wt-leak:1": [{ fingerprint: LEAKED, paths: leak.paths }],
       },
     });
     expect(log.labels).toContain(`done:${a}`);
@@ -3875,7 +3933,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
       log.labels.indexOf(`wt-remove:${a}`),
     );
     expect(promptFor(log, "wt-leak:1")).toContain(
-      "fingerprint --expect landed",
+      `fingerprint --expect ${LANDED}`,
     );
     expect(log.labels.some((label) => label.startsWith("commit-"))).toBe(false);
     expect(log.labels).not.toContain("scout-wave-2");
@@ -3979,7 +4037,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
       {
         scouts: [],
         worktree: {
-          "wt-leak:resume": [{ fingerprint: "resume-fresh", paths: [] }],
+          "wt-leak:resume": [{ fingerprint: RESUME_FRESH, paths: [] }],
         },
       },
       { ...resume, resumeFrom: "'verify'" },
@@ -3988,7 +4046,9 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
     expect(log.labels[0]).toBe("wt-leak:resume");
     expect(promptFor(log, "wt-leak:resume")).toContain("fingerprint --repo");
     expect(promptFor(log, "wt-leak:resume")).not.toContain("--expect");
-    expect(promptFor(log, `wt-land:${a}`)).toContain("--expect resume-fresh");
+    expect(promptFor(log, `wt-land:${a}`)).toContain(
+      `--expect ${RESUME_FRESH}`,
+    );
     expect(log.result.completed).toEqual([a]);
   });
 
@@ -4159,7 +4219,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
           [`wt-land:${a}`]: [leak],
           "wt-leak:1":
             later === "leak"
-              ? [{ fingerprint: "later", paths: ["later.ts"] }]
+              ? [{ fingerprint: LATER, paths: ["later.ts"] }]
               : [null, null],
         },
       });
@@ -4180,7 +4240,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
         scouts: [wave(a, 1, 0)],
         gate: { [a]: [{ passed: false, summary: "red" }] },
         worktree: {
-          "wt-leak:1": [{ fingerprint: "leaked", paths: leak.paths }],
+          "wt-leak:1": [{ fingerprint: LEAKED, paths: leak.paths }],
         },
       },
       { maxAttempts: "1" },
@@ -4192,7 +4252,7 @@ describe("WORKTREE-05 abort and kept-worktree resume", () => {
     expect(log.labels.indexOf("wt-leak:1")).toBeGreaterThan(
       log.labels.indexOf(`block:${a}`),
     );
-    expect(promptFor(log, "wt-leak:1")).toContain("fingerprint --expect f0");
+    expect(promptFor(log, "wt-leak:1")).toContain(`fingerprint --expect ${F0}`);
     expect(log.result.aborted?.paths).toEqual(leak.paths);
     expect(log.labels.some((label) => label.startsWith("commit-"))).toBe(false);
     expect(log.labels).not.toContain("scout-wave-2");
@@ -4387,8 +4447,8 @@ describe("cockpit-rust flight fixes", () => {
     drift: false,
     files: ["src/a.ts"],
     paths: [],
-    fingerprint: "landed",
-    previous: "f0",
+    fingerprint: LANDED,
+    previous: F0,
   };
   const parkedEnd = () =>
     snapshot({
@@ -4525,9 +4585,9 @@ describe("cockpit-rust flight fixes", () => {
     expect(modelFor(log, `wt-land:${ref}`)).toBe("opus");
     expect(effortFor(log, `wt-land:${ref}`)).toBe("low");
     const land = promptFor(log, `wt-land:${ref}`);
-    expect(land).toContain(`land ${ref} --expect f0 --op a1-land `);
+    expect(land).toContain(`land ${ref} --expect ${F0} --op a1-land `);
     expect(land).toContain(`rebase ${ref} --op a1-land-rebase `);
-    expect(land).toContain(`land ${ref} --expect f0 --op a1-reland `);
+    expect(land).toContain(`land ${ref} --expect ${F0} --op a1-reland `);
     expect(land).toContain("--role land --attempt 1");
     expect(land).not.toContain(" reset ");
     const labels = log.labels;
@@ -4652,7 +4712,7 @@ describe("cockpit-rust flight fixes", () => {
   test("a create that returns an empty path parks the task instead of running dev in the main tree", async () => {
     const log = await runOrchestrator({
       scouts: [wave(ref, 1, 0)],
-      worktree: { [`wt-create:${ref}`]: [{ path: "", base: "" }] },
+      worktree: { [`wt-create:${ref}`]: [{ path: "", base: "" }, { path: "", base: "" }] },
     });
     expect(log.labels).not.toContain(`dev:${ref}#1`);
     expect(log.result.completed).toEqual([]);

@@ -161,7 +161,7 @@ Then show the user a one-screen brief. State the slug and how many tasks there a
 
 In goal mode, also state: the repair budget is `3 per task / 10 per flight`; a repair may edit a gate item, and every gate edit is reported in `FLIGHTREPORT.md`; the worst case is `12 attempts per task, 30 extra per flight`.
 
-Do not ask for a plain go-ahead to shield the agents from the user's latest message. Workflow agents receive no user message, on the launch turn or on a `/goal` continuation turn: each gets only the task the script computes, framed as carrying no user authority. An earlier runtime relayed that message to every agent, which is why this advice once existed.
+State that the user's latest typed message is relayed verbatim to every agent in the run, framed as the only user voice and ranked above that agent's task. A message typed while you work counts, and so does one typed turns of tool calls before the launch. An imperative meant for you, such as "stop flight, lets change to dev to claude", therefore reaches every dev, verifier and worktree agent as an order: in one run they refused their tasks, a create returned no worktree, and the post-loop commit was skipped. Launch only when the user's latest typed message is a plain go-ahead. When it carries anything else, act on it first, then ask the user to send a plain go-ahead.
 
 This is real compute, real edits, and an external code review. Get an explicit go from the user before calling Workflow.
 

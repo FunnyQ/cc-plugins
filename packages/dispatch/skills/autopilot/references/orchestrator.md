@@ -1097,6 +1097,20 @@ const wtCall = (label, command, schema) =>
       },
     );
     if (result === null) throw new Error(`${label}: no structured result`);
+    // An agent that refuses its command can still fill the schema, as with path '""' or fingerprint 'NOT_RUN: …'.
+    if (
+      schema === WT_SCHEMA.create &&
+      result.drained !== true &&
+      !/^(\/|[A-Za-z]:[\\/])/.test(result.path)
+    )
+      throw new Error(`${label}: path is not absolute: ${result.path}`);
+    if (
+      "fingerprint" in schema.properties &&
+      !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(result.fingerprint)
+    )
+      throw new Error(
+        `${label}: fingerprint is not a tree id: ${result.fingerprint}`,
+      );
     return result;
   }, MODEL.structuredRetry);
 
@@ -1248,9 +1262,6 @@ async function executeTask(item) {
           WT_SCHEMA.create,
         );
         if (created.drained === true) return created;
-        // a relay that drops `drained` from the drain echo returns an empty path, and dev would then run in the main tree
-        if (!created.path)
-          throw new Error(`worktree.ts returned no path for ${ref}`);
         live.set(ref, created.path);
         return created;
       });
