@@ -30,7 +30,15 @@
  */
 import { existsSync } from "node:fs";
 import { readFile, stat, readdir } from "node:fs/promises";
-import { basename, dirname, join, resolve, relative, sep } from "node:path";
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  resolve,
+  relative,
+  sep,
+} from "node:path";
 import {
   GATE_SECTIONS,
   parseTask,
@@ -155,8 +163,21 @@ const CODE_SPAN_REGEX = /`([^`\n]+)`/g;
 // Commands are read from code spans only and split on `;`, `&&`, `||`, `|`, so a
 // refused command a plan writes as bare prose, or hides in `sh -c '…'`, passes.
 // Upgrade to a shell parser if plans start writing gates that way.
-function gateCommands(item: string): string[][] {
-  const commands: string[][] = [];
+type GateCommand = { tokens: string[]; negated: boolean };
+
+const SHELL_PREFIX = new Set([
+  "(",
+  "if",
+  "then",
+  "elif",
+  "else",
+  "while",
+  "until",
+  "do",
+]);
+
+function gateCommands(item: string): GateCommand[] {
+  const commands: GateCommand[] = [];
   for (const span of item.matchAll(CODE_SPAN_REGEX)) {
     for (const segment of span[1].split(/;|&&|\|\||\||\$\(|\)/)) {
       const tokens = segment
@@ -164,8 +185,11 @@ function gateCommands(item: string): string[][] {
         .split(/\s+/)
         .filter(Boolean)
         .map((t) => t.replace(/^['"]|['"]$/g, ""));
-      while (tokens[0] === "!" || tokens[0] === "(") tokens.shift();
-      if (tokens.length > 0) commands.push(tokens);
+      let negated = false;
+      while (tokens[0] === "!" || SHELL_PREFIX.has(tokens[0])) {
+        if (tokens.shift() === "!") negated = !negated;
+      }
+      if (tokens.length > 0) commands.push({ tokens, negated });
     }
   }
   return commands;
@@ -189,37 +213,35 @@ function gateItems(task: ParsedTask): string[] {
   );
 }
 
+function gateHits(
+  items: string[],
+  matches: (command: GateCommand) => boolean,
+): string[] {
+  return items
+    .filter((item) => gateCommands(item).some(matches))
+    .map((item) => item.split("\n")[0].trim());
+}
+
 export function scopeGitDiffChecks(task: ParsedTask): string[] {
-  const hits: string[] = [];
-  for (const item of gateItems(task)) {
-    const unscoped = gateCommands(item).some((tokens) => {
-      const git = gitSubcommand(tokens);
-      if (git?.sub !== "diff") return false;
-      if (!git.args.some((a) => a === "--quiet" || a === "--exit-code"))
-        return false;
-      const dash = git.args.indexOf("--");
-      return dash === -1 || dash === git.args.length - 1;
-    });
-    if (unscoped) hits.push(item.split("\n")[0].trim());
-  }
-  return hits;
+  return gateHits(gateItems(task), ({ tokens }) => {
+    const git = gitSubcommand(tokens);
+    if (git?.sub !== "diff") return false;
+    if (!git.args.some((a) => a === "--quiet" || a === "--exit-code"))
+      return false;
+    const dash = git.args.indexOf("--");
+    return dash === -1 || dash === git.args.length - 1;
+  });
 }
 
 const REFUSED_GIT = new Set(["checkout", "restore", "reset", "stash", "clean"]);
 
 export function refusedCommandItems(task: ParsedTask): string[] {
-  const hits: string[] = [];
-  for (const item of checklistItems(
-    extractSection(task.body, "Verification"),
-  )) {
-    const refused = gateCommands(item).some((tokens) => {
-      if (tokens[0] === "docker" && tokens[1] === "run") return true;
-      const git = gitSubcommand(tokens);
-      return git !== null && REFUSED_GIT.has(git.sub);
-    });
-    if (refused) hits.push(item.split("\n")[0].trim());
-  }
-  return hits;
+  const items = checklistItems(extractSection(task.body, "Verification"));
+  return gateHits(items, ({ tokens }) => {
+    if (tokens[0] === "docker" && tokens[1] === "run") return true;
+    const git = gitSubcommand(tokens);
+    return git !== null && REFUSED_GIT.has(git.sub);
+  });
 }
 
 function repoRootOf(start: string): string | null {
@@ -239,30 +261,47 @@ function pathspecsOf(sub: string, args: string[]): string[] {
   return args.filter((a) => !a.startsWith("-"));
 }
 
+type InPlanDir = (path: string) => boolean;
+
+function planDirTest(filePath: string): InPlanDir | null {
+  if (!inferRefFromPath(filePath)) return null;
+  const planDir = dirname(dirname(dirname(resolve(filePath))));
+  const root = repoRootOf(planDir);
+  if (root === null || planDir === root) return null;
+  return (spec) => {
+    const rel = relative(planDir, resolve(root, spec));
+    return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+  };
+}
+
 export function planDirGitStatusItems(
   task: ParsedTask,
-  filePath: string,
+  inPlanDir: InPlanDir,
 ): string[] {
-  if (!inferRefFromPath(filePath)) return [];
-  const abs = resolve(filePath);
-  const planDir = dirname(dirname(dirname(abs)));
-  const root = repoRootOf(planDir);
-  if (root === null) return [];
-  const planRel = relative(root, planDir).split(sep).join("/");
-  if (planRel === "") return [];
-  const hits: string[] = [];
-  for (const item of gateItems(task)) {
-    const inside = gateCommands(item).some((tokens) => {
-      const git = gitSubcommand(tokens);
-      if (git?.sub !== "status" && git?.sub !== "diff") return false;
-      return pathspecsOf(git.sub, git.args).some((spec) => {
-        const path = spec.replace(/^\.\//, "").replace(/\/+$/, "");
-        return path === planRel || path.startsWith(`${planRel}/`);
-      });
-    });
-    if (inside) hits.push(item.split("\n")[0].trim());
-  }
-  return hits;
+  return gateHits(gateItems(task), ({ tokens }) => {
+    const git = gitSubcommand(tokens);
+    if (git?.sub !== "status" && git?.sub !== "diff") return false;
+    return pathspecsOf(git.sub, git.args).some(inPlanDir);
+  });
+}
+
+const TEST_COMMANDS = new Set(["test", "[", "[["]);
+const EXISTENCE_FLAGS = new Set(["-s", "-f", "-e"]);
+
+export function planDirOutputItems(
+  task: ParsedTask,
+  inPlanDir: InPlanDir,
+): string[] {
+  if (task.finalReview) return [];
+  return gateHits(gateItems(task), ({ tokens, negated }) => {
+    if (negated || !TEST_COMMANDS.has(tokens[0])) return false;
+    return tokens.some(
+      (t, i) =>
+        EXISTENCE_FLAGS.has(tokens[i - 1]) &&
+        tokens[i - 2] !== "!" &&
+        inPlanDir(t),
+    );
+  });
 }
 
 export function finalReviewGitStatusItems(task: ParsedTask): string[] {
@@ -304,6 +343,17 @@ export function humanOnlyGateSections(task: ParsedTask): string[] {
     if (items.every((item) => HUMAN_GATE_REGEX.test(item))) hits.push(heading);
   }
   return hits;
+}
+
+export function planDirDeclaredFiles(
+  task: ParsedTask,
+  inPlanDir: InPlanDir,
+): string[] {
+  if (task.finalReview) return [];
+  const section = extractSection(task.body, "Files to create / modify");
+  return [...section.matchAll(/^- (?:`([^`]+)`|(\S+))/gm)]
+    .map((m) => m[1] ?? m[2])
+    .filter(inPlanDir);
 }
 
 export function countDeclaredFiles(body: string): number {
@@ -480,10 +530,25 @@ export async function lintFile(
     );
   }
 
-  for (const item of planDirGitStatusItems(task, filePath)) {
+  const inPlanDir = planDirTest(filePath) ?? (() => false);
+  for (const item of planDirGitStatusItems(task, inPlanDir)) {
     push(
       "plan-dir-git-status",
-      `a \`git status\` or \`git diff\` pathspec inside the plan dir sees nothing under autopilot: each task runs in a worktree where the plan dir is an untracked symlink to the main tree, so a file written there never shows. Gate a report file with \`test -s <path>\` instead: ${item}`,
+      `a \`git status\` or \`git diff\` pathspec inside the plan dir sees nothing under autopilot: each task runs in a worktree where the plan dir is an untracked symlink to the main tree, so a file written there never shows. Gate only files this task lands, at a repo path outside the plan dir: ${item}`,
+    );
+  }
+
+  for (const item of planDirOutputItems(task, inPlanDir)) {
+    push(
+      "plan-dir-output",
+      `this gate checks for a file the task must create under the plan dir, which no worktree dev can write: the plan dir is an untracked symlink to the main tree, outside the worktree, and a sandboxed engine such as codex refuses the write. Write the file at a repo path outside the plan dir, list it under Files to create / modify, and gate that path: ${item}`,
+    );
+  }
+
+  for (const path of planDirDeclaredFiles(task, inPlanDir)) {
+    push(
+      "plan-dir-output",
+      `this task declares a file under the plan dir, which no worktree dev can write: the plan dir is an untracked symlink to the main tree, outside the worktree, and a sandboxed engine such as codex refuses the write. Move it to a repo path outside the plan dir and gate that path: ${path}`,
     );
   }
 

@@ -1778,24 +1778,43 @@ describe("refused-command rule", () => {
   });
 });
 
+const PLAN_DIR_TASK =
+  "docs/proj/legs/08c-work/tasks/ui/01-fixture-state-shell.md";
+
+async function lintPlanDirGate(
+  rule: string,
+  item: string,
+  { withGit = true, finalReview = false, files = "- a.ts (new)" } = {},
+) {
+  const root = await writeTree({});
+  const task = VALID_TASK.replace(
+    "- [ ] Run `bun test`",
+    item.replace("ROOT", root),
+  ).replace("- a.ts (new)", files);
+  await mkdir(join(root, PLAN_DIR_TASK, ".."), { recursive: true });
+  await writeFile(
+    join(root, PLAN_DIR_TASK),
+    finalReview
+      ? task.replace("> **Status**:", "> **Final review**: true\n> **Status**:")
+      : task,
+  );
+  if (withGit) await mkdir(join(root, ".git"));
+  const violations = await lintFile(join(root, PLAN_DIR_TASK));
+  await rm(root, { recursive: true, force: true });
+  return violations.filter((v) => v.rule === rule);
+}
+
 describe("plan-dir-git-status rule", () => {
-  const TASK = "docs/proj/legs/08c-work/tasks/ui/01-fixture-state-shell.md";
-  const lintGate = async (item: string, withGit = true) => {
-    const root = await writeTree({
-      [TASK]: VALID_TASK.replace("- [ ] Run `bun test`", item),
-    });
-    if (withGit) await mkdir(join(root, ".git"));
-    const violations = await lintFile(join(root, TASK));
-    await rm(root, { recursive: true, force: true });
-    return violations.filter((v) => v.rule === "plan-dir-git-status");
-  };
+  const TASK = PLAN_DIR_TASK;
+  const lintGate = (item: string, withGit = true) =>
+    lintPlanDirGate("plan-dir-git-status", item, { withGit });
 
   test("flags a git status pathspec inside the plan dir", async () => {
     const hits = await lintGate(
       "- [ ] Run `git status --short -- docs/proj/legs/08c-work/report.md`",
     );
     expect(hits).toHaveLength(1);
-    expect(hits[0].detail).toContain("test -s");
+    expect(hits[0].detail).toContain("outside the plan dir");
   });
 
   test("flags a git diff pathspec at the plan dir or naming the task file", async () => {
@@ -1825,6 +1844,96 @@ describe("plan-dir-git-status rule", () => {
       await lintGate(
         "- [ ] Run `git status --short -- docs/proj/legs/08c-work/report.md`",
         false,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("plan-dir-output rule", () => {
+  const lintGate = (item: string, finalReview = false) =>
+    lintPlanDirGate("plan-dir-output", item, { finalReview });
+
+  test("flags an existence test on a file under the plan dir", async () => {
+    const hits = await lintGate(
+      "- [ ] Run `test -s docs/proj/legs/08c-work/reports/platform-01.md`",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].detail).toContain("outside the plan dir");
+    expect(
+      await lintGate(
+        "- [ ] Run `[ -f ./docs/proj/legs/08c-work/reports/x.md ] && echo ok`",
+      ),
+    ).toHaveLength(1);
+  });
+
+  test("flags a non-normal path to the plan dir and a test inside an if", async () => {
+    for (const item of [
+      "- [ ] Run `test -s docs/proj/legs/./08c-work/reports/x.md`",
+      "- [ ] Run `test -s ROOT/docs/proj/legs/08c-work/reports/x.md`",
+      "- [ ] Run `if test -s docs/proj/legs/08c-work/reports/x.md; then echo ok; else exit 1; fi`",
+    ]) {
+      expect(await lintGate(item)).toHaveLength(1);
+    }
+  });
+
+  test("passes a negated existence test", async () => {
+    for (const item of [
+      "- [ ] Run `test ! -e docs/proj/legs/08c-work/reports/obsolete.md`",
+      "- [ ] Run `! test -e docs/proj/legs/08c-work/reports/obsolete.md`",
+      "- [ ] Run `[ ! -e docs/proj/legs/08c-work/reports/obsolete.md ]`",
+    ]) {
+      expect(await lintGate(item)).toEqual([]);
+    }
+  });
+
+  test("passes reads of plan files and paths outside the plan dir", async () => {
+    expect(
+      await lintGate(
+        "- [ ] Run `grep -q Goal docs/proj/legs/08c-work/PLAN.md`",
+      ),
+    ).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `test -s docs/reports/platform-01.md`"),
+    ).toEqual([]);
+    expect(
+      await lintGate("- [ ] Run `test -s docs/proj/legs/08c-workbench.md`"),
+    ).toEqual([]);
+  });
+
+  test("passes a Final review, which runs in the main tree", async () => {
+    expect(
+      await lintGate(
+        "- [ ] Run `test -s docs/proj/legs/08c-work/reports/final.md`",
+        true,
+      ),
+    ).toEqual([]);
+  });
+
+  const lintFiles = (files: string, finalReview = false) =>
+    lintPlanDirGate("plan-dir-output", "- [ ] Run `bun test`", {
+      files,
+      finalReview,
+    });
+
+  test("flags a declared file under the plan dir, however it is gated", async () => {
+    const hits = await lintFiles(
+      "- `a.ts` (modify) — fix\n- `docs/proj/legs/08c-work/reports/platform-01.md` (new) — findings",
+    );
+    expect(hits).toHaveLength(1);
+    expect(hits[0].detail).toContain("reports/platform-01.md");
+    expect(
+      await lintFiles("- docs/proj/legs/08c-work/reports/x.md (new)"),
+    ).toHaveLength(1);
+  });
+
+  test("passes declared files outside the plan dir and a Final review", async () => {
+    expect(
+      await lintFiles("- `docs/reports/platform-01.md` (new) — findings"),
+    ).toEqual([]);
+    expect(
+      await lintFiles(
+        "- `docs/proj/legs/08c-work/reports/final.md` (new)",
+        true,
       ),
     ).toEqual([]);
   });
