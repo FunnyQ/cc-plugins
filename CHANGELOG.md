@@ -1,5 +1,16 @@
 # Changelog
 
+## [dispatch 5.12.1] - 2026-11-18
+
+_tracks tag `dispatch-v5.12.1`_
+
+### Changed
+- Plan authors are now told to write reports to a repo path outside the plan dir and list it under Files to create / modify, instead of gating on `test -s` of a plan-dir file; the gate review also flags non-Final tasks that must write into the plan dir.
+
+### Fixed
+- Autopilot now asks about running codex/opencode steps in a visible live pane under herdr-app too, where the question was previously skipped and every external step ran headless.
+- Flightplan lint now rejects tasks that must write a file inside the plan dir, which a task worktree cannot write, so they are caught up front instead of parking autopilot as a plan-defect; gate parsing also handles `if` and negated `test` commands without false positives.
+
 ## [herdr 0.9.2] - 2026-11-17
 
 _tracks tag `herdr-v0.9.2`_
