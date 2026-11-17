@@ -5,7 +5,8 @@ description: >-
   on, message and clean up agents and programs; open spaces, tabs and panes;
   edit layouts, keys, settings and mods under ~/.config/herdr-app.
 when_to_use: >-
-  Inside a herdr-app terminal (HC_TERMINAL_ID set, no HERDR_ENV), or when asked
+  Inside a herdr-app terminal (HC_TERMINAL_ID set; a leaked HERDR_ENV whose
+  HERDR_SOCKET_PATH is not a live socket does not count), or when asked
   about herdr-app, `hc`, or a herdr-app mod. Not for the `herdr` multiplexer
   (use the herdr skill), not for handing work to another project's agent
   (`tell`) or asking it something (`ask`).

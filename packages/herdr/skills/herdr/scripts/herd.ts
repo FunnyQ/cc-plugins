@@ -12,6 +12,7 @@ import {
   createAskRunDir,
   extractFinalText,
 } from "./ask-contract.ts";
+import { hostOf, type Host } from "../../shared/host.ts";
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
@@ -1107,12 +1108,16 @@ const APP_VERBS = new Set(["list", "tell", "ask", "collect"]);
 export function runtimeFor(
   env: Record<string, string | undefined>,
   verb: string,
+  host: Host | null = hostOf(env),
 ): { kind: "herdr" } | { kind: "app"; self: string } | { error: string } {
-  if (env.HERDR_ENV === "1") return { kind: "herdr" };
-  if (!env.HC_TERMINAL_ID) {
+  if (host === "herdr") return { kind: "herdr" };
+  if (host === null) {
+    const dead =
+      env.HERDR_ENV === "1"
+        ? ` HERDR_ENV=1 is set, but no herdr server answers at ${env.HERDR_SOCKET_PATH ?? "(no HERDR_SOCKET_PATH)"}.`
+        : "";
     return {
-      error:
-        "herd: not inside herdr (HERDR_ENV != 1) or herdr-app (no HC_TERMINAL_ID). These verbs only work inside one of them.",
+      error: `herd: not inside herdr or herdr-app (no HC_TERMINAL_ID).${dead} These verbs only work inside one of them.`,
     };
   }
   if (!APP_VERBS.has(verb)) {
@@ -1120,7 +1125,7 @@ export function runtimeFor(
       error: `herd ${verb}: under herdr-app use hc directly (read \`hc --skill\`); herd keeps only list, tell, ask and collect there.`,
     };
   }
-  return { kind: "app", self: env.HC_TERMINAL_ID };
+  return { kind: "app", self: env.HC_TERMINAL_ID! };
 }
 
 const BOOLEAN_FLAGS = new Set(["new-tab", "new-workspace"]);

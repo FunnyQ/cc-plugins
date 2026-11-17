@@ -6,7 +6,7 @@ Use this when Claude is running _inside_ a herdr-managed pane and needs to contr
 
 ## Precondition
 
-Before you do any of this, confirm `HERDR_ENV=1` is set in the environment. If it is not set, you are not running inside a herdr-managed pane. Say so, and stop. Do not try to inspect or control a focused herdr pane from outside herdr.
+Before you do any of this, confirm `HERDR_ENV=1` is set and `test -S "$HERDR_SOCKET_PATH"` succeeds. If either fails, you are not running inside a herdr-managed pane: with `HC_TERMINAL_ID` set, switch to the `herdr-app` skill; otherwise say so, and stop. Do not try to inspect or control a focused herdr pane from outside herdr.
 
 ## Concepts
 

@@ -266,26 +266,28 @@ describe("ask without herdr.space labels", () => {
 });
 
 describe("runtimeFor", () => {
-  test("old herdr wins when its pane env is present", () => {
-    expect(
-      runtimeFor({ HERDR_ENV: "1", HC_TERMINAL_ID: "t1" }, "spawn"),
-    ).toEqual({
-      kind: "herdr",
-    });
+  test("herdr when the host is herdr", () => {
+    expect(runtimeFor({}, "spawn", "herdr")).toEqual({ kind: "herdr" });
   });
 
   test("herdr-app admits only the broker verbs", () => {
-    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "tell")).toEqual({
+    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "tell", "app")).toEqual({
       kind: "app",
       self: "t1",
     });
-    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "spawn")).toHaveProperty(
+    expect(runtimeFor({ HC_TERMINAL_ID: "t1" }, "spawn", "app")).toHaveProperty(
       "error",
     );
   });
 
-  test("refuses outside both", () => {
-    expect(runtimeFor({}, "tell")).toHaveProperty("error");
+  test("refuses outside both, naming a dead herdr socket", () => {
+    const result = runtimeFor(
+      { HERDR_ENV: "1", HERDR_SOCKET_PATH: "/tmp/gone.sock" },
+      "tell",
+      null,
+    );
+    expect(result).toHaveProperty("error");
+    expect((result as { error: string }).error).toContain("/tmp/gone.sock");
   });
 });
 

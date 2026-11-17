@@ -5,7 +5,8 @@ description: >-
   plugins, and coordinating agents across panes.
 when_to_use: >-
   For herdr config.toml, keybindings, themes, popup commands, CLI commands, or
-  plugin development; or — inside a herdr pane (HERDR_ENV=1) — spawning,
+  plugin development; or — inside a herdr pane (HERDR_ENV=1 and
+  HERDR_SOCKET_PATH is a live socket) — spawning,
   driving, or coordinating agents in other panes. herdr-app and `hc` belong to
   the `herdr-app` skill. Handing work to an agent already running in another
   project belongs to the `tell` skill, and getting an ANSWER back from one
@@ -17,8 +18,11 @@ version: 4
 
 Two products carry the name. Check which one you are in before anything else:
 
-- **`HERDR_ENV=1`**: the `herdr` terminal multiplexer. Everything below this section applies.
-- **`HC_TERMINAL_ID` set, no `HERDR_ENV`**: herdr-app, whose terminals herdr-core (`hc`) runs. Use the `herdr-app` skill instead; nothing below applies.
+- **`HERDR_ENV=1` and `test -S "$HERDR_SOCKET_PATH"` succeeds**: the `herdr` terminal multiplexer. Everything below this section applies.
+- **`HC_TERMINAL_ID` set, and the herdr test above fails**: herdr-app, whose terminals herdr-core (`hc`) runs. Use the `herdr-app` skill instead; nothing below applies.
+- **Both pass**: the nearest of `herdr-core` and `herdr` among this shell's parent processes decides. `herd.ts` and `browser.ts` check this themselves.
+
+A herdr-core daemon started from a herdr pane leaks `HERDR_*` into every herdr-app terminal, so `HERDR_ENV=1` alone does not prove herdr. When the socket is missing, do not tell the person to start herdr.
 
 ## The `herdr` multiplexer
 
@@ -28,7 +32,7 @@ Docs: <https://herdr.dev/docs/>. For an agent-readable index pinned to the insta
 
 ### Orchestrating agents — use the `herd` wrapper first
 
-Inside a herdr pane (`HERDR_ENV=1`), use the bundled `scripts/herd.ts` wrapper instead of hand-rolled raw `herdr` CLI chains. It collapses create-pane → start → prompt → wait → read into ten typed verbs, and addresses agents by a generated name that survives a cross-workspace pane-id change.
+Inside a herdr pane, use the bundled `scripts/herd.ts` wrapper instead of hand-rolled raw `herdr` CLI chains. It collapses create-pane → start → prompt → wait → read into ten typed verbs, and addresses agents by a generated name that survives a cross-workspace pane-id change.
 
 `${CLAUDE_PLUGIN_ROOT}` is not reliable inside an agent Bash call. Resolve the script instead from the load-time **"Base directory for this skill"** banner (`$SKILL_DIR/scripts/herd.ts`).
 
@@ -95,7 +99,7 @@ This skill's detail lives in `references/`. Read only the file(s) relevant to th
 | `references/config.md`              | `config.toml` sections, keybindings and popup commands, themes, toast/sound notifications, environment variables, `herdr server reload-config`                                    |
 | `references/cli.md`                 | Any `herdr <subcommand>` usage — session/workspace/tab/pane/agent management, waits, integrations, plugin CLI commands                                                            |
 | `references/plugin-development.md`  | Writing or debugging a Herdr plugin — `herdr-plugin.toml` manifest, runtime env vars, dev workflow (`plugin link`), distribution, pitfalls                                        |
-| `references/agent-orchestration.md` | Claude is running _inside_ a herdr pane (`HERDR_ENV=1`) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents                     |
+| `references/agent-orchestration.md` | Claude is running _inside_ a herdr pane (see the check above) and needs to control herdr live — split panes, wait for output, spawn or coordinate with other agents                     |
 | `references/socket-api.md`          | Talking to herdr over `HERDR_SOCKET_PATH` instead of the CLI — envelope, framing rules, CLI↔method map, enum spelling traps, `events.subscribe` (the one thing the CLI cannot do) |
 
 Most CLI commands output JSON for scripting. `herdr --default-config` prints the full default config as a starting point.

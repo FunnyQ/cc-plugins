@@ -18,6 +18,7 @@ import {
 } from "./terminal-browser";
 
 export type { Tab, Target } from "./terminal-browser";
+import { hostOf } from "../../shared/host";
 import {
   attach,
   axTree,
@@ -376,7 +377,7 @@ function withoutGhostty(
 }
 
 function inHerdrApp(): boolean {
-  return !!process.env.HC_TERMINAL_ID && !process.env.HERDR_PANE_ID;
+  return hostOf(process.env) === "app";
 }
 
 export function resolveMetrics(

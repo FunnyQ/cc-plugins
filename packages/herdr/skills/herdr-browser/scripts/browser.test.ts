@@ -755,7 +755,9 @@ describe("openTerminal", () => {
     const saved = {
       pane: process.env.HERDR_PANE_ID,
       workspace: process.env.HERDR_WORKSPACE_ID,
+      terminal: process.env.HC_TERMINAL_ID,
     };
+    delete process.env.HC_TERMINAL_ID;
     process.env.HERDR_PANE_ID = "P0";
     process.env.HERDR_WORKSPACE_ID = "W0";
     const calls: string[][] = [];
@@ -779,6 +781,7 @@ describe("openTerminal", () => {
       for (const [key, value] of [
         ["HERDR_PANE_ID", saved.pane],
         ["HERDR_WORKSPACE_ID", saved.workspace],
+        ["HC_TERMINAL_ID", saved.terminal],
       ] as const) {
         if (value === undefined) delete process.env[key];
         else process.env[key] = value;
@@ -788,12 +791,13 @@ describe("openTerminal", () => {
   });
 
   describe("under herdr-app", () => {
-    const keys = ["HC_TERMINAL_ID", "HERDR_PANE_ID"] as const;
+    const keys = ["HC_TERMINAL_ID", "HERDR_PANE_ID", "HERDR_ENV"] as const;
     let saved: (string | undefined)[] = [];
     beforeEach(() => {
       saved = keys.map((key) => process.env[key]);
       process.env.HC_TERMINAL_ID = "t46";
       delete process.env.HERDR_PANE_ID;
+      delete process.env.HERDR_ENV;
     });
     afterEach(() => {
       keys.forEach((key, index) => {
@@ -1037,8 +1041,10 @@ describe("Herdr executable and cleanup ownership", () => {
       "HERDR_BIN_PATH",
       "HERDR_PANE_ID",
       "HERDR_WORKSPACE_ID",
+      "HC_TERMINAL_ID",
     ] as const;
     const saved = keys.map((key) => process.env[key]);
+    delete process.env.HC_TERMINAL_ID;
     const executable = "C:/Program Files/Herdr/herdr.exe";
     process.env.HERDR_BIN_PATH = executable;
     process.env.HERDR_PANE_ID = "initiator";
