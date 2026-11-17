@@ -153,7 +153,7 @@ The split is not cosmetic. Neither codex-model question is worth asking until th
 
 The picks set `CFG.devEngine`, `CFG.reviewEngine`, `CFG.codexDevModel`, `CFG.codexReviewModel`, `CFG.reviewLensModel`, `CFG.liveDevEngine`, and `CFG.liveReviewEngine` in Step 3. Whichever external engines get chosen, their `--version` check from Step 1 becomes load-bearing. If a picked engine is unreachable, say so before flying. Offer to fall back: Claude for the dev engine, the other CLI for the reviewer.
 
-When the user picks live, leave `CFG.liveCollectRounds` at its default `3`, and lower it only when a fast fail matters more than finishing a slow task. Both live steps pass `--dangerous`; `references/orchestrator.md` carries the reasoning for that and for the collect rounds.
+When the user picks live, leave `CFG.liveCollectRounds` at its default `7`, and lower it only when a fast fail matters more than finishing a slow task. Both live steps pass `--dangerous`; `references/orchestrator.md` carries the reasoning for that and for the collect rounds.
 
 If the live-pane env is not fulfilled, omit the live-panes question from the second call. Set `CFG.liveDevEngine = false`, `CFG.liveReviewEngine = false`, and `CFG.relayPath = ''`. The same fallback applies when no pane host is found, when `relay.ts` did not resolve, or when the user picks neither step. In every one of these cases, every external step runs through the headless wrappers. The three Claude quality lenses always stay headless — they are Claude agents, with no external CLI to put in a pane.
 

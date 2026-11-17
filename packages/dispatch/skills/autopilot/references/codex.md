@@ -376,8 +376,10 @@ bun "$RELAY" claude review --git-scope none --dangerous --no-ask --wait-timeout 
 
 When the flight agreed on headless, add `--headless`; otherwise relay routes to a live pane inside herdr or herdr-app.
 Run it as one foreground call within the 600s tool cap, and never poll it from a shell loop.
-When relay prints a pending report, run the `relay.ts collect --agent <name> --result <path>` command it prints, at most 3 times.
-When the last collect is still pending, treat the review as unreachable.
+When relay prints a pending report, run the `relay.ts collect --agent <name> --result <path>` command it prints, at most 7 times.
+When the last collect is still pending, run `relay.ts stop --agent <name> --result <path>` once before the fixer starts.
+When `stop` exits 0 and prints findings, use them as the review.
+Otherwise treat the review as unreachable, and name `STOPPED <name>` or `WRITER STILL RUNNING` in the artifact.
 When using relay configuration or wrapper defaults, omit `--model` instead of passing an empty value.
 Preserve the wrapper's sandbox or record-only contract.
 When the external engine is unreachable, preserve its `CODEX UNREACHABLE` or `OPENCODE UNREACHABLE` error in the findings artifact, or write `CLAUDE UNREACHABLE` for a failed or still-pending relay run.

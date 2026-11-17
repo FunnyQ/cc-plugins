@@ -1502,6 +1502,23 @@ describe("orchestrator cross-vendor review lens", () => {
       "relay ... collect --agent <name> --result <path>",
     );
     expect(prompt).toContain("at most 2 times");
+    expect(prompt).toContain(
+      "bun /abs/relay/relay.ts stop --agent <name> --result <path>",
+    );
+  });
+
+  test("stops a pending review at once with no collect rounds", async () => {
+    const prompt = await reviewPrompt({
+      liveReviewEngine: "true",
+      relayPath: "'/abs/relay/relay.ts'",
+      liveCollectRounds: "0",
+    });
+
+    expect(prompt).not.toContain("collect --agent");
+    expect(prompt).toContain("still running after");
+    expect(prompt).toContain(
+      "bun /abs/relay/relay.ts stop --agent <name> --result <path>",
+    );
   });
 
   test("falls back to headless when relayPath did not resolve", async () => {
@@ -1633,6 +1650,27 @@ describe("orchestrator commit ownership", () => {
     expect(prompt).toContain("bun /abs/relay/relay.ts codex delegate");
     expect(prompt).toContain("--no-ask");
   });
+
+  for (const rounds of ["3", "0"]) {
+    test(`the live dev driver stops a delegate it gives up on (${rounds} collect rounds)`, async () => {
+      const log = await runOrchestrator(
+        { scouts: [devWave, complete(2)] },
+        {
+          devEngine: "'codex'",
+          liveDevEngine: "true",
+          relayPath: "'/abs/relay/relay.ts'",
+          liveCollectRounds: rounds,
+        },
+      );
+      const prompt = promptFor(log, "dev-codex:ui/01#1");
+
+      expect(prompt).toContain(
+        "bun /abs/relay/relay.ts stop --agent <name> --result <path>",
+      );
+      expect(prompt).toContain("WRITER STILL RUNNING: <name>");
+      expect(prompt).not.toContain("LEFT OPEN");
+    });
+  }
 
   test("the live dev delegate passes the pinned codex dev model to relay", async () => {
     const log = await runOrchestrator(
@@ -4384,6 +4422,35 @@ describe("cockpit-rust flight fixes", () => {
     );
     expect(promptFor(log, `dev:${ref}#1`)).toContain("PLAN DEFECT:");
     expect(log.result.worktrees).toEqual([{ ref, path: `/wt/${ref}` }]);
+  });
+
+  test("a live delegate that may still be writing parks without verifying", async () => {
+    const log = await runOrchestrator(
+      {
+        scouts: [wave(ref, 1, 0), parkedEnd()],
+        devReply: {
+          [ref]: [
+            "WRITER STILL RUNNING: relay-codex-delegate-ab12\nrest of summary",
+          ],
+        },
+      },
+      {
+        devEngine: "'codex'",
+        liveDevEngine: "true",
+        relayPath: "'/abs/relay/relay.ts'",
+      },
+    );
+    expect(log.labels).not.toContain(`verify:${ref}#1`);
+    expect(log.labels).not.toContain(`dev-codex:${ref}#2`);
+    expect(log.result.escalations[0]).toMatchObject({
+      task: ref,
+      attempt: 1,
+      parked: true,
+      infrastructure: true,
+    });
+    expect(log.result.escalations[0].reason).toContain(
+      "relay-codex-delegate-ab12",
+    );
   });
 
   test("a verifier-reported plan defect parks at once without another attempt", async () => {
