@@ -236,7 +236,9 @@ The `scope-pgrep` rule is the same class of check: a `pgrep -f` pattern in a gat
 
 The `scope-git-diff` rule holds `git diff --quiet` and `git diff --exit-code` to the same standard: with no `--` pathspec they read the whole tree, so a sibling's edits and the runner's own Status edit fail a correct task. Narrow them with `-- <paths>`. The Final review's `git diff --name-only` form is exempt.
 
-The `plan-dir-git-status` rule fails a `git status` or `git diff` pathspec that points inside the plan dir, the task file itself included. When a gate checks a report written under the plan dir, gate it with `test -s <path>`.
+The `plan-dir-git-status` rule fails a `git status` or `git diff` pathspec that points inside the plan dir, the task file itself included.
+
+The `plan-dir-output` rule fails a `## Files to create / modify` entry inside the plan dir, and a `test -s`, `test -f`, or `test -e` gate on a path inside it, unless the task is a Final review. No worktree dev can create that file: the plan dir is an untracked symlink to the main tree, outside the worktree, and codex's sandbox refuses the write. When a task produces a report, write it at a repo path outside the plan dir, list it under `## Files to create / modify`, and gate that path, so it lands with the task's other files.
 
 The `refused-command` rule fails a `## Verification` item that runs `git checkout`, `git restore`, `git reset`, `git stash`, `git clean`, or `docker run`. The verifier is forbidden the git commands and agents cannot start a container, so the gate can never pass. Prove the property without rewriting the tree or starting a container, for example with `git diff --quiet -- <file>` after the check, or against the existing dev database. The rule reads commands inside code spans only, so prose such as "does not call git reset" passes. It skips `## Acceptance criteria`, where a code span usually names a command in prose rather than runs it; keep refused commands out of acceptance criteria by hand.
 

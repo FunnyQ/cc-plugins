@@ -68,7 +68,7 @@ For a nested waypoints leg, pass its actual plan directory to every worktree com
 Read `PLAN.md` and the task tree's required context.
 Run `bun "$SCRIPTS/next-ready.ts" "$TASKS" --summary`.
 Run `bun "$SCRIPTS/lint-task.ts" "$TASKS"` before dispatch.
-Resolve `scope-git-status`, `scope-git-diff`, `plan-dir-git-status`, and `refused-command` violations and `serial-undeclared` advisories as Step 1 of `SKILL.md` requires for an isolated-worktree flight.
+Resolve `scope-git-status`, `scope-git-diff`, `plan-dir-git-status`, `plan-dir-output`, and `refused-command` violations and `serial-undeclared` advisories as Step 1 of `SKILL.md` requires for an isolated-worktree flight.
 For a live resource that worktrees cannot isolate, set `> **Max parallel**: 1` in the plan.
 Keep independent build directories parallel when worktrees isolate them.
 Before resetting stale `in-progress` tasks to `todo`, confirm that no prior agent is still writing their worktrees.

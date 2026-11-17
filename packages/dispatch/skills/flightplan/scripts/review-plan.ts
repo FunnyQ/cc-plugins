@@ -183,7 +183,7 @@ You check the plan is still heading where it says it is going:
 You check that every gate actually checks. For every \`## Verification\` command
 and every \`## Acceptance criteria\` item, run two thought experiments:
 
-1. A correct implementation — would it pass? Flag a check that cannot pass: malformed shell (\`grep -c\` asked to print content, an unquoted placeholder), a pattern that also matches legitimate content (tests, fixtures, a namespace URL), a wrong expected value, a check that forbids an edit the task itself requires, a step that needs \`git checkout\`, \`docker run\` or a second database, which the verifier and agents refuse.
+1. A correct implementation — would it pass? Flag a check that cannot pass: malformed shell (\`grep -c\` asked to print content, an unquoted placeholder), a pattern that also matches legitimate content (tests, fixtures, a namespace URL), a wrong expected value, a check that forbids an edit the task itself requires, a step that needs \`git checkout\`, \`docker run\` or a second database, which the verifier and agents refuse, a task other than the Final review that must write any file under the plan dir (a report, a regenerated README), which no worktree dev can write.
 2. A deliberately broken implementation — would it fail? Flag a criterion loose enough to pass a regression: "not 404" that also accepts a 500, "behaves as before" with no recorded baseline.
 3. Checks no command can make must be tagged \`(human)\`, and a human check still needs a fixed sample and a pass condition.
 4. Eval rubric quality — dimensions specific to the task, a pass threshold that makes sense for what is built.
