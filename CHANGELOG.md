@@ -1,5 +1,22 @@
 # Changelog
 
+## [relay 0.11.2] - 2026-11-18
+
+_tracks tag `relay-v0.11.2`_
+
+### Added
+- `relay stop --agent <name> --result <path>` closes a pending live pane, confirms the agent is gone, and re-reads the result file, so a delegate you gave up on no longer keeps writing to your worktree.
+
+### Fixed
+- Programs started through `hc run` now get the caller's PATH, so tools such as mise's bun are found and Codex post-tool-use hooks no longer fail with exit 127.
+
+## [dispatch 5.12.3] - 2026-11-18
+
+_tracks tag `dispatch-v5.12.3`_
+
+### Fixed
+- Autopilot now stops a pending live writer with `relay stop` before moving on, and parks the task as infrastructure unverified if the writer is still running, so two writers can no longer touch one worktree; `liveCollectRounds` defaults to 7 (about 64 minutes), so a stuck delegate holds the wave longer.
+
 ## [dispatch 5.12.2] - 2026-11-18
 
 _tracks tag `dispatch-v5.12.2`_
