@@ -20,6 +20,7 @@ import {
   HC_CLIENT,
 } from "./live";
 import { RESULT_END_MARKER } from "./relay-prompt";
+import type { Host } from "./host";
 import { BACKENDS } from "./backends";
 
 const SCRIPT_DIR = resolve("/repo/packages/relay/skills/relay/scripts");
@@ -120,7 +121,7 @@ describe("compareVersionsDesc", () => {
 
 describe("liveGate", () => {
   const base = {
-    env: { HERDR_ENV: "1" },
+    host: "herdr" as Host | null,
     headless: false,
     mode: "delegate" as const,
     backend: BACKENDS.codex,
@@ -135,14 +136,14 @@ describe("liveGate", () => {
     expect(
       liveGate({
         ...base,
-        env: { HC_TERMINAL_ID: "t46" },
+        host: "app",
         herdScriptPath: HC_CLIENT,
       }),
     ).toEqual({ live: true });
   });
 
   it("stays headless outside herdr, silently", () => {
-    expect(liveGate({ ...base, env: {} })).toEqual({ live: false });
+    expect(liveGate({ ...base, host: null })).toEqual({ live: false });
   });
 
   it("stays headless on --headless, silently", () => {

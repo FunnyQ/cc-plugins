@@ -5,6 +5,7 @@ import { dirname, join } from "path";
 import type { Backend, InvokeOpts, Mode, RunResult } from "./types";
 import { capabilityGate, getBackend } from "./backends/gate";
 import { BACKENDS } from "./backends";
+import { hostOf, type Host } from "./host";
 import {
   appendFileContract,
   appendNoAskContract,
@@ -83,6 +84,7 @@ export type RelayDeps = {
   stderr: (text: string) => void;
   stdout: (text: string) => void;
   env: Record<string, string | undefined>;
+  host: () => Host | null;
   resolveHerdScript: () => string | null;
   runLive: (opts: RunLiveOpts) => Promise<LiveRunResult>;
   collectLive: (opts: CollectLiveOpts) => Promise<LiveRunResult>;
@@ -464,9 +466,7 @@ async function executeCollectCommand(
   }
 
   const herdScriptPath =
-    deps.env.HERDR_ENV !== "1" && deps.env.HC_TERMINAL_ID
-      ? HC_CLIENT
-      : deps.resolveHerdScript();
+    deps.host() === "app" ? HC_CLIENT : deps.resolveHerdScript();
   if (!herdScriptPath) {
     deps.stderr(
       "collect needs herd.ts (herdr plugin missing?) — nothing to reattach to\n",
@@ -526,6 +526,7 @@ export async function executeRelay(
     stderr: (text) => process.stderr.write(text),
     stdout: (text) => process.stdout.write(text),
     env: process.env,
+    host: () => hostOf(process.env),
     resolveHerdScript: () => resolveHerdScript(),
     runLive: (opts) => runLive(opts),
     collectLive: (opts) => collectLive(opts),
@@ -644,14 +645,15 @@ export async function executeRelay(
     return delegatePromptText;
   };
 
+  const host = deps.host();
   const herdScriptPath =
-    deps.env.HERDR_ENV === "1"
+    host === "herdr"
       ? deps.resolveHerdScript()
-      : deps.env.HC_TERMINAL_ID
+      : host === "app"
         ? HC_CLIENT
         : null;
   const gate = liveGate({
-    env: deps.env,
+    host,
     headless: parsed.flags.headless,
     mode: parsed.mode,
     backend,

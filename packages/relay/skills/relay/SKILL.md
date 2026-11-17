@@ -60,7 +60,7 @@ For brevity, the examples below write `relay.ts <backend> <mode> …` as shortha
 
 ## Live-pane mode (inside herdr or herdr-app)
 
-Inside herdr (`HERDR_ENV=1`) or a herdr-app terminal (`HC_TERMINAL_ID` set), `delegate` and `review` auto-route to a live TUI pane in a new tab.
+Inside herdr (`HERDR_ENV=1` with a live `HERDR_SOCKET_PATH` socket) or a herdr-app terminal (`HC_TERMINAL_ID` set), `delegate` and `review` auto-route to a live TUI pane in a new tab.
 Before running in that environment, read `references/live.md`.
 It covers flags (`--headless` / `--keep-pane` / `--wait-timeout` / `--dangerous` / `--no-ask`), stdout/stderr output contract, pane lifecycle, and pending-report semantics.
 `image` stays headless/native. An opencode run with a model (from `--model` or the relay config) also runs headless, because the opencode 2.x TUI takes no `-m`; relay prints one stderr line and continues.

@@ -12,6 +12,7 @@ import { homedir } from "os";
 import { fileURLToPath } from "url";
 import type { Backend, LiveSpec, Mode } from "./types";
 import { RESULT_END_MARKER } from "./relay-prompt";
+import type { Host } from "./host";
 
 export const DEFAULT_WAIT_TIMEOUT_MS = 600_000; // 10 min
 export const POLL_INTERVAL_MS = 5_000;
@@ -117,7 +118,7 @@ export function resolveHerdScript(
 export const HC_CLIENT = "hc";
 
 export type LiveGateInput = {
-  env: Record<string, string | undefined>;
+  host: Host | null;
   headless: boolean; // --headless escape hatch
   mode: Mode;
   backend: Backend;
@@ -127,7 +128,7 @@ export type LiveGateInput = {
 export type LiveGateResult = { live: boolean; reason?: string };
 
 export function liveGate(input: LiveGateInput): LiveGateResult {
-  if (input.env.HERDR_ENV !== "1" && !input.env.HC_TERMINAL_ID) {
+  if (input.host === null) {
     return { live: false };
   }
   if (input.headless) return { live: false };

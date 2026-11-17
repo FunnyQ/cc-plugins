@@ -44,6 +44,7 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
     stderr: () => {},
     stdout: () => {},
     env: {},
+    host: () => null,
     resolveHerdScript: () => null,
     runLive: () =>
       Promise.resolve({
@@ -64,6 +65,7 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
 function liveDeps(overrides: Partial<RelayDeps> = {}): RelayDeps {
   return deps({
     env: { HERDR_ENV: "1" },
+    host: () => "herdr",
     resolveHerdScript: () => "/x/herd.ts",
     ...overrides,
   });
@@ -788,6 +790,7 @@ describe("executeRelay live routing", () => {
       ["opencode", "delegate", "--task", "x"],
       deps({
         env: { HC_TERMINAL_ID: "t46" },
+        host: () => "app",
         resolveHerdScript: () => {
           resolved = true;
           return "/x/herd.ts";
@@ -816,6 +819,7 @@ describe("executeRelay live routing", () => {
       ],
       deps({
         env: { HC_TERMINAL_ID: "t46" },
+        host: () => "app",
         collectLive: (opts) => {
           herdScriptPath = opts.herdScriptPath;
           return Promise.resolve(liveOk);
@@ -1572,5 +1576,42 @@ describe("relay config check / apply", () => {
 
     expect(invocation).not.toContain("-m");
     expect(invocation).not.toContain(CLI_DEFAULT);
+  });
+});
+
+describe("executeRelay host routing", () => {
+  it("goes live through hc when leaked herdr env meets a herdr-app host", async () => {
+    let herdScriptPath: string | undefined;
+    const result = await executeRelay(
+      ["opencode", "delegate", "--task", "x"],
+      deps({
+        env: { HERDR_ENV: "1", HC_TERMINAL_ID: "t46" },
+        host: () => "app",
+        resolveHerdScript: () => "/x/herd.ts",
+        runLive: (opts) => {
+          herdScriptPath = opts.herdScriptPath;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+    expect(result.code).toBe(0);
+    expect(herdScriptPath).toBe("hc");
+  });
+
+  it("reattaches through hc on collect under the same leak", async () => {
+    let herdScriptPath: string | undefined;
+    await executeRelay(
+      ["collect", "--agent", "relay-claude-delegate-ab12", "--result", "/tmp/r.md"],
+      deps({
+        env: { HERDR_ENV: "1", HC_TERMINAL_ID: "t46" },
+        host: () => "app",
+        resolveHerdScript: () => "/x/herd.ts",
+        collectLive: (opts) => {
+          herdScriptPath = opts.herdScriptPath;
+          return Promise.resolve(liveOk);
+        },
+      }),
+    );
+    expect(herdScriptPath).toBe("hc");
   });
 });
