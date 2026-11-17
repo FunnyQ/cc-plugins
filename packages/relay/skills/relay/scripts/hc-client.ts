@@ -89,7 +89,12 @@ export function createHcClient(
       cmd.push("--name", name);
       if (opts.cwd) cmd.push("--cwd", opts.cwd);
       if (opts.workspace) cmd.push("--label", `herdr.space=${opts.workspace}`);
-      if (opts.env?.length) cmd.push("env", ...opts.env);
+      // hc starts the program with the core's PATH, which lacks mise's shims.
+      const programEnv = [
+        ...(env.PATH ? [`PATH=${env.PATH}`] : []),
+        ...(opts.env ?? []),
+      ];
+      if (programEnv.length) cmd.push("env", ...programEnv);
       cmd.push(opts.agent);
       // hc's manual: Codex without --no-daemon runs its commands outside hc.
       if (basename(opts.agent) === "codex") cmd.push("--no-daemon");

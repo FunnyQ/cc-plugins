@@ -126,6 +126,32 @@ describe("createHcClient", () => {
     ]);
   });
 
+  it("hands the caller's PATH to the program, since hc starts it with the core's", async () => {
+    const { run, calls } = fake((cmd) =>
+      cmd[1] === "run" ? { address: "t9" } : { spaces: [] },
+    );
+    const path =
+      "/Users/q/.local/share/mise/shims:/Users/q/Library/Application Support/x";
+    const client = createHcClient(
+      { HC_TERMINAL_ID: "t46", PATH: path },
+      run,
+      () => "ab12",
+      async () => {},
+    );
+    await client.spawn({
+      role: "r",
+      agent: "codex",
+      env: ["RELAY_DELEGATED=1"],
+    });
+    await client.spawn({ role: "r", agent: "codex" });
+    const runs = calls.filter((c) => c[1] === "run");
+    for (const cmd of runs) {
+      const at = cmd.indexOf("env");
+      expect(cmd[at + 1]).toBe(`PATH=${path}`);
+    }
+    expect(runs[0]).toContain("RELAY_DELEGATED=1");
+  });
+
   it("reports a never-reported status as unknown, and a reported one by its state", async () => {
     const { run } = fake((cmd) =>
       cmd[3] === "a"
