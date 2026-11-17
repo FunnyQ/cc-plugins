@@ -626,12 +626,6 @@ export type StopResult =
 const STOP_CONFIRM_POLLS = 10;
 const STOP_CONFIRM_INTERVAL_MS = 1_000;
 
-/**
- * End a pending live pane so a caller can fail the attempt without leaving a
- * second writer on the working tree. Only a successful list without the name
- * counts as gone; a list that throws proves nothing. The result file is read
- * after the kill, so a delegate that finished in the meantime is not lost.
- */
 export async function stopLive(
   opts: StopLiveOpts,
   deps: RunLiveDeps = defaultRunLiveDeps(),
