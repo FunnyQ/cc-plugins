@@ -103,7 +103,7 @@ When cross-vendor review is required, pick Claude through relay, or an installed
 When choosing Codex review, disclose that it supplies an independent context but no cross-vendor signal in this flight.
 Check the chosen external CLI with `--version` before flying; for Claude, run `claude --version`.
 State which service receives the branch diff.
-When `HERDR_ENV=1` or `HC_TERMINAL_ID` is set and `$RELAY` resolved, ask whether the closing review runs in a visible relay live pane, defaulting to headless.
+When the Step 1 item 9 probe of `SKILL.md` finds a pane host (herdr or herdr-app) and `$RELAY` resolved, run the closing review in a visible relay live pane without asking, unless the user asked for headless in this conversation.
 Run every non-relay external review through the headless wrappers.
 State that this path does not implement Workflow's external-dev fallback ladder, because native Codex agents write every task.
 Keep commits between waves and after Final review unless the user explicitly disables them for this flight.
@@ -374,7 +374,7 @@ When choosing Claude, run relay instead:
 bun "$RELAY" claude review --git-scope none --dangerous --no-ask --wait-timeout 480000 --prompt-file "$PROMPT_FILE"
 ```
 
-When the flight agreed on headless, add `--headless`; otherwise relay routes to a live pane inside herdr or herdr-app.
+When the user asked for headless, add `--headless`; otherwise relay routes to a live pane inside herdr or herdr-app.
 Run it as one foreground call within the 600s tool cap, and never poll it from a shell loop.
 When relay prints a pending report, run the `relay.ts collect --agent <name> --result <path>` command it prints, at most 3 times.
 When the last collect is still pending, treat the review as unreachable.
