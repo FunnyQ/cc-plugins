@@ -1,5 +1,12 @@
 # Changelog
 
+## [relay 0.11.3] - 2026-11-18
+
+_tracks tag `relay-v0.11.3`_
+
+### Fixed
+- A live codex delegate now keeps its delegation marker for 8x the wait instead of 4x, so long autopilot runs of about 64 minutes no longer lose it halfway and trigger decision-log nudges for a delegate nobody is watching.
+
 ## [relay 0.11.2] - 2026-11-18
 
 _tracks tag `relay-v0.11.2`_
