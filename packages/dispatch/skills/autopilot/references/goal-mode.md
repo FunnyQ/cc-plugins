@@ -162,7 +162,7 @@ Record `refuse` with the same command as step 4, using `--verdict refuse`. Never
    - `dev` for each ref this round recorded as `fix`, `defer`, `not-plan`, or `infra-retry` that no guard map names, such as an escalated task whose repair edited only a sibling's `Depends on`;
    - each entry of the `CFG.reentry` you baked for the last launch whose task still reads `todo`, because it never became ready in that run and still needs its attempt seed and kept worktree.
 
-   When a ref appears more than once, use `dev` if any entry says `dev`. For each ref, run `bun $SCRIPTS/flightlog.ts progress <log> --task <ref> --json` and take its `attempt`. Omit a ref with no recorded attempts, since it starts fresh. Write each entry as `{ "<ref>": { "from": "dev" | "verify", "attempt": N } }`.
+   When a ref appears more than once, use `dev` if any entry says `dev`. For each ref, run `bun $SCRIPTS/flightlog.ts progress <log> --task <ref> --json` and take its `attempt` field as `N`. That field is the next attempt number, one past the highest recorded: a task with attempts 1 and 2 prints 3. Omit a ref with no recorded attempts, since it starts fresh. Write each entry as `{ "<ref>": { "from": "dev" | "verify", "attempt": N } }`. The orchestrator runs attempt `N` first and gives the task a full `maxAttempts` window from there, so the attempts before the repair do not count against it.
 
 3. Set `CFG.deferredScope` as `SKILL.md` Step 3 says.
 4. Bake with every other `CFG` value unchanged, launch the Workflow, and go to step 2 when it returns. Add 1 to `<round>`.
