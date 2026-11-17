@@ -1,5 +1,19 @@
 # Changelog
 
+## [herdr 0.9.2] - 2026-11-17
+
+_tracks tag `herdr-v0.9.2`_
+
+### Fixed
+- Agents in herdr-app terminals no longer report "no herdr server" when a stale HERDR_ENV leaks in from a herdr-core daemon; the host is now detected from a live socket and the nearest herdr process in the parent chain.
+
+## [relay 0.11.1] - 2026-11-17
+
+_tracks tag `relay-v0.11.1`_
+
+### Fixed
+- Relay now routes collect, delegate, review and live checks by the detected host instead of HERDR_ENV alone, so a stale environment variable no longer sends work to the wrong pane.
+
 ## [dispatch 5.12.0] - 2026-11-15
 
 _tracks tag `dispatch-v5.12.0`_
