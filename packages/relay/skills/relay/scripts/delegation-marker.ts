@@ -54,7 +54,7 @@ export function buildMarker(opts: {
 }): DelegationMarker {
   const ttl = Math.min(
     MAX_TTL_MS,
-    Math.max(MIN_TTL_MS, opts.waitTimeoutMs * 4),
+    Math.max(MIN_TTL_MS, opts.waitTimeoutMs * 8),
   );
   return {
     cwd: opts.cwd,

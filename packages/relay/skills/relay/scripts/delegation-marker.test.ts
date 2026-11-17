@@ -61,7 +61,9 @@ describe("buildMarker", () => {
       now: NOW,
       waitTimeoutMs: 480_000,
     });
-    expect(marker.expiresAt - NOW).toBe(480_000 * 4);
+    // autopilot: the first wait plus its default 7 collect rounds
+    expect(marker.expiresAt - NOW).toBe(480_000 * 8);
+    expect(marker.expiresAt - NOW).toBe(64 * 60_000);
   });
 
   it("floors a tiny wait so a fast timeout still covers the session", () => {
