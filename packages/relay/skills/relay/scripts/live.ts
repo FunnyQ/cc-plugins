@@ -401,6 +401,9 @@ function pendingReport(ctx: PollContext, elapsedMs: number): string {
     `Keep waiting — this reattaches to the SAME pane, and is repeatable:`,
     `  bun ${shellArg(RELAY_SCRIPT_PATH)} collect --agent ${agent} --result ${result} --wait-timeout ${ctx.waitTimeoutMs}${keep}`,
     ``,
+    `Give up on it — this ends the pane so nothing keeps writing (exit 0: it finished after all, 1: stopped, 3: may still be running):`,
+    `  bun ${shellArg(RELAY_SCRIPT_PATH)} stop --agent ${agent} --result ${result}`,
+    ``,
     `Or drive the pane by hand:`,
     `  cat ${result}   # collect the answer once written`,
     `  ${herd} read ${agent}                  # read the pane (holds the answer if result.md was never written)`,
@@ -607,6 +610,69 @@ export async function collectLive(
   }
 
   return pollForResult(herd, { ...opts, label: "collect" }, deps);
+}
+
+export type StopLiveOpts = {
+  agentName: string;
+  herdScriptPath: string;
+  resultPath: string;
+};
+
+export type StopResult =
+  | { kind: "finished"; agentName: string; text: string }
+  | { kind: "stopped"; agentName: string }
+  | { kind: "alive"; agentName: string; error: string };
+
+const STOP_CONFIRM_POLLS = 10;
+const STOP_CONFIRM_INTERVAL_MS = 1_000;
+
+/**
+ * End a pending live pane so a caller can fail the attempt without leaving a
+ * second writer on the working tree. Only a successful list without the name
+ * counts as gone; a list that throws proves nothing. The result file is read
+ * after the kill, so a delegate that finished in the meantime is not lost.
+ */
+export async function stopLive(
+  opts: StopLiveOpts,
+  deps: RunLiveDeps = defaultRunLiveDeps(),
+): Promise<StopResult> {
+  const { agentName } = opts;
+  let herd: HerdClient;
+  try {
+    herd = await deps.loadHerd(opts.herdScriptPath);
+  } catch (error) {
+    return {
+      kind: "alive",
+      agentName,
+      error: `failed to load herd.ts: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+
+  let closeError = "";
+  try {
+    await herd.close(agentName);
+  } catch (error) {
+    closeError = error instanceof Error ? error.message : String(error);
+  }
+
+  let gone = false;
+  for (let poll = 0; poll < STOP_CONFIRM_POLLS && !gone; poll++) {
+    if (poll > 0) await deps.sleep(STOP_CONFIRM_INTERVAL_MS);
+    try {
+      gone = !(await herd.list()).some((a) => a.name === agentName);
+    } catch {}
+  }
+
+  if (deps.fileExists(opts.resultPath)) {
+    const text = extractFinalText(deps.readFile(opts.resultPath));
+    if (text !== null) return { kind: "finished", agentName, text };
+  }
+  if (gone) return { kind: "stopped", agentName };
+  return {
+    kind: "alive",
+    agentName,
+    error: `${agentName} is still listed after the kill${closeError ? ` (${closeError})` : ""}`,
+  };
 }
 
 async function pollForResult(

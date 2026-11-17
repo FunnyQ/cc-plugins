@@ -49,6 +49,18 @@ Reattach to the pane a pending report named and watch it for another bounded win
 
 Do not use `collect` to poll. One bounded call, then act on what it returns.
 
+### Stopping a pending run
+
+```bash
+relay.ts stop --agent <name> --result <path>
+```
+
+When you give up on a pending run, stop it before you fail the work or start another attempt on the same files. Otherwise the delegate keeps writing the working tree under whatever runs next. `stop` closes the pane, then confirms the name is gone from the agent list and reads the result file once more:
+
+- Exit 0: the result landed before the pane closed. The answer is on stdout; treat it as a success.
+- Exit 1: `STOPPED <name>`. The pane is closed and gone.
+- Exit 3: `WRITER STILL RUNNING`. Relay could not confirm the pane is gone. Do not start another writer on that working tree; close the pane by hand first.
+
 If a pane exists, failures also leave it open. This leaves a postmortem target you can read or close manually.
 
 Live mode can be denied for a non-user reason: herd.ts is unresolvable, or the backend has no live seam. When that happens, relay prints one stderr note and runs headless in the same invocation. No action is needed.

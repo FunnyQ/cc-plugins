@@ -15,6 +15,8 @@ import {
   DEFAULT_WAIT_TIMEOUT_MS,
   type CollectLiveOpts,
   type LiveRunResult,
+  type StopLiveOpts,
+  type StopResult,
 } from "./live";
 
 const RUN_DIR = "/tmp/relay/test-run";
@@ -57,6 +59,12 @@ function deps(overrides: Partial<RelayDeps> = {}): RelayDeps {
         ok: false,
         pending: false,
         error: "collectLive not stubbed",
+      }),
+    stopLive: () =>
+      Promise.resolve({
+        kind: "alive",
+        agentName: "",
+        error: "stopLive not stubbed",
       }),
     ...overrides,
   };
@@ -1351,6 +1359,80 @@ describe("relay collect", () => {
 
     expect(res.code).toBe(1);
     expect(err.join("")).toContain("herd.ts");
+  });
+});
+
+describe("relay stop", () => {
+  function stopDeps(result: StopResult, overrides: Partial<RelayDeps> = {}) {
+    const out: string[] = [];
+    const err: string[] = [];
+    const seen: StopLiveOpts[] = [];
+    const d = liveDeps({
+      stdout: (t) => out.push(t),
+      stderr: (t) => err.push(t),
+      stopLive: (opts) => {
+        seen.push(opts);
+        return Promise.resolve(result);
+      },
+      ...overrides,
+    });
+    return { d, out, err, seen };
+  }
+
+  const ARGV = [
+    "stop",
+    "--agent",
+    "relay-codex-delegate-ab12",
+    "--result",
+    "/tmp/relay/run/result.md",
+  ];
+
+  it("exits 1 once the pane is confirmed gone, so the caller fails the attempt", async () => {
+    const { d, err, seen } = stopDeps({
+      kind: "stopped",
+      agentName: "relay-codex-delegate-ab12",
+    });
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(1);
+    expect(err.join("")).toContain("STOPPED relay-codex-delegate-ab12");
+    expect(seen[0]).toEqual({
+      agentName: "relay-codex-delegate-ab12",
+      herdScriptPath: "/x/herd.ts",
+      resultPath: "/tmp/relay/run/result.md",
+    });
+  });
+
+  it("prints a result that landed during the stop and exits 0", async () => {
+    const { d, out } = stopDeps({
+      kind: "finished",
+      agentName: "relay-codex-delegate-ab12",
+      text: "late answer",
+    });
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(0);
+    expect(out.join("")).toBe("late answer");
+  });
+
+  it("exits 3 when the writer may still be running", async () => {
+    const { d, err } = stopDeps({
+      kind: "alive",
+      agentName: "relay-codex-delegate-ab12",
+      error: "still listed",
+    });
+
+    const res = await executeRelay(ARGV, d);
+
+    expect(res.code).toBe(3);
+    expect(err.join("")).toContain("WRITER STILL RUNNING");
+  });
+
+  it("requires --agent and --result", async () => {
+    const { d } = stopDeps({ kind: "stopped", agentName: "a" });
+    expect((await executeRelay(["stop", "--agent", "a"], d)).code).toBe(1);
   });
 });
 

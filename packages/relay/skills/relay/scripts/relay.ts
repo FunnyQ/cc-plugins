@@ -25,8 +25,11 @@ import {
   liveGate,
   resolveHerdScript,
   runLive,
+  stopLive,
   type CollectLiveOpts,
   type LiveRunResult,
+  type StopLiveOpts,
+  type StopResult,
   type RunLiveOpts,
 } from "./live";
 import {
@@ -88,6 +91,7 @@ export type RelayDeps = {
   resolveHerdScript: () => string | null;
   runLive: (opts: RunLiveOpts) => Promise<LiveRunResult>;
   collectLive: (opts: CollectLiveOpts) => Promise<LiveRunResult>;
+  stopLive: (opts: StopLiveOpts) => Promise<StopResult>;
 };
 
 export type RelayExecution = {
@@ -106,6 +110,7 @@ function usage(backends: string): string {
     `Usage: relay <${backends}> <delegate|review|image> [flags]`,
     `       relay config set-model|check|apply ...   (relay config for details)`,
     `       relay collect --agent <name> --result <path> [--wait-timeout <ms>] [--keep-pane]`,
+    `       relay stop --agent <name> --result <path>`,
     "flags: --task <text> | --files <csv> | --model <provider/model>",
     "       --effort <low|medium|high|xhigh|max>   (claude only)",
     "       --out <path> | --git-scope <s> | --no-project",
@@ -507,6 +512,70 @@ async function executeCollectCommand(
   return { code: 1, agentName: result.agentName };
 }
 
+const STOP_USAGE = "Usage: relay stop --agent <name> --result <path>\n";
+
+/**
+ * `relay stop` — end a pending live pane when the caller gives up on it.
+ *
+ * A caller that fails an attempt and moves on must not leave the delegate
+ * writing the working tree under the next attempt. Exit 0 means the result
+ * landed after all, 1 means the pane is confirmed gone, and 3 means it may
+ * still be writing.
+ */
+async function executeStopCommand(
+  argv: string[],
+  deps: RelayDeps,
+): Promise<RelayExecution> {
+  const rest = argv.slice(1);
+  let agentName: string | undefined;
+  let resultPath: string | undefined;
+  try {
+    for (let i = 0; i < rest.length; i++) {
+      const arg = rest[i];
+      if (arg === "--agent") {
+        agentName = requireValue(rest, i, arg);
+        i++;
+      } else if (arg === "--result") {
+        resultPath = requireValue(rest, i, arg);
+        i++;
+      } else {
+        throw new UsageError(`Unknown flag: ${arg}`);
+      }
+    }
+  } catch (error) {
+    deps.stderr(
+      `${error instanceof Error ? error.message : String(error)}\n${STOP_USAGE}`,
+    );
+    return { code: 1 };
+  }
+  if (!agentName || !resultPath) {
+    deps.stderr(`stop requires --agent and --result\n${STOP_USAGE}`);
+    return { code: 1 };
+  }
+
+  const herdScriptPath =
+    deps.host() === "app" ? HC_CLIENT : deps.resolveHerdScript();
+  if (!herdScriptPath) {
+    deps.stderr(
+      `WRITER STILL RUNNING: no herd.ts to stop ${agentName} with (herdr plugin missing?)\n`,
+    );
+    return { code: 3, agentName };
+  }
+
+  const result = await deps.stopLive({ agentName, herdScriptPath, resultPath });
+  if (result.kind === "finished") {
+    deps.stdout(result.text);
+    deps.stderr(`\n[relay live] ${agentName} finished before the stop\n`);
+    return { code: 0, agentName };
+  }
+  if (result.kind === "stopped") {
+    deps.stderr(`STOPPED ${agentName}: the pane is closed and gone\n`);
+    return { code: 1, agentName };
+  }
+  deps.stderr(`WRITER STILL RUNNING: ${result.error}\n`);
+  return { code: 3, agentName };
+}
+
 export function writeFileCreatingDir(path: string, text: string): void {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, text, "utf-8");
@@ -530,6 +599,7 @@ export async function executeRelay(
     resolveHerdScript: () => resolveHerdScript(),
     runLive: (opts) => runLive(opts),
     collectLive: (opts) => collectLive(opts),
+    stopLive: (opts) => stopLive(opts),
   },
 ): Promise<RelayExecution> {
   let parsed: ParsedFlags;
@@ -541,6 +611,10 @@ export async function executeRelay(
 
   if (argv[0] === "collect") {
     return executeCollectCommand(argv, deps);
+  }
+
+  if (argv[0] === "stop") {
+    return executeStopCommand(argv, deps);
   }
 
   try {

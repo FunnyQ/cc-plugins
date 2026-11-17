@@ -11,6 +11,7 @@ import {
   resolveHerdScript,
   runLive,
   shellArg,
+  stopLive,
   type CallerLocation,
   type CollectLiveOpts,
   type HerdClient,
@@ -1264,6 +1265,114 @@ describe("collectLive", () => {
     expect(result.ok).toBe(false);
     if (result.ok || result.pending) throw new Error("expected failure");
     expect(result.error).toContain("no herd");
+  });
+});
+
+function stopHarness(options: {
+  listed: string[][]; // names per list() call (last repeats)
+  listError?: boolean;
+  closeError?: Error;
+  resultContent?: string; // result.md content once the pane is closed
+  loadError?: Error;
+}) {
+  const calls: string[] = [];
+  let lists = 0;
+  let closed = false;
+  const herd = {
+    async close() {
+      calls.push("close");
+      closed = true;
+      if (options.closeError) throw options.closeError;
+      return {};
+    },
+    async list() {
+      calls.push("list");
+      if (options.listError) throw new Error("list failed");
+      const names =
+        options.listed[Math.min(lists++, options.listed.length - 1)];
+      return names.map((name) => ({
+        name,
+        type: null,
+        status: "working",
+        paneId: name,
+      }));
+    },
+  } as unknown as HerdClient;
+  const deps: RunLiveDeps = {
+    loadHerd: async () => {
+      if (options.loadError) throw options.loadError;
+      return herd;
+    },
+    fileExists: () => closed && options.resultContent !== undefined,
+    readFile: () => options.resultContent ?? "",
+    stderr: () => {},
+    now: () => 0,
+    sleep: async () => {},
+  };
+  const run = () =>
+    stopLive(
+      {
+        agentName: "relay-codex-delegate-ab12",
+        herdScriptPath: "/x/herd.ts",
+        resultPath: "/tmp/relay/run/result.md",
+      },
+      deps,
+    );
+  return { run, calls };
+}
+
+describe("stopLive", () => {
+  it("closes the pane and confirms it is gone from the agent list", async () => {
+    const { run, calls } = stopHarness({
+      listed: [["relay-codex-delegate-ab12"], ["other"]],
+    });
+
+    expect(await run()).toEqual({
+      kind: "stopped",
+      agentName: "relay-codex-delegate-ab12",
+    });
+    expect(calls[0]).toBe("close");
+  });
+
+  it("returns the result when the delegate finished as it was stopped", async () => {
+    const { run } = stopHarness({
+      listed: [[]],
+      resultContent: `done\n${RESULT_END_MARKER}\n`,
+    });
+
+    expect(await run()).toEqual({
+      kind: "finished",
+      agentName: "relay-codex-delegate-ab12",
+      text: "done",
+    });
+  });
+
+  it("reports the writer alive when the pane never leaves the list", async () => {
+    const { run } = stopHarness({
+      listed: [["relay-codex-delegate-ab12"]],
+      closeError: new Error("kill refused"),
+    });
+
+    const result = await run();
+
+    expect(result.kind).toBe("alive");
+    if (result.kind !== "alive") throw new Error("expected alive");
+    expect(result.error).toContain("kill refused");
+  });
+
+  it("never reads a failed list as gone", async () => {
+    const { run } = stopHarness({ listed: [[]], listError: true });
+
+    expect((await run()).kind).toBe("alive");
+  });
+
+  it("reports the writer alive when the herd client cannot load", async () => {
+    const { run } = stopHarness({
+      listed: [[]],
+      loadError: new Error("no herd"),
+    });
+
+    expect((await run()).kind).toBe("alive");
   });
 });
 
