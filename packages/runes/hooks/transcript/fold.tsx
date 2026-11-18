@@ -26,6 +26,7 @@ export type Member = {
   isLast: boolean;
   label: string;
   title: Title;
+  isOpen?: true;
 };
 type $ = Parameters<Hook<"tool.call">>[0];
 type Render = Parameters<Hook<"ui.render">>;
@@ -88,7 +89,7 @@ export const runsOf = (
   let tools: string[] = [];
   let titles: Title[] = [];
   let hasScript = false;
-  const close = (least = min) => {
+  const close = (least = min, isOpen = false) => {
     if (run.length >= least) {
       titles.forEach((t, i) => {
         if (t.depth && !titles[i + 1]?.depth) t.isLastChild = true;
@@ -109,6 +110,7 @@ export const runsOf = (
           isLast: i === ids.length - 1,
           label,
           title: titles[i]!,
+          ...(isOpen ? { isOpen: true as const } : {}),
         }),
       );
     }
@@ -147,7 +149,7 @@ export const runsOf = (
       if (!u.isError) add(u, inFlight.has(u.tool_use_id));
   }
   for (const u of pending) if (!seen.has(u.tool_use_id)) add(u, !u.isDone);
-  close(1);
+  close(1, true);
   return members;
 };
 
@@ -193,7 +195,7 @@ const scriptRuns = (output: unknown, m: Member) => {
     o?.asyncDispatched === true &&
     typeof o.evalId === "number" &&
     !settled.has(o.evalId) &&
-    m.run === [...members.values()].at(-1)?.run
+    m.isOpen === true
   );
 };
 const RAIL_MAX_CARD_LINES = 200;

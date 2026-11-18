@@ -497,6 +497,30 @@ test("a folded ToolGroup draws its calls' titles itself, and hands back to the e
   expect(await find($, B2, { key: "bash" })).toBeDefined();
 });
 
+test("a REPL stops spinning once a reply closes its run, though no Poll reported its eval", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+      said("assistant", "all done"),
+    ],
+  });
+  const row = ROW(
+    "r1",
+    "REPL",
+    { description: "Survey" },
+    {
+      output: { result: "(dispatched #5)", evalId: 5, asyncDispatched: true },
+    },
+  );
+  expect(
+    await eventually(
+      async () => (await find($, row, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  expect(await find($, row, { key: "fold:spinner" })).toBeUndefined();
+});
+
 test("a folded ToolGroup spins each call by its own state, not the group's", async ($, on) => {
   await startSession($, on, {
     messages: [
