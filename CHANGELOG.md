@@ -1,5 +1,21 @@
 # Changelog
 
+## [runes 0.14.4] - 2026-11-18
+
+_tracks tag `runes-v0.14.4`_
+
+### Fixed
+- The REPL spinner now stops once the model's reply closes its run, instead of spinning forever when a script's end arrived outside the usual Poll result.
+- Folded REPL calls now spin while their script runs and hang off a dim tree guide, so nesting reads at a glance.
+- Fold in code mode no longer spins forever on finished calls or clutters the run summary with REPL and Poll, and calls made by a script are indented under their REPL.
+
+## [guard 0.9.4] - 2026-11-18
+
+_tracks tag `guard-v0.9.4`_
+
+### Changed
+- Reformatted the plugin's source with the repo-wide formatter; behaviour is unchanged.
+
 ## [dispatch 5.12.4] - 2026-11-18
 
 _tracks tag `dispatch-v5.12.4`_
