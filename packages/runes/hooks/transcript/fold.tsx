@@ -72,6 +72,10 @@ const titleOf = (tool: string, input: Record<string, unknown>) => {
     (path && shortPath(path)) ??
     s("pattern") ??
     s("command")?.split("\n")[0] ??
+    s("code")
+      ?.split("\n")
+      .find((l) => l.trim())
+      ?.trim() ??
     s("skill");
   return detail ? `${nameOf(tool)} ${detail}` : nameOf(tool);
 };

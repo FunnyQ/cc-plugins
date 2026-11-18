@@ -226,6 +226,14 @@ test("runsOf leaves code mode's REPL and Poll out of the tally and hides Poll's 
   ).toBe("1 call · REPL 1");
 });
 
+test("a REPL with no description is titled by its script's first line", () => {
+  const runs = runsOf(
+    [called(use("r1", "REPL", { code: "\n  const out = await $`ls`;\nout" }))],
+    { keep: [], min: 1 },
+  );
+  expect(runs.get("r1")?.title.text).toBe("REPL const out = await $`ls`;");
+});
+
 test("a folded Poll draws no title line", async ($, on) => {
   await startSession($, on, {
     messages: [
