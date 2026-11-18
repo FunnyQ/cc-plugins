@@ -88,7 +88,7 @@ cc-plugins/
 │   │   ├── agents/                       # lawspeaker (commit) / storykeeper (pr) / annalist (release) /
 │   │   │                                 # judge+codifier+barrowkeeper (adr) — none spawns a child
 │   │   ├── agents-codex/                 # Codex agent definitions (TOML format)
-│   │   ├── hooks/register.ts             # Claude Code mod: classic.PreToolUse Bash, matcher gates on `git commit`, asks
+│   │   ├── hooks/register.ts             # Claude Code mod: classic.PreToolUse Bash, COMMIT_COMMAND gates in the body, asks
 │   │   ├── hooks/commit-command.ts       # that command regex; commit-command.test.ts holds the sh and opencode copies equal
 │   │   ├── hooks/check-branch.sh         # OpenCode and Codex: the same workflow-configured branch guard
 │   │   ├── hooks/check-branch.codex.ts   # Codex PreToolUse: translate the shell guard's ask into deny

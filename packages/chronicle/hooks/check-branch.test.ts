@@ -143,4 +143,19 @@ describe("check-branch", () => {
 
     expect(runHook("git status").stdout.toString()).toBe("");
   });
+
+  test("ignores a command that only quotes the words git commit", () => {
+    writePrConfig({ workflow: "github-flow", base: "main" });
+
+    expect(runHook('rg "git commit" src').stdout.toString()).toBe("");
+  });
+
+  test("asks for a commit on a later line or behind global options", () => {
+    writePrConfig({ workflow: "github-flow", base: "main" });
+
+    for (const command of ["git add .\ngit commit -m x", "git -C . commit"])
+      expect(runHook(command).stdout.toString()).toContain(
+        '"permissionDecision":"ask"',
+      );
+  });
 });

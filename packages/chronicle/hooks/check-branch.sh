@@ -6,7 +6,15 @@ input=$(cat)
 
 command=$(echo "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || echo "")
 
-if [[ ! "$command" =~ git[[:space:]]+commit ]]; then
+commit_re='(^|[;&|({`]|\$\()[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*git([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+commit([^A-Za-z0-9_-]|$)'
+gates=0
+while IFS= read -r line; do
+  if [[ "$line" =~ $commit_re ]]; then
+    gates=1
+    break
+  fi
+done <<<"$command"
+if [[ $gates -eq 0 ]]; then
   exit 0
 fi
 

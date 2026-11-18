@@ -17,9 +17,10 @@ type PrConfig = {
 export const register: Register = (on) => {
   on(
     "classic.PreToolUse",
-    { tool: "Bash", command: COMMIT_COMMAND },
+    // the engine refuses a matcher regex with a nested quantifier, so COMMIT_COMMAND runs in the body
+    { tool: "Bash" },
     async ($, e, next) => {
-      if (e.tool !== "Bash") return next(e);
+      if (e.tool !== "Bash" || !COMMIT_COMMAND.test(e.command)) return next(e);
 
       const git = async (...args: string[]) => {
         const r = await $.process.run(["git", ...args]);

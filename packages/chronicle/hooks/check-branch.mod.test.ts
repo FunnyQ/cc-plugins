@@ -173,3 +173,25 @@ test(
     expect(runs).toEqual([]);
   },
 );
+
+test(
+  "asks for a commit behind git's global options",
+  { plugins: [spy] },
+  async ($, on) => {
+    repo(on, { pr: { workflow: "github-flow", base: "main" } });
+    const ran = await $.tool.call(bash("git -C . commit -m x"));
+    expect(ran.text).toStartWith("ask: ");
+  },
+);
+
+test(
+  "a Bash call that only quotes git commit spawns nothing",
+  { plugins: [spy] },
+  async ($, on) => {
+    const { runs } = repo(on, {
+      pr: { workflow: "github-flow", base: "main" },
+    });
+    expect((await $.tool.call(bash('rg "git commit" src'))).text).toBe("ran");
+    expect(runs).toEqual([]);
+  },
+);
