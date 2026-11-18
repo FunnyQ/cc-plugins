@@ -141,7 +141,18 @@ test("Clawd off with no map and no lesson draws the button row alone", async ($,
   const { ui } = await setup($, on, "clawd:\n  enabled: false\n");
   expect(await ui.find({ key: "explain-buttons" })).toBeDefined();
   expect(await ui.find({ key: "clawd" })).toBeUndefined();
-  expect(await ui.find({ text: "engine" })).toBeUndefined();
+  type Part = {
+    props?: { key?: string };
+    part?: { plugin: string };
+    children?: Part[];
+  };
+  // the kit stacks each plugin's band as its own part, the test's included, so only runes' part shows what runes drew
+  const band = (await ui.find({ type: "Box" })) as Part;
+  const drawn = band.children?.filter((c) => c.part?.plugin === "runes");
+  expect(drawn?.map((c) => c.props?.key)).toEqual(["clawd-row"]);
+  expect((await ui.find({ key: "clawd-row" }))?.text).toBe(
+    "[Explain plz!][Tell me…]",
+  );
   await ui.unmount();
 });
 
@@ -256,7 +267,7 @@ test("a press that writes an html page spawns the checker from inside runes' own
     spawns.push(e.prompt.split("\n")[0]!);
     return { agentId: "k1", model: "sonnet" } as never;
   });
-  on("ui.press", async (_$, e, next) => {
+  on("ui.press", { plugin: "runes" }, async (_$, e, next) => {
     const pressed = await next(e);
     spawnsPastBottom.push(spawns.length);
     return pressed;

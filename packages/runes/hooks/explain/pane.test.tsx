@@ -527,12 +527,12 @@ test("the ask field grows a row per typed line, up to 6", async ($, on) => {
 test("a pick and a follow-up fork from runes' own hooks once the press and submit bottoms returned", async ($, on) => {
   const forks: string[] = [];
   const forksPastBottom: number[] = [];
-  on("ui.press", async (_$, e, next) => {
+  on("ui.press", { plugin: "runes" }, async (_$, e, next) => {
     const pressed = await next(e);
     forksPastBottom.push(forks.length);
     return pressed;
   });
-  on("ui.input", async (_$, e, next) => {
+  on("ui.input", { plugin: "runes" }, async (_$, e, next) => {
     const submitted = await next(e);
     forksPastBottom.push(forks.length);
     return submitted;
