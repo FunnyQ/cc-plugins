@@ -175,6 +175,134 @@ test("runsOf folds a call still running, from tool.call before the transcript ho
   ).toBe("1 call · Bash 1");
 });
 
+test("runsOf spins only a call tool.call still holds, never a stored call merely missing its result", () => {
+  const stored = [
+    said("user", "go"),
+    called({
+      tool_use_id: "v1",
+      tool: "Bash",
+      input: { command: "ls" },
+    } as never),
+  ];
+  expect(
+    runsOf(stored, { keep: [], min: 1 }).get("v1")?.title.isRunning,
+  ).toBeUndefined();
+  const done = {
+    tool_use_id: "p1",
+    tool: "Poll",
+    input: {},
+    isDone: true as const,
+  };
+  expect(
+    runsOf(stored, { keep: [], min: 1, pending: [done] }).get("p1")?.title
+      .isRunning,
+  ).toBeUndefined();
+  expect(
+    runsOf(stored, {
+      keep: [],
+      min: 1,
+      pending: [{ ...done, tool_use_id: "v1" }],
+    }).get("v1")?.title.isRunning,
+  ).toBeUndefined();
+});
+
+test("runsOf leaves code mode's REPL and Poll out of the tally and hides Poll's title", () => {
+  const coded = [
+    said("user", "go"),
+    called(use("r1", "REPL", { description: "Survey the files" })),
+    called(
+      use("v1", "Bash", { command: "ls" }),
+      use("v2", "Bash", { command: "pwd" }),
+    ),
+    called(use("p1", "Poll")),
+  ];
+  const runs = runsOf(coded, { keep: [], min: 1 });
+  expect(runs.get("p1")?.label).toBe("2 calls · Bash 2");
+  expect(runs.get("p1")?.title.isHidden).toBe(true);
+  expect(runs.get("p1")?.title.text).toBe("Waiting for the script...");
+  expect(runs.get("r1")?.title.isHidden).toBeUndefined();
+  expect(
+    runsOf([called(use("r1", "REPL"))], { keep: [], min: 1 }).get("r1")?.label,
+  ).toBe("1 call · REPL 1");
+});
+
+test("a folded Poll draws no title line", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL")),
+      called(use("p1", "Poll")),
+    ],
+  });
+  const repl = ROW("r1", "REPL");
+  expect(
+    await eventually(
+      async () => (await find($, repl, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  expect(
+    await find($, ROW("p1", "Poll"), { key: "fold:title" }),
+  ).toBeUndefined();
+  expect(await find($, ROW("p1", "Poll"), { key: "fold:row" })).toBeDefined();
+});
+
+test("a Poll the engine still runs draws its title with a spinner, though tool.call never saw it", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL")),
+      called(use("p1", "Poll")),
+    ],
+  });
+  expect(
+    await eventually(
+      async () =>
+        (await find($, ROW("r1", "REPL"), { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  const waiting = ROW("p1", "Poll", {}, { isRunning: true });
+  expect(await find($, waiting, { key: "fold:title" })).toBeDefined();
+  expect(await find($, waiting, { key: "fold:spinner" })).toBeDefined();
+});
+
+test("runsOf nests a REPL's own calls under it, and only those", () => {
+  const runs = runsOf(
+    [
+      said("user", "go"),
+      called(use("b1", "Bash", { command: "ls" })),
+      called(use("r1", "REPL", { description: "Survey" })),
+      called(use("repl_1", "Bash", { command: "pwd" })),
+      called(use("repl_2", "Read", { file_path: "/a.ts" })),
+    ],
+    { keep: [], min: 1 },
+  );
+  expect(runs.get("repl_1")?.title.depth).toBe(1);
+  expect(runs.get("repl_2")?.title.depth).toBe(1);
+  expect(runs.get("r1")?.title.depth).toBeUndefined();
+  expect(runs.get("b1")?.title.depth).toBeUndefined();
+});
+
+test("a nested title's icon sits two cells right of its REPL's", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+      called(use("repl_1", "Bash", { command: "pwd" })),
+    ],
+  });
+  const repl = ROW("r1", "REPL", { description: "Survey" });
+  expect(
+    await eventually(
+      async () => (await find($, repl, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  const outer = (await find($, repl, { key: "fold:title" }))!.text;
+  const inner = (await find($, ROW("repl_1", "Bash", { command: "pwd" }), {
+    key: "fold:title",
+  }))!.text;
+  expect(inner.indexOf(DEFAULTS.bash.icon)).toBe(outer.indexOf("\u{F0AD}") + 2);
+});
+
 test("runsOf names an MCP tool by its own name, without the server prefix", () => {
   const mcp = [
     called(use("m1", "mcp__srv__ping"), use("m2", "mcp__srv__ping")),
@@ -312,6 +440,19 @@ test("transcript.fold.enabled false draws every row as before", async ($, on) =>
   expect(await find($, B2, { key: "bash" })).toBeDefined();
 });
 
+const hang = (on: On) => on("tool.call", () => new Promise(() => {}) as never);
+const inFlight = async ($: Engine, id: string, command: string) => {
+  void $.tool.call({ tool: "Bash", tool_use_id: id, command } as never);
+  expect(
+    await eventually(
+      async () =>
+        (await find($, ROW(id, "Bash", { command }, { isRunning: true }), {
+          key: "fold:spinner",
+        })) !== undefined,
+    ),
+  ).toBe(true);
+};
+
 test("a running call's spinner sits left of its icon and turns on its own frame clock, with no hook event", async ($, on) => {
   const running = [
     said("user", "go"),
@@ -321,7 +462,9 @@ test("a running call's spinner sits left of its icon and turns on its own frame 
       input: { command: "sleep 9" },
     } as never),
   ];
+  hang(on);
   await start($, on, running);
+  await inFlight($, "b1", "sleep 9");
   const head = ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true });
   const row = await $.ui.mount(head);
   // the Client draws its own tree, read with `in`, so its text is not the title Box's
@@ -463,6 +606,18 @@ for (const reason of ["answer", "aborted", "refusal", "error"] as const)
     ).toBe(true);
   });
 
+test("a call stops spinning once tool.call returns, before the turn ends", async ($, on) => {
+  await callPending($, on);
+  expect(
+    await eventually(
+      async () =>
+        (await find($, ROW("p1", "Bash", { command: "sleep 9" }), {
+          key: "fold:spinner",
+        })) === undefined,
+    ),
+  ).toBe(true);
+});
+
 test("a subagent's turn ending leaves the main loop's pending calls held", async ($, on) => {
   await callPending($, on);
   await $.turn.complete({
@@ -485,6 +640,7 @@ test("a running title's spinner and a folded title's dot hold the same two cells
       input: { command: "sleep 9" },
     } as never),
   ];
+  hang(on);
   await startSession($, on, { messages });
   const done = ROW("b0", "Bash", { command: "ls" });
   expect(
@@ -492,6 +648,7 @@ test("a running title's spinner and a folded title's dot hold the same two cells
       async () => (await find($, done, { key: "fold:title" })) !== undefined,
     ),
   ).toBe(true);
+  await inFlight($, "b1", "sleep 9");
   const row = await $.ui.mount(
     ROW("b1", "Bash", { command: "sleep 9" }, { isRunning: true }),
   );

@@ -9,12 +9,15 @@ export type Title = {
   tool: string;
   text: string;
   isRunning?: true;
+  isHidden?: true;
+  depth?: 1;
   answers?: string[];
 };
 export type Pending = {
   tool_use_id: string;
   tool: string;
   input: Record<string, unknown>;
+  isDone?: true;
 };
 export type Member = {
   run: string;
@@ -27,6 +30,9 @@ type $ = Parameters<Hook<"tool.call">>[0];
 type Render = Parameters<Hook<"ui.render">>;
 
 const nameOf = (tool: string) => tool.replace(/^mcp__.+?__/, "");
+
+// code mode wraps every call in a REPL script and waits on it with Poll; the calls inside are the work
+const PLUMBING = ["REPL", "Poll"];
 
 type Question = { question?: unknown; header?: unknown };
 const questionsOf = (input: Record<string, unknown>) =>
@@ -49,6 +55,7 @@ const answersOf = (input: Record<string, unknown>, result: unknown) => {
 };
 
 const titleOf = (tool: string, input: Record<string, unknown>) => {
+  if (tool === "Poll") return "Waiting for the script...";
   if (tool === "AskUserQuestion") {
     const qs = questionsOf(input);
     if (qs.length === 1) return String(qs[0]!.question);
@@ -79,12 +86,15 @@ export const runsOf = (
   let run: string[] = [];
   let tools: string[] = [];
   let titles: Title[] = [];
+  let hasScript = false;
   const close = (least = min) => {
     if (run.length >= least) {
+      const work = tools.filter((t) => !PLUMBING.includes(t));
+      const tally = work.length ? work : tools;
       const counts = new Map<string, number>();
-      for (const t of tools) counts.set(t, (counts.get(t) ?? 0) + 1);
+      for (const t of tally) counts.set(t, (counts.get(t) ?? 0) + 1);
       const label = [
-        plural(run.length, "call"),
+        plural(tally.length, "call"),
         ...[...counts].map(([t, n]) => `${t} ${n}`),
       ].join(" · ");
       const ids = run;
@@ -101,8 +111,12 @@ export const runsOf = (
     run = [];
     tools = [];
     titles = [];
+    hasScript = false;
   };
   const seen = new Set<string>();
+  const inFlight = new Set(
+    pending.filter((u) => !u.isDone).map((u) => u.tool_use_id),
+  );
   const add = (u: Pending & { result?: unknown }, isRunning: boolean) => {
     seen.add(u.tool_use_id);
     if (keep.includes(u.tool)) return;
@@ -114,16 +128,21 @@ export const runsOf = (
       tool: u.tool,
       text: titleOf(u.tool, u.input),
       ...(isRunning ? { isRunning: true as const } : {}),
+      ...(u.tool === "Poll" ? { isHidden: true as const } : {}),
+      ...(hasScript && u.tool_use_id.startsWith("repl_")
+        ? { depth: 1 as const }
+        : {}),
       ...(answers.length ? { answers } : {}),
     });
+    if (u.tool === "REPL") hasScript = true;
   };
   for (const m of messages) {
     // tool results ride on user messages with no text; anything the person typed ends the run
     if (m.text.trim()) close();
     for (const u of m.toolUses)
-      if (!u.isError) add(u, u.result === undefined && u.text === undefined);
+      if (!u.isError) add(u, inFlight.has(u.tool_use_id));
   }
-  for (const u of pending) if (!seen.has(u.tool_use_id)) add(u, true);
+  for (const u of pending) if (!seen.has(u.tool_use_id)) add(u, !u.isDone);
   close(1);
   return members;
 };
@@ -179,11 +198,15 @@ function titleLines(
   suffix = "",
 ) {
   const { Box, Button, Client, Text } = $.ui.resolve(e);
-  const { tool, text: title, isRunning, answers = [] } = m.title;
+  const { tool, text: title, isHidden, answers = [] } = m.title;
+  // code mode's Poll and REPL never reach tool.call, so only the engine knows they still run
+  const isRunning =
+    m.title.isRunning || (e.props as { isRunning?: boolean }).isRunning;
+  if (isHidden && !isRunning) return [];
   const width = innerWidth(e.viewport?.columns);
   const scope = `fold:${id}`;
   const { icon, color } = iconOf(tool);
-  const lead = `  ${icon}  `;
+  const lead = `  ${m.title.depth ? "  " : ""}${icon}  `;
   const room = width - cells(lead);
   const line = wrap(title, room - 2)[0] ?? "";
   const shown = `${line}${cells(line) < cells(title) ? "…" : ""}`;
@@ -273,6 +296,8 @@ export const fold = (on: On) => {
     try {
       return await next(e);
     } finally {
+      for (const u of pending)
+        if (u.tool_use_id === e.tool_use_id) u.isDone = true;
       void refresh($);
     }
   });
