@@ -11,6 +11,7 @@ export type Title = {
   isRunning?: true;
   isHidden?: true;
   depth?: 1;
+  isLastChild?: true;
   answers?: string[];
 };
 export type Pending = {
@@ -89,6 +90,9 @@ export const runsOf = (
   let hasScript = false;
   const close = (least = min) => {
     if (run.length >= least) {
+      titles.forEach((t, i) => {
+        if (t.depth && !titles[i + 1]?.depth) t.isLastChild = true;
+      });
       const work = tools.filter((t) => !PLUMBING.includes(t));
       const tally = work.length ? work : tools;
       const counts = new Map<string, number>();
@@ -172,6 +176,26 @@ const iconOf = (tool: string) => {
 let members = new Map<string, Member>();
 let pending: Pending[] = [];
 const open = new Set<string>();
+const settled = new Set<number>();
+const SETTLED = /kind="repl-eval"[^>]*?\beval="(\d+)"/g;
+// a Poll's reply names each script that ended, the only sign a dispatched REPL is done
+const noteSettled = (output: unknown) => {
+  const text = (output as { content?: unknown } | undefined)?.content;
+  if (typeof text !== "string") return false;
+  const before = settled.size;
+  for (const [, n] of text.matchAll(SETTLED)) settled.add(Number(n));
+  return settled.size > before;
+};
+const scriptRuns = (output: unknown, m: Member) => {
+  const o = output as
+    { evalId?: unknown; asyncDispatched?: unknown } | undefined;
+  return (
+    o?.asyncDispatched === true &&
+    typeof o.evalId === "number" &&
+    !settled.has(o.evalId) &&
+    m.run === [...members.values()].at(-1)?.run
+  );
+};
 const RAIL_MAX_CARD_LINES = 200;
 const isOn = () => config.enabled.transcript && config.enabled.fold;
 
@@ -195,18 +219,22 @@ function titleLines(
   e: Render[1],
   id: string,
   m: Member,
+  call: { isRunning?: boolean; output?: unknown },
   suffix = "",
 ) {
   const { Box, Button, Client, Text } = $.ui.resolve(e);
   const { tool, text: title, isHidden, answers = [] } = m.title;
   // code mode's Poll and REPL never reach tool.call, so only the engine knows they still run
   const isRunning =
-    m.title.isRunning || (e.props as { isRunning?: boolean }).isRunning;
+    m.title.isRunning ||
+    call.isRunning ||
+    (tool === "REPL" && scriptRuns(call.output, m));
   if (isHidden && !isRunning) return [];
   const width = innerWidth(e.viewport?.columns);
   const scope = `fold:${id}`;
   const { icon, color } = iconOf(tool);
-  const lead = `  ${m.title.depth ? "  " : ""}${icon}  `;
+  const guide = m.title.depth ? (m.title.isLastChild ? "└ " : "│ ") : "";
+  const lead = `  ${guide}${icon}  `;
   const room = width - cells(lead);
   const line = wrap(title, room - 2)[0] ?? "";
   const shown = `${line}${cells(line) < cells(title) ? "…" : ""}`;
@@ -226,7 +254,8 @@ function titleLines(
           {open.has(id) ? "▾ " : "· "}
         </Text>
       )}
-      <Text {...paint(color, scope)}>{lead.slice(2)}</Text>
+      {guide ? <Text {...paint(palette().dim, scope)}>{guide}</Text> : null}
+      <Text {...paint(color, scope)}>{lead.slice(2 + guide.length)}</Text>
       <Button
         key={`fold:open${suffix}`}
         plain
@@ -317,12 +346,14 @@ export const fold = (on: On) => {
     { component: "ToolUse", surface: "terminal" },
     async ($, e, next) => {
       const id = e.props.tool_use_id;
+      if (e.props.tool === "Poll" && noteSettled(e.props.output))
+        $.ui.invalidate("ui.render");
       const m = isOn() ? members.get(id) : undefined;
       if (!m) return next(e);
       const { Box, Text } = $.ui.resolve(e);
       return (
         <Box key="fold:call" flexDirection="column">
-          {titleLines($, e, id, m)}
+          {titleLines($, e, id, m, e.props)}
           {open.has(id) ? (
             // the rail spans the card whatever its height: absolute, so its glyphs never stretch the row, and
             // column-reverse, so the overflow it clips is above and its corner sits on the card's last line;
@@ -378,13 +409,17 @@ export const fold = (on: On) => {
     { component: "ToolGroup", surface: "terminal" },
     async ($, e, next) => {
       if (!isOn()) return next(e);
+      if (e.props.calls.some((c) => c.tool === "Poll" && noteSettled(c.output)))
+        $.ui.invalidate("ui.render");
       const ids = e.props.calls.map((c) => c.tool_use_id ?? "");
       const ms = ids.map((id) => members.get(id));
       const first = ms[0];
       if (!first || ms.some((m) => m?.run !== first.run)) return next(e);
       if (ids.some((id) => open.has(id))) return next(e);
       const { Box } = $.ui.resolve(e);
-      const lines = ids.map((id, i) => titleLines($, e, id, ms[i]!, `:${i}`));
+      const lines = ids.map((id, i) =>
+        titleLines($, e, id, ms[i]!, e.props.calls[i]!, `:${i}`),
+      );
       const last = ms.at(-1)!;
       return (
         <Box key="fold:group" flexDirection="column">

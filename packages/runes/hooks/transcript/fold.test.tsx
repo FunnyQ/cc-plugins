@@ -303,6 +303,88 @@ test("a nested title's icon sits two cells right of its REPL's", async ($, on) =
   expect(inner.indexOf(DEFAULTS.bash.icon)).toBe(outer.indexOf("\u{F0AD}") + 2);
 });
 
+test("a REPL's calls hang off it on a guide, the last one closing it", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+      called(use("repl_1", "Bash", { command: "pwd" })),
+      called(use("repl_2", "Bash", { command: "ls" })),
+      called(use("p1", "Poll")),
+    ],
+  });
+  const first = ROW("repl_1", "Bash", { command: "pwd" });
+  expect(
+    await eventually(
+      async () => (await find($, first, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  expect((await find($, first, { key: "fold:title" }))!.text).toStartWith(
+    "· │ ",
+  );
+  expect(
+    (await find($, ROW("repl_2", "Bash", { command: "ls" }), {
+      key: "fold:title",
+    }))!.text,
+  ).toStartWith("· └ ");
+});
+
+test("a dispatched REPL spins until a Poll reports its eval, and only in the latest run", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "first"),
+      called(use("r0", "REPL", { description: "Old" })),
+      said("assistant", "done"),
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+    ],
+  });
+  const dispatched = (id: string, evalId: number) =>
+    ROW(
+      id,
+      "REPL",
+      { description: "x" },
+      {
+        output: {
+          result: `(dispatched #${evalId})`,
+          evalId,
+          asyncDispatched: true,
+        },
+      },
+    );
+  expect(
+    await eventually(
+      async () =>
+        (await find($, dispatched("r1", 7), { key: "fold:spinner" })) !==
+        undefined,
+    ),
+  ).toBe(true);
+  expect(
+    await find($, dispatched("r0", 6), { key: "fold:spinner" }),
+  ).toBeUndefined();
+  await find(
+    $,
+    ROW(
+      "p9",
+      "Poll",
+      {},
+      {
+        output: {
+          content: '<event kind="repl-eval" at="t" eval="7" status="settled">',
+        },
+      },
+    ),
+    { key: "fold:title" },
+  );
+  expect(
+    await eventually(
+      async () =>
+        (await find($, dispatched("r1", 7), { key: "fold:spinner" })) ===
+        undefined,
+    ),
+  ).toBe(true);
+});
+
 test("runsOf names an MCP tool by its own name, without the server prefix", () => {
   const mcp = [
     called(use("m1", "mcp__srv__ping"), use("m2", "mcp__srv__ping")),
@@ -413,6 +495,54 @@ test("a folded ToolGroup draws its calls' titles itself, and hands back to the e
   await group.press({ key: "fold:open:0" }).catch(() => {});
   await group.unmount().catch(() => {});
   expect(await find($, B2, { key: "bash" })).toBeDefined();
+});
+
+test("a folded ToolGroup spins each call by its own state, not the group's", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+      called(use("p1", "Poll")),
+    ],
+  });
+  const group = (calls: object[]) =>
+    ({
+      plugin: "runes",
+      surface: "terminal",
+      component: "ToolGroup",
+      requestId: "group",
+      props: { calls, isActive: true, isExpanded: true },
+      viewport: { columns: 60, rows: 40 },
+    }) as never;
+  const repl = {
+    tool_use_id: "r1",
+    tool: "REPL",
+    input: { description: "Survey" },
+    isRunning: false,
+    output: { result: "(dispatched #4)", evalId: 4, asyncDispatched: true },
+  };
+  const poll = { tool_use_id: "p1", tool: "Poll", input: {}, isRunning: true };
+  expect(
+    await eventually(
+      async () =>
+        (await find($, group([repl, poll]), { key: "fold:spinner:0" })) !==
+        undefined,
+    ),
+  ).toBe(true);
+  expect(
+    await find($, group([repl, poll]), { key: "fold:spinner:1" }),
+  ).toBeDefined();
+  const done = {
+    ...poll,
+    isRunning: false,
+    output: {
+      content: '<event kind="repl-eval" at="t" eval="4" status="settled">',
+    },
+  };
+  await find($, group([repl, done]), { key: "fold:group" });
+  expect(
+    await find($, group([repl, done]), { key: "fold:spinner:0" }),
+  ).toBeUndefined();
 });
 
 test("a kept tool and a failed call stay drawn by their own rune", async ($, on) => {
