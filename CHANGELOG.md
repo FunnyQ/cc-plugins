@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.14.5] - 2026-11-18
+
+_tracks tag `runes-v0.14.5`_
+
+### Fixed
+- Code Mode REPL calls without a description now fold under the first line of their script instead of all reading "REPL", so each group in a session has a distinct title.
+
 ## [chronicle 0.23.2] - 2026-11-18
 
 _tracks tag `chronicle-v0.23.2`_
