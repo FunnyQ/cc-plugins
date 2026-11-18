@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.23.2] - 2026-11-18
+
+_tracks tag `chronicle-v0.23.2`_
+
+### Fixed
+- The commit branch guard no longer prompts when `git commit` merely appears in a command such as `rg "git commit" src`, `echo git commit` or `git commit-tree`; it now fires only when git is actually run, though wrapped forms like `bash -c`, `sudo` and `/usr/bin/git commit` are no longer caught.
+
 ## [runes 0.14.4] - 2026-11-18
 
 _tracks tag `runes-v0.14.4`_
