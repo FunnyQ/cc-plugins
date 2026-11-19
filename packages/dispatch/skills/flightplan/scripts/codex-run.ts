@@ -49,8 +49,8 @@ const CODEX_BIN = process.env.CODEX_BIN ?? "codex";
 type Mode = "delegate" | "review";
 
 const DEFAULT_MODEL: Record<Mode, string> = {
-  delegate: "gpt-6.1-sol",
-  review: "gpt-6-astra",
+  delegate: "gpt-6.2-sol",
+  review: "gpt-6.2-astra",
 };
 
 function resolveModel(mode: Mode, args: string[]): string | null {

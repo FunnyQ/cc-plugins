@@ -133,8 +133,8 @@ describe("codex-run model selection", () => {
 
   test("defaults per mode — the cheap model writes, the strong one reviews", async () => {
     for (const [mode, model] of [
-      ["delegate", "gpt-6.1-sol"],
-      ["review", "gpt-6-astra"],
+      ["delegate", "gpt-6.2-sol"],
+      ["review", "gpt-6.2-astra"],
     ]) {
       expect(spawn([mode!]).success).toBe(true);
       const logged = await loggedArgs();
