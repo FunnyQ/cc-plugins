@@ -32,6 +32,7 @@ export const COLOR: Record<string, () => string> = {
   write: () => config.write.color,
   agent: () => config.agent.color,
   skill: () => config.skill.color,
+  repl: () => config.repl.color,
 };
 const colorOf = (kind: string) => COLOR[kind]?.() ?? "#808080";
 

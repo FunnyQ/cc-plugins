@@ -44,6 +44,7 @@ test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the r
             input: { command: "ls" },
           },
           { type: "tool_use", id: "toolu_2", name: "Grep", input: {} },
+          { type: "tool_use", id: "toolu_3", name: "REPL", input: {} },
         ],
       },
     },
@@ -58,6 +59,7 @@ test("rowsOf keeps prompts, reply text and tool calls, in order, and skips the r
     { id: "a1", kind: "reply", size: 4 },
     { id: "toolu_1", kind: "bash", size: 16 },
     { id: "toolu_2", kind: "tool", size: 2 },
+    { id: "toolu_3", kind: "repl", size: 2 },
   ]);
 });
 

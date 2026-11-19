@@ -59,6 +59,7 @@ type Config = {
   };
   agent: { color: string; error_color: string; icon: string; side: Side };
   skill: { color: string; error_color: string; icon: string; side: Side };
+  repl: { color: string; icon: string };
   peer: { color: string; icon: string; side: Side; fold_lines: number };
   fold: { keep: string; min_calls: number };
   glow: { style: string };
@@ -127,6 +128,8 @@ export const DEFAULTS: Config = {
     icon: "\u{F0FD7}",
     side: "left",
   },
+  // nf-md U+F0BC2, needs a Nerd Font; code mode's REPL title and its calls' guide in the fold
+  repl: { color: "#c678dd", icon: "\u{F0BC2}" },
   // nf-md-robot U+F06A9, needs a Nerd Font
   peer: { color: "#9b7fd1", icon: "\u{F06A9}", side: "left", fold_lines: 8 },
   fold: { keep: "", min_calls: 1 },
@@ -206,6 +209,10 @@ transcript:
     # error_color: "${DEFAULTS.skill.error_color}"
     # icon: "\\U000F0FD7"   # Nerd Font glyph
     # side: ${DEFAULTS.skill.side}
+  repl:
+    # code mode's REPL title in the fold, and the guide its calls hang off
+    # color: "${DEFAULTS.repl.color}"
+    # icon: "\\U000F0BC2"   # Nerd Font glyph
   peer:
     enabled: ${enabled.peer}    # subagents' and other sessions' messages
     # color: "${DEFAULTS.peer.color}"
@@ -243,11 +250,12 @@ const UNDER = [
   "write",
   "agent",
   "skill",
+  "repl",
   "peer",
   "fold",
   "glow",
 ] as const;
-type Section = Rune | "glow";
+type Section = Rune | "glow" | "repl";
 const pathOf = (s: Section): string[] =>
   (UNDER as readonly string[]).includes(s) ? ["transcript", s] : [s];
 
@@ -331,6 +339,10 @@ const RULES: {
     error_color: [isColor, "#rrggbb"],
     icon: [isText, "a glyph"],
     side: [isSide, "left | right"],
+  },
+  repl: {
+    color: [isColor, "#rrggbb"],
+    icon: [isText, "a glyph"],
   },
   peer: {
     color: [isColor, "#rrggbb"],
@@ -590,7 +602,12 @@ export const upgrade = (text: string, raw: unknown): string => {
         s,
         s === "transcript" ? block.slice(0, 2) : block,
       );
-    } else if (s !== "glow" && b.isOpen && switchAt(lines, b) === -1) {
+    } else if (
+      s !== "glow" &&
+      s !== "repl" &&
+      b.isOpen &&
+      switchAt(lines, b) === -1
+    ) {
       lines = setSwitch(lines.join("\n"), s, carried[s]).split("\n");
     }
   }

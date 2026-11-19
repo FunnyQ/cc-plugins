@@ -170,6 +170,7 @@ const iconOf = (tool: string) => {
       Write: config.write,
       Agent: config.agent,
       Skill: config.skill,
+      REPL: config.repl,
     } as Record<string, { icon: string; color: string }>
   )[tool];
   if (rune) return rune;
@@ -260,7 +261,7 @@ function titleLines(
           {open.has(id) ? "▾ " : "· "}
         </Text>
       )}
-      {guide ? <Text {...paint(palette().dim, scope)}>{guide}</Text> : null}
+      {guide ? <Text {...paint(config.repl.color, scope)}>{guide}</Text> : null}
       <Text {...paint(color, scope)}>{lead.slice(2 + guide.length)}</Text>
       <Button
         key={`fold:open${suffix}`}

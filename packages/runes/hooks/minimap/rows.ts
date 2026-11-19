@@ -27,6 +27,7 @@ export const TOOL_KIND: Record<string, string> = {
   Write: "write",
   Agent: "agent",
   Skill: "skill",
+  REPL: "repl",
 };
 
 const rowsOfLine = (raw: string): Row[] => {

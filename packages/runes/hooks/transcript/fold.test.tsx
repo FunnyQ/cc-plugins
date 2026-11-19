@@ -4,7 +4,7 @@ import type { On, SessionMessage } from "claude-code";
 import { DEFAULTS } from "../config";
 import { PALETTES } from "./bubble";
 import { SEARCH_ICON, runsOf } from "./fold";
-import { CONFIG, eventually, find, startSession } from "./test-session";
+import { CONFIG, eventually, find, startSession, within } from "./test-session";
 
 const use = (
   tool_use_id: string,
@@ -308,7 +308,37 @@ test("a nested title's icon sits two cells right of its REPL's", async ($, on) =
   const inner = (await find($, ROW("repl_1", "Bash", { command: "pwd" }), {
     key: "fold:title",
   }))!.text;
-  expect(inner.indexOf(DEFAULTS.bash.icon)).toBe(outer.indexOf("\u{F0AD}") + 2);
+  expect(inner.indexOf(DEFAULTS.bash.icon)).toBe(
+    outer.indexOf(DEFAULTS.repl.icon) + 2,
+  );
+});
+
+test("a REPL's title and its calls' guide take the repl colour and icon", async ($, on) => {
+  await startSession($, on, {
+    messages: [
+      said("user", "go"),
+      called(use("r1", "REPL", { description: "Survey" })),
+      called(use("repl_1", "Bash", { command: "pwd" })),
+    ],
+  });
+  const repl = ROW("r1", "REPL", { description: "Survey" });
+  expect(
+    await eventually(
+      async () => (await find($, repl, { key: "fold:title" })) !== undefined,
+    ),
+  ).toBe(true);
+  expect(
+    await within(
+      $,
+      repl,
+      "fold:title",
+      new RegExp(`^${DEFAULTS.repl.icon} {2}$`, "u"),
+    ),
+  ).toMatchObject({ hover: { color: DEFAULTS.repl.color } });
+  const nested = ROW("repl_1", "Bash", { command: "pwd" });
+  expect(await within($, nested, "fold:title", /^└ $/)).toMatchObject({
+    hover: { color: DEFAULTS.repl.color },
+  });
 });
 
 test("a REPL's calls hang off it on a guide, the last one closing it", async ($, on) => {
