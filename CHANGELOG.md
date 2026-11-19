@@ -1,5 +1,12 @@
 # Changelog
 
+## [relay 0.11.4] - 2026-11-20
+
+_tracks tag `relay-v0.11.4`_
+
+### Added
+- relay's codex image mode now defaults to the gpt-6.2-astra model, and honors --model or models.codex.image in config, where it previously ignored both and always used the model in ~/.codex/config.toml; set it to cli-default to keep codex's own choice.
+
 ## [chronicle 0.23.3] - 2026-11-20
 
 _tracks tag `chronicle-v0.23.3`_
