@@ -78,14 +78,14 @@ describe("setup-codex-agents", () => {
         ],
       ),
     );
-    expect(installed.lawspeaker).toContain('model = "gpt-5.6-terra"');
+    expect(installed.lawspeaker).toContain('model = "gpt-6.1-terra"');
     expect(installed.lawspeaker).toContain("commit.ts apply");
-    expect(installed.storykeeper).toContain('model = "gpt-5.6-terra"');
+    expect(installed.storykeeper).toContain('model = "gpt-6.1-terra"');
     expect(installed.storykeeper).toContain('request-creator.ts" --material');
     expect(installed.storykeeper).not.toContain("chronicle_skald");
-    expect(installed.annalist).toContain('model = "gpt-5.6-terra"');
-    expect(installed.codifier).toContain('model = "gpt-5.6-terra"');
-    expect(installed.barrowkeeper).toContain('model = "gpt-5.6-luna"');
+    expect(installed.annalist).toContain('model = "gpt-6.1-terra"');
+    expect(installed.codifier).toContain('model = "gpt-6.1-terra"');
+    expect(installed.barrowkeeper).toContain('model = "gpt-6-luna"');
     for (const content of Object.values(installed)) {
       expect(content).toContain("developer_instructions");
     }

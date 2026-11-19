@@ -11,8 +11,8 @@ const claudeDir = join(pluginRoot, "agents");
 const codexDir = join(pluginRoot, "agents-codex");
 
 const CODEX_MODEL: Record<string, string> = {
-  sonnet: "gpt-5.6-terra",
-  haiku: "gpt-5.6-luna",
+  sonnet: "gpt-6.1-terra",
+  haiku: "gpt-6-luna",
 };
 
 const names = (dir: string, ext: string) =>
