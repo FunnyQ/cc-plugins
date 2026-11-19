@@ -215,7 +215,7 @@ When the user passes an explicit `--model` flag:
 
 Config file location: `~/.config/q-lab/cc-plugins/relay/config.json`.
 
-Model precedence is `--model` flag, then this config, then the backend CLI's own default. The value `cli-default` in either place omits the model flag. A malformed config file fails the run with `Could not read relay config`. Report that file to the user. Do not ask for a model.
+Model precedence is `--model` flag, then this config, then relay's per-backend default (only codex `image`: `gpt-6.2-astra`), then the backend CLI's own default. The value `cli-default` in either place omits the model flag. A malformed config file fails the run with `Could not read relay config`. Report that file to the user. Do not ask for a model.
 
 ---
 

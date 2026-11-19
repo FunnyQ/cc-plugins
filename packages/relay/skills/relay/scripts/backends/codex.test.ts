@@ -181,6 +181,23 @@ describe("codexBackend", () => {
         );
       });
 
+      it("passes the model with -m", () => {
+        const result = codexBackend.invoke("image", {
+          task: "a fox",
+          model: "gpt-6.2-astra",
+          lastFile: "/tmp/last.txt",
+        });
+        expect(result.argv).toEqual([
+          "codex",
+          "exec",
+          "-m",
+          "gpt-6.2-astra",
+          "-o",
+          "/tmp/last.txt",
+          "-",
+        ]);
+      });
+
       it("should use generic prompt if task is absent", () => {
         const opts: InvokeOpts = { lastFile: "/tmp/last.txt" };
         const result = codexBackend.invoke("image", opts);

@@ -603,6 +603,40 @@ describe("executeRelay", () => {
     expect(invocation.join(" ")).not.toContain("/code-review");
   });
 
+  it("runs codex image on gpt-6.2-astra when neither the flag nor the config names a model", async () => {
+    let invocation: string[] = [];
+    await executeRelay(
+      ["codex", "image", "a quiet studio", "--out", "/tmp/relay/studio.png"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        fileExists: () => false,
+      }),
+    );
+
+    expect(invocation[invocation.indexOf("-m") + 1]).toBe("gpt-6.2-astra");
+  });
+
+  it("lets a cli-default image model in the config drop codex's -m", async () => {
+    let invocation: string[] = [];
+    await executeRelay(
+      ["codex", "image", "a quiet studio", "--out", "/tmp/relay/studio.png"],
+      deps({
+        run: (argv) => {
+          invocation = argv;
+          return { ok: true, stdout: "", stderr: "", code: 0 };
+        },
+        fileExists: (path) => path === CONFIG_PATH,
+        readFile: () =>
+          JSON.stringify({ models: { codex: { image: CLI_DEFAULT } } }),
+      }),
+    );
+
+    expect(invocation).not.toContain("-m");
+  });
+
   it("exits non-zero when a post-run step fails", async () => {
     const errors: string[] = [];
 

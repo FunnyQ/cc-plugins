@@ -22,6 +22,23 @@ describe("resolveModel", () => {
     expect(result).toBe("my-model");
   });
 
+  it("falls back to the backend default when neither flag nor config names a model", () => {
+    expect(
+      resolveModel("codex", "image", undefined, () => ({}), "fallback"),
+    ).toBe("fallback");
+  });
+
+  it("lets cli-default in the config override the backend default", () => {
+    const result = resolveModel(
+      "codex",
+      "image",
+      undefined,
+      () => ({ models: { codex: { image: CLI_DEFAULT } } }),
+      "fallback",
+    );
+    expect(result).toBeUndefined();
+  });
+
   it("returns config.models[backend][mode] when flag absent", () => {
     const result = resolveModel("opencode", "delegate", undefined, () => ({
       models: { opencode: { delegate: "config-model" } },

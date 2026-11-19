@@ -80,6 +80,7 @@ export function selectSourcePng(
 export const codexBackend: Backend = {
   name: "codex",
   supports: new Set(["delegate", "review", "image"]),
+  defaultModels: { image: "gpt-6.2-astra" },
 
   invoke(mode: Mode, opts: InvokeOpts) {
     if (mode === "delegate") {
@@ -116,8 +117,9 @@ export const codexBackend: Backend = {
       return { argv, stdin: opts.promptText };
     }
 
+    const model = opts.model ? ["-m", opts.model] : [];
     return {
-      argv: [CODEX_BIN, "exec", "-o", opts.lastFile!, "-"],
+      argv: [CODEX_BIN, "exec", ...model, "-o", opts.lastFile!, "-"],
       stdin: buildImagePrompt(opts.task || "an image"),
     };
   },

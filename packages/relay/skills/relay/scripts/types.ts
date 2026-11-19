@@ -28,6 +28,7 @@ export type LiveSpec = {
 export type Backend = {
   name: string; // registry key (codex/opencode/claude today) — string so a 4th backend needs no core edit
   supports: Set<Mode>;
+  defaultModels?: Partial<Record<Mode, string>>;
   invoke(mode: Mode, opts: InvokeOpts): { argv: string[]; stdin?: string };
   parseOutput(raw: string): string;
   postRun?(mode: Mode, parsed: string, opts: InvokeOpts): PostRunResult;

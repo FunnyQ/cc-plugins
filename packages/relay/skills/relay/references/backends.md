@@ -86,7 +86,7 @@ Generated PNGs land under `~/.codex/generated_images/`. After the run, locate th
 
 ### Model
 
-Unset by default, so codex uses its own configured model. When a caller passes `--model <model>`, delegate and live append `-m <model>`, and review appends `-c model="<model>"` because `codex review` has no `-m`. Image ignores it.
+Unset by default for delegate, review, and live, so codex uses its own configured model. Image defaults to `gpt-6.2-astra` (`defaultModels` in `backends/codex.ts`); a `cli-default` in the config drops it. When a model resolves, delegate, image, and live append `-m <model>`, and review appends `-c model="<model>"` because `codex review` has no `-m`.
 
 ### Output capture
 

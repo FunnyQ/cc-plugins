@@ -99,8 +99,10 @@ export function resolveModel(
   mode: Mode,
   flagModel: string | undefined,
   readConfig: () => unknown,
+  fallback?: string,
 ): string | undefined {
-  const model = flagModel || configuredModel(readConfig(), backend, mode);
+  const model =
+    flagModel || configuredModel(readConfig(), backend, mode) || fallback;
   return model === CLI_DEFAULT ? undefined : model;
 }
 

@@ -678,8 +678,12 @@ export async function executeRelay(
 
   let model: string | undefined;
   try {
-    model = resolveModel(parsed.backend, parsed.mode, parsed.flags.model, () =>
-      readJsonObject(CONFIG_PATH, deps),
+    model = resolveModel(
+      parsed.backend,
+      parsed.mode,
+      parsed.flags.model,
+      () => readJsonObject(CONFIG_PATH, deps),
+      backend?.defaultModels?.[parsed.mode],
     );
   } catch (error) {
     deps.stderr(configReadError(error));
