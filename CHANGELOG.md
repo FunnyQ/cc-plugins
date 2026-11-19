@@ -1,5 +1,19 @@
 # Changelog
 
+## [chronicle 0.23.3] - 2026-11-20
+
+_tracks tag `chronicle-v0.23.3`_
+
+### Changed
+- Chronicle's Codex agents now run on newer models: the sonnet-tier agents use gpt-6.1-terra and barrowkeeper uses gpt-6-luna.
+
+## [dispatch 5.12.5] - 2026-11-20
+
+_tracks tag `dispatch-v5.12.5`_
+
+### Changed
+- Codex delegation and review now default to gpt-6.2-sol and gpt-6.2-astra, and autopilot offers only the 6.2 models as Codex dev and review choices.
+
 ## [runes 0.14.5] - 2026-11-18
 
 _tracks tag `runes-v0.14.5`_
