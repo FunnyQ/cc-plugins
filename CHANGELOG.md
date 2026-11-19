@@ -1,5 +1,13 @@
 # Changelog
 
+## [monitor 8.7.1] - 2026-11-20
+
+_tracks tag `monitor-v8.7.1`_
+
+### Fixed
+- Usage from forked Codex threads is now archived instead of reported as unresolved, because a fork's own thread id is no longer overwritten by its parent's (502 threads were affected).
+- The first load after updating reparses every Codex rollout (about 12.6 s for 5.39 GiB), because the Codex session cache is now versioned and an older cache is emptied.
+
 ## [monitor 8.7.0] - 2026-11-20
 
 _tracks tag `monitor-v8.7.0`_
