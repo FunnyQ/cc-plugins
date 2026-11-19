@@ -628,9 +628,11 @@ fn run_update(db_path: &Path, rebuild: bool) -> anyhow::Result<String> {
     persist_wal(&db);
     let result = update_rollup(&mut db, &paths::projects_dir(), UpdateOptions { rebuild })?;
     let rows: i64 = db.query_row("SELECT COUNT(*) FROM usage_hourly", [], |r| r.get(0))?;
+    let codex_archived = super::codex_archive::capture_live(&mut db)?;
     let mut out = serde_json::to_value(result)?;
     if let Value::Object(map) = &mut out {
         map.insert("usageHourlyRows".into(), rows.into());
+        map.insert("codexThreadsArchived".into(), codex_archived.into());
     }
     Ok(serde_json::to_string_pretty(&out)?)
 }
@@ -1390,7 +1392,15 @@ mod tests {
             .keys()
             .cloned()
             .collect();
-        assert_eq!(keys, ["filesScanned", "rebuilt", "usageHourlyRows"]);
+        assert_eq!(
+            keys,
+            [
+                "filesScanned",
+                "rebuilt",
+                "usageHourlyRows",
+                "codexThreadsArchived"
+            ]
+        );
         assert!(out.contains("\"rebuilt\": true"));
 
         let db = Connection::open(&db_path).unwrap();

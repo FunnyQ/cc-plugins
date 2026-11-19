@@ -242,7 +242,7 @@ describe("rollup-update", () => {
       0,
     );
 
-  test("prints filesScanned/rebuilt/usageHourlyRows in order, exit 0", async () => {
+  test("prints filesScanned/rebuilt/usageHourlyRows/codexThreadsArchived in order, exit 0", async () => {
     const f = await fixture();
     const r = await run(f, "rollup-update");
     expect(r.code).toBe(0);
@@ -252,7 +252,9 @@ describe("rollup-update", () => {
       "filesScanned",
       "rebuilt",
       "usageHourlyRows",
+      "codexThreadsArchived",
     ]);
+    expect(out.codexThreadsArchived).toBe(2);
     expect(typeof out.filesScanned).toBe("number");
     expect(typeof out.rebuilt).toBe("boolean");
     expect(typeof out.usageHourlyRows).toBe("number");

@@ -10,7 +10,7 @@
     },
     {
       "key": "schema_version",
-      "value": "4"
+      "value": "5"
     }
   ],
   "ingested_files": [

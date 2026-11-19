@@ -2,7 +2,13 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 export type AtlasSub =
-  "serve" | "stats" | "live" | "rollup-update" | "measure" | "push-usage";
+  | "serve"
+  | "stats"
+  | "live"
+  | "rollup-update"
+  | "measure"
+  | "push-usage"
+  | "codex-archive";
 
 export const DEFAULT_BIN = join(
   import.meta.dir,

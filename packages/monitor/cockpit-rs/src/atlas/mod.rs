@@ -1,5 +1,6 @@
 pub mod claude;
 pub mod codex;
+pub mod codex_archive;
 pub mod dedup;
 pub mod jsonl;
 pub mod live;
@@ -17,7 +18,8 @@ pub mod stats;
 
 use std::process::ExitCode;
 
-const USAGE: &str = "usage: cockpit atlas <serve|stats|live|rollup-update|measure|push-usage>";
+const USAGE: &str =
+    "usage: cockpit atlas <serve|stats|live|rollup-update|measure|push-usage|codex-archive>";
 
 pub fn run(args: &[String]) -> ExitCode {
     let rest = args.get(1..).unwrap_or_default();
@@ -28,6 +30,7 @@ pub fn run(args: &[String]) -> ExitCode {
         Some("rollup-update") => rollup_update::run(rest),
         Some("measure") => measure::run_measure(rest),
         Some("push-usage") => push_usage::run(rest),
+        Some("codex-archive") => codex_archive::run(rest),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)

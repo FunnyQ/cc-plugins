@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 pub const LEDGER_REBUILD_PENDING: &str = "ledger_rebuild_pending";
 
@@ -132,6 +132,18 @@ const SCHEMA_DDL: &str = "
       cache_creation INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (path, session_key, model)
     );
+    CREATE TABLE IF NOT EXISTS codex_thread_archive (
+      thread_id               TEXT    PRIMARY KEY,
+      record                  TEXT    NOT NULL,
+      input_tokens            INTEGER NOT NULL,
+      cached_input_tokens     INTEGER NOT NULL,
+      output_tokens           INTEGER NOT NULL,
+      reasoning_output_tokens INTEGER NOT NULL,
+      source_path             TEXT    NOT NULL,
+      source_size             INTEGER NOT NULL,
+      source_mtime_ms         INTEGER NOT NULL,
+      captured_at_ms          INTEGER NOT NULL
+    );
   ";
 
 pub fn open_sqlite_file(path: &Path) -> anyhow::Result<Connection> {
@@ -215,7 +227,8 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
     conn.execute_batch("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")?;
 
     let stored = get_meta(conn, "schema_version")?;
-    let upgradable = matches!(stored.as_deref(), Some("1" | "2" | "3"));
+    let upgradable = matches!(stored.as_deref(), Some("1" | "2" | "3" | "4"));
+    let rewinds = matches!(stored.as_deref(), Some("1" | "2" | "3"));
     if let Some(version) = &stored
         && !upgradable
         && *version != SCHEMA_VERSION.to_string()
@@ -234,7 +247,7 @@ fn migrate(conn: &Connection) -> anyhow::Result<()> {
             ))?;
         }
     }
-    if upgradable {
+    if rewinds {
         // The flag is what tells the ingest this is a rebuild; a zeroed cursor alone looks
         // like a file it has never seen. seen_requests still blocks re-billing usage_hourly,
         // and seen_tool_calls must go or the replayed ledger counts no tool call at all.
@@ -671,13 +684,51 @@ mod tests {
     }
 
     #[test]
-    fn fresh_db_is_v4_rust_written_with_no_backup() {
+    fn v4_db_gains_the_codex_archive_without_a_rewind() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = db_in(&dir);
+        {
+            let conn = open_rollup_db(&path).unwrap();
+            conn.execute_batch(
+                "INSERT INTO ingested_files VALUES ('/t/a.jsonl', 4096, 111, 222);
+                 INSERT INTO usage_hourly VALUES (3600000, '/p', 'claude-opus', 1, 2, 3, 4, 5, 6);
+                 INSERT INTO session_ledger VALUES ('/t/a.jsonl', 's1', '/p', 100, 200, 3, 1);
+                 DROP TABLE codex_thread_archive;
+                 UPDATE meta SET value = '4' WHERE key = 'schema_version';",
+            )
+            .unwrap();
+        }
+        let before = dump(&path);
+        let conn = open_rollup_db(&path).unwrap();
+        assert_eq!(
+            get_meta(&conn, "schema_version").unwrap().as_deref(),
+            Some("5")
+        );
+        assert_ne!(
+            get_meta(&conn, LEDGER_REBUILD_PENDING).unwrap().as_deref(),
+            Some("1")
+        );
+        assert_eq!(get_meta(&conn, BILLING_CORRECTION_PENDING).unwrap(), None);
+        drop(conn);
+        assert_eq!(dump(&path)[1..], before[1..]);
+        assert!(dir.path().join("rollup.db.v4.bak").exists());
+        let count: i64 = Connection::open(&path)
+            .unwrap()
+            .query_row("SELECT count(*) FROM codex_thread_archive", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn fresh_db_is_v5_rust_written_with_no_backup() {
         let dir = tempfile::tempdir().unwrap();
         let path = db_in(&dir);
         let conn = open_rollup_db(&path).unwrap();
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("4")
+            Some("5")
         );
         assert_eq!(get_meta(&conn, BILLING_CORRECTION_PENDING).unwrap(), None);
         assert_eq!(get_meta(&conn, "writer").unwrap().as_deref(), Some("rust"));
@@ -817,7 +868,7 @@ mod tests {
         let conn = open_rollup_db(&path).unwrap();
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("4")
+            Some("5")
         );
         assert!(!sibling(&path, ".v2.bak").exists());
     }
@@ -836,7 +887,7 @@ mod tests {
         assert_eq!(dump(&sibling(&path, ".v2.bak")), before);
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("4")
+            Some("5")
         );
         assert_eq!(
             get_meta(&conn, LEDGER_REBUILD_PENDING).unwrap().as_deref(),
@@ -885,7 +936,7 @@ mod tests {
         assert_eq!(dump(&sibling(&path, ".v3.bak")), before);
         assert_eq!(
             get_meta(&conn, "schema_version").unwrap().as_deref(),
-            Some("4")
+            Some("5")
         );
         for flag in [LEDGER_REBUILD_PENDING, BILLING_CORRECTION_PENDING] {
             assert_eq!(

@@ -1,4 +1,5 @@
 // Port of codex-cache.ts plus api.ts's Codex source (parseCodexUsage) and Codex usage limits.
+use super::codex_archive::{ArchivedThread, capture, read_archive};
 use super::dedup::walk_files;
 use super::jsonl::read_jsonl_lines;
 use super::model::{
@@ -9,7 +10,7 @@ use super::model::{
     model_usage_total, now_ms,
 };
 use super::paths;
-use super::rollup_db::open_sqlite_file;
+use super::rollup_db::{open_rollup_db, open_sqlite_file};
 use crate::server::opencode::js_truthy;
 use indexmap::{IndexMap, IndexSet};
 use jiff::{Timestamp, tz::TimeZone};
@@ -67,35 +68,35 @@ pub struct CodexSource {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-struct CodexTokenUsage {
+pub(super) struct CodexTokenUsage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    input_tokens: Option<i64>,
+    pub(super) input_tokens: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    cached_input_tokens: Option<i64>,
+    pub(super) cached_input_tokens: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    output_tokens: Option<i64>,
+    pub(super) output_tokens: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    reasoning_output_tokens: Option<i64>,
+    pub(super) reasoning_output_tokens: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     total_tokens: Option<i64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CodexTokenEvent {
-    timestamp_ms: i64,
+pub(super) struct CodexTokenEvent {
+    pub(super) timestamp_ms: i64,
     usage: CodexTokenUsage,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct CodexSessionSummary {
-    id: Option<String>,
+pub(super) struct CodexSessionSummary {
+    pub(super) id: Option<String>,
     timestamp_ms: i64,
     cwd: String,
     model: Option<String>,
-    token_usage: Option<CodexTokenUsage>,
-    token_events: Vec<CodexTokenEvent>,
+    pub(super) token_usage: Option<CodexTokenUsage>,
+    pub(super) token_events: Vec<CodexTokenEvent>,
     user_messages: i64,
     tool_calls: i64,
 }
@@ -115,7 +116,7 @@ fn token_usage_from(value: &Value) -> CodexTokenUsage {
     }
 }
 
-fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
+pub(super) fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
     if !file.exists() {
         return None;
     }
@@ -267,7 +268,7 @@ fn open_codex_cache(path: &Path) -> anyhow::Result<Connection> {
     Ok(conn)
 }
 
-type Summaries = IndexMap<String, Option<CodexSessionSummary>>;
+pub(super) type Summaries = IndexMap<String, Option<CodexSessionSummary>>;
 
 // One bulk read and one write transaction rather than a query per file: the cold path writes ~2,000 rows.
 fn summarise_sessions(
@@ -357,14 +358,35 @@ fn prune_cache(db: &mut Connection, present: &Summaries) -> anyhow::Result<()> {
     Ok(())
 }
 
-struct CodexThreadRow {
-    id: Option<String>,
-    rollout_path: Option<String>,
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct IndexRow {
     created_at: Option<i64>,
     updated_at: Option<i64>,
     cwd: Option<String>,
     model: Option<String>,
     tokens_used: Option<i64>,
+}
+
+pub(super) struct CodexThreadRow {
+    pub(super) id: Option<String>,
+    pub(super) rollout_path: Option<String>,
+    pub(super) index: IndexRow,
+}
+
+pub(super) struct Thread {
+    pub(super) id: String,
+    pub(super) row_id: Option<String>,
+    pub(super) index: Option<IndexRow>,
+    pub(super) session: Option<CodexSessionSummary>,
+    pub(super) source: Option<String>,
+    pub(super) files: Vec<String>,
+}
+
+pub(super) fn usage_rank(session: Option<&CodexSessionSummary>) -> Option<i64> {
+    session
+        .and_then(|s| s.token_usage.as_ref())
+        .map(|u| u.input_tokens.unwrap_or(0) + u.output_tokens.unwrap_or(0))
 }
 
 fn query_thread_rows(path: &Path) -> rusqlite::Result<Vec<CodexThreadRow>> {
@@ -374,17 +396,19 @@ fn query_thread_rows(path: &Path) -> rusqlite::Result<Vec<CodexThreadRow>> {
         Ok(CodexThreadRow {
             id: row.get(0)?,
             rollout_path: row.get(1)?,
-            created_at: row.get(2)?,
-            updated_at: row.get(3)?,
-            cwd: row.get(4)?,
-            model: row.get(6)?,
-            tokens_used: row.get(7)?,
+            index: IndexRow {
+                created_at: row.get(2)?,
+                updated_at: row.get(3)?,
+                cwd: row.get(4)?,
+                model: row.get(6)?,
+                tokens_used: row.get(7)?,
+            },
         })
     })?;
     rows.collect()
 }
 
-fn read_thread_rows() -> Vec<CodexThreadRow> {
+pub(super) fn read_thread_rows() -> Vec<CodexThreadRow> {
     let path = paths::codex_state_db();
     if !path.exists() {
         return Vec::new();
@@ -410,14 +434,7 @@ fn local_day_hour(ms: i64) -> Option<(usize, usize)> {
     ))
 }
 
-pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
-    let rows = read_thread_rows();
-    let mut row_by_rollout: IndexMap<&str, &CodexThreadRow> = IndexMap::new();
-    for row in &rows {
-        if let Some(path) = row.rollout_path.as_deref() {
-            row_by_rollout.insert(path, row);
-        }
-    }
+pub(super) fn discover_files(rows: &[CodexThreadRow]) -> (IndexSet<String>, usize) {
     let mut walked = Vec::new();
     walk_files(&paths::codex_sessions_dir(), ".jsonl", &mut walked);
     let mut session_files: IndexSet<String> = rows
@@ -429,7 +446,114 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
             .iter()
             .map(|path| path.to_string_lossy().into_owned()),
     );
+    (session_files, walked.len())
+}
 
+pub(super) fn collect_threads(
+    rows: &[CodexThreadRow],
+    files: &IndexSet<String>,
+    summaries: &Summaries,
+) -> IndexMap<String, Thread> {
+    let mut row_by_rollout: IndexMap<&str, &CodexThreadRow> = IndexMap::new();
+    for row in rows {
+        if let Some(path) = row.rollout_path.as_deref() {
+            row_by_rollout.insert(path, row);
+        }
+    }
+    let row_by_id: IndexMap<&str, &CodexThreadRow> = rows
+        .iter()
+        .filter_map(|row| row.id.as_deref().map(|id| (id, row)))
+        .collect();
+    let mut threads: IndexMap<String, Thread> = IndexMap::new();
+    for file in files {
+        let session = summaries.get(file).cloned().flatten();
+        let row = row_by_rollout.get(file.as_str()).copied().or_else(|| {
+            let id = session.as_ref()?.id.as_deref()?;
+            row_by_id.get(id).copied()
+        });
+        let row_id = row.and_then(|row| row.id.clone());
+        let id = row_id
+            .clone()
+            .or_else(|| session.as_ref().and_then(|s| s.id.clone()))
+            .unwrap_or_else(|| file.clone());
+        let Some(existing) = threads.get_mut(&id) else {
+            threads.insert(
+                id.clone(),
+                Thread {
+                    id,
+                    row_id,
+                    index: row.map(|row| row.index.clone()),
+                    source: session.is_some().then(|| file.clone()),
+                    session,
+                    files: vec![file.clone()],
+                },
+            );
+            continue;
+        };
+        existing.files.push(file.clone());
+        let rank = usage_rank(session.as_ref());
+        let existing_rank = usage_rank(existing.session.as_ref());
+        if rank > existing_rank
+            || (rank == existing_rank && existing.session.is_none() && session.is_some())
+        {
+            existing.session = session;
+            existing.source = Some(file.clone());
+        }
+        if existing.index.is_none() {
+            existing.index = row.map(|row| row.index.clone());
+            existing.row_id = row_id;
+        }
+    }
+    threads
+}
+
+pub(super) fn merge_archived(
+    threads: &mut IndexMap<String, Thread>,
+    archived: IndexMap<String, ArchivedThread>,
+) {
+    for (id, record) in archived {
+        let Some(live) = threads.get_mut(&id) else {
+            threads.insert(
+                id.clone(),
+                Thread {
+                    id,
+                    row_id: None,
+                    index: record.index,
+                    session: Some(record.session),
+                    source: None,
+                    files: Vec::new(),
+                },
+            );
+            continue;
+        };
+        if usage_rank(Some(&record.session)) > usage_rank(live.session.as_ref()) {
+            live.index = record.index.or(live.index.take());
+            live.session = Some(record.session);
+            live.source = None;
+        } else if live.index.is_none() {
+            live.index = record.index;
+        }
+    }
+}
+
+pub(super) fn thread_times(
+    row: Option<&IndexRow>,
+    session: Option<&CodexSessionSummary>,
+) -> (i64, i64) {
+    let created_ms = match row.and_then(|row| row.created_at).filter(|&s| s != 0) {
+        Some(seconds) => seconds * 1000,
+        None => session.map_or(0, |s| s.timestamp_ms),
+    };
+    let updated_ms = row
+        .and_then(|row| row.updated_at)
+        .filter(|&s| s != 0)
+        .map_or(created_ms, |seconds| seconds * 1000);
+    (created_ms, updated_ms)
+}
+
+pub(super) fn discover_threads() -> (Vec<CodexThreadRow>, IndexMap<String, Thread>, usize) {
+    let rows = read_thread_rows();
+    let (session_files, walked_count) = discover_files(&rows);
     let summaries = open_codex_cache(&paths::codex_cache_path())
         .and_then(|mut cache| summarise_sessions(&mut cache, &session_files, read_codex_session))
         .unwrap_or_else(|_| {
@@ -438,6 +562,20 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
                 .map(|file| (file.clone(), read_codex_session(Path::new(file))))
                 .collect()
         });
+    let threads = collect_threads(&rows, &session_files, &summaries);
+    (rows, threads, walked_count)
+}
+
+pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
+    let (rows, mut threads, walked_count) = discover_threads();
+    let archived = match open_rollup_db(&paths::rollup_db_path()) {
+        Ok(mut db) => capture(&mut db, &threads, now_ms())
+            .map(|(archived, _)| archived)
+            .or_else(|_| read_archive(&db))
+            .unwrap_or_default(),
+        Err(_) => IndexMap::new(),
+    };
+    merge_archived(&mut threads, archived);
 
     let mut usage = ProviderUsage::default();
     let mut project_activity: IndexMap<String, CodexProjectActivity> = IndexMap::new();
@@ -448,9 +586,9 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
     let mut total_interactions = 0;
     let mut total_tool_calls = 0;
 
-    for file in &session_files {
-        let row = row_by_rollout.get(file.as_str()).copied();
-        let session = summaries.get(file).and_then(Option::as_ref);
+    for thread in threads.values() {
+        let row = thread.index.as_ref();
+        let session = thread.session.as_ref();
         let model = non_empty(row.and_then(|row| row.model.as_deref()))
             .or_else(|| non_empty(session.and_then(|s| s.model.as_deref())))
             .unwrap_or("unknown");
@@ -458,14 +596,7 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         let row_tokens = row.and_then(|row| row.tokens_used).unwrap_or(0);
         let thread_usage = codex_usage_from_thread(row_tokens, session);
         let token_total = or_nonzero(row_tokens, || model_usage_total(&thread_usage));
-        let created_ms = match row.and_then(|row| row.created_at).filter(|&s| s != 0) {
-            Some(seconds) => seconds * 1000,
-            None => session.map_or(0, |s| s.timestamp_ms),
-        };
-        let updated_ms = row
-            .and_then(|row| row.updated_at)
-            .filter(|&s| s != 0)
-            .map_or(created_ms, |seconds| seconds * 1000);
+        let (created_ms, updated_ms) = thread_times(row, session);
         if created_ms == 0 {
             continue;
         }
@@ -541,12 +672,8 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         }
 
         let timestamp_ms = or_nonzero(updated_ms, || created_ms);
-        let id = row
-            .and_then(|row| row.id.as_deref())
-            .or_else(|| session.and_then(|s| s.id.as_deref()))
-            .unwrap_or(file);
         ledger.push(InternalLedgerRow {
-            id: format!("codex:{id}"),
+            id: format!("codex:{}", thread.id),
             provider: Provider::Codex,
             timestamp_ms,
             date: fmt_date(timestamp_ms),
@@ -567,10 +694,16 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         });
     }
 
-    for row in &rows {
-        if non_empty(row.rollout_path.as_deref()).is_some() {
+    for full_row in &rows {
+        if non_empty(full_row.rollout_path.as_deref()).is_some()
+            || full_row
+                .id
+                .as_deref()
+                .is_some_and(|id| threads.contains_key(id))
+        {
             continue;
         }
+        let row = &full_row.index;
         let model = non_empty(row.model.as_deref()).unwrap_or("unknown");
         let key = model_key(Provider::Codex, model);
         let tokens_used = row.tokens_used.unwrap_or(0);
@@ -597,7 +730,7 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
             add_nested_model_usage(&mut usage.project_model_usage, cwd, &key, &thread_usage);
         }
         ledger.push(InternalLedgerRow {
-            id: format!("codex:{}", row.id.as_deref().unwrap_or("null")),
+            id: format!("codex:{}", full_row.id.as_deref().unwrap_or("null")),
             provider: Provider::Codex,
             timestamp_ms,
             date,
@@ -622,11 +755,11 @@ pub fn load(_ctx: &Ctx) -> anyhow::Result<CodexSource> {
         daily_activity,
         week_hour_matrix,
         daily_hour_counts,
-        total_threads: session_files.len(),
+        total_threads: threads.len(),
         total_interactions,
         total_tool_calls,
         ledger,
-        codex_session_file_count: walked.len(),
+        codex_session_file_count: walked_count,
         codex_thread_row_count: rows.len(),
     })
 }
@@ -985,7 +1118,7 @@ pub fn source_json(src: &CodexSource, limits: &UsageLimits) -> serde_json::Value
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::paths::tests::TestEnv;
     use std::cell::Cell;
@@ -994,7 +1127,12 @@ mod tests {
 
     const NOW: i64 = 1_790_870_400_000;
 
-    fn totals(input: i64, cached: i64, output: i64, reasoning: i64) -> CodexTokenUsage {
+    pub(in crate::atlas) fn totals(
+        input: i64,
+        cached: i64,
+        output: i64,
+        reasoning: i64,
+    ) -> CodexTokenUsage {
         CodexTokenUsage {
             input_tokens: Some(input),
             cached_input_tokens: Some(cached),
@@ -1109,13 +1247,13 @@ mod tests {
         assert_eq!(js_date_parse(""), None);
     }
 
-    fn write_lines(path: &Path, rows: &[Value]) {
+    pub(in crate::atlas) fn write_lines(path: &Path, rows: &[Value]) {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let body: String = rows.iter().map(|row| format!("{row}\n")).collect();
         std::fs::write(path, body).unwrap();
     }
 
-    fn rollout(
+    pub(in crate::atlas) fn rollout(
         id: &str,
         cwd: &str,
         model: &str,
@@ -1352,7 +1490,7 @@ mod tests {
         assert!(f.row(&b).is_some());
     }
 
-    fn create_threads(path: &Path) -> Connection {
+    pub(in crate::atlas) fn create_threads(path: &Path) -> Connection {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let db = Connection::open(path).unwrap();
         db.execute_batch(
@@ -1365,7 +1503,10 @@ mod tests {
         db
     }
 
-    fn insert_thread(db: &Connection, row: (&str, &str, i64, i64, &str, Option<&str>, i64)) {
+    pub(in crate::atlas) fn insert_thread(
+        db: &Connection,
+        row: (&str, &str, i64, i64, &str, Option<&str>, i64),
+    ) {
         let (id, rollout, created, updated, cwd, model, tokens) = row;
         db.execute(
             "insert into threads values (?, ?, ?, ?, ?, 't', ?, ?)",
@@ -1374,7 +1515,7 @@ mod tests {
         .unwrap();
     }
 
-    fn ctx() -> Ctx {
+    pub(in crate::atlas) fn ctx() -> Ctx {
         Ctx {
             now_ms: NOW,
             plugin_root: PathBuf::new(),
