@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.14.6] - 2026-11-20
+
+_tracks tag `runes-v0.14.6`_
+
+### Added
+- Code mode's REPL now has its own colour and icon in the fold and the minimap, so it no longer reads like a generic tool; set them with `transcript.repl { color, icon }` in `config.yaml`.
+
 ## [relay 0.11.4] - 2026-11-20
 
 _tracks tag `relay-v0.11.4`_
