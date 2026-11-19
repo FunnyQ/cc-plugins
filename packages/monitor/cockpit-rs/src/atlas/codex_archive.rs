@@ -1,6 +1,7 @@
 use super::codex::{
-    CodexSessionSummary, IndexRow, Summaries, Thread, collect_threads, discover_files,
-    discover_threads, read_codex_session, read_thread_rows, thread_times, usage_rank,
+    CODEX_CACHE_VERSION, CodexSessionSummary, IndexRow, Summaries, Thread, collect_threads,
+    discover_files, discover_threads, read_codex_session, read_thread_rows, thread_times,
+    usage_rank,
 };
 use super::model::now_ms;
 use super::paths;
@@ -142,6 +143,10 @@ fn read_cache_rows() -> HashMap<String, (Stat, String)> {
     let path = paths::codex_cache_path();
     let read = || -> rusqlite::Result<HashMap<String, (Stat, String)>> {
         let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if version < CODEX_CACHE_VERSION {
+            return Ok(HashMap::new());
+        }
         let mut stmt = conn.prepare("SELECT path, size, mtime_ms, summary FROM session_summary")?;
         let rows = stmt.query_map([], |row| {
             Ok((row.get(0)?, ((row.get(1)?, row.get(2)?), row.get(3)?)))

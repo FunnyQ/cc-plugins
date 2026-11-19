@@ -153,7 +153,7 @@ pub(super) fn read_codex_session(file: &Path) -> Option<CodexSessionSummary> {
         };
         match entry.get("type").and_then(Value::as_str) {
             Some("session_meta") => {
-                id = payload_str("id").map(String::from).or(id);
+                id = id.or(payload_str("id").map(String::from));
                 cwd = payload_str("cwd").map(String::from).unwrap_or(cwd);
                 model = payload_str("model").map(String::from).or(model);
                 if timestamp_ms == 0
@@ -255,6 +255,8 @@ fn codex_usage_from_thread(tokens_used: i64, session: Option<&CodexSessionSummar
     }
 }
 
+pub(super) const CODEX_CACHE_VERSION: i64 = 1;
+
 fn open_codex_cache(path: &Path) -> anyhow::Result<Connection> {
     let conn = open_sqlite_file(path)?;
     conn.execute_batch(
@@ -265,6 +267,12 @@ fn open_codex_cache(path: &Path) -> anyhow::Result<Connection> {
           summary  TEXT NOT NULL
         );",
     )?;
+    let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+    if version < CODEX_CACHE_VERSION {
+        conn.execute_batch(&format!(
+            "DELETE FROM session_summary; PRAGMA user_version = {CODEX_CACHE_VERSION};"
+        ))?;
+    }
     Ok(conn)
 }
 
@@ -1318,6 +1326,54 @@ pub(super) mod tests {
         let empty = dir.path().join("empty.jsonl");
         std::fs::write(&empty, "").unwrap();
         assert_eq!(read_codex_session(&empty), Some(summary(None)));
+    }
+
+    #[test]
+    fn a_forked_rollout_keeps_its_own_id_over_the_copied_parent_meta() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fork.jsonl");
+        write_lines(
+            &path,
+            &[
+                json!({"timestamp": "2026-09-27T10:00:00.000Z", "type": "session_meta", "payload": {"id": "child", "cwd": "/w/a"}}),
+                json!({"timestamp": "2026-09-27T10:00:00.000Z", "type": "session_meta", "payload": {"id": "parent", "cwd": "/w/a"}}),
+            ],
+        );
+        assert_eq!(
+            read_codex_session(&path).unwrap().id.as_deref(),
+            Some("child")
+        );
+    }
+
+    #[test]
+    fn cache_drops_rows_written_before_the_fork_id_fix() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("codex-sessions.db");
+        {
+            let old = Connection::open(&path).unwrap();
+            old.execute_batch(
+                "CREATE TABLE session_summary (path TEXT PRIMARY KEY, size INTEGER NOT NULL,
+                   mtime_ms INTEGER NOT NULL, summary TEXT NOT NULL);
+                 INSERT INTO session_summary VALUES ('/r.jsonl', 1, 1, 'null');",
+            )
+            .unwrap();
+        }
+        let db = open_codex_cache(&path).unwrap();
+        let rows: i64 = db
+            .query_row("SELECT count(*) FROM session_summary", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(rows, 0);
+        db.execute(
+            "INSERT INTO session_summary VALUES ('/r.jsonl', 1, 1, 'null')",
+            [],
+        )
+        .unwrap();
+        drop(db);
+        let again = open_codex_cache(&path).unwrap();
+        let rows: i64 = again
+            .query_row("SELECT count(*) FROM session_summary", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(rows, 1);
     }
 
     #[test]
