@@ -1,5 +1,16 @@
 # Changelog
 
+## [monitor 8.7.0] - 2026-11-20
+
+_tracks tag `monitor-v8.7.0`_
+
+### Added
+- Codex thread usage is now archived in rollup.db (schema v5), keyed by thread ID, so deleting old rollouts to reclaim disk no longer erases your usage history.
+- New `atlas codex-archive` coverage check tells you which Codex rollouts are safe to delete, and the docs explain its statuses and warn that deleting a rollout breaks `codex resume` and Cockpit transcript viewing.
+
+### Changed
+- Older monitor builds refuse a v5 rollup.db, so update every machine sharing it before relying on the archive.
+
 ## [runes 0.14.6] - 2026-11-20
 
 _tracks tag `runes-v0.14.6`_
