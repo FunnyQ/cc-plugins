@@ -101,6 +101,33 @@ It does not send transcripts, message content, or project/session lists. If
 `LLM_QUOTA_INGEST_SECRET` is set, the worker sends it as the
 `X-Auth-Token` header.
 
+## Codex Usage Archive
+
+Codex usage outlives its rollout file, the same way Claude token usage outlives its transcript. Every dashboard load and every `cockpit atlas rollup-update` copies each Codex thread's usage into the `codex_thread_archive` table of `rollup.db`, keyed by thread ID. The monitor mod's `session.measure` hook runs `rollup-update` at most every 5 minutes after a Claude Code turn.
+
+A captured row stores the token totals and breakdown, the timed token events behind the hourly buckets, the effective model, project, timestamps, and message and tool-call counts. It stores no transcript and no tool content. Unlike a Claude transcript's ledger row, a Codex thread keeps its ledger row after its rollout is gone.
+
+Before you delete rollouts, check coverage:
+
+1. Open the dashboard or run `cockpit atlas rollup-update`, so the newest usage is captured.
+2. Run `cockpit atlas codex-archive --older-than 30 --dry-run`. Use `--thread <id>` (repeatable) to check threads by ID instead of by age.
+3. Delete only the `paths` listed under `unchanged` threads. Keep every `would-archive`, `unstable`, `incomplete`, or `unresolved` rollout.
+
+Run the command without `--dry-run` to capture the listed threads immediately.
+
+| Status          | Meaning                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `unchanged`     | The archive already holds this usage or more. Safe to delete.                                    |
+| `would-archive` | The rollout holds usage the archive lacks.                                                       |
+| `archived`      | Written by this run, outside `--dry-run`.                                                        |
+| `unstable`      | The rollout changed while it was read. Rerun later.                                              |
+| `incomplete`    | No parsed token usage, only the index's `tokens_used` estimate. Never archived.                  |
+| `unresolved`    | No stable thread ID, the index and rollout disagree on it, or the ID is unknown. Never archived. |
+
+Reports merge live and archived threads by thread ID and count each thread once. A readable rollout with at least the archived usage wins, so a resumed thread shows its new usage. An index row without its rollout never displaces an archived record.
+
+Deleting a rollout has costs the archive does not cover. `codex resume` cannot reopen the thread, because the rollout is the conversation. Cockpit cannot show its transcript. Data health's Codex file and index-row counts drop. A rollout deleted before any capture saw its last turn loses that last turn's usage.
+
 ## Pricing
 
 Defaults ship in `references/pricing-defaults.json`. On startup, the server tries OpenRouter's `/api/v1/models` endpoint (3s timeout). It merges any live prices it gets. User overrides win. Drop a JSON file at `~/.config/cc-dashboard/pricing.json`:
