@@ -224,6 +224,36 @@ async function writeCommit(
   await unlink(messagePath).catch(() => {});
 }
 
+/**
+ * Reads each planned commit's `Upgrade` trailers back through git's own parser,
+ * because a line that only looks like a trailer (followed by more prose, or
+ * stripped by a commit-msg hook) is invisible to every downstream reader. */
+async function missingUpgrades(
+  commits: PlannedCommit[],
+): Promise<{ commit: string; upgrade: string }[]> {
+  const missing: { commit: string; upgrade: string }[] = [];
+  for (const [index, commit] of commits.entries()) {
+    if (!commit.upgrade?.length) continue;
+    const rev = `HEAD~${commits.length - 1 - index}`;
+    const landed = (
+      await gitOrEmpty(
+        "log",
+        "-1",
+        "--format=%(trailers:key=Upgrade,valueonly)",
+        rev,
+      )
+    )
+      .split("\n")
+      .map((line) => line.trim());
+    for (const action of commit.upgrade) {
+      if (!landed.includes(action.trim())) {
+        missing.push({ commit: subjectOf(commit), upgrade: action });
+      }
+    }
+  }
+  return missing;
+}
+
 async function applyMain(planPath: string): Promise<void> {
   const plan = await readPlanFile(planPath);
   const decision = decideShape(
@@ -295,9 +325,10 @@ async function applyMain(planPath: string): Promise<void> {
     remainingPaths(),
   ]);
   const verification = verifyPlanLanded(planned, committed, remaining, exclude);
+  const upgradeMissing = await missingUpgrades(commits);
 
   const result = {
-    ok: verification.ok,
+    ok: verification.ok && upgradeMissing.length === 0,
     ...decision,
     base,
     ...(exclude.length > 0 && {
@@ -313,11 +344,12 @@ async function applyMain(planPath: string): Promise<void> {
       plannedFiles: new Set(planned).size,
       committedFiles: committed.length,
       ...verification,
+      upgradeMissing,
     },
   };
 
   emit(result);
-  if (!verification.ok) process.exit(3);
+  if (!result.ok) process.exit(3);
 }
 
 async function main(): Promise<void> {

@@ -11,6 +11,8 @@
 ---
 
 繁體中文摘要（一到三句，說明這次改了什麼、為什麼）
+
+Upgrade: the action a downstream project must take on upgrade
 ```
 
 ## Change Types
@@ -39,6 +41,9 @@
 - The `---` separator is literal. It is always present when a 繁中 summary
   follows.
 - The message describes only the files in _this_ commit.
+- An `Upgrade:` trailer comes from the plan's `upgrade` field, never from the
+  body or the summary. `commit.ts` writes it as the last paragraph, because git
+  reads trailers only there.
 
 ## Scope of the body
 

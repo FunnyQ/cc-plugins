@@ -47,6 +47,11 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
    **Collect `exclude`**: the repo-root-relative paths that follow the `exclude` argument, or
    the ones the user explicitly asks to leave out ("don't commit X", "X 先不要 commit").
    Never exclude a path on your own judgement. Omit `exclude` when there are none.
+   **Collect `upgrade`**: when the user or the change asks for an upgrade note, write
+   each action a downstream or generated project must take on upgrade as one line,
+   such as `Run midgard pull, then bin/setup`. Omit `upgrade` when there is none.
+   Pass it as its own input, never only inside `contextBrief`: a note buried in the
+   brief has landed as a paragraph after the trailer, and in `simple` mode not at all.
 2. **Distill `contextBrief`** — terse intent and non-obvious rationale from this
    chat. The Lawspeaker sees the diff but not the conversation, so this is the only
    source of _why_ for every commit body it writes. Everything the reader of a
@@ -63,10 +68,13 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
      branch guard before spawning; do not re-implement branch protection.
    - `mode` (from step 1).
    - `exclude` (from step 1), only when it holds paths.
+   - `upgrade` (from step 1), only when it holds actions.
 4. **Verify against git, not against the report.** The Lawspeaker returns `base`.
    Run `git log --oneline {base}..HEAD` and report that.
    - No `base`, or the range is empty → report no commit plus the Lawspeaker's
      reason. Do not respawn.
+   - If you passed `upgrade`, check the trailer with
+     `git log --format='%h %(trailers:key=Upgrade,valueonly)' {base}..HEAD`.
    - If you passed `exclude`, relay the Lawspeaker's `warning` line to the user. An excluded
      file the committed code needs leaves a HEAD that does not build, and only the user can
      judge that.
@@ -87,7 +95,7 @@ Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_lawspeaker` and pass the literal skill directory, `contextBrief`,
-   `branch`, `mode`, and any `exclude`.
+   `branch`, `mode`, and any `exclude` and `upgrade`.
 2. **Generic sub-agent API only**: first verify the stable role file exists at
    `$CODEX_HOME/agents/chronicle/lawspeaker.toml` (default `$CODEX_HOME` to
    `~/.codex`). Spawn exactly one non-fork generic agent with task name
@@ -122,6 +130,11 @@ base-directory banner.
   first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there.
 - **Leaving files out**: `exclude` is whole-file and opt-in. A path ending in `/` excludes every changed path under that directory, read when `apply` runs, so files added there after the plan is written stay out too. A changed path that is neither
   planned nor excluded still fails the coverage check. Hunk-level exclusion does not exist.
+- **Upgrade notes**: `commit.ts` writes each action as an `Upgrade: <action>` git
+  trailer, the last paragraph of the commit body, after the 繁中 summary. Nothing
+  may follow it, or git stops reading it as a trailer. `apply` reads it back with
+  `%(trailers:key=Upgrade)` and fails with `verify.upgradeMissing` when it did not
+  land. `chronicle:release` turns every such commit into a `**Upgrade:** ` bullet.
 - **A re-run after any failure**: safe. `apply` reads how much of the plan is already
   at HEAD off the log, not off a stored flag.
 - **A changeset too wide for one digest**: `analyze-changes.ts` holds back the

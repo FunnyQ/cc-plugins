@@ -23,6 +23,8 @@ export type CommitGroup = {
 export type PlannedCommit = CommitGroup & {
   body?: string;
   summary?: string;
+  /** Actions a downstream project must take on upgrade, one `Upgrade:` trailer each. */
+  upgrade?: string[];
 };
 
 export type CommitPlan = {
@@ -193,7 +195,18 @@ export function resolveShapedCommits(
   if (shape === "atomic" || plan.commits.length === 1) return plan.commits;
 
   const files = [...new Set(plan.commits.flatMap((commit) => commit.files))];
-  return [{ ...(plan.simple as SimpleProse), files }];
+  const upgrade = [
+    ...new Set(
+      [plan.simple, ...plan.commits].flatMap((prose) => prose?.upgrade ?? []),
+    ),
+  ];
+  return [
+    {
+      ...(plan.simple as SimpleProse),
+      files,
+      ...(upgrade.length > 0 && { upgrade }),
+    },
+  ];
 }
 
 function isFilledString(value: unknown): boolean {
@@ -315,6 +328,14 @@ function proseErrors(
   if (!isFilledString(candidate.subject)) {
     errors.push(`${at}.subject is missing — imperative, no trailing period`);
   }
+  const upgrade = candidate.upgrade;
+  if (
+    upgrade !== undefined &&
+    (!Array.isArray(upgrade) ||
+      upgrade.some((action) => !isFilledString(action) || /\n/.test(action)))
+  ) {
+    errors.push(`${at}.upgrade must be an array of one-line actions`);
+  }
 
   if (!needsFiles) {
     if ("files" in candidate) errors.push(`remove \`${at}.files\``);
@@ -373,6 +394,8 @@ export function composeMessage(commit: PlannedCommit): string {
   let message = subject;
   if (body) message += `\n\n${body}`;
   if (summary) message += `\n\n---\n\n${summary}`;
+  const upgrade = commit.upgrade?.map((action) => `Upgrade: ${action.trim()}`);
+  if (upgrade?.length) message += `\n\n${upgrade.join("\n")}`;
   return `${message}\n`;
 }
 

@@ -417,6 +417,23 @@ describe("validatePlanFile", () => {
     expect(errors[0]).toContain("absolute path");
   });
 
+  test("rejects an upgrade that is not a list of one-line actions", () => {
+    const at = (upgrade: unknown) =>
+      validatePlanFile({
+        commits: [{ type: "feat", subject: "a", files: ["a.ts"], upgrade }],
+      });
+    expect(at(["run x"])).toEqual([]);
+    expect(at("run x")).toEqual([
+      "commits[0].upgrade must be an array of one-line actions",
+    ]);
+    expect(at(["run x\nthen y"])).toEqual([
+      "commits[0].upgrade must be an array of one-line actions",
+    ]);
+    expect(at([" "])).toEqual([
+      "commits[0].upgrade must be an array of one-line actions",
+    ]);
+  });
+
   test("rejects an unknown mode", () => {
     expect(validatePlanFile({ ...draft, mode: "atomic" })).toHaveLength(1);
   });
@@ -460,6 +477,20 @@ describe("resolveShapedCommits", () => {
         summary: "一起加。",
         files: ["a.ts", "b.md"],
       },
+    ]);
+  });
+
+  test("a collapse carries every group's Upgrade action, once each", () => {
+    const upgrading: PlanDraft = {
+      commits: [
+        { type: "feat", subject: "add a", files: ["a.ts"], upgrade: ["run x"] },
+        { type: "docs", subject: "add b", files: ["b.md"], upgrade: ["run x"] },
+      ],
+      simple: { type: "feat", subject: "add both", upgrade: ["run y"] },
+    };
+    expect(resolveShapedCommits(upgrading, "simple")[0]?.upgrade).toEqual([
+      "run y",
+      "run x",
     ]);
   });
 
@@ -520,6 +551,32 @@ describe("composeMessage", () => {
         files: [],
       }),
     ).toBe("🚑 fix: patch prod\n");
+  });
+
+  test("ends the message with the Upgrade trailers, after the 繁中 summary", () => {
+    expect(
+      composeMessage({
+        type: "feat",
+        subject: "add the thing",
+        files: [],
+        body: "- because",
+        summary: "加了。",
+        upgrade: ["run midgard pull", "  rebuild the index  "],
+      }),
+    ).toBe(
+      "✨ feat: add the thing\n\n- because\n\n---\n\n加了。\n\nUpgrade: run midgard pull\nUpgrade: rebuild the index\n",
+    );
+  });
+
+  test("a subject-only commit still carries its Upgrade trailer", () => {
+    expect(
+      composeMessage({
+        type: "fix",
+        subject: "x",
+        files: [],
+        upgrade: ["run y"],
+      }),
+    ).toBe("🐛 fix: x\n\nUpgrade: run y\n");
   });
 
   test("a body without a summary carries no separator", () => {

@@ -72,6 +72,12 @@ async function subjects(): Promise<string[]> {
   return text ? text.split("\n") : [];
 }
 
+async function trailers(rev: string): Promise<string[]> {
+  const format = "--format=%(trailers:key=Upgrade,valueonly)";
+  const out = await $`git log -1 ${format} ${rev}`.cwd(repo).quiet();
+  return out.stdout.toString().split("\n").filter(Boolean);
+}
+
 beforeEach(async () => {
   repo = await initRepo();
 });
@@ -260,6 +266,76 @@ describe("apply", () => {
     expect(message).toBe(
       "✨ feat: add a\n\n- because it was needed\n\n---\n\n加了 a。",
     );
+  });
+
+  test("writes the Upgrade action as a real git trailer in simple mode", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    const planPath = await writePlan({
+      mode: "simple",
+      commits: [
+        {
+          type: "feat",
+          subject: "add a",
+          files: ["a.ts"],
+          body: "- because",
+          summary: "加了 a。",
+          upgrade: ["run midgard pull"],
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.verify.upgradeMissing).toEqual([]);
+    expect(await trailers("HEAD")).toEqual(["run midgard pull"]);
+  });
+
+  test("puts the Upgrade trailer only on the atomic commit that needs it", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed("docs/b.md", "b\n");
+    const planPath = await writePlan({
+      moduleSpread: [".", "docs"],
+      commits: [
+        { type: "feat", subject: "add a", files: ["a.ts"], upgrade: ["run x"] },
+        { type: "docs", subject: "add b", files: ["docs/b.md"] },
+      ],
+      simple: { type: "feat", subject: "add a and b", upgrade: ["run x"] },
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.shape).toBe("atomic");
+    expect(json.verify.upgradeMissing).toEqual([]);
+    expect(await trailers("HEAD~1")).toEqual(["run x"]);
+    expect(await trailers("HEAD")).toEqual([]);
+  });
+
+  test("fails when a commit-msg hook strips the Upgrade trailer", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    const hook = join(repo, ".git", "hooks", "commit-msg");
+    await writeFile(hook, '#!/bin/sh\nsed -i.bak "/^Upgrade:/d" "$1"\n', {
+      mode: 0o755,
+    });
+    const planPath = await writePlan({
+      commits: [
+        {
+          type: "feat",
+          subject: "add a",
+          files: ["a.ts"],
+          upgrade: ["run x"],
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(3);
+    expect(json.ok).toBe(false);
+    expect(json.verify.upgradeMissing).toEqual([
+      { commit: "✨ feat: add a", upgrade: "run x" },
+    ]);
   });
 
   test("commits into an unborn branch", async () => {
