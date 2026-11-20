@@ -1,5 +1,16 @@
 # Changelog
 
+## [chronicle 0.24.0] - 2026-11-21
+
+_tracks tag `chronicle-v0.24.0`_
+
+### Added
+- Commit plans carry Upgrade trailers as a per-commit `upgrade` field, written as the last paragraph of the message and verified after the commit, so downstream projects that scan for `Upgrade:` always see them and a hook that strips one fails the commit.
+- Release entries must cite every commit that carries an Upgrade trailer in a bullet starting with `**Upgrade:** `, so required downstream actions can no longer slip out of the changelog.
+
+### Changed
+- The commit and release agents on Claude, Codex and OpenCode now know the Upgrade trailer: the commit agent passes upgrade notes through the plan's `upgrade` input, and the release agent writes an `**Upgrade:**` bullet for such commits.
+
 ## [monitor 8.7.1] - 2026-11-20
 
 _tracks tag `monitor-v8.7.1`_
