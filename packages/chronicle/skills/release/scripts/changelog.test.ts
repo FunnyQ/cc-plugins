@@ -337,6 +337,81 @@ describe("classifyJudged", () => {
 });
 
 describe("gatherFacts", () => {
+  test("attributes an Upgrade commit that touches no component, like an empty trailer-only commit, to every scoped unit", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-facts-"));
+    const git = (...args: string[]) =>
+      $`git -c user.email=t@t.t -c user.name=t -c commit.gpgsign=false ${args}`
+        .cwd(dir)
+        .quiet();
+    await git("init", "-q", "-b", "main");
+    await Bun.write(join(dir, "backend/a.rb"), "a\n");
+    await Bun.write(join(dir, "cli/b.ts"), "b\n");
+    await git("add", "-A");
+    await git("commit", "-q", "-m", "🔧 chore: init");
+    await git("tag", "base");
+    await Bun.write(join(dir, "backend/a.rb"), "a2\n");
+    await git("commit", "-q", "-am", "✨ feat: Backend change");
+    await git(
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "📖 docs: Note upgrade\n\nUpgrade: run midgard pull",
+    );
+    await Bun.write(join(dir, "cli/b.ts"), "b2\n");
+    await git(
+      "commit",
+      "-q",
+      "-am",
+      "✨ feat: CLI change\n\nUpgrade: reinstall the cli",
+    );
+    await Bun.write(join(dir, "README.md"), "r\n");
+    await git("add", "README.md");
+    await git(
+      "commit",
+      "-q",
+      "-m",
+      "📖 docs: Readme\n\nUpgrade: read the readme",
+    );
+    await git(
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "🔧 chore: Empty without trailer",
+    );
+    const unit = (component: string) => ({
+      component,
+      targetVersion: "1.0.0",
+      lastTag: "base",
+      tagName: `${component}-v1.0.0`,
+      headerLabel: `${component} 1.0.0`,
+      pathScope: component,
+      versionFiles: [],
+      artifacts: [],
+    });
+    const previous = process.cwd();
+    process.chdir(dir);
+    try {
+      const [backend, cli] = await gatherFacts(
+        [unit("backend"), unit("cli")],
+        ["backend", "cli"],
+      );
+      expect(backend!.commits.map((c) => c.subject)).toEqual([
+        "📖 docs: Readme",
+        "📖 docs: Note upgrade",
+        "✨ feat: Backend change",
+      ]);
+      expect(cli!.commits.map((c) => c.subject)).toEqual([
+        "📖 docs: Readme",
+        "✨ feat: CLI change",
+        "📖 docs: Note upgrade",
+      ]);
+    } finally {
+      process.chdir(previous);
+    }
+  });
+
   test("carries each commit's Upgrade trailers", async () => {
     const dir = await mkdtemp(join(tmpdir(), "chronicle-facts-"));
     const git = (...args: string[]) =>
@@ -355,18 +430,21 @@ describe("gatherFacts", () => {
     const previous = process.cwd();
     process.chdir(dir);
     try {
-      const [unit] = await gatherFacts([
-        {
-          component: "x",
-          targetVersion: "1.0.0",
-          lastTag: null,
-          tagName: "x-v1.0.0",
-          headerLabel: "x 1.0.0",
-          pathScope: null,
-          versionFiles: [],
-          artifacts: [],
-        },
-      ]);
+      const [unit] = await gatherFacts(
+        [
+          {
+            component: "x",
+            targetVersion: "1.0.0",
+            lastTag: null,
+            tagName: "x-v1.0.0",
+            headerLabel: "x 1.0.0",
+            pathScope: null,
+            versionFiles: [],
+            artifacts: [],
+          },
+        ],
+        [],
+      );
       expect(unit!.commits.map((c) => c.upgrade)).toEqual([
         undefined,
         ["run x"],
@@ -378,18 +456,21 @@ describe("gatherFacts", () => {
 
   test("fails loudly on a bad range instead of reporting no commits that an empty entry would pass", async () => {
     await expect(
-      gatherFacts([
-        {
-          component: "chronicle",
-          targetVersion: "9.9.9",
-          lastTag: "definitely-not-a-real-tag",
-          tagName: "chronicle-v9.9.9",
-          headerLabel: "chronicle 9.9.9",
-          pathScope: "packages/chronicle",
-          versionFiles: [],
-          artifacts: [],
-        },
-      ]),
+      gatherFacts(
+        [
+          {
+            component: "chronicle",
+            targetVersion: "9.9.9",
+            lastTag: "definitely-not-a-real-tag",
+            tagName: "chronicle-v9.9.9",
+            headerLabel: "chronicle 9.9.9",
+            pathScope: "packages/chronicle",
+            versionFiles: [],
+            artifacts: [],
+          },
+        ],
+        [],
+      ),
     ).rejects.toThrow();
   });
 });

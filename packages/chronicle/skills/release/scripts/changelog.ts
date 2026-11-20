@@ -90,26 +90,67 @@ export function parseCommitLog(raw: string): Commit[] {
     });
 }
 
-export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
+async function gitOut(args: string[]): Promise<string> {
+  const out = await $`git ${args}`.quiet().nothrow();
+  if (out.exitCode !== 0) {
+    throw new Error(
+      `git ${args.join(" ")} failed: ${out.stderr.toString().trim()}`,
+    );
+  }
+  return out.stdout.toString();
+}
+
+function underAny(path: string, scopes: string[]): boolean {
+  return scopes.some(
+    (scope) =>
+      path === scope || path.startsWith(`${scope.replace(/\/+$/, "")}/`),
+  );
+}
+
+export async function gatherFacts(
+  units: Unit[],
+  componentPaths: string[],
+): Promise<UnitFacts[]> {
+  const format =
+    "--format=%h%x1f%s%x1f%b%x1f%(trailers:key=Upgrade,valueonly)%x1e";
   return Promise.all(
     units.map(async (unit) => {
       const range = unit.lastTag ? [`${unit.lastTag}..HEAD`] : ["HEAD"];
-      const scope = unit.pathScope ? ["--", unit.pathScope] : [];
-      const format =
-        "--format=%h%x1f%s%x1f%b%x1f%(trailers:key=Upgrade,valueonly)%x1e";
-      const log = await $`git log ${format} ${range} ${scope}`
-        .quiet()
-        .nothrow();
-      if (log.exitCode !== 0) {
-        throw new Error(
-          `git log ${range.join(" ")} failed: ${log.stderr.toString().trim()}`,
-        );
+      if (!unit.pathScope) {
+        return {
+          tagName: unit.tagName,
+          headerLabel: unit.headerLabel,
+          commits: parseCommitLog(await gitOut(["log", format, ...range])),
+        };
       }
-      const raw = log.stdout.toString();
+      const [scoped, all] = await Promise.all([
+        gitOut(["log", "--format=%h", ...range, "--", unit.pathScope]),
+        gitOut(["log", format, ...range]),
+      ]);
+      const inScope = new Set(scoped.split("\n").filter(Boolean));
+      const commits = await Promise.all(
+        parseCommitLog(all).map(async (commit) => {
+          if (inScope.has(commit.sha)) return commit;
+          if (!commit.upgrade?.length) return null;
+          const files = await gitOut([
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "--root",
+            commit.sha,
+          ]);
+          const touchesComponent = files
+            .split("\n")
+            .filter(Boolean)
+            .some((path) => underAny(path, componentPaths));
+          return touchesComponent ? null : commit;
+        }),
+      );
       return {
         tagName: unit.tagName,
         headerLabel: unit.headerLabel,
-        commits: parseCommitLog(raw),
+        commits: commits.filter((commit) => commit !== null),
       };
     }),
   );

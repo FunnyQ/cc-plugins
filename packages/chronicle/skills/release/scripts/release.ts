@@ -484,7 +484,10 @@ async function execute(
       const path = resolve(ctx.root, p.changelogPath);
       const changelog = await readFile(path, "utf-8").catch(() => "");
       const pending = p.units.filter((u) => !entryDone(u, changelog));
-      const facts = await gatherFacts(pending);
+      const facts = await gatherFacts(
+        pending,
+        (config.components ?? []).map((c) => c.path),
+      );
       const tags = new Set(pending.map((u) => u.tagName));
       const drafts = (
         JSON.parse(await readFile(ctx.entriesFile, "utf-8")) as EntryDraft[]
@@ -656,6 +659,7 @@ async function main() {
     ).catch(() => "");
     const facts = await gatherFacts(
       current.units.filter((u) => !entryDone(u, changelog)),
+      (config.components ?? []).map((c) => c.path),
     );
     const jev = await classifyJudged(facts, {
       apiKey: process.env.TYPESAFE_API_KEY,
