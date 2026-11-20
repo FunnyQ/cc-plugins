@@ -26,6 +26,7 @@ plan you write, so the diff must not leave this subtree — never quote it back.
 - `branch` — the current branch (already checked safe by the main agent).
 - `mode` — `"auto"` by default when absent, or `"simple"` to force one commit.
 - `exclude` — optional. Repo-root-relative paths the caller wants left uncommitted; an entry ending in `/` covers every path under that directory.
+- `upgrade` — optional. One-line actions a downstream or generated project must take on upgrade.
 
 `{NAME}` marks a **substitution site**: put the literal value there before you run
 the command. If a declared placeholder is still in the command, report the missing
@@ -136,8 +137,9 @@ type PlanFile = {
     emoji?: string; // omit it — commit.ts derives it from `type`
     body?: string; // English markdown bullets
     summary?: string; // 繁體中文摘要
+    upgrade?: string[]; // one-line actions; each becomes an `Upgrade:` trailer
   }[];
-  simple?: { type; subject; body?; summary? }; // no `files` — see below
+  simple?: { type; subject; body?; summary?; upgrade? }; // no `files` — see below
 };
 ```
 
@@ -146,6 +148,11 @@ digest. Be terse on purpose: about 3–4 one-line bullets saying _why_, and a �
 摘要 of 1–3 sentences that summarizes rather than re-translates. A trivial
 one-liner may omit both. If the digest reported elided or held-back diffs,
 mention the incomplete diff once, in the body it affects.
+
+**Put every `upgrade` action on the commit whose change needs it**, verbatim, as
+`upgrade`, and on `simple` too. Never write `Upgrade:` into `body` or `summary`.
+`commit.ts` appends the trailers after the 繁中 summary, because git reads a
+trailer only from the message's last paragraph.
 
 **`simple` is required as soon as `commits` holds more than one group.** It is the
 single commit those groups collapse into, should `commit.ts` decide the split is
@@ -190,6 +197,9 @@ only hide the first one's outcome. Never fall back to hand-rolled git: never
   valid and a second run resumes at N+1. Re-run `apply`.
 - **`ok: false` with `verify.missing` / `verify.leftover`** — commits were written
   but the changeset did not land intact. Do not retry. Fail with the paths.
+- **`ok: false` with `verify.upgradeMissing`** — commits were written but git does
+  not read their `Upgrade` trailer, often because a commit-msg hook rewrote the
+  message. Do not retry. Fail with the listed commits and actions.
 
 Retry at most once per failure kind. Never retry a verification failure.
 

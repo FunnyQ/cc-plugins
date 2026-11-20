@@ -36,6 +36,7 @@ type UnitFacts = {
     subject: string;
     body: string;
     section: Suggestion;
+    upgrade?: string[]; // the commit's `Upgrade:` git trailers
     judgedBy?: "jev"; // section came from TypeSafe's Jev, not the commit type
     confidence?: number;
   }[];
@@ -88,6 +89,13 @@ type Bullet = { text: string; commits: string[] }; // shas this bullet covers
 `commits` or into `omitted`. The engine refuses a file that leaves one out, because
 a changelog is immutable once its tag is pushed. Several commits may share one
 bullet. Omit only what a reader gains nothing from.
+
+**A commit with `upgrade` gets its own bullet that starts with `**Upgrade:** `**
+and states the action a downstream project must take, in the commit's usual
+section. Never omit it and never fold it into a plain bullet: tools such as
+`midgard pull` scan the changelog for lines starting `- **Upgrade:**`, and the
+engine refuses a file that does not cite the commit in such a bullet. The same
+commit may also appear in a plain bullet about what it changed.
 
 Write one plain sentence per bullet, leading with the outcome. No heading, date, or
 leading `- `: the engine renders those. An entry needs at least one bullet; when
