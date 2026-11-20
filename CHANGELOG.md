@@ -1,5 +1,12 @@
 # Changelog
 
+## [chronicle 0.24.1] - 2026-11-21
+
+_tracks tag `chronicle-v0.24.1`_
+
+### Fixed
+- A release now enforces Upgrade trailers carried by empty or root-only commits, which previously reached no unit and slipped past the entry check; such a commit is attributed to every component being cut.
+
 ## [chronicle 0.24.0] - 2026-11-21
 
 _tracks tag `chronicle-v0.24.0`_
