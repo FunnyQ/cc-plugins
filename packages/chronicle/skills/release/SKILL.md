@@ -254,7 +254,9 @@ Agent({
 ```
 
 Pass the returned path to step 7 as `--entries-file`. The `entry` stage validates
-that every commit is accounted for, renders the markdown, and splices it above the
+that every commit is accounted for, and that every commit with an `Upgrade:` git
+trailer is cited in a bullet starting `**Upgrade:** ` (tools such as `midgard
+pull` scan the changelog for `- **Upgrade:**`). It then renders the markdown, and splices it above the
 first existing heading. A rejected file names each problem: resume the same
 annalist with that list through `SendMessage`, never a second spawn. Skip this
 whole step whenever `entry` reads `entry✓` — the entry exists, and a second one for

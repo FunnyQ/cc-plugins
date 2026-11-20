@@ -30,6 +30,9 @@ Security.
 
 - User-facing, not a commit dump. A reader skims to learn what's new.
 - Write one line per change. Lead with the outcome, not the mechanism.
+- Start a bullet with `**Upgrade:** ` when its commit carries an `Upgrade:` git
+  trailer, and state the action a downstream project must take. The engine
+  refuses an entry that leaves such a commit out of an `**Upgrade:** ` bullet.
 - Fold a pure chore away — for example a lockfile bump, a formatting pass, or an
   internal refactor with no visible effect. Keep it only when it is the _only_
   change in the release.

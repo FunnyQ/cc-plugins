@@ -1,4 +1,9 @@
+import { $ } from "bun";
 import { describe, expect, test } from "bun:test";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { Unit } from "./stages";
 
 import {
   classifyJudged,
@@ -27,6 +32,11 @@ describe("parseCommitLog", () => {
       },
       { sha: "def5678", subject: "🐛 fix: Fix y", body: "", section: "Fixed" },
     ]);
+  });
+
+  test("reads the Upgrade trailers from a fourth field", () => {
+    const raw = `abc1234${US}✨ feat: Add x${US}body\n\nUpgrade: run x${US}run x\nrun y\n${RS}\n`;
+    expect(parseCommitLog(raw)[0]?.upgrade).toEqual(["run x", "run y"]);
   });
 
   test("returns nothing for empty output", () => {
@@ -79,6 +89,42 @@ const good: EntryDraft[] = [
 describe("validateEntries", () => {
   test("accepts a draft that accounts for every commit", () => {
     expect(validateEntries(good, facts)).toEqual([]);
+  });
+
+  test("requires an Upgrade commit in a bullet that starts with **Upgrade:**, so midgard pull reports it", () => {
+    const upgrading: UnitFacts[] = [
+      {
+        ...facts[0]!,
+        commits: facts[0]!.commits.map((c) =>
+          c.sha === "a1" ? { ...c, upgrade: ["run x"] } : c,
+        ),
+      },
+    ];
+    const error =
+      "chronicle-v0.2.0: commit a1 (✨ feat: A) carries an Upgrade trailer — cite it in a bullet that starts with `**Upgrade:** `";
+    expect(validateEntries(good, upgrading)).toEqual([error]);
+
+    const omitted: EntryDraft[] = [
+      {
+        ...good[0]!,
+        sections: { Fixed: good[0]!.sections.Fixed! },
+        omitted: ["a1", "c3"],
+      },
+    ];
+    expect(validateEntries(omitted, upgrading)).toEqual([error]);
+
+    const fixed: EntryDraft[] = [
+      {
+        ...good[0]!,
+        sections: {
+          ...good[0]!.sections,
+          Added: [
+            { text: "**Upgrade:** Run x after you pull.", commits: ["a1"] },
+          ],
+        },
+      },
+    ];
+    expect(validateEntries(fixed, upgrading)).toEqual([]);
   });
 
   test("names a commit the draft never accounted for, since a changelog is immutable once its tag is pushed", () => {
@@ -291,6 +337,45 @@ describe("classifyJudged", () => {
 });
 
 describe("gatherFacts", () => {
+  test("carries each commit's Upgrade trailers", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-facts-"));
+    const git = (...args: string[]) =>
+      $`git -c user.email=t@t.t -c user.name=t -c commit.gpgsign=false ${args}`
+        .cwd(dir)
+        .quiet();
+    await git("init", "-q", "-b", "main");
+    await git(
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "✨ feat: A\n\n- why\n\n---\n\n摘要\n\nUpgrade: run x",
+    );
+    await git("commit", "-q", "--allow-empty", "-m", "🐛 fix: B");
+    const previous = process.cwd();
+    process.chdir(dir);
+    try {
+      const [unit] = await gatherFacts([
+        {
+          component: "x",
+          targetVersion: "1.0.0",
+          lastTag: null,
+          tagName: "x-v1.0.0",
+          headerLabel: "x 1.0.0",
+          pathScope: null,
+          versionFiles: [],
+          artifacts: [],
+        },
+      ]);
+      expect(unit!.commits.map((c) => c.upgrade)).toEqual([
+        undefined,
+        ["run x"],
+      ]);
+    } finally {
+      process.chdir(previous);
+    }
+  });
+
   test("fails loudly on a bad range instead of reporting no commits that an empty entry would pass", async () => {
     await expect(
       gatherFacts([

@@ -25,6 +25,8 @@ export type Commit = {
   subject: string;
   body: string;
   section: Suggestion;
+  /** Values of the commit's `Upgrade:` git trailers. */
+  upgrade?: string[];
   judgedBy?: "jev";
   confidence?: number;
 };
@@ -72,8 +74,19 @@ export function parseCommitLog(raw: string): Commit[] {
     .map((record) => record.replace(/^\n+/, ""))
     .filter((record) => record.trim())
     .map((record) => {
-      const [sha = "", subject = "", body = ""] = record.split(US);
-      return { sha, subject, body: body.trim(), section: sectionFor(subject) };
+      const [sha = "", subject = "", body = "", trailers = ""] =
+        record.split(US);
+      const upgrade = trailers
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      return {
+        sha,
+        subject,
+        body: body.trim(),
+        section: sectionFor(subject),
+        ...(upgrade.length > 0 && { upgrade }),
+      };
     });
 }
 
@@ -82,7 +95,9 @@ export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
     units.map(async (unit) => {
       const range = unit.lastTag ? [`${unit.lastTag}..HEAD`] : ["HEAD"];
       const scope = unit.pathScope ? ["--", unit.pathScope] : [];
-      const log = await $`git log --format=%h%x1f%s%x1f%b%x1e ${range} ${scope}`
+      const format =
+        "--format=%h%x1f%s%x1f%b%x1f%(trailers:key=Upgrade,valueonly)%x1e";
+      const log = await $`git log ${format} ${range} ${scope}`
         .quiet()
         .nothrow();
       if (log.exitCode !== 0) {
@@ -99,6 +114,9 @@ export async function gatherFacts(units: Unit[]): Promise<UnitFacts[]> {
     }),
   );
 }
+
+/** Downstream tools (`midgard pull`) scan CHANGELOG.md for bullets starting `- **Upgrade:**`. */
+export const UPGRADE_PREFIX = "**Upgrade:** ";
 
 export function validateEntries(
   drafts: EntryDraft[],
@@ -128,6 +146,7 @@ export function validateEntries(
     }
     const known = new Set(unit.commits.map((c) => c.sha));
     const cited = new Set(draft.omitted ?? []);
+    const upgradeCited = new Set<string>();
     let bullets = 0;
 
     for (const [name, list] of Object.entries(draft.sections ?? {})) {
@@ -145,6 +164,9 @@ export function validateEntries(
             errors.push(`${unit.tagName}: bullet cites unknown commit ${sha}`);
           }
           cited.add(sha);
+          if (bullet.text?.trim().startsWith(UPGRADE_PREFIX)) {
+            upgradeCited.add(sha);
+          }
         }
       }
     }
@@ -157,6 +179,10 @@ export function validateEntries(
       if (!cited.has(commit.sha)) {
         errors.push(
           `${unit.tagName}: commit ${commit.sha} (${commit.subject}) is neither in a bullet nor in \`omitted\``,
+        );
+      } else if (commit.upgrade?.length && !upgradeCited.has(commit.sha)) {
+        errors.push(
+          `${unit.tagName}: commit ${commit.sha} (${commit.subject}) carries an Upgrade trailer — cite it in a bullet that starts with \`${UPGRADE_PREFIX}\``,
         );
       }
     }
