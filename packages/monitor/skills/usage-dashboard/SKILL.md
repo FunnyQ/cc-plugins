@@ -111,7 +111,17 @@ Before you delete rollouts, check coverage:
 
 1. Open the dashboard or run `cockpit atlas rollup-update`, so the newest usage is captured.
 2. Run `cockpit atlas codex-archive --older-than 30 --dry-run`. Use `--thread <id>` (repeatable) to check threads by ID instead of by age.
-3. Delete only the `paths` listed under `unchanged` threads. Keep every `would-archive`, `unstable`, `incomplete`, or `unresolved` rollout.
+3. Review the age cutoff and the list before deleting. Select only `unchanged` threads with live rollout paths. Keep every `would-archive`, `unstable`, `incomplete`, or `unresolved` rollout.
+
+Deletion is permanent. For one covered thread, run `codex delete --force <uuid>`. Codex removes the rollout file and thread index row. To delete a reviewed age range, use the same cutoff in the command below (30 days in this example):
+
+```sh
+cockpit atlas codex-archive --older-than 30 --dry-run |
+  jq -r '.threads[] | select(.status == "unchanged" and (.paths | length) > 0) | .threadId' |
+  while IFS= read -r id; do codex delete --force "$id" || break; done
+```
+
+After deletion, run `cockpit atlas codex-archive --thread <uuid> --dry-run`. Expect `unchanged` with reason `archived; no live source` and an empty `paths` list.
 
 Run the command without `--dry-run` to capture the listed threads immediately.
 
