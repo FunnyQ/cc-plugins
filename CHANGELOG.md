@@ -1,5 +1,22 @@
 # Changelog
 
+## [chronicle 0.25.0] - 2026-11-23
+
+_tracks tag `chronicle-v0.25.0`_
+
+### Added
+- The Traditional Chinese summary is now written as a single-line `zh-summary:` trailer, so it and any `Upgrade:` trailer survive a `git am` round trip instead of being cut at the `---` separator.
+
+### Changed
+- `commit.ts apply` reads every planned trailer back through git and reports a missing or rewrapped one in `verify.trailerMissing`, which replaces `verify.upgradeMissing`.
+
+## [monitor 8.7.2] - 2026-11-23
+
+_tracks tag `monitor-v8.7.2`_
+
+### Changed
+- Documented how to permanently delete Codex rollouts that Token Atlas already covers, keeping their usage history and leaving archive-only entries out of the deletion.
+
 ## [chronicle 0.24.1] - 2026-11-21
 
 _tracks tag `chronicle-v0.24.1`_
