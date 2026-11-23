@@ -95,6 +95,20 @@ describe("owned lifecycle", () => {
     });
   });
 
+  test("leaves a stale record whose profile is still locked for the next call, and still throws any other failure", async () => {
+    await fixture(async (root, owned) => {
+      const record = join(root, "instances", `${owned.id}.json`);
+      const fail = (code: string) => () => {
+        throw Object.assign(new Error(code), { code });
+      };
+      expect(liveInstances(root, fail("EBUSY"))).toEqual([]);
+      expect(existsSync(record)).toBe(true);
+      expect(() => liveInstances(root, fail("EACCES"))).toThrow("EACCES");
+      expect(liveInstances(root)).toEqual([]);
+      expect(existsSync(record)).toBe(false);
+    });
+  });
+
   test("waits for exit before deleting a profile", async () => {
     await fixture(async (root, owned) => {
       let alive = true;

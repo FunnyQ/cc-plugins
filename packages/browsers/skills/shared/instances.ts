@@ -258,7 +258,10 @@ function removeInstance(stateDir: string, instance: Instance): void {
   rmSync(join(stateDir, "instances", `${instance.id}.owner`), { force: true });
 }
 
-export function liveInstances(stateDir: string): Instance[] {
+export function liveInstances(
+  stateDir: string,
+  remove = removeInstance,
+): Instance[] {
   const dir = join(stateDir, "instances");
   if (!existsSync(dir)) return [];
   const live: Instance[] = [];
@@ -274,7 +277,13 @@ export function liveInstances(stateDir: string): Instance[] {
       verifyProcessOwnership(stateDir, instance);
       live.push(instance);
     } else if (profileBusy(instance)) live.push(instance);
-    else removeInstance(stateDir, instance);
+    else
+      try {
+        remove(stateDir, instance);
+      } catch (error) {
+        // Windows keeps a just-exited browser's profile locked for a moment; the record stays, so the next call retries
+        if ((error as NodeJS.ErrnoException).code !== "EBUSY") throw error;
+      }
   }
   return live;
 }
