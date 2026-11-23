@@ -504,7 +504,7 @@ describe("resolveShapedCommits", () => {
 });
 
 describe("composeMessage", () => {
-  test("joins subject, body, and 繁中 summary with the literal separator", () => {
+  test("writes the 繁中 summary as a zh-summary trailer under the body", () => {
     expect(
       composeMessage({
         emoji: "✨",
@@ -515,7 +515,7 @@ describe("composeMessage", () => {
         summary: "加了那個東西。",
       }),
     ).toBe(
-      "✨ feat: add the thing\n\n- because it was needed\n\n---\n\n加了那個東西。\n",
+      "✨ feat: add the thing\n\n- because it was needed\n\nzh-summary: 加了那個東西。\n",
     );
   });
 
@@ -553,7 +553,20 @@ describe("composeMessage", () => {
     ).toBe("🚑 fix: patch prod\n");
   });
 
-  test("ends the message with the Upgrade trailers, after the 繁中 summary", () => {
+  test("folds a multi-line summary onto one trailer line", () => {
+    expect(
+      composeMessage({
+        type: "feat",
+        subject: "add the thing",
+        files: [],
+        summary: "第一句。\n  第二句。\n\n第三句。",
+      }),
+    ).toBe(
+      "✨ feat: add the thing\n\nzh-summary: 第一句。 第二句。 第三句。\n",
+    );
+  });
+
+  test("ends the message with the Upgrade trailers, in the zh-summary paragraph", () => {
     expect(
       composeMessage({
         type: "feat",
@@ -564,7 +577,7 @@ describe("composeMessage", () => {
         upgrade: ["run midgard pull", "  rebuild the index  "],
       }),
     ).toBe(
-      "✨ feat: add the thing\n\n- because\n\n---\n\n加了。\n\nUpgrade: run midgard pull\nUpgrade: rebuild the index\n",
+      "✨ feat: add the thing\n\n- because\n\nzh-summary: 加了。\nUpgrade: run midgard pull\nUpgrade: rebuild the index\n",
     );
   });
 

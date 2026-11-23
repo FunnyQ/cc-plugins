@@ -385,17 +385,23 @@ export function emojiFor(commit: Pick<CommitGroup, "emoji" | "type">): string {
   return commit.emoji?.trim() || (EMOJI_FOR_TYPE[commit.type] ?? "🔧");
 }
 
+export function trailersOf(commit: PlannedCommit): string[] {
+  const summary = commit.summary?.trim().replace(/\s*\n\s*/g, " ");
+  return [
+    ...(summary ? [`zh-summary: ${summary}`] : []),
+    ...(commit.upgrade ?? []).map((action) => `Upgrade: ${action.trim()}`),
+  ];
+}
+
 export function composeMessage(commit: PlannedCommit): string {
   const subject =
     `${emojiFor(commit)} ${commit.type}: ${commit.subject}`.trim();
   const body = commit.body?.trim();
-  const summary = commit.summary?.trim();
 
   let message = subject;
   if (body) message += `\n\n${body}`;
-  if (summary) message += `\n\n---\n\n${summary}`;
-  const upgrade = commit.upgrade?.map((action) => `Upgrade: ${action.trim()}`);
-  if (upgrade?.length) message += `\n\n${upgrade.join("\n")}`;
+  const trailers = trailersOf(commit);
+  if (trailers.length) message += `\n\n${trailers.join("\n")}`;
   return `${message}\n`;
 }
 

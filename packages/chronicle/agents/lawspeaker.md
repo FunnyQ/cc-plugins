@@ -148,9 +148,8 @@ one-liner may omit both. If the digest reported elided or held-back diffs,
 mention the incomplete diff once, in the body it affects.
 
 **Put every `upgrade` action on the commit whose change needs it**, verbatim, as
-`upgrade`, and on `simple` too. Never write `Upgrade:` into `body` or `summary`.
-`commit.ts` appends the trailers after the 繁中 summary, because git reads a
-trailer only from the message's last paragraph.
+`upgrade`, and on `simple` too. Never write `Upgrade:` or `zh-summary:` into
+`body` or `summary`: `commit.ts` writes both trailers, per the template.
 
 **`simple` is required as soon as `commits` holds more than one group.** It is the
 single commit those groups collapse into, should `commit.ts` decide the split is
@@ -195,9 +194,10 @@ only hide the first one's outcome. Never fall back to hand-rolled git: never
   valid and a second run resumes at N+1. Re-run `apply`.
 - **`ok: false` with `verify.missing` / `verify.leftover`** — commits were written
   but the changeset did not land intact. Do not retry. Fail with the paths.
-- **`ok: false` with `verify.upgradeMissing`** — commits were written but git does
-  not read their `Upgrade` trailer, often because a commit-msg hook rewrote the
-  message. Do not retry. Fail with the listed commits and actions.
+- **`ok: false` with `verify.trailerMissing`** — commits were written but git does
+  not read a `zh-summary` or `Upgrade` trailer as `commit.ts` wrote it, often
+  because a commit-msg hook rewrote the message. Do not retry. Fail with the
+  listed commits and trailers.
 
 Retry at most once per failure kind. Never retry a verification failure.
 

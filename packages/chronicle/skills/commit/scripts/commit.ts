@@ -43,6 +43,7 @@ import {
   resolveResumption,
   resolveShapedCommits,
   subjectOf,
+  trailersOf,
   validatePlan,
   validatePlanFile,
   type CommitPlan,
@@ -225,29 +226,23 @@ async function writeCommit(
 }
 
 /**
- * Reads each planned commit's `Upgrade` trailers back through git's own parser,
- * because a line that only looks like a trailer (followed by more prose, or
+ * Reads each planned commit's trailers back through git's own parser, because
+ * a line that only looks like a trailer (wrapped, followed by more prose, or
  * stripped by a commit-msg hook) is invisible to every downstream reader. */
-async function missingUpgrades(
+async function missingTrailers(
   commits: PlannedCommit[],
-): Promise<{ commit: string; upgrade: string }[]> {
-  const missing: { commit: string; upgrade: string }[] = [];
+): Promise<{ commit: string; trailer: string }[]> {
+  const missing: { commit: string; trailer: string }[] = [];
   for (const [index, commit] of commits.entries()) {
-    if (!commit.upgrade?.length) continue;
+    const planned = trailersOf(commit);
+    if (planned.length === 0) continue;
     const rev = `HEAD~${commits.length - 1 - index}`;
     const landed = (
-      await gitOrEmpty(
-        "log",
-        "-1",
-        "--format=%(trailers:key=Upgrade,valueonly)",
-        rev,
-      )
-    )
-      .split("\n")
-      .map((line) => line.trim());
-    for (const action of commit.upgrade) {
-      if (!landed.includes(action.trim())) {
-        missing.push({ commit: subjectOf(commit), upgrade: action });
+      await gitOrEmpty("log", "-1", "--format=%(trailers:only)", rev)
+    ).split("\n");
+    for (const trailer of planned) {
+      if (!landed.includes(trailer)) {
+        missing.push({ commit: subjectOf(commit), trailer });
       }
     }
   }
@@ -325,10 +320,10 @@ async function applyMain(planPath: string): Promise<void> {
     remainingPaths(),
   ]);
   const verification = verifyPlanLanded(planned, committed, remaining, exclude);
-  const upgradeMissing = await missingUpgrades(commits);
+  const trailerMissing = await missingTrailers(commits);
 
   const result = {
-    ok: verification.ok && upgradeMissing.length === 0,
+    ok: verification.ok && trailerMissing.length === 0,
     ...decision,
     base,
     ...(exclude.length > 0 && {
@@ -344,7 +339,7 @@ async function applyMain(planPath: string): Promise<void> {
       plannedFiles: new Set(planned).size,
       committedFiles: committed.length,
       ...verification,
-      upgradeMissing,
+      trailerMissing,
     },
   };
 

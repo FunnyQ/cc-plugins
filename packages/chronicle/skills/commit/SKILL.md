@@ -130,11 +130,11 @@ base-directory banner.
   first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there.
 - **Leaving files out**: `exclude` is whole-file and opt-in. A path ending in `/` excludes every changed path under that directory, read when `apply` runs, so files added there after the plan is written stay out too. A changed path that is neither
   planned nor excluded still fails the coverage check. Hunk-level exclusion does not exist.
-- **Upgrade notes**: `commit.ts` writes each action as an `Upgrade: <action>` git
-  trailer, the last paragraph of the commit body, after the 繁中 summary. Nothing
-  may follow it, or git stops reading it as a trailer. `apply` reads it back with
-  `%(trailers:key=Upgrade)` and fails with `verify.upgradeMissing` when it did not
-  land. `chronicle:release` turns every such commit into a `**Upgrade:** ` bullet.
+- **Trailers**: `commit.ts` writes the 繁中 summary as a `zh-summary:` trailer and
+  each upgrade action as an `Upgrade: <action>` trailer, and `apply` fails with
+  `verify.trailerMissing` when git does not read one back as written.
+  `references/commit-template.md` holds the rules. `chronicle:release` turns
+  every commit with an `Upgrade` trailer into a `**Upgrade:** ` bullet.
 - **A re-run after any failure**: safe. `apply` reads how much of the plan is already
   at HEAD off the log, not off a stored flag.
 - **A changeset too wide for one digest**: `analyze-changes.ts` holds back the

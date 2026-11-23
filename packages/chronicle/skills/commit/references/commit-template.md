@@ -8,10 +8,7 @@
 - what changed and why (English, markdown list)
 - another detail if needed
 
----
-
-繁體中文摘要（一到三句，說明這次改了什麼、為什麼）
-
+zh-summary: 繁體中文摘要（一到三句，說明這次改了什麼、為什麼）
 Upgrade: the action a downstream project must take on upgrade
 ```
 
@@ -38,12 +35,22 @@ Upgrade: the action a downstream project must take on upgrade
 - Every non-trivial commit includes the body and the 繁中 summary.
 - A trivial one-liner (a typo, a version bump) may omit the body. It must
   still carry the subject.
-- The `---` separator is literal. It is always present when a 繁中 summary
-  follows.
 - The message describes only the files in _this_ commit.
-- An `Upgrade:` trailer comes from the plan's `upgrade` field, never from the
-  body or the summary. `commit.ts` writes it as the last paragraph, because git
-  reads trailers only there.
+
+## Trailers
+
+`commit.ts` writes every trailer. Never write `zh-summary:` or `Upgrade:` into
+the body or the summary.
+
+- `zh-summary:` holds the plan's `summary` field. Each `Upgrade:` holds one
+  action from the plan's `upgrade` field.
+- The trailers form the last paragraph, `zh-summary` first, because git reads
+  trailers only there. Nothing may follow them.
+- Each trailer is one line. `commit.ts` folds every line break in the summary
+  into a space, because an unindented second line stops git reading the
+  paragraph as trailers.
+- `apply` reads every trailer back with `%(trailers:only)` and fails with
+  `verify.trailerMissing` when git does not return a line as written.
 
 ## Scope of the body
 

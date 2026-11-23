@@ -72,8 +72,8 @@ async function subjects(): Promise<string[]> {
   return text ? text.split("\n") : [];
 }
 
-async function trailers(rev: string): Promise<string[]> {
-  const format = "--format=%(trailers:key=Upgrade,valueonly)";
+async function trailers(rev: string, key = "Upgrade"): Promise<string[]> {
+  const format = `--format=%(trailers:key=${key},valueonly)`;
   const out = await $`git log -1 ${format} ${rev}`.cwd(repo).quiet();
   return out.stdout.toString().split("\n").filter(Boolean);
 }
@@ -264,7 +264,7 @@ describe("apply", () => {
       .toString()
       .trim();
     expect(message).toBe(
-      "✨ feat: add a\n\n- because it was needed\n\n---\n\n加了 a。",
+      "✨ feat: add a\n\n- because it was needed\n\nzh-summary: 加了 a。",
     );
   });
 
@@ -287,7 +287,32 @@ describe("apply", () => {
 
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(0);
-    expect(json.verify.upgradeMissing).toEqual([]);
+    expect(json.verify.trailerMissing).toEqual([]);
+    expect(await trailers("HEAD")).toEqual(["run midgard pull"]);
+  });
+
+  test("git reads a multi-line summary back as one zh-summary trailer beside Upgrade", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    const planPath = await writePlan({
+      commits: [
+        {
+          type: "feat",
+          subject: "add a",
+          files: ["a.ts"],
+          body: "- because",
+          summary: "加了 a。\n順便修了 b。",
+          upgrade: ["run midgard pull"],
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(await trailers("HEAD", "zh-summary")).toEqual([
+      "加了 a。 順便修了 b。",
+    ]);
+    expect(json.verify.trailerMissing).toEqual([]);
     expect(await trailers("HEAD")).toEqual(["run midgard pull"]);
   });
 
@@ -307,7 +332,7 @@ describe("apply", () => {
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(0);
     expect(json.shape).toBe("atomic");
-    expect(json.verify.upgradeMissing).toEqual([]);
+    expect(json.verify.trailerMissing).toEqual([]);
     expect(await trailers("HEAD~1")).toEqual(["run x"]);
     expect(await trailers("HEAD")).toEqual([]);
   });
@@ -333,8 +358,37 @@ describe("apply", () => {
     const { exitCode, json } = await run("apply", planPath);
     expect(exitCode).toBe(3);
     expect(json.ok).toBe(false);
-    expect(json.verify.upgradeMissing).toEqual([
-      { commit: "✨ feat: add a", upgrade: "run x" },
+    expect(json.verify.trailerMissing).toEqual([
+      { commit: "✨ feat: add a", trailer: "Upgrade: run x" },
+    ]);
+  });
+
+  test("fails when a commit-msg hook wraps zh-summary onto a second line", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    const hook = join(repo, ".git", "hooks", "commit-msg");
+    await writeFile(hook, '#!/bin/sh\nperl -pi -e "s/。 /。\\n /" "$1"\n', {
+      mode: 0o755,
+    });
+    const planPath = await writePlan({
+      commits: [
+        {
+          type: "feat",
+          subject: "add a",
+          files: ["a.ts"],
+          summary: "加了 a。 順便修了 b。",
+        },
+      ],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(3);
+    expect(json.ok).toBe(false);
+    expect(json.verify.trailerMissing).toEqual([
+      {
+        commit: "✨ feat: add a",
+        trailer: "zh-summary: 加了 a。 順便修了 b。",
+      },
     ]);
   });
 
