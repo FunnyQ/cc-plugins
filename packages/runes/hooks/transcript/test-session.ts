@@ -70,12 +70,14 @@ export const fakeHost = (
     probe,
     env = {},
     messages = [],
+    apiMessages = [],
   }: {
     files?: Map<string, string>;
     run?: (e: Run[1]) => unknown;
     probe?: (e: Run[1]) => unknown;
     env?: FixtureEnv;
     messages?: unknown[];
+    apiMessages?: unknown[];
   } = {},
 ) => {
   const store = new Map<string, unknown>();
@@ -151,7 +153,16 @@ export const fakeHost = (
   });
   on("command.register", () => ({ value: undefined }) as never);
   on("settings.read", () => ({ value: {} }) as never);
-  on("session.messages", () => ({ value: messages }) as never);
+  on(
+    "session.messages",
+    (_$, e) =>
+      ({
+        value:
+          (e as { as?: string } | undefined)?.as === "api"
+            ? apiMessages
+            : messages,
+      }) as never,
+  );
   return { files, store, toasts, registered };
 };
 

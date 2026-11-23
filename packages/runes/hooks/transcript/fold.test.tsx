@@ -3,7 +3,7 @@ import type { On, SessionMessage } from "claude-code";
 
 import { DEFAULTS } from "../config";
 import { PALETTES } from "./bubble";
-import { SEARCH_ICON, runsOf } from "./fold";
+import { SEARCH_ICON, runsOf, thoughtsOf } from "./fold";
 import { CONFIG, eventually, find, startSession, within } from "./test-session";
 
 const use = (
@@ -533,6 +533,155 @@ test("a folded ToolGroup draws its calls' titles itself, and hands back to the e
   await group.press({ key: "fold:open:0" }).catch(() => {});
   await group.unmount().catch(() => {});
   expect(await find($, B2, { key: "bash" })).toBeDefined();
+});
+
+test("a ToolGroup with an unfolded call asks the engine for a row per call, since its one line would replace the title", async ($, on) => {
+  const asked: boolean[] = [];
+  on("ui.render", { component: "ToolGroup" }, ($, e) => {
+    asked.push(e.props.isExpanded);
+    const { Box } = $.ui.resolve(e);
+    return <Box key="engine" />;
+  });
+  await start($, on, RUN);
+  const calls: [string, string][] = [
+    ["b2", "Bash"],
+    ["g1", "Grep"],
+  ];
+  const lone = { ...(GROUP(calls) as { props: object }) };
+  const folded = {
+    ...lone,
+    props: { ...lone.props, isExpanded: false },
+  } as never;
+  const group = await $.ui.mount(folded);
+  await group.press({ key: "fold:open:0" });
+  expect(await group.find({ key: "engine" })).toBeDefined();
+  expect(asked.at(-1)).toBe(true);
+  await group.unmount();
+});
+
+const CODE_GROUP = (calls: [string, string][]) =>
+  ({
+    plugin: "runes",
+    surface: "terminal",
+    component: "ToolGroup",
+    requestId: "group",
+    props: {
+      calls: calls.map(([tool_use_id, tool]) => ({
+        tool_use_id,
+        tool,
+        input: {},
+        isRunning: false,
+      })),
+      isActive: false,
+      isExpanded: true,
+    },
+    viewport: { columns: 60, rows: 40 },
+  }) as never;
+const SCRIPTS = [
+  said("user", "go"),
+  called(use("r1", "REPL", { description: "Survey" })),
+  called(use("repl_1", "Bash", { command: "pwd" })),
+  called(use("p1", "Poll")),
+  called(use("r2", "REPL", { description: "Report" })),
+  called(use("p2", "Poll")),
+  said("assistant", "all done"),
+];
+const SCRIPT_CALLS: [string, string][] = [
+  ["r1", "REPL"],
+  ["p1", "Poll"],
+  ["repl_1", "Bash"],
+  ["r2", "REPL"],
+  ["p2", "Poll"],
+];
+const engineBeneath = (on: On) =>
+  on("ui.render", { component: "ToolGroup" }, ($, e) => {
+    const { Box } = $.ui.resolve(e);
+    return <Box key="engine" />;
+  });
+const folded = async ($: Engine, event: never) =>
+  expect(
+    await eventually(
+      async () => (await find($, event, { key: "fold:title:0" })) !== undefined,
+    ),
+  ).toBe(true);
+
+test("thoughtsOf gives each call the thinking written just before it, and text between drops it", () => {
+  const thoughts = thoughtsOf([
+    {
+      content: [
+        { type: "thinking", thinking: " survey first " },
+        { type: "tool_use", id: "r1" },
+        { type: "tool_use", id: "p1" },
+      ],
+    },
+    {
+      content: [
+        { type: "thinking", thinking: "stale" },
+        { type: "text", text: "hello" },
+        { type: "tool_use", id: "r2" },
+      ],
+    },
+  ]);
+  expect([...thoughts]).toEqual([["r1", "survey first"]]);
+});
+
+test("pressing a REPL title in a ToolGroup keeps every title in place and draws that script's thinking under it, with no hand-back", async ($, on) => {
+  engineBeneath(on);
+  await startSession($, on, {
+    messages: SCRIPTS,
+    apiMessages: [
+      {
+        role: "assistant",
+        content: [
+          { type: "thinking", thinking: "survey the files first" },
+          { type: "tool_use", id: "r1" },
+        ],
+      },
+    ],
+  });
+  const event = CODE_GROUP(SCRIPT_CALLS);
+  await folded($, event);
+  const group = await $.ui.mount(event);
+  await group.press({ key: "fold:open:0" });
+  expect(
+    await eventually(
+      async () => (await group.find({ key: "fold:thought:0" })) !== undefined,
+    ),
+  ).toBe(true);
+  expect((await group.find({ key: "fold:thought:0" }))?.text).toContain(
+    "survey the files first",
+  );
+  expect((await group.find({ key: "fold:title:0" }))?.text.trim()).toMatch(
+    /^▾ .*Survey$/,
+  );
+  expect(await group.find({ key: "fold:title:2" })).toBeDefined();
+  expect(await group.find({ key: "fold:title:3" })).toBeDefined();
+  expect(await group.find({ key: "engine" })).toBeUndefined();
+  await group.press({ key: "fold:open:0" });
+  expect(await group.find({ key: "fold:thought:0" })).toBeUndefined();
+  await group.unmount();
+});
+
+test("unfolding a script's own call hands the ToolGroup back, and each REPL title is drawn by the call after it or, with none after, under the engine's rows", async ($, on) => {
+  engineBeneath(on);
+  await startSession($, on, { messages: SCRIPTS });
+  const event = CODE_GROUP(SCRIPT_CALLS);
+  await folded($, event);
+  const inner = ROW("repl_1", "Bash", { command: "pwd" });
+  expect(await find($, inner, { key: "fold:title:lead0" })).toBeUndefined();
+  const group = await $.ui.mount(event);
+  await group.press({ key: "fold:open:2" });
+  expect(await group.find({ key: "engine" })).toBeDefined();
+  expect(await group.find({ key: "fold:title:0" })).toBeUndefined();
+  expect(
+    (await find($, inner, { key: "fold:title:lead0" }))?.text.trim(),
+  ).toMatch(/^· .*Survey$/);
+  expect((await group.find({ key: "fold:title:3" }))?.text.trim()).toMatch(
+    /Report$/,
+  );
+  expect(await group.find({ key: "fold:row" })).toBeDefined();
+  await group.press({ key: "fold:open:2" }).catch(() => {});
+  await group.unmount().catch(() => {});
 });
 
 test("a REPL stops spinning once a reply closes its run, though no Poll reported its eval", async ($, on) => {

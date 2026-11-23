@@ -2,7 +2,7 @@ import type { Hook, On, SessionMessage } from "claude-code";
 
 import { config } from "../config";
 import { paint, palette, pressRow } from "./bubble";
-import { cells, innerWidth, plural, wrap } from "./text";
+import { cells, innerWidth, plural, wrap, wrapWords } from "./text";
 import { shortPath } from "./where";
 
 export type Title = {
@@ -183,6 +183,36 @@ const iconOf = (tool: string) => {
 let members = new Map<string, Member>();
 let pending: Pending[] = [];
 const open = new Set<string>();
+const thoughts = new Map<string, string>();
+type ApiBlock = { type: string; [field: string]: unknown };
+export const thoughtsOf = (
+  messages: readonly { content: readonly ApiBlock[] }[],
+) => {
+  const out = new Map<string, string>();
+  let held = "";
+  for (const m of messages)
+    for (const b of m.content) {
+      if (b.type === "thinking" && typeof b.thinking === "string")
+        held = b.thinking.trim();
+      else if (b.type === "text") held = "";
+      else if (b.type === "tool_use" && typeof b.id === "string") {
+        if (held) out.set(b.id, held);
+        held = "";
+      }
+    }
+  return out;
+};
+// read on a press, never per refresh: the API form carries every image inline
+const loadThoughts = ($: Render[0]) =>
+  void $.session
+    .messages({ as: "api" })
+    .then((messages) => {
+      for (const [id, text] of thoughtsOf(messages)) thoughts.set(id, text);
+      $.ui.invalidate("ui.render");
+    })
+    .catch(() => {});
+type GroupCall = { isRunning?: boolean; output?: unknown };
+const lead = new Map<string, { id: string; call: GroupCall }[]>();
 const settled = new Set<number>();
 const SETTLED = /kind="repl-eval"[^>]*?\beval="(\d+)"/g;
 // a Poll's reply names each script that ended, the only sign a dispatched REPL is done
@@ -270,6 +300,7 @@ function titleLines(
         hover={{ color: palette().text, scope }}
         onPress={() => {
           open.has(id) ? open.delete(id) : open.add(id);
+          if (PLUMBING.includes(tool) && open.has(id)) loadThoughts($);
           $.ui.invalidate("ui.render");
         }}
       >
@@ -289,6 +320,26 @@ function titleLines(
   ];
 }
 
+function thoughtLines($: Render[0], e: Render[1], id: string, suffix: string) {
+  const text = open.has(id) ? thoughts.get(id) : undefined;
+  if (!text) return [];
+  const { Box, Text } = $.ui.resolve(e);
+  const rows = wrapWords([{ text }], innerWidth(e.viewport?.columns) - 2);
+  return [
+    <Box
+      key={`fold:thought${suffix}`}
+      flexDirection="column"
+      backgroundColor={palette().surface}
+    >
+      {rows.map((row, j) => (
+        <Text key={`fold:thought${suffix}:${j}`} color={palette().dim}>
+          {`${j === rows.length - 1 ? "╰" : "│"} ${row.map((r) => r.text).join("")}`}
+        </Text>
+      ))}
+    </Box>,
+  ];
+}
+
 function summary($: Render[0], e: Render[1], m: Member) {
   const { Box, Button } = $.ui.resolve(e);
   const isAllOpen = m.ids.every((id) => open.has(id));
@@ -301,6 +352,7 @@ function summary($: Render[0], e: Render[1], m: Member) {
         hover: { color: palette().text, scope: `fold:${m.run}` },
         onPress: () => {
           for (const id of m.ids) isAllOpen ? open.delete(id) : open.add(id);
+          if (!isAllOpen) loadThoughts($);
           $.ui.invalidate("ui.render");
         },
       })}
@@ -360,6 +412,10 @@ export const fold = (on: On) => {
       const { Box, Text } = $.ui.resolve(e);
       return (
         <Box key="fold:call" flexDirection="column">
+          {(lead.get(id) ?? []).flatMap((p, j) => {
+            const pm = members.get(p.id);
+            return pm ? titleLines($, e, p.id, pm, p.call, `:lead${j}`) : [];
+          })}
           {titleLines($, e, id, m, e.props)}
           {open.has(id) ? (
             // the rail spans the card whatever its height: absolute, so its glyphs never stretch the row, and
@@ -410,7 +466,7 @@ export const fold = (on: On) => {
   );
 
   // the engine's own fold of reads and searches sits inside a run too: folded, it draws its calls' titles itself, since
-  // their rows inside it are not drawn, and once one is unfolded the engine draws the group and each row its own line
+  // their rows inside it are not drawn, and once one is unfolded the engine expands the group into a row per call; it draws none for a REPL or Poll, so the call after one draws its title. An unfolded REPL alone is no hand-back: its thinking is drawn under its title here, where the engine would put it above
   on(
     "ui.render",
     { component: "ToolGroup", surface: "terminal" },
@@ -422,12 +478,37 @@ export const fold = (on: On) => {
       const ms = ids.map((id) => members.get(id));
       const first = ms[0];
       if (!first || ms.some((m) => m?.run !== first.run)) return next(e);
-      if (ids.some((id) => open.has(id))) return next(e);
       const { Box } = $.ui.resolve(e);
-      const lines = ids.map((id, i) =>
-        titleLines($, e, id, ms[i]!, e.props.calls[i]!, `:${i}`),
-      );
       const last = ms.at(-1)!;
+      if (
+        ids.some(
+          (id, i) => open.has(id) && !PLUMBING.includes(e.props.calls[i]!.tool),
+        )
+      ) {
+        let held: number[] = [];
+        ids.forEach((id, i) => {
+          if (PLUMBING.includes(e.props.calls[i]!.tool)) return held.push(i);
+          lead.set(
+            id,
+            held.map((h) => ({ id: ids[h]!, call: e.props.calls[h]! })),
+          );
+          held = [];
+        });
+        return (
+          <Box key="fold:group" flexDirection="column">
+            {await next({ ...e, props: { ...e.props, isExpanded: true } })}
+            {held.flatMap((i) =>
+              titleLines($, e, ids[i]!, ms[i]!, e.props.calls[i]!, `:${i}`),
+            )}
+            {held.length && last.isLast ? summary($, e, last) : null}
+          </Box>
+        );
+      }
+      for (const id of ids) lead.delete(id);
+      const lines = ids.map((id, i) => [
+        ...titleLines($, e, id, ms[i]!, e.props.calls[i]!, `:${i}`),
+        ...thoughtLines($, e, id, `:${i}`),
+      ]);
       return (
         <Box key="fold:group" flexDirection="column">
           {lines.flat()}
