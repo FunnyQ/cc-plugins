@@ -1,5 +1,12 @@
 # Changelog
 
+## [browsers 0.1.6] - 2026-11-23
+
+_tracks tag `browsers-v0.1.6`_
+
+### Fixed
+- Chrome and Firefox commands no longer fail on Windows when a just-closed browser profile is still locked; the stale-instance cleanup now skips it and retries on the next call.
+
 ## [runes 0.14.7] - 2026-11-23
 
 _tracks tag `runes-v0.14.7`_
