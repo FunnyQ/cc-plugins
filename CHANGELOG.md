@@ -1,5 +1,12 @@
 # Changelog
 
+## [runes 0.14.7] - 2026-11-23
+
+_tracks tag `runes-v0.14.7`_
+
+### Fixed
+- Pressing a folded REPL title in Code Mode no longer makes the title vanish; it stays in place and shows that script's thinking beneath it.
+
 ## [chronicle 0.25.0] - 2026-11-23
 
 _tracks tag `chronicle-v0.25.0`_
