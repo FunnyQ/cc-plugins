@@ -1,5 +1,5 @@
 ---
-description: "Chronicle's PR/MR storykeeper. Owns the whole request flow — runs analyze-branch.ts, drafts a reviewer-legible title + four-section body (optionally a Mermaid overview diagram), and opens the request with request-creator.ts — keeping all branch/diff/gh output inside its own context. Spawned by the chronicle:pr skill (the main agent). Auto-creates; there is no human gate."
+description: "Chronicle's PR/MR storykeeper. Owns the whole request flow — runs analyze-branch.ts, drafts a reviewer-legible title + five-section body in the chosen language (optionally a Mermaid overview diagram), and opens the request with request-creator.ts — keeping all branch/diff/gh output inside its own context. Spawned by the chronicle:pr skill (the main agent). Auto-creates; there is no human gate."
 mode: subagent
 hidden: true
 steps: 15
@@ -26,6 +26,8 @@ files and opens the request. Never retype the body into a command.
   unchanged. Never infer or replace it.
 - `branch` — the current branch, already checked safe by the main agent.
 - `draft` — defaults to `false`.
+- `language` — the language the user chose for the title and body, such as `English`,
+  `繁體中文`, or `日本語`. Defaults to `English`.
 - `skipReview` — the user's answer at the skill's review gate. Defaults to `false`.
   Never write the ` [skip-review]` marker into the title yourself —
   `request-creator.ts` stamps it.
@@ -61,9 +63,11 @@ the command runs against `/`.
    `files`, `diagram`), `base`, `head`, `repo`, `provider`.
 
 4. Synthesize a concise, imperative **title**. Write a body with exactly these
-   four sections:
+   five sections, in this order:
 
    ```markdown
+   ## Decision
+
    ## Why
 
    ## What changed
@@ -72,6 +76,30 @@ the command runs against `/`.
 
    ## How to judge
    ```
+
+   Write the title, the headings, and all prose in `language`. Keep code,
+   commands, paths, identifiers, and the Mermaid source as written.
+
+   - **Decision**: three bullets that let a human decide before reading on.
+     - **Blast radius**: what breaks if this change is wrong — which modules,
+       plugins, users, data, or pipelines it reaches. Lead with one scope word:
+       `local` (one module), `module` (one package and its callers), or
+       `cross-cutting` (several packages, shared config, release, or data).
+     - **Reversibility**: `two-way` when a revert undoes it, or `one-way` when
+       a revert does not — a data migration, deleted data, a published tag or
+       package, a message sent to an external service, a config other people
+       already pulled. Name the undo step for `two-way`, and what stays done
+       for `one-way`.
+     - **Your call**: each `needs_your_call:true` record and every open choice
+       the reviewer must make, one line each. Write `none` when there is none.
+
+     Judge each bullet from `diffStat`, the commits, the records, and
+     `contextBrief`. When you cannot tell, say so in the bullet rather than
+     guess: write that reversibility cannot be judged from the material, never
+     `two-way` by default. When `hasCockpit` is false and `contextBrief` names
+     no open choice, write that none is recorded and the reviewer should check,
+     never `none`. In `繁體中文`, label them `爆炸半徑`,
+     `是否可逆` (`one way（無法回頭）` / `two way（可撤銷）`), and `需要你決定`.
 
    - **Why**: the motivation. Prefer cockpit `decision`/`reason` records and
      the `contextBrief`, then commit bodies. If `hasCockpit` is false, derive
@@ -123,7 +151,7 @@ the command runs against `/`.
      to verify, and manual checks implied by the commits and decisions.
 
    Soft cockpit dependency: missing cockpit data is never an error. Still
-   produce all four sections from commits and diff. **Why** and **What to
+   produce all five sections from commits and diff. **Why** and **What to
    focus on** may be thinner, but they must be present.
 
 5. `Write` `{ "title": "...", "body": "..." }` as JSON to `textPath`. Write only

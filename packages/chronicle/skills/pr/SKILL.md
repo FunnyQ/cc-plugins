@@ -21,7 +21,7 @@ conversation, and it preserves the "why" behind the change.
 main agent  (holds the conversation = the "why")
   └─ chronicle:storykeeper   (subagent_type — a custom agent, NOT a fork)
        ├─ analyze-branch.ts   → branch material file + textPath
-       ├─ writes { title, body } to textPath (4 sections, optional overview diagram)
+       ├─ writes { title, body } to textPath (5 sections, optional overview diagram)
        └─ request-creator.ts --material --text  → opens the PR/MR, returns the URL
 ```
 
@@ -35,7 +35,7 @@ defaults to `false`, so the request opens ready for review. The main agent may
 pass `draft:true` to open it as a draft.
 
 The agent lives at `packages/chronicle/agents/storykeeper.md` and auto-registers
-as `chronicle:storykeeper`. Its full procedure — the four-section body spec, the
+as `chronicle:storykeeper`. Its full procedure — the five-section body spec, the
 optional Mermaid overview diagram, and the `CreateResult` contract — lives there.
 
 ## The main agent's job (thin)
@@ -82,23 +82,34 @@ optional Mermaid overview diagram, and the `CreateResult` contract — lives the
    this invocation only. It does not rewrite config. See
    [references/pr-config.md](references/pr-config.md) for the schema and routing rules.
 
-2. **Ask whether this PR needs review.** Use the harness's interactive question tool —
-   `AskUserQuestion` in Claude Code, `request_user_input` in Codex. Offer two options:
-   "Needs review" (recommended, the default) and "No review needed". Ask once, on every
-   run, before spawning. Never infer the answer from the diff size or the branch name.
+2. **Ask whether this PR needs review, and in which language to write it.** Use the
+   harness's interactive question tool — `AskUserQuestion` in Claude Code,
+   `request_user_input` in Codex — and ask both questions in one call. Ask once, on every
+   run, before spawning. Never infer either answer from the diff size or the branch name.
+
+   For review, offer two options: "Needs review" (recommended, the default) and "No
+   review needed".
 
    - "Needs review" → `skipReview` is `false`.
    - "No review needed" → `skipReview` is `true`. `request-creator.ts` appends
      ` [skip-review]` to the title. Do not write the marker into the title yourself,
      and never ask the Storykeeper to.
 
+   For language, offer "English", "繁體中文", and "日本語". Recommend the language the
+   user writes to you in. The answer becomes `language`; an answer typed as "Other"
+   passes through as written.
+
    If no structured question tool is available, ask in plain text and resume only after
-   the answer. If the user already stated the answer in the current request ("no review
-   needed", "skip review"), take it and skip the question.
+   the answers. If the user already stated an answer in the current request ("no review
+   needed", "skip review", "write it in Chinese"), take it and skip that question.
 
 3. **Distill the `contextBrief`** — a tight summary of _why_ this branch exists,
    drawn from this conversation (the Storykeeper can't see the chat).
    This is the only "why" it gets beyond the cockpit trail and commits.
+   List every choice this branch leaves open for the reviewer, and every one-way
+   action it takes (a data migration, deleted data, a published tag or package, a
+   message sent to an external service). Without a cockpit trail, this list is the
+   Storykeeper's only source for the Decision section.
 4. **Spawn the Storykeeper** (`subagent_type: "chronicle:storykeeper"`), passing:
    - the **skill directory** — the skill's load-time "Base directory for this
      skill" banner value (so the Storykeeper resolves `<skill dir>/scripts/analyze-branch.ts`
@@ -113,7 +124,8 @@ optional Mermaid overview diagram, and the `CreateResult` contract — lives the
      existing branch guard before spawning.
    - `draft` — optional. Default `false`. Pass `true` only if the user asked to open
      the PR as a draft.
-   - `skipReview` — the answer from step 2. Always pass it explicitly.
+   - `language` — the language answer from step 2. Always pass it explicitly.
+   - `skipReview` — the review answer from step 2. Always pass it explicitly.
 
 **On `PR NOT PUSHED`:** no remote branch of the same name contains `HEAD`. Ask the
 user whether to push. On yes, run `git push -u <remote> <branch>` visibly, then
@@ -150,12 +162,12 @@ Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_storykeeper`, passing the literal skill directory, `contextBrief`,
-   `base`, `branch`, `draft`, and `skipReview`.
+   `base`, `branch`, `draft`, `language`, and `skipReview`.
 2. **Generic sub-agent API only**: first verify the stable role files exist under
    `$CODEX_HOME/agents/chronicle/` (default `$CODEX_HOME` to `~/.codex`). Spawn
    exactly one non-fork generic agent with task name `chronicle_storykeeper` and no
    inherited turns. Tell it to read and obey the `developer_instructions` in
-   `storykeeper.toml` before it handles the same six inputs. Do not paste or
+   `storykeeper.toml` before it handles the same seven inputs. Do not paste or
    improvise the role instructions in the spawn prompt.
 
 If the registered role and stable TOMLs are both unavailable, tell the user to run

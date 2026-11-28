@@ -403,7 +403,7 @@ Chronicle authors your git history — what a commit says, what a pull request a
 
 - **adr** — triages the cockpit decision trail as an inbox: judge agents screen clustered entries, you confirm, and the decisions that mattered become Architecture Decision Records under `docs/adr/`.
 - **commit** — one agent reads the changeset, cuts it into commits that each build on their own, and writes the messages; a script decides whether the split is worth keeping and does the staging. Pass `simple` to force one commit.
-- **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title, a four-section body, and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
+- **pr** — reads the branch, harvests the cockpit decision trail when one exists, and opens a GitHub PR or GitLab MR with a title and a five-section body in the language you pick — a decision block of blast radius, reversibility and your open calls first — and an optional Mermaid overview diagram. The trail is an enrichment, not a requirement; an unrecognized remote stops the flow rather than guessing.
 - **release** — config-first: detects whole-repo vs per-component layout, remembers it in a committed `.chronicle/release.json`, then bumps the version files and writes the CHANGELOG entry, commits, tags, and pushes. Pass `local` to stop before the push, or `prepare` to stop after the entry.
 - **install** — registers the named agent roles on Codex. Claude Code and OpenCode need no setup step.
 

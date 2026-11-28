@@ -14,8 +14,8 @@ subagent_type: "storykeeper"
 ## Nothing is inherited
 
 OpenCode task-tool subagents do **not** inherit parent context. Pass every
-input explicitly on the spawn — `contextBrief`, `base`, `branch`, `draft`, and
-`skipReview` — plus the **skill directory** as a literal:
+input explicitly on the spawn — `contextBrief`, `base`, `branch`, `draft`,
+`language`, and `skipReview` — plus the **skill directory** as a literal:
 
 ```text
 skill directory = /Users/<you>/.config/opencode/skills/pr
