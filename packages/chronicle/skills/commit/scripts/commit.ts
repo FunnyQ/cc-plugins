@@ -31,6 +31,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import {
   committedPathsSince,
   parseStatus,
+  partitionOnly,
   remainingPaths,
   verifyPlanLanded,
   type ParsedStatus,
@@ -274,9 +275,24 @@ async function applyMain(planPath: string): Promise<void> {
   );
   const pending = commits.slice(landed);
   const changeset = await readChangeset();
-  const exclude = expandExclude(plan.exclude ?? [], changeset);
+  const excluded = expandExclude(plan.exclude ?? [], changeset);
+  const untouched = plan.only
+    ? partitionOnly(plan.only, changeset).untouched.filter(
+        (path) => !excluded.includes(path),
+      )
+    : [];
+  const exclude = [...excluded, ...untouched];
 
   if (pending.length > 0) {
+    const outsideOnly = [
+      ...new Set(pending.flatMap((commit) => commit.files)),
+    ].filter((path) => untouched.includes(path));
+    if (outsideOnly.length > 0) {
+      refuse("the plan commits changed paths outside `only`", {
+        outsideOnly,
+      });
+    }
+
     const coverage = validatePlan(
       { shape: decision.shape, commits: pending },
       changeset,
@@ -295,7 +311,7 @@ async function applyMain(planPath: string): Promise<void> {
     // The merge commit takes the whole index, so it would carry a staged excluded file.
     if (duringMerge && exclude.length > 0) {
       refuse(
-        "a merge or cherry-pick is in progress — git commits the whole index, so nothing can be excluded",
+        `a merge or cherry-pick is in progress — git commits the whole index, so nothing can be left out by ${untouched.length > 0 ? "`only`" : "exclude"}`,
       );
     }
 
@@ -326,9 +342,17 @@ async function applyMain(planPath: string): Promise<void> {
     ok: verification.ok && trailerMissing.length === 0,
     ...decision,
     base,
+    ...(excluded.length > 0 && { excluded }),
+    ...(untouched.length > 0 && { untouched }),
     ...(exclude.length > 0 && {
-      excluded: exclude,
-      warning: `left uncommitted on request: ${exclude.join(", ")} — if the committed code depends on them, HEAD does not build`,
+      warning: `left uncommitted on request: ${[
+        ...excluded,
+        ...(untouched.length > 0
+          ? [`${untouched.length} path(s) outside \`only\``]
+          : []),
+      ].join(
+        ", ",
+      )} — if the committed code depends on them, HEAD does not build`,
     }),
     executed: pending.map(subjectOf),
     skipped: commits.slice(0, landed).map(subjectOf),

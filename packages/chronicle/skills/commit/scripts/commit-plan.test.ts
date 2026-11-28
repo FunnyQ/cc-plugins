@@ -448,6 +448,16 @@ describe("validatePlanFile", () => {
       1,
     );
   });
+
+  test("accepts an only list of repo-relative paths", () => {
+    expect(validatePlanFile({ ...draft, only: ["a.ts", "lib/"] })).toEqual([]);
+  });
+
+  test("rejects an only that is empty or not a list of repo-relative paths", () => {
+    expect(validatePlanFile({ ...draft, only: "a.ts" })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, only: [] })).toHaveLength(1);
+    expect(validatePlanFile({ ...draft, only: ["/tmp/a.ts"] })).toHaveLength(1);
+  });
 });
 
 describe("resolveShapedCommits", () => {

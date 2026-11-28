@@ -40,6 +40,7 @@ type PlanShape = {
   moduleSpread?: string[];
   totalFiles?: number;
   exclude?: string[];
+  only?: string[];
 };
 
 async function writePlan(plan: PlanShape): Promise<string> {
@@ -823,6 +824,122 @@ describe("apply", () => {
     expect(exitCode).toBe(2);
     expect(json.error).toContain("exclude");
     expect(await subjects()).not.toContain("🐛 fix: resolve conflict");
+  });
+});
+
+describe("apply with only", () => {
+  test("commits only the listed paths and reports every other changed path", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed("lib/b.ts", "b\n");
+    await seed("docs/unrelated/one.md", "one\n");
+    await seed("README.md", "# repo, edited elsewhere\n");
+    const planPath = await writePlan({
+      commits: [
+        {
+          type: "feat",
+          subject: "add a and b",
+          files: ["a.ts", "lib/b.ts"],
+        },
+      ],
+      only: ["a.ts", "lib/"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.ok).toBe(true);
+    expect(json.untouched).toEqual(["README.md", "docs/unrelated/one.md"]);
+    expect(json.excluded).toBeUndefined();
+    expect(json.warning).toContain("2 path(s) outside `only`");
+    expect(json.verify.leftover).toEqual([]);
+    const shown = await $`git show --name-only --format= HEAD`
+      .cwd(repo)
+      .quiet();
+    expect(shown.stdout.toString().trim().split("\n").sort()).toEqual([
+      "a.ts",
+      "lib/b.ts",
+    ]);
+    const status = await $`git status --porcelain -uall`.cwd(repo).quiet();
+    expect(status.stdout.toString()).toContain("docs/unrelated/one.md");
+  });
+
+  test("refuses a planned path outside only, before staging anything", async () => {
+    await baseCommit();
+    await seed("a.ts", "a\n");
+    await seed("b.ts", "b\n");
+    const planPath = await writePlan({
+      commits: [{ type: "feat", subject: "add", files: ["a.ts", "b.ts"] }],
+      only: ["a.ts"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(2);
+    expect(json.error).toContain("only");
+    expect(json.outsideOnly).toEqual(["b.ts"]);
+    expect(await subjects()).toEqual(["🔧 chore: init"]);
+  });
+
+  test("keeps both halves of a rename when only names one of them", async () => {
+    await seed("old.ts", "x\n");
+    await baseCommit();
+    await $`git mv old.ts new.ts`.cwd(repo).quiet();
+    await seed("other.ts", "o\n");
+    const planPath = await writePlan({
+      commits: [
+        { type: "refactor", subject: "rename", files: ["old.ts", "new.ts"] },
+      ],
+      only: ["new.ts"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.untouched).toEqual(["other.ts"]);
+    const shown = await $`git show --name-only --no-renames --format= HEAD`
+      .cwd(repo)
+      .quiet();
+    expect(shown.stdout.toString().trim().split("\n").sort()).toEqual([
+      "new.ts",
+      "old.ts",
+    ]);
+  });
+
+  test("leaves an excluded path inside only uncommitted", async () => {
+    await baseCommit();
+    await seed("lib/a.ts", "a\n");
+    await seed("lib/scratch.ts", "s\n");
+    const planPath = await writePlan({
+      commits: [{ type: "feat", subject: "add a", files: ["lib/a.ts"] }],
+      only: ["lib/"],
+      exclude: ["lib/scratch.ts"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(0);
+    expect(json.excluded).toEqual(["lib/scratch.ts"]);
+    expect(json.untouched).toBeUndefined();
+  });
+
+  test("refuses only while a merge is in progress when it leaves a path out", async () => {
+    await baseCommit();
+    await $`git checkout -q -b side`.cwd(repo).quiet();
+    await seed("c.ts", "side\n");
+    await $`git add -A`.cwd(repo).quiet();
+    await $`git commit -q -m ${"✨ feat: side"}`.cwd(repo).quiet();
+    await $`git checkout -q main`.cwd(repo).quiet();
+    await seed("c.ts", "main\n");
+    await $`git add -A`.cwd(repo).quiet();
+    await $`git commit -q -m ${"✨ feat: main"}`.cwd(repo).quiet();
+    await $`git merge side`.cwd(repo).quiet().nothrow();
+
+    await seed("d.ts", "d\n");
+    const planPath = await writePlan({
+      commits: [{ type: "fix", subject: "resolve conflict", files: ["c.ts"] }],
+      only: ["c.ts"],
+    });
+
+    const { exitCode, json } = await run("apply", planPath);
+    expect(exitCode).toBe(2);
+    expect(json.error).toContain("only");
   });
 });
 

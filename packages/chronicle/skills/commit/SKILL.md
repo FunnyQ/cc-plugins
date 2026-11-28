@@ -7,7 +7,7 @@ when_to_use: >-
   When you want to commit the current changes now. The `simple` argument
   forces one commit instead of the auto-decided atomic split. Human-invoked
   only — do NOT auto-fire from an incidental mention of committing.
-argument-hint: "[simple] [exclude <path>...]"
+argument-hint: "[simple] [only <path>...] [exclude <path>...]"
 ---
 
 # Chronicle Commit
@@ -47,6 +47,11 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
    **Collect `exclude`**: the repo-root-relative paths that follow the `exclude` argument, or
    the ones the user explicitly asks to leave out ("don't commit X", "X 先不要 commit").
    Never exclude a path on your own judgement. Omit `exclude` when there are none.
+   **Collect `only`**: the repo-root-relative paths that follow the `only` argument, or
+   the ones the user explicitly limits the commit to ("only commit X", "just commit what you
+   changed"). When the user asks for this conversation's work, list the paths this
+   conversation edited. Never limit the commit on your own judgement. Omit `only` when the
+   user set no limit.
    **Collect `upgrade`**: when the user or the change asks for an upgrade note, write
    each action a downstream or generated project must take on upgrade as one line,
    such as `Run midgard pull, then bin/setup`. Omit `upgrade` when there is none.
@@ -68,6 +73,7 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
      branch guard before spawning; do not re-implement branch protection.
    - `mode` (from step 1).
    - `exclude` (from step 1), only when it holds paths.
+   - `only` (from step 1), only when it holds paths.
    - `upgrade` (from step 1), only when it holds actions.
 4. **Verify against git, not against the report.** The Lawspeaker returns `base`.
    Run `git log --oneline {base}..HEAD` and report that.
@@ -75,9 +81,11 @@ The role lives at `packages/chronicle/agents/lawspeaker.md` and auto-registers a
      reason. Do not respawn.
    - If you passed `upgrade`, check the trailer with
      `git log --format='%h %(trailers:key=Upgrade,valueonly)' {base}..HEAD`.
-   - If you passed `exclude`, relay the Lawspeaker's `warning` line to the user. An excluded
-     file the committed code needs leaves a HEAD that does not build, and only the user can
-     judge that.
+   - If you passed `exclude` or `only`, relay the Lawspeaker's `warning` line to the user.
+     An excluded file the committed code needs leaves a HEAD that does not build, and only the
+     user can judge that.
+   - If you passed `only`, list the Lawspeaker's `untouched` paths to the user, so no
+     changed path drops out of sight.
    - Relay every `[TypeSafe grouping …]` line to the user: how long the call took,
      or why it did not run — no key, a key that is failing, `simple` mode, or a
      changeset under 2 or over 20 files. Nothing else surfaces either.
@@ -95,7 +103,7 @@ Codex uses the same topology through one of two role-loading paths:
 
 1. **Named-role selector available**: spawn exactly one registered
    `chronicle_lawspeaker` and pass the literal skill directory, `contextBrief`,
-   `branch`, `mode`, and any `exclude` and `upgrade`.
+   `branch`, `mode`, and any `exclude`, `only` and `upgrade`.
 2. **Generic sub-agent API only**: first verify the stable role file exists at
    `$CODEX_HOME/agents/chronicle/lawspeaker.toml` (default `$CODEX_HOME` to
    `~/.codex`). Spawn exactly one non-fork generic agent with task name
@@ -127,9 +135,10 @@ base-directory banner.
   no hunk splitting.
 - **Merge or cherry-pick in progress**: git demands the whole index, so only one
   commit is possible. `apply` refuses an atomic plan there rather than letting the
-  first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there.
+  first commit swallow the rest. For the same reason, `apply` refuses any `exclude` there, and any `only` that leaves a changed path out.
 - **Leaving files out**: `exclude` is whole-file and opt-in. A path ending in `/` excludes every changed path under that directory, read when `apply` runs, so files added there after the plan is written stay out too. A changed path that is neither
   planned nor excluded still fails the coverage check. Hunk-level exclusion does not exist.
+- **Committing a subset**: `only` is whole-file and opt-in, the inverse of `exclude`. A path ending in `/` covers every changed path under that directory, and a rename counts as inside when either half is. `analyze-changes.ts --only` digests only those paths and lists the rest. `apply` skips the coverage check for every changed path outside `only`, refuses a plan that commits one, and returns them as `untouched`. An `exclude` inside `only` still leaves its paths out.
 - **Trailers**: `commit.ts` writes the 繁中 summary as a `zh-summary:` trailer and
   each upgrade action as an `Upgrade: <action>` trailer, and `apply` fails with
   `verify.trailerMissing` when git does not read one back as written.

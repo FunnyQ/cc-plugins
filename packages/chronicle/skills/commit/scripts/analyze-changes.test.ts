@@ -10,6 +10,7 @@ import {
   isBinaryFile,
   mustPairs,
   parseNumstat,
+  partitionOnly,
   parseStatus,
   parseStatusRecords,
   renderDigest,
@@ -503,6 +504,75 @@ describe("verifyPlanLanded", () => {
     const result = verifyPlanLanded(["a.ts"], ["a.ts", "b.ts"], []);
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe("partitionOnly", () => {
+  const entries = [
+    { path: "a.ts", staged: false, status: "modified" },
+    { path: "lib/b.ts", staged: false, status: "added" },
+    { path: "libby.ts", staged: false, status: "added" },
+    { path: "new.ts", oldPath: "old.ts", staged: true, status: "renamed" },
+    { path: "docs/x.md", staged: false, status: "added" },
+  ] as const;
+
+  test("keeps exact paths and paths under a trailing-slash entry", () => {
+    const { kept, untouched } = partitionOnly(["a.ts", "lib/"], [...entries]);
+    expect(kept.map((entry) => entry.path)).toEqual(["a.ts", "lib/b.ts"]);
+    expect(untouched).toEqual(["docs/x.md", "libby.ts", "new.ts", "old.ts"]);
+  });
+
+  test("keeps both halves of a rename when either half matches", () => {
+    expect(
+      partitionOnly(["old.ts"], [...entries]).kept.map((entry) => entry.path),
+    ).toEqual(["new.ts"]);
+    expect(partitionOnly(["new.ts"], [...entries]).untouched).not.toContain(
+      "old.ts",
+    );
+  });
+});
+
+describe("analyze-changes --only", () => {
+  const script = join(import.meta.dir, "analyze-changes.ts");
+
+  async function repoWith(files: Record<string, string>): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), "chronicle-only-"));
+    await $`git init -q -b main`.cwd(dir).quiet();
+    for (const [name, body] of Object.entries(files)) {
+      await $`mkdir -p ${join(dir, name, "..")}`.quiet();
+      await writeFile(join(dir, name), body);
+    }
+    return dir;
+  }
+
+  test("digests only the listed paths and names the rest", async () => {
+    const dir = await repoWith({
+      "a.ts": "a\n",
+      "docs/unrelated/one.md": "one\n",
+    });
+    const out = await $`bun ${script} --only a.ts --simple`
+      .cwd(dir)
+      .env({ ...process.env, TYPESAFE_API_KEY: "" })
+      .quiet()
+      .text();
+    expect(out).toContain("# Changeset — 1 files");
+    expect(out).toContain("### a.ts");
+    expect(out).not.toContain("### docs/unrelated/one.md");
+    expect(out).toContain("docs/unrelated/one.md");
+    expect(out).toContain("outside `only`");
+  });
+
+  test("says nothing to commit when no changed path is inside only", async () => {
+    const dir = await repoWith({ "a.ts": "a\n" });
+    const out = await $`bun ${script} --only b.ts`
+      .cwd(dir)
+      .env({ ...process.env, TYPESAFE_API_KEY: "" })
+      .quiet()
+      .text();
+    expect(out.split("\n")[0]).toBe(
+      "# Changeset — nothing to commit inside `only`",
+    );
+    expect(out).toContain("a.ts");
   });
 });
 

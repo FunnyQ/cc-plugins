@@ -186,6 +186,7 @@ export type PlanDraft = {
   notes?: string[];
   /** Changed paths the caller asked to leave uncommitted. Never the agent's own call. */
   exclude?: string[];
+  only?: string[];
 };
 
 export function resolveShapedCommits(
@@ -254,16 +255,19 @@ export function validatePlanFile(raw: unknown): string[] {
     }
   }
 
-  if (draft.exclude !== undefined) {
+  for (const key of ["exclude", "only"]) {
+    const list = draft[key];
+    if (list === undefined) continue;
     if (
-      !Array.isArray(draft.exclude) ||
-      draft.exclude.some((path) => !isFilledString(path))
+      !Array.isArray(list) ||
+      (key === "only" && list.length === 0) ||
+      list.some((path) => !isFilledString(path))
     ) {
-      errors.push("`exclude` must be an array of repo-relative paths");
+      errors.push(`\`${key}\` must be an array of repo-relative paths`);
     } else {
-      for (const path of draft.exclude as string[]) {
+      for (const path of list as string[]) {
         if (path.startsWith("/")) {
-          errors.push(`\`exclude\` holds an absolute path: ${path}`);
+          errors.push(`\`${key}\` holds an absolute path: ${path}`);
         }
       }
     }

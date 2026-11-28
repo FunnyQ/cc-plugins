@@ -26,6 +26,7 @@ plan you write, so the diff must not leave this subtree — never quote it back.
 - `branch` — the current branch (already checked safe by the main agent).
 - `mode` — `"auto"` by default when absent, or `"simple"` to force one commit.
 - `exclude` — optional. Repo-root-relative paths the caller wants left uncommitted; an entry ending in `/` covers every path under that directory.
+- `only` — optional. Repo-root-relative paths the caller wants committed, and nothing else; an entry ending in `/` covers every path under that directory.
 - `upgrade` — optional. One-line actions a downstream or generated project must take on upgrade.
 
 `{NAME}` marks a **substitution site**: put the literal value there before you run
@@ -43,13 +44,18 @@ what the diff already shows is the failure this rule exists to prevent.
 bun "{SKILL_DIR}/scripts/analyze-changes.ts"
 ```
 
-When `mode` is `simple`, append `--simple` to that command.
+When `mode` is `simple`, append `--simple` to that command. When you were given
+`only`, append `--only` followed by each of its paths, quoted, as the last arguments.
+The digest then holds only those paths and lists every other changed path under
+`` ## Changed paths outside `only` ``.
 
 Run it directly; do not test for the file first. A wrong path makes bun print
 `error: Module not found "<path>"` and exit 1 before anything runs, and that
 printed path is how you see an unsubstituted `{SKILL_DIR}`. Report it and stop.
 
 `# Changeset — nothing to commit` → report `nothing to commit` and stop.
+`` # Changeset — nothing to commit inside `only` `` → report `nothing to commit inside
+only` with the paths it lists, and stop.
 
 The digest carries the file table, the recent commits, the commit message
 template, and the diffs. It is complete unless it ends by naming diffs it held
@@ -92,6 +98,9 @@ caller's list into the plan as `exclude`, unchanged. **Never add a path to
 `exclude` yourself.** A `missing` complaint from `apply` means your plan dropped a
 file; fix the plan, never the exclusion list.
 
+With `only`, plan only the paths in the digest's file table, never one listed outside
+`only`. Copy the caller's list into the plan as `only`, unchanged.
+
 Groups are **whole-file**. Every other path appears in exactly one group; a file with
 mixed concerns goes entirely into one. Deduplicate a path listed both staged and
 unstaged. `added` + `unstaged` covers both an untracked file and a `git add -N`
@@ -130,6 +139,7 @@ type PlanFile = {
   elidedFiles?: number;
   notes?: string[]; // why the groups are in this order
   exclude?: string[]; // the caller's list, verbatim; omit when none
+  only?: string[]; // the caller's list, verbatim; omit when none
   commits: {
     type: string; // feat / fix / docs / refactor / chore / remove / …
     subject: string; // imperative, ≤ ~50 chars, no trailing period
@@ -185,13 +195,17 @@ only hide the first one's outcome. Never fall back to hand-rolled git: never
 - **`ok: true`** → relay the `log` verbatim, prefixed with `simple commit (forced)`,
   `simple commit`, or `atomic split — N commits`. Append the `verify` counts as one
   line of evidence, and `base` on its own line so the main agent can check HEAD.
-  When the result carries `warning`, relay it verbatim on its own line. Relay every
+  When the result carries `warning`, relay it verbatim on its own line. When it
+  carries `untouched`, relay those paths on one line, prefixed `untouched:`. Relay every
   `[TypeSafe grouping …]` line the digest held verbatim too — its time or why it
   was skipped.
 - **`ok: false` with `errors`** — the plan file is malformed. Every complaint names
   its field. Fix them all in one rewrite and run `apply` again.
+- **`ok: false` with `outsideOnly`** — the plan commits a changed path outside
+  `only` and nothing was staged. Drop those paths from the plan and re-run.
 - **`ok: false` with `missing` / `duplicated` / `unknown` / `splitRenames`** — the
   plan did not cover the changeset and nothing was staged. Fix the plan and re-run.
+  When you were given `only` and `missing` names paths outside it, your plan dropped `only`: add the caller's `only` list, never those paths.
 - **`ok: false` with `executed: N`** — the first N commits stand. The plan is still
   valid and a second run resumes at N+1. Re-run `apply`.
 - **`ok: false` with `verify.missing` / `verify.leftover`** — commits were written

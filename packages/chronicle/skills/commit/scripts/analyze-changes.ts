@@ -425,8 +425,9 @@ function summarizeFile(file: AnalyzedFile): FileSummary {
   };
 }
 
-async function analyzeChanges(): Promise<AnalysisResult> {
-  const entries = parseStatus(await gitText`git status --porcelain -uall -z`);
+async function analyzeChanges(
+  entries: ParsedStatus[],
+): Promise<AnalysisResult> {
   const [analyzed, logOutput] = await Promise.all([
     Promise.all(entries.map(analyzeFile)),
     gitText`git log --oneline -10`.catch(() => ""),
@@ -575,6 +576,26 @@ export function renderRules(paths: string[]): string {
   return ["", "## Rules the plan must follow", ...lines, ""].join("\n");
 }
 
+function underOnly(path: string, only: string[]): boolean {
+  return only.some((entry) =>
+    entry.endsWith("/") ? path.startsWith(entry) : path === entry,
+  );
+}
+
+export function partitionOnly(
+  only: string[],
+  changed: ParsedStatus[],
+): { kept: ParsedStatus[]; untouched: string[] } {
+  const kept: ParsedStatus[] = [];
+  const untouched: string[] = [];
+  for (const entry of changed) {
+    const halves = entry.oldPath ? [entry.path, entry.oldPath] : [entry.path];
+    if (halves.some((path) => underOnly(path, only))) kept.push(entry);
+    else untouched.push(...halves);
+  }
+  return { kept, untouched: [...new Set(untouched)].sort() };
+}
+
 export type PlanVerification = {
   ok: boolean;
   missing: string[];
@@ -668,13 +689,35 @@ async function main() {
   if (repoRoot) process.chdir(repoRoot);
   if (process.argv[2] === "verify") return await verifyMain(process.argv);
 
+  const onlyAt = process.argv.indexOf("--only");
+  const afterOnly = process.argv.slice(onlyAt + 1);
+  const flagAt = afterOnly.findIndex((arg) => arg.startsWith("--"));
+  const only =
+    onlyAt === -1
+      ? undefined
+      : flagAt === -1
+        ? afterOnly
+        : afterOnly.slice(0, flagAt);
+  const changed = parseStatus(await gitText`git status --porcelain -uall -z`);
+  const { kept, untouched } = only
+    ? partitionOnly(only, changed)
+    : { kept: changed, untouched: [] };
+  const outsideOnly =
+    untouched.length > 0
+      ? `\n## Changed paths outside \`only\` — leave them out of every group\n${untouched.join("\n")}\n`
+      : "";
+
   const [analysis, promptPath] = await Promise.all([
-    analyzeChanges(),
+    analyzeChanges(kept),
     resolvePromptPath(),
   ]);
 
   if (analysis.files.length === 0) {
-    console.log("# Changeset — nothing to commit");
+    console.log(
+      only && changed.length > 0
+        ? `# Changeset — nothing to commit inside \`only\`\n${outsideOnly}`
+        : "# Changeset — nothing to commit",
+    );
     return;
   }
 
@@ -693,6 +736,7 @@ async function main() {
 
   console.log(
     renderDigest(analysis, template, outputPath) +
+      outsideOnly +
       renderRules(analysis.files.map((file) => file.path)) +
       renderSuggestion(suggestion),
   );
