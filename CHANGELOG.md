@@ -1,5 +1,14 @@
 # Changelog
 
+## [chronicle 0.26.0] - 2026-11-28
+
+_tracks tag `chronicle-v0.26.0`_
+
+### Added
+- PR bodies now open with a Decision section covering blast radius, reversibility and "your call", so a reviewer can decide before reading further.
+- The pr skill asks for the PR language in the same question as the review on every run, and without a cockpit trail the Storykeeper now says it cannot tell instead of defaulting to two-way or "none".
+- commit accepts an `only` input, the inverse of `exclude`, so an unrelated untracked directory no longer blocks a whole commit; skipped paths are reported as `untouched`.
+
 ## [browsers 0.1.6] - 2026-11-23
 
 _tracks tag `browsers-v0.1.6`_
